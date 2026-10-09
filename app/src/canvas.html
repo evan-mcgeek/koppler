@@ -1234,6 +1234,7 @@ const world = document.getElementById('world');
 const MIN_WORLD = { w: 3000, h: 2000 }, WORLD = { ...MIN_WORLD }, NODE_W = 260, NODE_H = 160, PAD = 24, OVERSCROLL = 50, FIT_PAD = 50;
 const ZOOM = { min: 0.25, max: 2, step: 1.2 };
 const SIDES = { top: [0, -1], right: [1, 0], bottom: [0, 1], left: [-1, 0] };
+const OPPOSITE = { top: 'bottom', bottom: 'top', left: 'right', right: 'left' };
 // What each kind of app offers on its card (kinds.js): where it runs, and a platform for mobile apps.
 const kindOf = id => KopplerKinds.of(registry.apps[id]);
 const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), Math.max(lo, hi));
@@ -1742,10 +1743,18 @@ function arrange(ids, edges, sizeOf, dir = 'down', mirror = false) {
   return pos;
 }
 const layoutBox = (pos, sizeOf) => { const ids = Object.keys(pos); return { w: Math.max(...ids.map(id => pos[id].x + sizeOf(id).w)) - Math.min(...ids.map(id => pos[id].x)), h: Math.max(...ids.map(id => pos[id].y + sizeOf(id).h)) - Math.min(...ids.map(id => pos[id].y)) }; };
-// Callee further along the layout direction: the cable leaves from that side; otherwise it runs whichever way the cards face.
-const sidesFor = (pos, e, dir = 'down') => dir === 'right' && pos[e.to].x > pos[e.from].x ? { fromSide: 'right', toSide: 'left' }
-  : pos[e.to].y > pos[e.from].y ? { fromSide: 'bottom', toSide: 'top' }
-  : pos[e.to].x >= pos[e.from].x ? { fromSide: 'right', toSide: 'left' } : { fromSide: 'left', toSide: 'right' };
+// The sides of two cards that face each other, from their boxes (not their corners): a card clearly above or below
+// the other, with more room between them that way, gets a vertical cable; otherwise it runs sideways, towards the
+// other card. A side kept for a card's tunnels and queues is used only when no other side faces.
+const sidesFor = (pos, e, dir = 'down', sizeOf = size, keep = {}) => {
+  const box = id => { const s = sizeOf(id); return { x: pos[id].x, y: pos[id].y, w: s.w, h: s.h, cx: pos[id].x + s.w / 2, cy: pos[id].y + s.h / 2 }; };
+  const a = box(e.from), b = box(e.to);
+  const gapX = Math.max(b.x - (a.x + a.w), a.x - (b.x + b.w)), gapY = Math.max(b.y - (a.y + a.h), a.y - (b.y + b.h));
+  const vertical = b.cy > a.cy ? { fromSide: 'bottom', toSide: 'top' } : { fromSide: 'top', toSide: 'bottom' };
+  const sideways = b.cx >= a.cx ? { fromSide: 'right', toSide: 'left' } : { fromSide: 'left', toSide: 'right' };
+  const pick = gapY > gapX || (gapY === gapX && dir === 'down') ? [vertical, sideways] : [sideways, vertical];
+  return pick.find(s => keep[e.from] !== s.fromSide && keep[e.to] !== s.toSide) ?? pick[0];
+};
 
 // Lays the board out. Several versions are possible (down or across, and each mirrored); they are ranked by how large the
 // whole board shows, and `version` picks one (0 = the best). Cards are measured at full size whatever the zoom, so the
@@ -1785,7 +1794,9 @@ function placeAll(ids, edges, layoutEdges = edges, version = 0) {
   const { dir, pos } = ranked[version % ranked.length];
   state.tidy = dir;
   for (const id of ids) Object.assign(state.nodes[id], pos[id]);
-  state.edges = edges.map(e => ({ from: e.from, to: e.to, ...sidesFor(pos, e, dir) }));
+  // Each cable on the sides its cards face each other with, keeping free the side where a card's tunnels and queues go.
+  const kept = Object.fromEntries(ids.filter(id => tunnelsLedBy(id).length).map(id => [id, dir === 'down' && layoutEdges.some(e => e.from === id && ids.includes(e.to)) ? 'right' : 'bottom']));
+  state.edges = edges.map(e => ({ from: e.from, to: e.to, ...sidesFor(pos, e, dir, id => largest[id], kept) }));
   for (const id of ids) placeTunnelsBeside(id);
   // Queue and outside cards go back between the cards they link, now that those have moved.
   for (const c of flowCards()) { delete state.infra[c.key]; cardEl(c.key)?.remove(); }
@@ -3346,9 +3357,20 @@ function drawWires() {
     const atRight = under.length && under.every(t => Math.abs(t.pos.x + t.el.offsetWidth - state.nodes[id].x - room) < 2);
     const covered = under.length ? Math.max(...under.map(t => t.el.offsetWidth + 12)) : 0;
     const free = covered && room - covered >= 56 ? room - covered : 0, shift = !free ? 0 : atRight ? free / 2 - room / 2 : covered + free / 2 - room / 2;
-    const step = list.length > 1 ? Math.min(26, ((free || room) - (free ? 20 : 48)) / (list.length - 1)) : 0;
-    list.forEach((x, j) => { offset[x.key] = shift + (j - (list.length - 1) / 2) * step; });
-    if (list.length === 1 && !shift) world.querySelector(`.node[data-id="${id}"] .port[data-side="${side}"]`)?.classList.add('on');
+    const spread = (len, n) => n > 1 ? Math.min(26, (len - 48) / (n - 1)) : 0;
+    let step = list.length > 1 ? Math.min(26, ((free || room) - (free ? 20 : 48)) / (list.length - 1)) : 0, centre = shift;
+    // Cables that all go to one card, onto the side facing this one, spread around the middle of the stretch both cards
+    // share, with the same spacing on both, so they run straight across instead of slanting into each other.
+    const other = list.every(x => x.other === list[0].other) && state.nodes[list[0].other] ? list[0].other : null;
+    const facing = other && list.every(x => { const e = state.edges[x.i]; return (x.key.endsWith('|from') ? e.toSide : e.fromSide) === OPPOSITE[side]; });
+    if (facing && !shift) {
+      const start = n => state.nodes[n][along], length = n => along === 'x' ? size(n).w : size(n).h;
+      const lo = Math.max(start(id), start(other)), hi = Math.min(start(id) + room, start(other) + length(other));
+      const both = Math.min(step, spread(length(other), list.length));
+      if (hi - lo >= both * (list.length - 1) + 32) { step = both; centre = (lo + hi) / 2 - (start(id) + room / 2); }
+    }
+    list.forEach((x, j) => { offset[x.key] = centre + (j - (list.length - 1) / 2) * step; });
+    if (list.length === 1 && !centre) world.querySelector(`.node[data-id="${id}"] .port[data-side="${side}"]`)?.classList.add('on');
   }
   const endPoint = (id, side, key) => { const p = portPoint(id, side), d = offset[key] ?? 0; return SIDES[side][0] === 0 ? { ...p, x: p.x + d } : { ...p, y: p.y + d }; };
   state.edges.forEach((edge, i) => {
