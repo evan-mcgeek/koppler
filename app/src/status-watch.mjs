@@ -607,7 +607,7 @@ function tunnelPorts() {
     const sandbox = { window: {} };
     vm.runInNewContext(fs.readFileSync(path.join(TEMP, 'registry.js'), 'utf8'), sandbox);
     const apps = Object.values(sandbox.window.REGISTRY.apps);
-    const declared = apps.flatMap(a => [...(a.prereqs ?? []), ...Object.values(a.envs ?? {}).flatMap(e => e.prereqs ?? [])]).filter(p => p.tunnel && p.port).map(p => p.port);
+    const declared = apps.flatMap(a => [...(a.prereqs ?? []), ...Object.values(a.envs ?? {}).flatMap(e => e.prereqs ?? [])]).filter(p => p.tunnel && Number.isInteger(p.port) && p.port > 0 && p.port < 65536).map(p => p.port);
     // Tunnels koppler moved to another port are checked there too.
     let running = [];
     try { running = fs.readdirSync(path.join(STATE_DIR, 'procs')).map(f => { try { return JSON.parse(fs.readFileSync(path.join(STATE_DIR, 'procs', f), 'utf8')).port; } catch { return null; } }).filter(Boolean); } catch {}

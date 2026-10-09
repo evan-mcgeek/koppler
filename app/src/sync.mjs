@@ -170,6 +170,9 @@ export function validateStack(stack) {
     for (const [n, c] of (Array.isArray(app?.localChanges) ? app.localChanges : app?.localChanges === undefined ? [] : [null]).entries())
       if (!c || typeof c.file !== 'string' || !c.file || typeof c.find !== 'string' || !c.find || typeof c.replace !== 'string' || path.isAbsolute(c.file) || c.file.split(/[\\/]/).includes('..'))
         errors.push(`apps.${id}.localChanges[${n}]: needs file (a path inside the app's clone, no .. or leading /), find and replace`);
+    // A tunnel's port is a number: it reaches the page, shell commands and the port probe.
+    for (const [where, list] of [['prereqs', app?.prereqs], ...Object.entries(app?.envs ?? {}).map(([env, e]) => [`envs.${env}.prereqs`, e?.prereqs])])
+      for (const [n, p] of (Array.isArray(list) ? list : []).entries()) if (p?.port !== undefined && !(Number.isInteger(p.port) && p.port > 0 && p.port < 65536)) errors.push(`apps.${id}.${where}[${n}].port: a port number from 1 to 65535`);
     for (const [where, list] of [['secrets', app?.secrets], ...Object.entries(app?.envs ?? {}).map(([env, e]) => [`envs.${env}.secrets`, e?.secrets])])
       for (const s of list ?? []) if (s?.type !== undefined && !SECRET_TYPES.includes(s.type)) errors.push(`apps.${id}.${where}: type "${s.type}" is not one Koppler tests (${SECRET_TYPES.join(', ')})`);
   }
