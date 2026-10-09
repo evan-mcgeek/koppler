@@ -24,6 +24,7 @@ import kinds from './kinds.js';
 import { needs as needsFor } from './needs.mjs';
 import { missingTunnels } from './checks.mjs';
 import { APP, BIN, LOGS, STATE, TEMP } from './paths.mjs';
+import { readActions, updateActions } from './actions.mjs';
 
 // A first-time setup ends with the full picture: ports, conflicts and calls of every app.
 // With --pick, or on a stack that has no apps yet, init ends on the canvas, where the user ticks the clones that belong to the stack.
@@ -433,7 +434,7 @@ async function up(args) {
   const left = [], skip = new Set(), logFile = path.join(TEMP, 'actions.json');
   if (board) {
     // What the plan stops or restarts goes first; its own code changes stay for the agent to revert.
-    const actions = (() => { try { return JSON.parse(fs.readFileSync(logFile, 'utf8')); } catch { return []; } })();
+    let actions; try { actions = readActions(logFile); } catch (e) { fail(e.message); }
     for (const { id } of [...(board.plan?.stops ?? []), ...(board.plan?.restarts ?? [])]) {
       const rec = readRecord(id); if (rec && alive(rec)) console.log(await stopOne(rec));
       if ((board.plan?.stops ?? []).some(x => x.id === id) && actions.some(a => a.app === id && a.kind !== 'process')) left.push(`revert ${registry.apps[id]?.name ?? id}'s changes (it left the board)`);
@@ -529,7 +530,7 @@ async function down(args) {
   const logFile = path.join(TEMP, 'actions.json');
   for (const rec of records().filter(r => r.name !== 'canvas')) console.log(await stopOne(rec));
   fs.rmSync(path.join(TEMP, 'progress.json'), { force: true });
-  let log; try { log = JSON.parse(fs.readFileSync(logFile, 'utf8')); } catch { log = []; }
+  let log; try { log = readActions(logFile); } catch (e) { fail(e.message); }
   const left = [], keep = [], bom = t => t.startsWith('﻿') ? '﻿' : '';
   const name = a => load('registry.js', 'REGISTRY')?.apps?.[a.app]?.name ?? a.app ?? a.repo ?? '';
   for (const a of [...log].reverse()) {
@@ -560,7 +561,9 @@ async function down(args) {
     keep.push(a);
   }
   // Branches go back last, once the edits on them are undone; switchBack takes each one off the log as it succeeds.
-  fs.writeFileSync(logFile, JSON.stringify(keep.reverse(), null, 2) + '\n', { mode: 0o600 });
+  // What could not be undone stays; entries added meanwhile (another command, the agent) are kept too.
+  const handled = new Set(log.map(a => JSON.stringify(a))), kept = keep.reverse();
+  updateActions(logFile, list => { const added = list.filter(a => !handled.has(JSON.stringify(a))); list.splice(0, list.length, ...kept, ...added); });
   const { switchBack } = await import('./branch.mjs');
   for (const a of keep.filter(a => a.kind === 'checkout').reverse()) {
     const r = switchBack({ app: a.app, logFile });
@@ -898,5 +901,10 @@ if (process.argv[1] && fs.realpathSync(process.argv[1]) === fileURLToPath(import
     process.exit(2);
   }
   if (own.includes('--help') || own.includes('-h')) { help(byName[cmd]); process.exit(0); }
-  await byName[cmd].run(args);
+  // A failure says what went wrong in one line; KOPPLER_DEBUG=1 adds where, for a bug report.
+  try { await byName[cmd].run(args); } catch (e) {
+    console.error(`koppler: ${e?.message ?? e}`);
+    if (process.env.KOPPLER_DEBUG) console.error(e?.stack);
+    process.exit(1);
+  }
 }

@@ -5,6 +5,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { readActions, updateActions } from './actions.mjs';
 
 const read = file => { try { return fs.readFileSync(file, 'utf8'); } catch { return null; } };
 const json = file => { try { return JSON.parse(read(file)); } catch { return null; } };
@@ -41,12 +42,14 @@ export function librariesFor(appDir, clones) {
 const OVERRIDES = 'pubspec_overrides.yaml', MARK = '# Written by Koppler for a local run; Stop removes it.';
 // Points the app at the local libraries; returns the action-log entries to undo it.
 export function link(appId, appDir, libs, logFile) {
-  const log = (() => { try { return JSON.parse(fs.readFileSync(logFile, 'utf8')); } catch { return []; } })(), done = [];
+  const log = readActions(logFile), done = [];
+  // Each change is logged before it is made, so a crash part-way still leaves Stop an entry to undo.
+  const record = entry => { updateActions(logFile, list => { list.push(entry); }); done.push(entry); };
   const dart = libs.filter(l => l.ecosystem === 'dart'), npm = libs.filter(l => l.ecosystem === 'npm');
   if (dart.length) {
     const file = path.join(appDir, OVERRIDES), before = read(file);
     // The file as it was before the first change of this run is what Stop puts back.
-    if (!log.some(a => a.kind === 'file' && a.file === file)) done.push({ kind: 'file', app: appId, file, before });
+    if (!log.some(a => a.kind === 'file' && a.file === file)) record({ kind: 'file', app: appId, file, before });
     const lines = dart.map(l => `  ${l.name}:\n    path: ${l.path}`).join('\n');
     const base = before && !before.includes(MARK) ? before : null;
     const text = base
@@ -55,11 +58,10 @@ export function link(appId, appDir, libs, logFile) {
     fs.writeFileSync(file, text);
   }
   if (npm.length) {
+    record({ kind: 'npm-local', app: appId, repo: appDir, packages: npm.map(l => l.name) });
     const r = spawnSync('npm', ['install', '--no-save', ...npm.map(l => l.path)], { cwd: appDir, encoding: 'utf8' });
     if (r.status !== 0) throw new Error(`npm could not install the local ${npm.map(l => l.name).join(', ')}: ${(r.stderr || '').trim().split('\n').pop()}`);
-    done.push({ kind: 'npm-local', app: appId, repo: appDir, packages: npm.map(l => l.name) });
   }
-  fs.writeFileSync(logFile, JSON.stringify([...log, ...done], null, 2));
   return done;
 }
 // Undoes one entry from link(); returns what happened, in words.

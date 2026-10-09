@@ -5,7 +5,8 @@ The agent keeps `<state>/actions.json` so it knows exactly what it started and c
 
 ## Action log
 
-In `auto` mode, append one object per action to `<state>/actions.json` (JSON array, in order) right after it succeeds. Never store secret values.
+In `auto` mode, append one object per action to `<state>/actions.json` (JSON array, in order) just before you make the change, so a change interrupted part-way still has its entry. Never store secret values.
+If the file cannot be read as a JSON list, stop and tell the user: never start it afresh, since every entry in it is a change Stop must undo. Koppler's own commands refuse the same way and keep a copy (`actions.json.damaged-<time>`).
 Give every entry its `app`, so that when a later run drops one app from the board, only that app's entries are stopped and reverted and removed from the log; a full Stop and revert still empties it.
 The log says how to undo things; which runs and Stops happened, and how they ended, is the run history (`koppler history`, `<state>/history.jsonl`, written by the canvas and `koppler history --done`).
 

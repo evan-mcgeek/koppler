@@ -10,6 +10,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { runs } from './runs.mjs';
+import { readActions, updateActions } from './actions.mjs';
 
 const configDir = () => process.env.KOPPLER_CONFIG_DIR || path.join(os.homedir(), '.config', 'koppler');
 const privateFile = () => path.join(configDir(), 'recipes.json');
@@ -58,7 +59,7 @@ export function remember({ registry, app, edit, why, whenText, forcePrivate, any
 
 // Applies each matching recipe once: the original text must be in the file exactly once, else it is reported, never guessed.
 export function prepare({ registry, apps, env, calls, repoOf, logFile }) {
-  const log = readJson(logFile, []), out = [];
+  const log = readActions(logFile), out = [];
   for (const app of apps) for (const r of recipesFor(registry, app).filter(x => matches(x, { env, calls: calls[app] ?? [] }))) {
     const repo = repoOf(app), file = repo && path.join(repo, r.file);
     if (log.some(a => a.recipe === r.id)) { out.push({ app, id: r.id, state: 'already', why: r.why }); continue; }
@@ -68,11 +69,12 @@ export function prepare({ registry, apps, env, calls, repoOf, logFile }) {
     const count = body.split(find).length - 1;
     if (body.includes(replace)) { out.push({ app, id: r.id, state: 'already', why: r.why }); continue; }
     if (count !== 1) { out.push({ app, id: r.id, state: 'moved', why: r.why, detail: `${r.file}: the original text is ${count ? 'there more than once' : 'no longer there'}` }); continue; }
+    // Logged before the file changes, so a crash part-way still leaves Stop an entry to undo.
+    const entry = { kind: 'edit', app, file, before: find, after: replace, recipe: r.id };
+    updateActions(logFile, list => { list.push(entry); }); log.push(entry);
     fs.writeFileSync(file, body.replace(find, () => replace));
-    log.push({ kind: 'edit', app, file, before: find, after: replace, recipe: r.id });
     out.push({ app, id: r.id, state: 'applied', why: r.why, scope: r.scope });
   }
-  fs.writeFileSync(logFile, JSON.stringify(log, null, 2) + '\n', { mode: 0o600 });
   return out;
 }
 
