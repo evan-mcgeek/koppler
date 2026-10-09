@@ -1,0 +1,89 @@
+name: Plugin
+
+on:
+  push:
+    branches: [main]
+    paths: [plugin/**, .claude-plugin/**, .github/workflows/plugin.yml]
+  pull_request:
+    paths: [plugin/**, .claude-plugin/**, .github/workflows/plugin.yml]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate plugin and skill
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Validate SKILL.md frontmatter
+        shell: python
+        run: |
+          import pathlib, sys
+          failed = False
+          skills = sorted(pathlib.Path("plugin/skills").glob("*/SKILL.md"))
+          if not skills:
+              print("::error::no skills found under plugin/skills"); sys.exit(1)
+          for f in skills:
+              lines = f.read_text().splitlines()
+              if not lines or lines[0] != "---" or "---" not in lines[1:]:
+                  print(f"::error file={f}::missing YAML frontmatter"); failed = True; continue
+              front = lines[1:lines.index("---", 1)]
+              for key in ("name", "description"):
+                  if not any(l.startswith(f"{key}:") and l[len(key) + 1:].strip() for l in front):
+                      print(f"::error file={f}::missing '{key}' in frontmatter"); failed = True
+              name = next((l.split(":", 1)[1].strip() for l in front if l.startswith("name:")), "")
+              if name != f.parent.name:
+                  print(f"::error file={f}::name is {name!r}, expected the folder name {f.parent.name!r}"); failed = True
+              print(f"checked: {f}")
+          sys.exit(failed)
+
+      - name: Check every reference the skill names exists
+        shell: python
+        run: |
+          import pathlib, re, sys
+          failed = False
+          for skill in sorted(pathlib.Path("plugin/skills").iterdir()):
+              for doc in [skill / "SKILL.md", *sorted((skill / "references").glob("*.md"))]:
+                  for ref in sorted(set(re.findall(r"references/[\w.-]+\.md", doc.read_text()))):
+                      if not (skill / ref).is_file():
+                          print(f"::error file={doc}::{ref} does not exist"); failed = True
+              print(f"checked: {skill}")
+          sys.exit(failed)
+
+      - name: Check the marketplace lists the plugin and nothing pins a version
+        shell: python
+        run: |
+          import json, pathlib, sys
+          market = json.loads(pathlib.Path(".claude-plugin/marketplace.json").read_text())
+          manifest = json.loads(pathlib.Path("plugin/.claude-plugin/plugin.json").read_text())
+          failed = False
+          entries = [p for p in market["plugins"] if p.get("source") == "./plugin"]
+          if len(entries) != 1:
+              print("::error file=.claude-plugin/marketplace.json::exactly one entry must have source ./plugin"); failed = True
+          for entry in entries:
+              if entry["name"] != manifest.get("name"):
+                  print(f"::error file=.claude-plugin/marketplace.json::entry {entry['name']!r} differs from plugin.json name {manifest.get('name')!r}"); failed = True
+          for where, obj in ((".claude-plugin/marketplace.json", e) for e in entries):
+              if "version" in obj: print(f"::error file={where}::remove 'version'; updates track commits"); failed = True
+          if "version" in manifest:
+              print("::error file=plugin/.claude-plugin/plugin.json::remove 'version'; updates track commits"); failed = True
+          print("checked: marketplace")
+          sys.exit(failed)
+
+      # Unpinned deliberately: validate against the Claude Code version installers actually get;
+      # `claude --version` records what ran.
+      - name: Install Claude Code CLI
+        run: |
+          npm install --global @anthropic-ai/claude-code
+          claude --version
+
+      - name: Validate marketplace and plugin manifests
+        run: |
+          claude plugin validate .
+          claude plugin validate plugin

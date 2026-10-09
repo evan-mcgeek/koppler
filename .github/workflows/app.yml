@@ -1,0 +1,65 @@
+name: App
+
+on:
+  push:
+    branches: [main]
+    paths: [app/**, .github/workflows/app.yml]
+  pull_request:
+    paths: [app/**, .github/workflows/app.yml]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: app
+
+jobs:
+  test:
+    name: Test on ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - name: Tests
+        run: npm test
+
+  check:
+    name: Syntax and package
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - name: Script syntax
+        run: |
+          for f in src/*.mjs src/*.js; do node --check "$f"; done
+          for f in bin/*; do if head -1 "$f" | grep -q bash; then bash -n "$f"; fi; done
+      - name: The command starts
+        run: |
+          node src/koppler.mjs --help > /dev/null
+          node src/koppler.mjs --version
+      - name: Package holds the app and nothing else
+        shell: python
+        run: |
+          import json, subprocess, sys
+          files = {f["path"] for f in json.loads(subprocess.check_output(["npm", "pack", "--dry-run", "--json"], text=True))[0]["files"]}
+          failed = False
+          for need in ("package.json", "src/koppler.mjs", "src/canvas.html", "src/status-watch.mjs"):
+              if need not in files: print(f"::error::{need} is missing from the package"); failed = True
+          for f in sorted(files):
+              if f.startswith("test/") or ".test." in f or f.startswith("."):
+                  print(f"::error::{f} should not be in the package"); failed = True
+          print(f"{len(files)} files in the package")
+          sys.exit(failed)
