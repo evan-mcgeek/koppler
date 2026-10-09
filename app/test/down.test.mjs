@@ -52,3 +52,16 @@ assert.equal(again.code, 3, again.out);
 assert.match(again.out, /Left for the agent:[\s\S]*changed since Koppler edited it/);
 assert.equal(JSON.parse(fs.readFileSync(path.join(dir, 'actions.json'), 'utf8')).length, 1);
 console.log('down tests ok');
+
+// Reverting text that holds $& or $' (regexes, shell, templates) puts it back exactly, not as replacement patterns.
+{
+  const d = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-down-dollar-')), file = path.join(d, 'match.js');
+  const e = { ...process.env, KOPPLER_STATE: d, KOPPLER_TEMP: d, KOPPLER_CONFIG_DIR: d };
+  const before = "const re = /^a$/; const s = x.replace(re, '$&-$\\'');", after = 'const re = null;';
+  fs.writeFileSync(file, `// top\n${after}\n// bottom\n`);
+  fs.writeFileSync(path.join(d, 'registry.js'), `window.REGISTRY = ${JSON.stringify({ envs: ['qa'], apps: { api: { name: 'API' } } })};`);
+  fs.writeFileSync(path.join(d, 'actions.json'), JSON.stringify([{ kind: 'edit', app: 'api', file, before, after }]));
+  const out = spawnSync('node', [path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'src', 'koppler.mjs'), 'down'], { encoding: 'utf8', env: e });
+  assert.equal(out.status, 0, out.stdout + out.stderr);
+  assert.equal(fs.readFileSync(file, 'utf8'), `// top\n${before}\n// bottom\n`);
+}

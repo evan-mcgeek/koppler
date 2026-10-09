@@ -536,7 +536,7 @@ async function down(args) {
     try {
       if (a.kind === 'edit') {
         const body = fs.readFileSync(a.file, 'utf8'), n = body.split(a.after).length - 1;
-        if (n === 1) { fs.writeFileSync(a.file, body.replace(a.after, a.before)); console.log(`${name(a)}: reverted ${path.basename(a.file)}`); continue; }
+        if (n === 1) { fs.writeFileSync(a.file, body.replace(a.after, () => a.before)); console.log(`${name(a)}: reverted ${path.basename(a.file)}`); continue; }
         if (body.includes(a.before) && !n) { console.log(`${name(a)}: ${path.basename(a.file)} already as before`); continue; }
         left.push(`${name(a)}: ${a.file} changed since Koppler edited it; put back by hand: ${JSON.stringify(a.before).slice(0, 200)}`);
       } else if (a.kind === 'file' || a.kind === 'npm-local') {
