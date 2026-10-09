@@ -98,11 +98,15 @@ const registry = () => { try { const sandbox = { window: {} }; vm.runInNewContex
 const fail = message => { console.error(`koppler: ${message}`); process.exit(1); };
 
 // The plan for the newest Send that has not been applied, worked out again now, and whether it is still what the user confirmed.
+// What running a board would start, restart, stop and keep, against what runs now.
+export function planFor(board) {
+  const reg = registry(), names = runningNames(), envs = runningEnvs(), liveBoard = live();
+  return kp.plan(liveBoard, board, { name: id => reg?.apps?.[id]?.name ?? id, running: id => names.includes(id), strays: strays(liveBoard, names, Object.keys(reg?.apps ?? {})), startedOn: id => envs[id], queuesOf: id => kp.queuesOf(reg, id) });
+}
 export function currentPlan() {
   const all = runs(), run = [...all].reverse().find(r => r.kind === 'run' && (r.state === 'waiting' || r.state === 'applying'));
   if (!run) return null;
-  const reg = registry(), names = runningNames(), envs = runningEnvs(), liveBoard = live();
-  const plan = kp.plan(liveBoard, run, { name: id => reg?.apps?.[id]?.name ?? id, running: id => names.includes(id), strays: strays(liveBoard, names, Object.keys(reg?.apps ?? {})), startedOn: id => envs[id], queuesOf: id => kp.queuesOf(reg, id) });
+  const reg = registry(), plan = planFor(run);
   return { run, plan, confirmed: kp.same(plan, run.plan), name: id => reg?.apps?.[id]?.name ?? id };
 }
 

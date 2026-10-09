@@ -47,10 +47,9 @@ console.log('ok');
   cleanups.push(() => spawnSync('node', [path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'src', 'koppler.mjs'), 'stop', '--all', '--yes'], { env }));
   const koppler = (...args) => { const r = spawnSync('node', [path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'src', 'koppler.mjs'), ...args], { encoding: 'utf8', env }); return (r.stdout + r.stderr).trim(); };
   const app = port => ({ name: `App ${port}`, kind: 'other', start: `python3 -m http.server ${port} --bind 127.0.0.1`, url: `http://localhost:${port}` });
-  fs.writeFileSync(path.join(dir, 'registry.js'), `window.REGISTRY = ${JSON.stringify({ envs: ['qa'], apps: { a: app(59971), b: app(59972) } })};`);
+  fs.writeFileSync(path.join(dir, 'registry.js'), `window.REGISTRY = ${JSON.stringify({ envs: ['qa'], apps: { a: { ...app(59971), consumes: { b: { how: 'env', env: 'B_URL' } } }, b: app(59972) } })};`);
   fs.writeFileSync(path.join(dir, 'local.js'), `window.LOCAL = ${JSON.stringify({ apps: { a: { path: dir }, b: { path: dir } } })};`);
-  fs.writeFileSync(path.join(dir, 'history.jsonl'), JSON.stringify({ id: 'run000009', at: 't', kind: 'run', env: 'qa', nodes: { a: { run: 'cli' }, b: { run: 'cli' } }, edges: [{ from: 'a', to: 'b' }] }) + '\n');
-  const out = koppler('up', 'a', 'b');
+  const out = koppler('up', 'a', 'b', '--cable', 'a:b');
   assert.ok(out.indexOf('started b') >= 0 && out.indexOf('started b') < out.indexOf('started a'), out);
   assert.match(out, /Up on QA\./);
   assert.match(koppler('up', 'a', 'b'), /a: already running[\s\S]*b: already running|b: already running[\s\S]*a: already running/);
@@ -77,6 +76,31 @@ console.log('ok');
   assert.match(fs.readFileSync(path.join(dir, 'logs', 'a.log'), 'utf8'), /B_URL=http:\/\/localhost:59962/);
   assert.match(fs.readFileSync(path.join(dir, 'history.jsonl'), 'utf8'), /"event":"done"/);
   assert.deepEqual(Object.keys(JSON.parse(fs.readFileSync(path.join(dir, 'live.json'), 'utf8')).nodes).sort(), ['a', 'b']);
+  koppler('stop', '--all', '--yes');
+}
+// From the terminal or chat: every up is recorded as a run, added to what already runs, with its cables wired.
+{
+  const { spawnSync } = await import('node:child_process');
+  const fs = await import('node:fs'), os = await import('node:os'), path = await import('node:path'), { fileURLToPath } = await import('node:url');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-upchat-'));
+  const env = { ...process.env, KOPPLER_STATE: dir, KOPPLER_TEMP: dir, KOPPLER_CONFIG_DIR: dir };
+  cleanups.push(() => spawnSync('node', [path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'src', 'koppler.mjs'), 'stop', '--all', '--yes'], { env }));
+  const koppler = (...args) => { const r = spawnSync('node', [path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'src', 'koppler.mjs'), ...args], { encoding: 'utf8', env }); return { out: (r.stdout + r.stderr).trim(), code: r.status }; };
+  const apps = {
+    a: { name: 'A', kind: 'other', start: 'echo "B_URL=$B_URL"; exec python3 -m http.server 59951 --bind 127.0.0.1', url: 'http://localhost:59951', consumes: { b: { how: 'env', env: 'B_URL' } } },
+    b: { name: 'B', kind: 'other', start: 'exec python3 -m http.server 59952 --bind 127.0.0.1', url: 'http://localhost:59952' },
+  };
+  fs.writeFileSync(path.join(dir, 'registry.js'), `window.REGISTRY = ${JSON.stringify({ envs: ['qa'], apps })};`);
+  fs.writeFileSync(path.join(dir, 'local.js'), `window.LOCAL = ${JSON.stringify({ apps: { a: { path: dir }, b: { path: dir } } })};`);
+  assert.equal(koppler('up', 'b', '--env', 'qa').code, 0);
+  const r = koppler('up', 'a', '--cable', 'a:b');
+  assert.equal(r.code, 0, r.out);
+  assert.match(r.out, /b: already running/);
+  assert.match(fs.readFileSync(path.join(dir, 'logs', 'a.log'), 'utf8'), /B_URL=http:\/\/localhost:59952/);
+  const live = JSON.parse(fs.readFileSync(path.join(dir, 'live.json'), 'utf8'));
+  assert.deepEqual([Object.keys(live.nodes).sort(), live.edges], [['a', 'b'], [{ from: 'a', to: 'b' }]]);
+  assert.equal((fs.readFileSync(path.join(dir, 'history.jsonl'), 'utf8').match(/"event":"done"/g) ?? []).length, 2);
+  assert.match(koppler('up', 'a', '--cable', 'a:nope').out, /usage: --cable/);
   koppler('stop', '--all', '--yes');
 }
 // Something left for the agent: the apps still start, the board shows them running (live state), and the run stays open (exit 3).

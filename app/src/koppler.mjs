@@ -361,19 +361,47 @@ function ports(args) {
 // With --run <id> it carries out that confirmed Send: stops and restarts, branches as chosen on the cards, remembered changes,
 // each cable's local address passed to its caller, then starts. What it cannot do alone is listed for the agent (exit 3).
 let START_ENV = null;
+// Records a board as a run, with its plan against what runs now, as a Run from the canvas would; returns its id.
+async function recordRun(registry, board, label) {
+  const { planFor } = await import('./runs.mjs');
+  const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  const data = { id, env: board.env, mode: 'auto', nodes: Object.entries(board.nodes).map(([node, n]) => ({ id: node, ...n })), edges: board.edges, queues: board.queues };
+  const plan = planFor({ ...data, nodes: board.nodes });
+  const record = runRecord({ tag: 'koppler', data: { ...data, plan } }) ?? fail(`could not start ${label}`);
+  appendRun(record);
+  const list = (word, xs) => xs.length ? `${word} ${xs.map(x => registry.apps[x.id]?.name ?? x.id).join(', ')}` : null;
+  console.log(`Running ${label} on ${board.env.toUpperCase()} (run ${id}); the canvas shows it.`);
+  const said = [list('starts', plan.starts), list('restarts', plan.restarts), list('stops', plan.stops)].filter(Boolean);
+  if (said.length) console.log(`It ${said.join(', ')}.`);
+  return id;
+}
+
 async function up(args) {
   const registry = load('registry.js', 'REGISTRY') ?? fail('no stack loaded (koppler init)');
-  // A saved board starts as a Send from the canvas would: recorded in the history, then run.
+  // Every run is recorded like a Run from the canvas, so the canvas, the history and Stop all know it: a saved board
+  // (--board), or apps from the terminal or chat, added to what already runs on that environment.
   if (args.includes('--board')) {
     const want = flagValue(args, '--board') ?? fail('usage: koppler up --board "<board or preset name>" [--env <env>]');
     const boards = [...(load('state.js', 'SAVED_STATE')?.presets ?? []), ...(registry.presets ?? [])];
     const b = boards.find(p => p.name === want) ?? boards.find(p => p.name?.toLowerCase() === want.toLowerCase()) ?? fail(`no board called ${want}; koppler use --boards lists them`);
-    const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 8), env = envOf(registry, args);
-    const record = runRecord({ tag: 'koppler', data: { id, env, mode: 'auto', nodes: Object.entries(b.nodes ?? {}).map(([node, n]) => ({ id: node, ...n })), edges: b.edges ?? [], queues: b.queues ?? {} } });
-    if (!record) fail(`could not start ${want}`);
-    appendRun(record);
-    console.log(`Running ${b.name} on ${env.toUpperCase()} (run ${id}); the canvas shows it.`);
-    return up(['--run', id]);
+    return up(['--run', await recordRun(registry, { env: envOf(registry, args), nodes: b.nodes ?? {}, edges: b.edges ?? [], queues: b.queues ?? {} }, b.name)]);
+  }
+  if (!args.includes('--run')) {
+    const ids = positional(args, ['--env', '--cable']);
+    if (!ids.length) fail('usage: koppler up <app...> [--cable <caller>:<callee>]... [--env <env>] | --board "<name>" | --run <id>');
+    for (const id of ids) if (!registry.apps[id]) fail(`${id} is not an app in the stack`);
+    for (const id of ids) if (registry.apps[id].outside) fail(`${registry.apps[id].name ?? id} does not run on this Mac: ${registry.apps[id].outside}`);
+    const env = envOf(registry, args), { live } = await import('./runs.mjs'), now = live();
+    const kept = now?.env === env ? now : { nodes: {}, edges: [], queues: {} };
+    const cables = args.flatMap((a, i) => args[i - 1] === '--cable' ? [a] : []).map(c => {
+      const [from, to] = c.split(':');
+      if (!registry.apps[from] || !registry.apps[to]) fail(`usage: --cable <caller>:<callee>, both apps in the stack (got ${c})`);
+      if (!ids.includes(from) && !kept.nodes[from] || !ids.includes(to) && !kept.nodes[to]) fail(`${c}: both ends must run; add them to the apps`);
+      return { from, to };
+    });
+    const nodes = { ...kept.nodes, ...Object.fromEntries(ids.map(id => [id, kept.nodes[id] ?? { run: 'cli' }])) };
+    const edges = [...(kept.edges ?? []), ...cables].filter((e, i, all) => all.findIndex(x => x.from === e.from && x.to === e.to) === i);
+    return up(['--run', await recordRun(registry, { env, nodes, edges, queues: kept.queues ?? {} }, ids.map(id => registry.apps[id].name).join(', '))]);
   }
   const local = load('local.js', 'LOCAL')?.apps ?? {};
   const flag = n => { const i = args.indexOf(`--${n}`); return i >= 0 ? args[i + 1] : undefined; };
@@ -827,7 +855,7 @@ const COMMANDS = [
   { name: 'add', who: 'agent', args: '<repo or folder>...', about: 'add apps to the stack from their clones', run: add, example: 'koppler add acme/orders-api' },
   { name: 'remove', who: 'agent', args: '<app>', about: 'take an app out of the stack (its clone stays)', run: remove, example: 'koppler remove orders-api' },
   { name: 'plan', who: 'agent', args: '[app...] [--env <env>] [--wire <caller> <callee>] [--json]', about: 'what the newest Send does; the tunnels apps need; what one cable changes', run: plan, example: 'koppler plan orders-api payments-api --env qa' },
-  { name: 'up', who: 'agent', args: '<app...> [--env <env>] | --board "<name>" | --run <id>', about: 'start a run: tunnels, local queues, then apps, callees first', run: up, example: 'koppler up --board "Checkout"' },
+  { name: 'up', who: 'agent', args: '<app...> [--cable <caller>:<callee>]... [--env <env>] | --board "<name>" | --run <id>', about: 'start a run, recorded like Run on the canvas: tunnels, local queues, then apps, callees first', run: up, example: 'koppler up orders-api payments-api --cable orders-api:payments-api --env qa' },
   { name: 'down', who: 'agent', args: '[--run <stop id>]', about: 'stop and revert: stop what Koppler runs, undo every change, branches back', run: down, example: 'koppler down' },
   { name: 'run', who: 'agent', args: '<app> [--env <env>] [--device ios|android|phone|<id>] [--lan] [--dry-run] | <name> [--cwd <dir>] [--port <n>] [--restart] -- <command...>', about: 'start one stack app, or any command, detached and logged', run, example: 'koppler run orders-api --env qa' },
   { name: 'switch', who: 'agent', args: '<app> <branch> [--set-aside | --take-along] | <app> --back', about: 'switch a clone to the board\'s branch, and back', run: switchBranch, example: 'koppler switch orders-api feature/refunds --set-aside' },
