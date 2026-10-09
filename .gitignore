@@ -1,0 +1,8 @@
+.DS_Store
+.idea/
+.claude/
+.lavish/
+.impeccable/
+node_modules/
+*.log
+.env
