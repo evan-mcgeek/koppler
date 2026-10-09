@@ -31,14 +31,20 @@ plan = planTunnels([{ app: 'a', tunnel: 'h1', port: 5432 }, { app: 'b', tunnel: 
 const aliased = plan.find(t => t.needsAlias);
 assert.equal(aliased.bind, '127.0.0.2');
 assert.equal(aliased.port, 5432);
-assert.deepEqual(planSteps(aliased).sudo, ['sudo ifconfig lo0 alias 127.0.0.2 up', "sudo sed -i .koppler.bak -E 's/[[:space:]]+h2([[:space:]]|$)/\\1/' /etc/hosts", 'echo "127.0.0.2 h2" | sudo tee -a /etc/hosts']);
+assert.deepEqual(planSteps(aliased).sudo, ['sudo ifconfig lo0 alias 127.0.0.2 up', "sudo sed -i .koppler.bak -E 's/[[:space:]]+h2([[:space:]]|$)/\\1/' /etc/hosts", "echo '127.0.0.2 h2' | sudo tee -a /etc/hosts"]);
 assert.deepEqual(planSteps(aliased).undo, ['sudo mv /etc/hosts.koppler.bak /etc/hosts', 'sudo ifconfig lo0 -alias 127.0.0.2']);
 // The app dials another name (e.g. a database endpoint from a secret): that name is the one that moves.
 const dialed = planTunnels([{ app: 'a', tunnel: 'h1', port: 5432 }, { app: 'b', tunnel: 'aurora.internal', port: 5432, connectsAs: 'db.cluster.rds.amazonaws.com' }]).find(t => t.needsAlias);
-assert.equal(planSteps(dialed).sudo[2], 'echo "127.0.0.2 db.cluster.rds.amazonaws.com" | sudo tee -a /etc/hosts');
+assert.equal(planSteps(dialed).sudo[2], "echo '127.0.0.2 db.cluster.rds.amazonaws.com' | sudo tee -a /etc/hosts");
 assert.match(planSteps(dialed).sudo[1], /db\\\.cluster\\\.rds/);
 assert.equal(describePlan(plan).join(' '), "b's tunnel keeps port 5432 on its own address, 127.0.0.2, next to a's tunnel. Needs a one-time sudo step.");
 
 // No conflict, nothing to say.
 assert.deepEqual(describePlan(planTunnels([{ app: 'a', tunnel: 'h1', port: 6379 }])), []);
+// The tunnel runs as a list of arguments: a host can never be read as shell syntax, even if it got past the stack check.
+{
+  const steps = planSteps({ host: 'db.acme.dev; touch /tmp/x #', bind: 'localhost', port: 5432 });
+  assert.deepEqual(steps.tunnelArgs, ['cloudflared', 'access', 'tcp', '--hostname', 'db.acme.dev; touch /tmp/x #', '--url', 'localhost:5432']);
+  assert.match(steps.tunnel, /--hostname 'db\.acme\.dev; touch \/tmp\/x #'/);
+}
 console.log('ok');

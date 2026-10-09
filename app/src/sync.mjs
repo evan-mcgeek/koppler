@@ -142,6 +142,8 @@ export function urlsInClone(repo) {
 }
 
 // The shared config is reviewed by people, so reject a malformed one loudly instead of drawing a broken canvas.
+const HOST = /^(?=.{1,253}$)[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*$/;
+const NAME = /^[\w.-]{1,128}$/, SETTING = /^[A-Za-z_][\w.:-]{0,127}$/, SLUG = /^[\w.-]+(?:\/[\w.-]+)+$/;
 export function validateStack(stack) {
   const errors = [];
   if (!Array.isArray(stack?.envs) || !stack.envs.length || !stack.envs.every(e => /^[a-z0-9-]+$/.test(e))) errors.push('envs: a non-empty list of lowercase names');
@@ -155,6 +157,7 @@ export function validateStack(stack) {
     if (k?.detect !== undefined && ![].concat(k.detect).every(f => typeof f === 'string')) errors.push(`kinds.${id}.detect: file names`);
   }
   for (const [id, q] of Object.entries(stack?.queues ?? {})) {
+    for (const [where, name] of [['queue', q?.queue], ...Object.entries(q?.envs ?? {}).map(([env, e]) => [`envs.${env}.queue`, e?.queue])]) if (name !== undefined && !(typeof name === 'string' && NAME.test(name))) errors.push(`queues.${id}.${where}: a queue or topic name`);
     if (!/^[a-z0-9-]{1,64}$/.test(id)) errors.push(`queues.${id}: id must be lowercase letters, digits and dashes`);
     if (typeof q?.name !== 'string' || !q.name) errors.push(`queues.${id}.name: required`);
     if (!QUEUE_TYPES.includes(q?.type)) errors.push(`queues.${id}.type: one of ${QUEUE_TYPES.join(', ')}`);
@@ -170,9 +173,19 @@ export function validateStack(stack) {
     for (const [n, c] of (Array.isArray(app?.localChanges) ? app.localChanges : app?.localChanges === undefined ? [] : [null]).entries())
       if (!c || typeof c.file !== 'string' || !c.file || typeof c.find !== 'string' || !c.find || typeof c.replace !== 'string' || path.isAbsolute(c.file) || c.file.split(/[\\/]/).includes('..'))
         errors.push(`apps.${id}.localChanges[${n}]: needs file (a path inside the app's clone, no .. or leading /), find and replace`);
-    // A tunnel's port is a number: it reaches the page, shell commands and the port probe.
+    // Values that end up in commands (tunnels, sign-ins, hosts entries, secret steps, clone commands) must look like
+    // what they are, so a shared stack.json cannot smuggle shell syntax into them.
+    if (app?.slug !== undefined && !(typeof app.slug === 'string' && SLUG.test(app.slug))) errors.push(`apps.${id}.slug: owner/repo, or host/path/to/repo`);
     for (const [where, list] of [['prereqs', app?.prereqs], ...Object.entries(app?.envs ?? {}).map(([env, e]) => [`envs.${env}.prereqs`, e?.prereqs])])
-      for (const [n, p] of (Array.isArray(list) ? list : []).entries()) if (p?.port !== undefined && !(Number.isInteger(p.port) && p.port > 0 && p.port < 65536)) errors.push(`apps.${id}.${where}[${n}].port: a port number from 1 to 65535`);
+      for (const [n, p] of (Array.isArray(list) ? list : []).entries()) {
+        // A tunnel's port is a number: it reaches the page, shell commands and the port probe.
+        if (p?.port !== undefined && !(Number.isInteger(p.port) && p.port > 0 && p.port < 65536)) errors.push(`apps.${id}.${where}[${n}].port: a port number from 1 to 65535`);
+        for (const key of ['tunnel', 'connectsAs', 'hosts']) if (p?.[key] !== undefined && !(typeof p[key] === 'string' && HOST.test(p[key]))) errors.push(`apps.${id}.${where}[${n}].${key}: a host name`);
+        if (p?.sso !== undefined && !(typeof p.sso === 'string' && NAME.test(p.sso))) errors.push(`apps.${id}.${where}[${n}].sso: an AWS profile name`);
+        if (p?.env !== undefined && !(typeof p.env === 'string' && SETTING.test(p.env))) errors.push(`apps.${id}.${where}[${n}].env: a setting name`);
+      }
+    for (const [where, list] of [['secrets', app?.secrets], ...Object.entries(app?.envs ?? {}).map(([env, e]) => [`envs.${env}.secrets`, e?.secrets])])
+      for (const [n, sec] of (Array.isArray(list) ? list : []).entries()) if (sec?.env !== undefined && !(typeof sec.env === 'string' && SETTING.test(sec.env))) errors.push(`apps.${id}.${where}[${n}].env: a setting name`);
     for (const [where, list] of [['secrets', app?.secrets], ...Object.entries(app?.envs ?? {}).map(([env, e]) => [`envs.${env}.secrets`, e?.secrets])])
       for (const s of list ?? []) if (s?.type !== undefined && !SECRET_TYPES.includes(s.type)) errors.push(`apps.${id}.${where}: type "${s.type}" is not one Koppler tests (${SECRET_TYPES.join(', ')})`);
   }

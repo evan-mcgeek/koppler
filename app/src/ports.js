@@ -64,17 +64,21 @@
 
   // The commands and settings that carry a plan out. A loopback alias moves the name the app dials (`connectsAs`, else
   // the tunnel host) to the alias: off any line that maps it already, since the first match wins, with a backup to undo.
+  // A value as one shell word, for the commands shown to the user to paste.
+  const q = v => /^[\w.:@\/-]+$/.test(String(v)) ? String(v) : `'${String(v).replace(/'/g, `'\\''`)}'`;
   function planSteps(t) {
-    const url = `${t.bind}:${t.port}`, dialed = t.connectsAs || t.host, pattern = dialed.replace(/\./g, '\\.');
+    const url = `${t.bind}:${t.port}`, dialed = t.connectsAs || t.host, pattern = dialed.replace(/[^\w-]/g, c => `\\${c}`);
     return {
       name: `tunnel-${t.host.split('.')[0]}-${t.port}`.toLowerCase().replace(/[^a-z0-9-]/g, '-'),
       sudo: t.needsAlias ? [
-        `sudo ifconfig lo0 alias ${t.bind} up`,
-        `sudo sed -i .koppler.bak -E 's/[[:space:]]+${pattern}([[:space:]]|$)/\\1/' /etc/hosts`,
-        `echo "${t.bind} ${dialed}" | sudo tee -a /etc/hosts`,
+        `sudo ifconfig lo0 alias ${q(t.bind)} up`,
+        `sudo sed -i .koppler.bak -E ${q(`s/[[:space:]]+${pattern}([[:space:]]|$)/\\1/`)} /etc/hosts`,
+        `echo ${q(`${t.bind} ${dialed}`)} | sudo tee -a /etc/hosts`,
       ] : [],
-      undo: t.needsAlias ? ['sudo mv /etc/hosts.koppler.bak /etc/hosts', `sudo ifconfig lo0 -alias ${t.bind}`] : [],
-      tunnel: `cloudflared access tcp --hostname ${t.host} --url ${url}`,
+      undo: t.needsAlias ? ['sudo mv /etc/hosts.koppler.bak /etc/hosts', `sudo ifconfig lo0 -alias ${q(t.bind)}`] : [],
+      // Run as a list of arguments, never through a shell; the text form is only shown.
+      tunnelArgs: ['cloudflared', 'access', 'tcp', '--hostname', t.host, '--url', url],
+      tunnel: `cloudflared access tcp --hostname ${q(t.host)} --url ${q(url)}`,
       settings: t.settings || [],
     };
   }

