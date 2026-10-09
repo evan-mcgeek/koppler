@@ -3919,6 +3919,20 @@ function paintHealthChip() {
     el.title = 'Koppler checks the connections again once it answers.';
     return;
   }
+  // Apps that run but this board does not show: from a run of another board (the agent in chat, another board
+  // here), or started by Koppler outside any run (a single `koppler run`). Never "Nothing running" while they do.
+  const name = id => registry.apps[id]?.name ?? id;
+  const elsewhere = !flowBusy && !otherEnv && !h.apps ? Object.keys(live?.nodes ?? {}).filter(id => !state.nodes[id] && runningNow(id) !== false) : [];
+  const strays = !flowBusy && !otherEnv && !h.apps ? strayApps().filter(id => !elsewhere.includes(id)) : [];
+  const unseen = [...elsewhere, ...strays];
+  if (unseen.length) {
+    el.dataset.state = 'warn';
+    el.querySelector('.label').textContent = `${unseen.length === 1 ? name(unseen[0]) : `${unseen.length} apps`} running, not on this board`;
+    el.title = `${unseen.map(name).join(', ')} ${unseen.length === 1 ? 'runs' : 'run'}, but this board does not show ${unseen.length === 1 ? 'it' : 'them'}`
+      + (strays.length ? `; ${strays.map(name).join(', ')} started outside a run` : '; open the board that ran them from History')
+      + '. Run starts this board and stops what is not on it; Stop stops everything.';
+    return;
+  }
   el.dataset.state = flowBusy ? 'busy' : otherEnv ? 'warn' : !h.apps ? 'idle' : bad ? 'bad' : unsent || waiting ? 'warn' : 'ok';
   el.querySelector('.label').textContent = flowBusy ? `Checking ${flow.length - left} of ${flow.length}`
     : otherEnv ? `Running on ${otherEnv}` : !h.apps ? 'Nothing running' : bad ? `${bad} ${bad === 1 ? 'thing is' : 'things are'} off`

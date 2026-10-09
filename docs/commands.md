@@ -36,7 +36,8 @@ You can run these yourself too; the agent uses them to do its part.
 | `koppler add <repo or folder>...` / `koppler remove <app>` | Add apps to the stack from your clones, or take one out |
 | `koppler plan [app...] [--env <env>]` | What the newest run starts, restarts and stops; with apps, the tunnels they need |
 | `koppler plan --wire <caller> <callee>` | What to change so a caller uses a local app |
-| `koppler up <app...> \| --board "<name>" \| --run <id>` | Start a run: tunnels, local queues, then apps, callees first, each waited for |
+| `koppler up <app...> [--cable <caller>:<callee>]...` | Start apps as a run, added to what already runs: recorded like Run on the canvas, so the canvas, history and Stop see it |
+| `koppler up --board "<name>" \| --run <id>` | Start a saved board, or a recorded run: tunnels, local queues, then apps, callees first, each waited for |
 | `koppler down` | Stop and revert: stop what Koppler runs, undo every change, put branches back |
 | `koppler run <app> [--env <env>] [--device ...] [--lan] [--dry-run]` | Start one stack app, any kind |
 | `koppler run <name> [--cwd <dir>] [--port <n>] [--restart] -- <command...>` | Start any command, detached and logged; it never gets secrets |
