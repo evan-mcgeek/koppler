@@ -1,0 +1,16 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "koppler",
+  "owner": {
+    "name": "Ivan Yanowsky",
+    "url": "https://github.com/evan-mcgeek"
+  },
+  "plugins": [
+    {
+      "name": "koppler",
+      "description": "The agent add-on for Koppler: your agent builds, runs and reverts local runs of your stack. Needs the koppler app (npm i -g koppler).",
+      "source": "./plugin"
+    }
+  ],
+  "description": "Koppler: run the part of your stack you need locally."
+}
