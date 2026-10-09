@@ -268,10 +268,14 @@
   .link-btn.inline { margin: 0; font-size: inherit; }
   .empty-board > div { display: grid; justify-items: center; gap: 14px; }
   .empty-board p { margin: 0; max-width: 560px; padding: 0 24px; text-align: center; line-height: 1.55; text-wrap: balance; }
-  .empty-presets { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; max-width: 520px; pointer-events: auto; }
-  .empty-presets:not(:empty)::before { content: 'Or open a board'; flex-basis: 100%; text-align: center; font-size: 13px; }
-  .empty-presets button { padding: 7px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink); font-weight: 500; cursor: pointer; }
-  .empty-presets button:hover { border-color: var(--cable); }
+  .empty-presets { display: flex; flex-direction: column; width: min(380px, 100%); margin: 0 auto; padding: 0; list-style: none; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); overflow: hidden; text-align: left; pointer-events: auto; }
+  .empty-presets:empty { display: none; }
+  .empty-presets::before { content: 'Or open a board'; padding: 10px 14px 6px; color: var(--muted); font-size: 12.5px; }
+  .empty-presets li + li { border-top: 1px solid var(--line); }
+  .empty-presets button { display: flex; flex-direction: column; gap: 2px; width: 100%; min-height: 44px; padding: 8px 14px; border: 0; background: none; color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
+  .empty-presets button:hover, .empty-presets button:focus-visible { background: color-mix(in oklab, var(--cable) 8%, transparent); }
+  .empty-presets .name { max-width: 100%; overflow-wrap: anywhere; font-weight: 500; line-height: 1.3; }
+  .empty-presets .meta { color: var(--muted); font-size: 12px; }
   .stack-picker { position: relative; display: flex; align-items: center; max-width: 220px; height: 32px; margin-left: -4px; padding: 0 26px 0 10px; border: 1px solid transparent; border-radius: 7px; background: none; color: var(--muted); font: 600 14px var(--sans); cursor: pointer; }
   .stack-picker::before { content: '/'; margin-right: 10px; color: var(--line); font-weight: 400; }
   .stack-picker .label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink); }
@@ -1073,7 +1077,7 @@
         <span class="sep" aria-hidden="true"></span>
         <button class="btn" id="clear" title="Remove every card from this board. Undo brings them back.">Clear</button>
       </div>
-      <div class="empty-board" id="empty"><div><p id="empty-text">Click the apps you want to run together, or drag them here.<br>Connect them; the board is saved as you go.</p><div class="empty-presets" id="empty-presets"></div></div></div>
+      <div class="empty-board" id="empty"><div><p id="empty-text">Click the apps you want to run together, or drag them here.<br>Connect them; the board is saved as you go.</p><ul class="empty-presets" id="empty-presets" aria-label="Recently opened boards"></ul></div></div>
     </main>
     <section id="logs" hidden data-lavish-action aria-label="App log">
       <div class="logs-grip" id="logs-grip" role="separator" aria-orientation="horizontal" aria-label="Resize the log" tabindex="0" title="Drag to resize. Double-click to switch between big and small."></div>
@@ -1238,6 +1242,10 @@ const SIDES = { top: [0, -1], right: [1, 0], bottom: [0, 1], left: [-1, 0] };
 const kindOf = id => KopplerKinds.of(registry.apps[id]);
 const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), Math.max(lo, hi));
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+// "2 hours ago", "yesterday": how long ago an ISO time was, in the browser's language.
+const ago = iso => { const secs = (new Date(iso).getTime() - Date.now()) / 1000, rtf = new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' });
+  for (const [unit, size] of [['year', 31536000], ['month', 2592000], ['week', 604800], ['day', 86400], ['hour', 3600], ['minute', 60]]) if (Math.abs(secs) >= size) return rtf.format(Math.round(secs / size), unit);
+  return 'just now'; };
 let registry, state, toastTimer;
 const local = id => window.LOCAL?.apps[id];
 const cloneRoots = () => (window.LOCAL?.roots ?? []).map(r => r.replace(/^\/Users\/[^/]+/, '~')).join(', ');
@@ -1852,8 +1860,11 @@ const stackFacts = () => ({
   branches: id => { const all = local(id)?.branches; return all?.length && all.length < MAX_BRANCHES ? all : null; },
 });
 // Every board is brought to the current format and checked first; one that cannot open leaves the board alone.
+// The boards you opened, newest first, with when: an empty board offers them in that order.
+const markOpened = name => { if (name) state.recent = [{ name, at: new Date().toISOString() }, ...(state.recent ?? []).filter(r => r.name !== name)].slice(0, 20); };
 function loadPreset(given) {
   delete state.scratch;
+  markOpened(given?.name);
   if (!Object.keys(given?.nodes ?? {}).length) return withUndo(null, () => { state.preset = given.name; state.nodes = {}; state.edges = []; });
   const { preset: p, notes, error } = KopplerPresets.check(given, stackFacts());
   if (error) return toast(`Cannot open ${given?.name ?? 'this board'}. ${error}`, 'warning');
@@ -1951,8 +1962,11 @@ function renderPresets() {
   const hasBoard = Object.keys(state.nodes).length > 0;
   presetOpen.querySelector('.save-form').hidden = presetOpen.querySelector('.save-label').hidden = !(state.presets ?? []).some(p => p.name === state.preset);
   presetOpen.querySelector('[data-board="dup"]').disabled = !hasBoard;
-  document.getElementById('empty-presets').innerHTML = list.slice(0, 6).map((p, i) => `<button type="button" data-i="${i}">${esc(p.name)}</button>`).join('');
-  document.querySelectorAll('#empty-presets button').forEach(b => b.onclick = () => loadPreset(list[Number(b.dataset.i)]));
+  // Most recently opened first; boards never opened follow in stack order.
+  const opened = name => (state.recent ?? []).find(r => r.name === name)?.at ?? '';
+  const recent = list.map((p, i) => ({ p, i, at: opened(p.name) })).sort((a, b) => (b.at > a.at) - (b.at < a.at) || a.i - b.i).slice(0, 6);
+  document.getElementById('empty-presets').innerHTML = recent.map(({ p, at }, i) => `<li><button type="button" data-i="${i}"><span class="name">${esc(p.name)}</span><span class="meta">${p.shared ? 'Team preset' : 'Your board'}${at ? ` · opened ${esc(ago(at))}` : ''}</span></button></li>`).join('');
+  document.querySelectorAll('#empty-presets button').forEach(b => b.onclick = () => loadPreset(recent[Number(b.dataset.i)].p));
   if (presetMenu) paintPresetMenu();
 }
 
