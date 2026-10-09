@@ -136,7 +136,14 @@ console.log('ok');
     assert.deepEqual([fsx.readFileSync(px.join(temp, 'state.js'), 'utf8'), fsx.readFileSync(px.join(temp, 'history.jsonl'), 'utf8')], ['board A', 'history A']);
     setStack(config, '/stacks/a', () => {});
     assert.equal(fsx.readFileSync(px.join(temp, 'state.js'), 'utf8'), 'board A');
-    console.log('switch stacks ok');
+    // A remembered change must name a file inside the app's clone.
+{
+  const base = { envs: ['qa'], apps: { a: { name: 'A', kind: 'node', slug: 'acme/a' } } };
+  const withChange = file => ({ ...base, apps: { a: { ...base.apps.a, localChanges: [{ file, find: 'x', replace: 'y' }] } } });
+  assert.deepEqual(validateStack(withChange('src/a.js')), []);
+  for (const bad of ['../x', '/etc/hosts', 'a/../../x']) assert.match(validateStack(withChange(bad)).join(), /localChanges\[0\]/, bad);
+}
+console.log('switch stacks ok');
   }
 }
 

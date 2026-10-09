@@ -166,6 +166,10 @@ export function validateStack(stack) {
     for (const key of app?.outside ? ['name', 'kind'] : ['name', 'kind', 'slug']) if (typeof app?.[key] !== 'string' || !app[key]) errors.push(`apps.${id}.${key}: required`);
     for (const dep of Object.keys(app?.consumes ?? {})) if (!stack.apps[dep]) errors.push(`apps.${id}.consumes.${dep}: no such app`);
     for (const key of ['publishes', 'reads']) for (const q of Object.keys(app?.[key] ?? {})) if (!stack.queues?.[q]) errors.push(`apps.${id}.${key}.${q}: no such queue under "queues"`);
+    // A remembered change edits one file inside the app's own clone: a path that could leave it is refused.
+    for (const [n, c] of (Array.isArray(app?.localChanges) ? app.localChanges : app?.localChanges === undefined ? [] : [null]).entries())
+      if (!c || typeof c.file !== 'string' || !c.file || typeof c.find !== 'string' || !c.find || typeof c.replace !== 'string' || path.isAbsolute(c.file) || c.file.split(/[\\/]/).includes('..'))
+        errors.push(`apps.${id}.localChanges[${n}]: needs file (a path inside the app's clone, no .. or leading /), find and replace`);
     for (const [where, list] of [['secrets', app?.secrets], ...Object.entries(app?.envs ?? {}).map(([env, e]) => [`envs.${env}.secrets`, e?.secrets])])
       for (const s of list ?? []) if (s?.type !== undefined && !SECRET_TYPES.includes(s.type)) errors.push(`apps.${id}.${where}: type "${s.type}" is not one Koppler tests (${SECRET_TYPES.join(', ')})`);
   }

@@ -460,6 +460,7 @@ async function up(args) {
     for (const r of prepare({ registry, apps: ids.filter(id => !skip.has(id)), env, calls, repoOf: a => local[a]?.path, logFile })) {
       if (r.state === 'applied') { console.log(`${r.app}: remembered change applied (${r.why})`); step(r.app, 'Remembered change', 'done', r.why); }
       if (r.state === 'moved' || r.state === 'missing') left.push(`${registry.apps[r.app].name}: remembered change "${r.why}" no longer fits (${r.detail})`);
+      if (r.state === 'refused') left.push(`${registry.apps[r.app].name}: remembered change "${r.why}" was refused: ${r.detail}. Check it in stack.json`);
     }
     // Each cable: the caller gets its local callee's address at start, or a remembered change already points it there.
     var setEnv = {};

