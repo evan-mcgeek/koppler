@@ -63,6 +63,9 @@ assert.equal(sanitizeLayout({ nodes: {}, edges: [], preset: 'Mobile App + Wallet
 assert.equal('preset' in sanitizeLayout({ nodes: {}, edges: [], preset: { x: 1 } }), false);
 console.log('ok');
 
+// Recently opened boards are kept, newest first, bounded; anything malformed is dropped.
+assert.deepEqual(sanitizeLayout({ nodes: {}, edges: [], recent: [{ name: 'Checkout', at: '2026-10-09T10:00:00.000Z' }, { name: 'x', at: 'yesterday' }, 'junk', { at: '2026-10-09T10:00:00Z' }] }).recent, [{ name: 'Checkout', at: '2026-10-09T10:00:00.000Z' }]);
+assert.equal(sanitizeLayout({ nodes: {}, edges: [], recent: Array.from({ length: 30 }, (_, n) => ({ name: `b${n}`, at: '2026-10-09T10:00:00Z' })) }).recent.length, 20);
 assert.equal(sanitizePrompt({ tag: 'rm -rf', text: 'x' }), null);
 assert.equal(sanitizePrompt({ tag: 'koppler' }), null);
 assert.equal(sanitizePrompt({ tag: 'koppler-stop', text: 'stop', data: [1] }).data.constructor, Object);
