@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# Runs a command and copies its output to the app's log file, which the canvas shows.
+# Usage: run-logged <app> -- <command...>
+set -uo pipefail
+app=${1:?usage: run-logged <app> -- <command...>}; shift
+[[ $app =~ ^[a-z0-9-]+$ ]] || { echo "invalid app id: $app" >&2; exit 1; }
+[[ ${1:-} == -- ]] && shift
+(( $# )) || { echo "usage: run-logged <app> -- <command...>" >&2; exit 1; }
+
+dir=${KOPPLER_LOGS:-$HOME/.local/state/koppler/logs}
+umask 077; mkdir -p "$dir"
+log=$dir/$app.log
+printf '%s $ %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*" > "$log"
+
+"$@" 2>&1 | tee -a "$log"
+exit "${PIPESTATUS[0]}"

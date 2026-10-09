@@ -1,0 +1,117 @@
+import assert from 'node:assert/strict';
+// Whatever a test started is stopped when the file ends, even after a failed assertion, so no port stays held.
+const cleanups = [];
+process.on('exit', () => cleanups.forEach(stopAll => stopAll()));
+import { commandFor, parseRun } from '../src/koppler.mjs';
+
+assert.deepEqual(parseRun(['mobile-api']), { name: 'mobile-api', command: [], restart: false });
+assert.deepEqual(parseRun(['db', '--port', '5436', '--restart', '--', 'cloudflared', 'access', 'tcp']),
+  { name: 'db', command: ['cloudflared', 'access', 'tcp'], restart: true, port: 5436 });
+assert.equal(parseRun(['web', '--cwd', '/tmp', '--', 'npm', 'start']).cwd, '/tmp');
+assert.deepEqual(parseRun(['a', '--', 'echo', '--restart']).command, ['echo', '--restart']);
+assert.throws(() => parseRun(['Bad Name', '--', 'x']), /name/);
+assert.throws(() => parseRun(['a', '--']), /nothing to run/);
+assert.throws(() => parseRun(['a', '--port', 'abc', '--', 'x']), /port/);
+assert.throws(() => parseRun(['a', '--force', '--', 'x']), /unknown option/);
+
+assert.deepEqual(commandFor(['echo', 'hi'], false), ['echo', 'hi']);
+const wrapped = commandFor(['echo', 'hi'], true);
+assert.equal(wrapped[0], 'sh');
+assert.deepEqual(wrapped.slice(-2), ['echo', 'hi']);
+console.log('ok');
+
+// A process that hands over to another program (as the secrets wrapper does) is still the same run: status and stop must see it.
+{
+  const { spawnSync } = await import('node:child_process');
+  const fs = await import('node:fs'), os = await import('node:os'), path = await import('node:path'), { fileURLToPath } = await import('node:url');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-alive-'));
+  const env = { ...process.env, KOPPLER_STATE: dir, KOPPLER_TEMP: dir };
+  cleanups.push(() => spawnSync('node', [path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'src', 'koppler.mjs'), 'stop', '--all', '--yes'], { env }));
+  const koppler = (...args) => { const r = spawnSync('node', [path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'src', 'koppler.mjs'), ...args], { encoding: 'utf8', env }); return (r.stdout + r.stderr).trim(); };
+  assert.match(koppler('run', 'handover', '--', 'sh', '-c', 'sleep 0.4; exec sleep 30'), /started handover/);
+  // With a port, "started" means it answers: a crash during startup is reported with its log, not as started.
+  assert.match(koppler('run', 'crashy', '--port', '59981', '--', 'sh', '-c', 'sleep 2; echo boom; exit 1'), /crashy exited before answering on port 59981[\s\S]*boom/);
+  await new Promise(r => setTimeout(r, 1200));
+  assert.match(koppler('status'), /handover\s+running/);
+  assert.match(koppler('stop', 'handover'), /handover: stopped/);
+  assert.doesNotMatch(koppler('status'), /handover\s+running/);
+  fs.rmSync(dir, { recursive: true });
+  console.log('handover ok');
+}
+// koppler up: the apps a run needs, the called one first, each waited for; what already runs is kept.
+{
+  const { spawnSync } = await import('node:child_process');
+  const fs = await import('node:fs'), os = await import('node:os'), path = await import('node:path'), { fileURLToPath } = await import('node:url');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-up-'));
+  const env = { ...process.env, KOPPLER_STATE: dir, KOPPLER_TEMP: dir };
+  cleanups.push(() => spawnSync('node', [path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'src', 'koppler.mjs'), 'stop', '--all', '--yes'], { env }));
+  const koppler = (...args) => { const r = spawnSync('node', [path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'src', 'koppler.mjs'), ...args], { encoding: 'utf8', env }); return (r.stdout + r.stderr).trim(); };
+  const app = port => ({ name: `App ${port}`, kind: 'other', start: `python3 -m http.server ${port} --bind 127.0.0.1`, url: `http://localhost:${port}` });
+  fs.writeFileSync(path.join(dir, 'registry.js'), `window.REGISTRY = ${JSON.stringify({ envs: ['qa'], apps: { a: app(59971), b: app(59972) } })};`);
+  fs.writeFileSync(path.join(dir, 'local.js'), `window.LOCAL = ${JSON.stringify({ apps: { a: { path: dir }, b: { path: dir } } })};`);
+  fs.writeFileSync(path.join(dir, 'history.jsonl'), JSON.stringify({ id: 'run000009', at: 't', kind: 'run', env: 'qa', nodes: { a: { run: 'cli' }, b: { run: 'cli' } }, edges: [{ from: 'a', to: 'b' }] }) + '\n');
+  const out = koppler('up', 'a', 'b');
+  assert.ok(out.indexOf('started b') >= 0 && out.indexOf('started b') < out.indexOf('started a'), out);
+  assert.match(out, /Up on QA\./);
+  assert.match(koppler('up', 'a', 'b'), /a: already running[\s\S]*b: already running|b: already running[\s\S]*a: already running/);
+  koppler('stop', '--all', '--yes');
+}
+// koppler up --run: a confirmed Send carried out by Koppler itself; a cable's address reaches its caller at start, and the run is done.
+{
+  const { spawnSync } = await import('node:child_process');
+  const fs = await import('node:fs'), os = await import('node:os'), path = await import('node:path'), { fileURLToPath } = await import('node:url');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-uprun-'));
+  const env = { ...process.env, KOPPLER_STATE: dir, KOPPLER_TEMP: dir, KOPPLER_CONFIG_DIR: dir };
+  cleanups.push(() => spawnSync('node', [path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'src', 'koppler.mjs'), 'stop', '--all', '--yes'], { env }));
+  const koppler = (...args) => { const r = spawnSync('node', [path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'src', 'koppler.mjs'), ...args], { encoding: 'utf8', env }); return { out: (r.stdout + r.stderr).trim(), code: r.status }; };
+  const apps = {
+    a: { name: 'A', kind: 'other', start: 'echo "B_URL=$B_URL"; exec python3 -m http.server 59961 --bind 127.0.0.1', url: 'http://localhost:59961', consumes: { b: { how: 'env', env: 'B_URL' } } },
+    b: { name: 'B', kind: 'other', start: 'exec python3 -m http.server 59962 --bind 127.0.0.1', url: 'http://localhost:59962' },
+  };
+  fs.writeFileSync(path.join(dir, 'registry.js'), `window.REGISTRY = ${JSON.stringify({ envs: ['qa'], apps })};`);
+  fs.writeFileSync(path.join(dir, 'local.js'), `window.LOCAL = ${JSON.stringify({ apps: { a: { path: dir }, b: { path: dir } } })};`);
+  fs.writeFileSync(path.join(dir, 'history.jsonl'), JSON.stringify({ id: 'run000010', at: 't', kind: 'run', env: 'qa', nodes: { a: { run: 'cli' }, b: { run: 'cli' } }, edges: [{ from: 'a', to: 'b' }], plan: { starts: [{ id: 'a' }, { id: 'b' }], restarts: [], stops: [], keeps: [] } }) + '\n');
+  const r = koppler('up', '--run', 'run000010');
+  assert.equal(r.code, 0, r.out);
+  assert.ok(r.out.indexOf('started b') < r.out.indexOf('started a'), r.out);
+  assert.match(fs.readFileSync(path.join(dir, 'logs', 'a.log'), 'utf8'), /B_URL=http:\/\/localhost:59962/);
+  assert.match(fs.readFileSync(path.join(dir, 'history.jsonl'), 'utf8'), /"event":"done"/);
+  assert.deepEqual(Object.keys(JSON.parse(fs.readFileSync(path.join(dir, 'live.json'), 'utf8')).nodes).sort(), ['a', 'b']);
+  koppler('stop', '--all', '--yes');
+}
+// Something left for the agent: the apps still start, the board shows them running (live state), and the run stays open (exit 3).
+{
+  const { spawnSync } = await import('node:child_process');
+  const fs = await import('node:fs'), os = await import('node:os'), path = await import('node:path'), { fileURLToPath } = await import('node:url');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-upleft-'));
+  const env = { ...process.env, KOPPLER_STATE: dir, KOPPLER_TEMP: dir, KOPPLER_CONFIG_DIR: dir };
+  cleanups.push(() => spawnSync('node', [path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'src', 'koppler.mjs'), 'stop', '--all', '--yes'], { env }));
+  const koppler = (...args) => { const r = spawnSync('node', [path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'src', 'koppler.mjs'), ...args], { encoding: 'utf8', env }); return { out: (r.stdout + r.stderr).trim(), code: r.status }; };
+  const apps = {
+    a: { name: 'A', kind: 'other', start: 'exec python3 -m http.server 59941 --bind 127.0.0.1', url: 'http://localhost:59941', consumes: { b: { how: 'unknown' } } },
+    b: { name: 'B', kind: 'other', start: 'exec python3 -m http.server 59942 --bind 127.0.0.1', url: 'http://localhost:59942' },
+  };
+  fs.writeFileSync(path.join(dir, 'registry.js'), `window.REGISTRY = ${JSON.stringify({ envs: ['qa'], apps })};`);
+  fs.writeFileSync(path.join(dir, 'local.js'), `window.LOCAL = ${JSON.stringify({ apps: { a: { path: dir }, b: { path: dir } } })};`);
+  fs.writeFileSync(path.join(dir, 'history.jsonl'), JSON.stringify({ id: 'run000011', at: 't', kind: 'run', env: 'qa', nodes: { a: { run: 'cli' }, b: { run: 'cli' } }, edges: [{ from: 'a', to: 'b' }], plan: { starts: [], restarts: [], stops: [], keeps: [] } }) + '\n');
+  const r = koppler('up', '--run', 'run000011');
+  assert.equal(r.code, 3, r.out);
+  assert.match(r.out, /Left for the agent:[\s\S]*A -> local B: point it at http:\/\/localhost:59942/);
+  assert.deepEqual(Object.keys(JSON.parse(fs.readFileSync(path.join(dir, 'live.json'), 'utf8')).nodes).sort(), ['a', 'b']);
+  assert.doesNotMatch(fs.readFileSync(path.join(dir, 'history.jsonl'), 'utf8'), /"event":"done"/);
+  koppler('stop', '--all', '--yes');
+}
+// stop --apps: everything Koppler runs except the canvas.
+{
+  const { spawnSync } = await import('node:child_process');
+  const fs = await import('node:fs'), os = await import('node:os'), path = await import('node:path'), { fileURLToPath } = await import('node:url');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-stopapps-'));
+  const env = { ...process.env, KOPPLER_STATE: dir, KOPPLER_TEMP: dir };
+  cleanups.push(() => spawnSync('node', [path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'src', 'koppler.mjs'), 'stop', '--all', '--yes'], { env }));
+  const koppler = (...args) => { const r = spawnSync('node', [path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'src', 'koppler.mjs'), ...args], { encoding: 'utf8', env }); return (r.stdout + r.stderr).trim(); };
+  koppler('run', 'canvas', '--', 'sleep', '30'); koppler('run', 'api', '--', 'sleep', '30'); koppler('run', 'tunnel-db-5432', '--', 'sleep', '30');
+  const out = koppler('stop', '--apps', '--yes');
+  assert.match(out, /api: stopped/); assert.match(out, /tunnel-db-5432: stopped/); assert.doesNotMatch(out, /canvas/);
+  assert.match(koppler('status'), /canvas\s+running/);
+  koppler('stop', '--all', '--yes');
+}
