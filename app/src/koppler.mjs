@@ -25,6 +25,7 @@ import { needs as needsFor } from './needs.mjs';
 import { APPROVE, approved, missingTunnels, startsFromStack } from './checks.mjs';
 import { APP, BIN, LOGS, STATE, TEMP } from './paths.mjs';
 import { readActions, updateActions } from './actions.mjs';
+import { appEnv } from './safe-env.mjs';
 
 // A first-time setup ends with the full picture: ports, conflicts and calls of every app.
 // With --pick, or on a stack that has no apps yet, init ends on the canvas, where the user ticks the clones that belong to the stack.
@@ -226,7 +227,7 @@ async function run(args) {
   // Only a stack app started by id gets its stored secrets; an arbitrary command never does.
   if (!opts.command.length) {
     const app = appCommand(opts.name, opts) ?? fail(`${opts.name} is not an app in the stack; to run a command: koppler run ${opts.name} -- <command>`);
-    Object.assign(opts, { cwd: app.cwd, command: app.command, port: opts.port ?? app.port, onStop: app.onStop ?? [], env: app.env });
+    Object.assign(opts, { cwd: app.cwd, command: app.command, port: opts.port ?? app.port, onStop: app.onStop ?? [], env: app.env, holdsSecrets: true });
     if (app.device) console.log(`device: ${app.device.name} (${app.device.platform})`);
   }
   if (opts.dryRun) {
@@ -250,7 +251,10 @@ async function run(args) {
   fs.writeSync(fd, `${new Date().toLocaleString('sv-SE')} $ ${display}\n`);
   const argv = commandFor(opts.command, opts.restart);
   const cwd = path.resolve(opts.cwd ?? process.cwd());
-  const child = spawn(argv[0], argv.slice(1), { cwd, detached: true, stdio: ['ignore', fd, fd] });
+  // An app started with its secrets does not inherit variables that would make its runtime load the caller's code.
+  const safe = opts.holdsSecrets ? appEnv() : null;
+  if (safe?.dropped.length) console.log(`left out of ${opts.name}'s environment, since they load extra code: ${safe.dropped.join(', ')}`);
+  const child = spawn(argv[0], argv.slice(1), { cwd, detached: true, stdio: ['ignore', fd, fd], ...(safe && { env: safe.env }) });
   let spawnError = null;
   child.on('error', e => { spawnError = e; });
   child.unref();

@@ -7,10 +7,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { parse } from './secret-check.mjs';
 import { BIN } from './paths.mjs';
+import { clientEnv, findClient } from './safe-env.mjs';
 
 const MAX_LINES = 500;
-const client = (name, formula) => [...(process.env.PATH ?? '').split(':').map(d => `${d}/${name}`), `/opt/homebrew/opt/${formula}/bin/${name}`, `/usr/local/opt/${formula}/bin/${name}`]
-  .find(p => { try { fs.accessSync(p, fs.constants.X_OK); return true; } catch { return false; } });
 const reason = text => /password authentication failed|access denied|WRONGPASS/i.test(text) ? 'it refused the user name or password'
   : /connection refused|could not connect|can't connect|timeout|timed out|could not translate|unknown (mysql )?server host|ENOTFOUND/i.test(text) ? 'nothing answers at its address (is the tunnel up?)'
   : /read-only|read only/i.test(text) ? 'that statement writes, and this connection is read-only'
@@ -118,10 +117,10 @@ export async function queryCommand(args, { load, fail, here }) {
 
 // { rows, more } or { error }; never the value, and of the server's messages only a plain reason or the SQL error.
 export async function runQuery(c, sql) {
-  const call = clientCall(c, sql), bin = call && client(...call.bin);
+  const call = clientCall(c, sql), bin = call && findClient(...call.bin);
   if (!call) return { error: `Koppler cannot query a ${c.type} connection` };
   if (!bin) return { error: `the ${call.bin[0]} client is not installed (brew install ${call.bin[1]})` };
-  const out = await new Promise(resolve => execFile(bin, call.args, { env: { ...process.env, ...call.env }, timeout: 60000, maxBuffer: 16 * 1024 * 1024 }, (err, stdout, stderr) => resolve({ err, stdout: String(stdout), stderr: String(stderr) })));
+  const out = await new Promise(resolve => execFile(bin, call.args, { env: clientEnv(call.env), timeout: 60000, maxBuffer: 16 * 1024 * 1024 }, (err, stdout, stderr) => resolve({ err, stdout: String(stdout), stderr: String(stderr) })));
   if (out.err) return { error: `the query failed: ${reason(out.stderr) ?? out.stderr.split('\n').find(l => /ERROR/i.test(l))?.replace(/^.*?ERROR[: ]*/i, '') ?? 'see the database client'}` };
   const lines = out.stdout.trimEnd().split('\n').filter(l => !/^(BEGIN|ROLLBACK|SET)$/.test(l.trim()));
   return { rows: lines.slice(0, MAX_LINES).join('\n'), more: Math.max(0, lines.length - MAX_LINES) };
