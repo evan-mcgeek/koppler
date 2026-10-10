@@ -18,7 +18,7 @@ The log says how to undo things; which runs and Stops happened, and how they end
 | `env-file` | `app`, `file` (e.g. `.env.local`), `lines` added, `created` (bool: Koppler created the file) |
 | `file` | `app`, `file`, `before` (the file's text before the run, `null` when Koppler created it), `after` (the text Koppler wrote last): a local library's `pubspec_overrides.yaml`; Stop puts `before` back or removes the file, and leaves a file that no longer reads as `after` for you to sort out |
 | `npm-local` | `app`, `repo`, `packages`: local libraries installed with `npm install --no-save`; Stop runs `npm install` to go back to the published ones, after the branch is back |
-| `checkout` | `app`, `repo`, `from`, `to`, `stash?` (its label), `carried?`; written by `koppler switch`, do not add it yourself |
+| `checkout` | `app`, `repo`, `from` (a branch, or a commit with `detached`), `to`, `stash?` (its label), `carried?`; written by `koppler switch`, do not add it yourself. It stays until the clone is back and its set-aside changes are too: when those clash, the clone is left clean, they stay in the stash, and the user takes them back with `git stash pop` |
 | `secret` | `app`, `env` (name only) |
 
 `koppler history --done` copies the code changes in this log (`edit`, `profile`, `env-file`, `checkout`) into the run's history entry, with secrets masked, so the canvas History shows them as diffs even after a revert. Log each change before calling it.
