@@ -6,10 +6,11 @@ These are the rules it follows, including the ones that hold whatever an agent d
 ## Secrets stay yours
 
 - Values live in the macOS Keychain, one item per secret, per app and environment.
+- Where there is no Keychain (Linux), or when `KOPPLER_SECRETS` names a folder, they live in files instead: one per app and environment under `~/.config/koppler/secrets`, readable by you alone (the folder is 700, each file 600). Nothing prompts before such a file is read, so there every environment is as open as the first one is on a Mac: anything running as you can read it. `koppler secret list` shows names only in both cases.
 - You store them yourself, in your own terminal, with a hidden prompt: `koppler secret set <app> <NAME>`, or piped from a fetch command with `--stdin`.
 - The agent can list secret names and start an app with its secrets (`koppler run <app>`), and nothing else. A command it runs never gets them.
 - Each environment has its own store, so a production value never replaces or leaks into a test environment.
-- Secrets of a protected environment show a Keychain prompt on every read. The stack says which environments are protected (`protected` in `stack.json`); without that, every environment except the first. It never depends on what an environment is called.
+- In the Keychain, secrets of a protected environment show a prompt on every read. The stack says which environments are protected (`protected` in `stack.json`); without that, every environment except the first. It never depends on what an environment is called.
 - Secrets of the other environments (usually just the first, your test environment) can be read without a prompt by anything running as you. For an agent, only the deny rules stand in the way; treat those values accordingly.
 - The canvas Credentials panel can set, test and remove a value, and never shows one.
 - `koppler doctor --secrets <app>` checks that a stored database or Redis secret connects and prints only the outcome. A value is only ever sent to the host named inside it.

@@ -78,7 +78,7 @@ Compose is checked last: many repos have a compose file only for their database.
 ## What every run gets
 
 - **Local addresses** for every cable, in the way the kind takes settings.
-- **Secrets** from the Keychain, loaded into that process only.
+- **Secrets** from your secret store, loaded into that process only.
 - **Tunnels** to deployed databases and services, opened first.
 - **Local queues**, when switched on: an SQS emulator or a Kafka broker in Docker. SNS and EventBridge stay deployed.
 - **Local libraries**, linked for the run: `pubspec_overrides.yaml` for Dart and Flutter, `npm install --no-save` for npm. Nothing tracked changes, and Stop puts the published packages back.

@@ -16,7 +16,7 @@ It helps most when you work on one app (a mobile app, a front end, one API) and 
 - **Run.** Koppler switches branches, points callers at the local apps, opens tunnels, starts local queues and starts the apps callees first, checking that each one answers.
 - **Live cards.** Each card shows its steps, whether its port answers, and its log.
 - **Stop and revert.** One click stops what Koppler started and undoes every temporary change. Apps you started yourself are left alone.
-- **Secrets stay yours.** You store them in the macOS Keychain; Koppler starts an app with them and never shows them.
+- **Secrets stay yours.** You store them in the macOS Keychain (on Linux, in files only you can read); Koppler starts an app with them and never shows them.
 
 ## Install
 
@@ -53,7 +53,7 @@ Either way, the agent drives the `koppler` command, so install the app first.
 
 ## Requirements
 
-- macOS (secrets live in the Keychain).
+- macOS (secrets live in the Keychain) or Linux (secrets live in private files, without the per-read prompt; see [security](docs/security.md)).
 - git and Node 22 or newer.
 
 Everything else depends on your stack (the .NET SDK, Flutter, Docker, the AWS CLI, ...).
