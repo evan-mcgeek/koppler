@@ -9,15 +9,17 @@ import os from 'node:os';
 import path from 'node:path';
 import { execFileSync, spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { takeSecrets } from './safe-env.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
+// Read once and taken out of the environment, so the build and Docker commands started below never carry them.
+const stored = takeSecrets();
 const [config, port, overridesFile] = [JSON.parse(process.argv[2] ?? 'null'), Number(process.argv[3]), process.argv[4]];
 if (!config?.handler || !config.runtime || !port) { console.error('usage: lambda-local.mjs <config json> <port> [<overrides file>]'); process.exit(1); }
 const emulator = port + 1, name = `koppler-lambda-${port}`, endpoint = `http://127.0.0.1:${emulator}`, arch = os.arch() === 'arm64' ? 'arm64' : 'x86_64';
 const work = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-lambda-')), cache = path.join(process.env.KOPPLER_STATE || path.join(os.homedir(), '.local', 'state', 'koppler'), 'lambda');
 const run = (cmd, args, opts = {}) => execFileSync(cmd, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], ...opts }).trim();
-// The emulator takes any credentials. The AWS CLI gets only what it needs to run: not the user's AWS profile, and none
-// of the app's stored secrets, which are in this process's environment.
+// The emulator takes any credentials. The AWS CLI gets only what it needs to run, not the user's AWS profile.
 const awsEnv = { PATH: process.env.PATH ?? '', HOME: process.env.HOME ?? '', ...(process.env.TMPDIR && { TMPDIR: process.env.TMPDIR }), AWS_ACCESS_KEY_ID: 'test', AWS_SECRET_ACCESS_KEY: 'test', AWS_PAGER: '', AWS_CONFIG_FILE: '/dev/null', AWS_SHARED_CREDENTIALS_FILE: '/dev/null' };
 const aws = (...args) => run('aws', ['--endpoint-url', endpoint, '--region', 'eu-west-1', '--output', 'text', ...args], { env: awsEnv });
 const say = text => console.log(`koppler: ${text}`);
@@ -42,7 +44,7 @@ try {
 
   const extra = [];
   if (config.secret) {
-    const value = process.env[config.secret.from];
+    const value = stored[config.secret.from];
     if (!value) throw new Error(`${config.secret.from} is not stored; see koppler doctor`);
     let secret; try { secret = JSON.parse(value); } catch { throw new Error(`${config.secret.from} is not the secret's JSON`); }
     const set = overridesFile && fs.existsSync(overridesFile) ? JSON.parse(fs.readFileSync(overridesFile, 'utf8')).set ?? {} : {};

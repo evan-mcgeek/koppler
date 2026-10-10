@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { appEnv, clientEnv, findClient, loadsCode } from '../src/safe-env.mjs';
+import { appEnv, clientEnv, findClient, loadsCode, takeSecrets } from '../src/safe-env.mjs';
 import { validateStack } from '../src/sync.mjs';
 import { allowStack } from './allow.mjs';
 
@@ -18,6 +18,14 @@ assert.deepEqual(app.dropped.sort(), ['BASH_ENV', 'DOTNET_STARTUP_HOOKS', 'DYLD_
 const client = clientEnv({ PGPASSWORD: 'p', PGCONNECT_TIMEOUT: '10' }, { ...caller, PGSERVICEFILE: '/x', PGPASSWORD: 'theirs', MYSQL_HOST: 'evil', MYSQL_PWD: 'theirs' });
 assert.deepEqual(Object.keys(client).sort(), ['AWS_PROFILE', 'HOME', 'PATH', 'PGCONNECT_TIMEOUT', 'PGPASSWORD']);
 assert.equal(client.PGPASSWORD, 'p');
+
+// A runner takes the stored secrets out of its environment, so the tools it starts do not carry them.
+{
+  const env = { PATH: '/usr/bin', DB_URL: 'db-not-real', API_KEY: 'key-not-real', KOPPLER_SECRET_NAMES: 'DB_URL API_KEY MISSING' };
+  assert.deepEqual(takeSecrets(env), { DB_URL: 'db-not-real', API_KEY: 'key-not-real', MISSING: undefined });
+  assert.deepEqual(env, { PATH: '/usr/bin', KOPPLER_SECRET_NAMES: 'DB_URL API_KEY MISSING' });
+  assert.deepEqual(takeSecrets({ PATH: '/usr/bin' }), {});
+}
 
 // Clients come from where they are installed, never from a folder the caller put first on the PATH.
 {
@@ -43,7 +51,9 @@ assert.deepEqual(['NODE_OPTIONS', 'DYLD_LIBRARY_PATH', 'LD_PRELOAD', 'JAVA_TOOL_
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-safeenv-')), seen = path.join(dir, 'seen.txt');
   const env = { ...process.env, KOPPLER_STATE: dir, KOPPLER_TEMP: dir, KOPPLER_CONFIG_DIR: dir, KOPPLER_SECRETS: path.join(dir, 'secrets'), NODE_OPTIONS: '--max-old-space-size=256' };
   const koppler = (...args) => spawnSync('node', [path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'src', 'koppler.mjs'), ...args], { encoding: 'utf8', env });
-  const stack = { envs: ['qa'], apps: { api: { name: 'API', kind: 'other', start: `printf '%s' "\${NODE_OPTIONS:-none}" > ${seen}; exec sleep 30` } } };
+  fs.mkdirSync(path.join(dir, 'secrets'));
+  fs.writeFileSync(path.join(dir, 'secrets', 'api.env'), 'export DB_URL=db-not-real\nexport API_KEY=key-not-real\n');
+  const stack = { envs: ['qa'], apps: { api: { name: 'API', kind: 'other', start: `printf '%s' "\${NODE_OPTIONS:-none}" > ${seen}; printf '%s' "$KOPPLER_SECRET_NAMES" > ${seen}.names; exec sleep 30` } } };
   fs.writeFileSync(path.join(dir, 'registry.js'), `window.REGISTRY = ${JSON.stringify(stack)};`);
   fs.writeFileSync(path.join(dir, 'local.js'), `window.LOCAL = ${JSON.stringify({ apps: { api: { path: dir } } })};`);
   allowStack(dir, stack);
@@ -52,6 +62,8 @@ assert.deepEqual(['NODE_OPTIONS', 'DYLD_LIBRARY_PATH', 'LD_PRELOAD', 'JAVA_TOOL_
     assert.equal(r.status, 0, r.stdout + r.stderr);
     assert.match(r.stdout, /left out of api's environment[^\n]*NODE_OPTIONS/);
     assert.equal(fs.readFileSync(seen, 'utf8'), 'none');
+    // The app is told which of its variables are stored secrets, by name.
+    assert.equal(fs.readFileSync(`${seen}.names`, 'utf8'), 'DB_URL API_KEY');
   } finally { koppler('stop', '--all', '--yes'); }
 }
 console.log('safe-env tests ok');
