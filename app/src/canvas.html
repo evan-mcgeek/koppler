@@ -1874,12 +1874,15 @@ const stackFacts = () => ({
 const markOpened = name => { if (name) state.recent = [{ name, at: new Date().toISOString() }, ...(state.recent ?? []).filter(r => r.name !== name)].slice(0, 20); };
 function loadPreset(given) {
   delete state.scratch;
+  // Local queue choices and dismissed notes belong to the board that was open.
+  const leave = () => { delete state.queues; delete state.dismissed; };
   markOpened(given?.name);
-  if (!Object.keys(given?.nodes ?? {}).length) return withUndo(null, () => { state.preset = given.name; state.nodes = {}; state.edges = []; });
+  if (!Object.keys(given?.nodes ?? {}).length) return withUndo(null, () => { leave(); state.preset = given.name; state.nodes = {}; state.edges = []; });
   const { preset: p, notes, error } = KopplerPresets.check(given, stackFacts());
   if (error) return toast(`Cannot open ${given?.name ?? 'this board'}. ${error}`, 'warning');
   const ids = Object.keys(p.nodes);
   withUndo(notes.length ? `Opened ${p.name}, changed to fit: ${notes.join('; ')}` : null, () => {
+    leave();
     state.preset = p.name;
     state.nodes = Object.fromEntries(ids.map(id => [id, { x: 0, y: 0, branch: p.nodes[id].branch ?? '', run: p.nodes[id].run,
       ...(p.nodes[id].platform && { platform: p.nodes[id].platform }), ...(isMobile(id) && !p.nodes[id].platform && { platform: 'ios' }), ...(p.nodes[id].note && { note: p.nodes[id].note }), ...(p.nodes[id].tunnels === false && { hideTunnels: true }), ...(p.nodes[id].queues === false && { hideQueues: true }) }]));
@@ -2967,9 +2970,12 @@ function paintTool() {
 function setTool(next) { tool = next; try { localStorage.setItem('koppler-tool', tool); } catch {} paintTool(); }
 document.querySelectorAll('.tool-switch .tool').forEach(b => b.onclick = () => setTool(b.dataset.tool));
 const typing = e => !!e.target.closest?.('input, textarea, select, [contenteditable]') || !!document.querySelector('.review:not([hidden])');
+// While a dialog that covers the board is open, no shortcut changes the board behind it.
+const modalOpen = () => !!document.querySelector('.review:not([hidden])');
 addEventListener('keydown', e => {
+  if (modalOpen()) return;
   // Cmd or Ctrl + Enter opens the Send review; nothing is sent before it is confirmed there.
-  if ((e.metaKey || e.ctrlKey) && e.key === 'Enter' && !document.querySelector('.review:not([hidden])')) { e.preventDefault(); if (!document.getElementById('send').disabled) startSend(); return; }
+  if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); if (!document.getElementById('send').disabled) startSend(); return; }
   if (typing(e) || e.metaKey || e.ctrlKey || e.altKey) return;
   if (e.code === 'Space') { e.preventDefault(); if (!e.repeat) { spaceHeld = true; paintTool(); } }
   else if (e.key === 'v' || e.key === 'V') setTool('select');
@@ -3017,7 +3023,7 @@ function selectArea(e) {
 addEventListener('keydown', e => { if (e.key === 'Escape' && selected.size && !e.target.closest('input, textarea, select, .review, .creds-pop, .history-pop, .note-pop')) clearSelection(); });
 // Delete or Backspace removes the selected cards from the board (a selected tunnel is hidden), with Undo.
 addEventListener('keydown', e => {
-  if ((e.key !== 'Delete' && e.key !== 'Backspace') || !selected.size || state.view === 'run' || e.target.closest('input, textarea, select, [contenteditable], [role="dialog"], [role="menu"]')) return;
+  if (modalOpen() || (e.key !== 'Delete' && e.key !== 'Backspace') || !selected.size || state.view === 'run' || e.target.closest('input, textarea, select, [contenteditable], [role="dialog"], [role="menu"]')) return;
   e.preventDefault();
   const apps = [...selected].filter(id => state.nodes[id]), tunnels = [...selected].filter(id => !state.nodes[id] && state.infra?.[id]);
   const what = apps.length === 1 && !tunnels.length ? registry.apps[apps[0]]?.name : [apps.length && `${apps.length} ${apps.length === 1 ? 'app' : 'apps'}`, tunnels.length && `${tunnels.length} ${tunnels.length === 1 ? 'tunnel' : 'tunnels'}`].filter(Boolean).join(' and ');
@@ -3773,7 +3779,7 @@ document.getElementById('fit').onclick = fit;
 document.getElementById('undo').onclick = () => stepHistory(true);
 document.getElementById('redo').onclick = () => stepHistory(false);
 addEventListener('keydown', e => {
-  if (!(e.metaKey || e.ctrlKey) || e.altKey || e.target.closest('input, textarea, select, [contenteditable]')) return;
+  if (modalOpen() || !(e.metaKey || e.ctrlKey) || e.altKey || e.target.closest('input, textarea, select, [contenteditable]')) return;
   const k = e.key.toLowerCase();
   if (k === 'z') { e.preventDefault(); stepHistory(!e.shiftKey); }
   else if (k === 'y' && e.ctrlKey && !e.metaKey) { e.preventDefault(); stepHistory(false); }
@@ -4152,6 +4158,8 @@ function startSend(note, mode = 'auto') {
   lastSend = { note, mode };
   const g = { ...graph(), mode, ...(note && { note }) };
   if (!g.nodes.length) return toast('Add at least one app first', 'warning');
+  // What is confirmed is the board as it was reviewed.
+  const layout = JSON.parse(JSON.stringify(state));
   const p = planFor(g), env = g.env.toUpperCase(), isProd = KopplerPlan.isProtected(registry, g.env);
   // A note is for the agent: such a Send goes to it first, since Koppler cannot act on free text.
   const byAgent = !!g.note || g.nodes.some(n => n.note);
@@ -4176,7 +4184,7 @@ function startSend(note, mode = 'auto') {
       const plan = Object.fromEntries(VERBS.map(([k]) => [k, p[k]]));
       const text = 'Set up and run this stack using the koppler-run skill and temp/registry.js.\n' + describe(g) + '\nPLAN the user confirmed on the canvas (do exactly this; check it first with koppler plan):\n' + KopplerPlan.describe(p, { name: id => registry.apps[id]?.name ?? id }).map(l => '  ' + l).join('\n');
       const id = newRunId();
-      deliver(text, { tag: 'koppler', text: `Run ${g.nodes.length} app(s) locally on ${env} (${g.mode})`, data: { ...g, id, plan, layout: state } }, g.mode === 'manual' || byAgent ? 'Sent. Waiting for the agent' : 'Sent. Koppler is starting it', text + '\n\n' + JSON.stringify(g, null, 2))
+      deliver(text, { tag: 'koppler', text: `Run ${g.nodes.length} app(s) locally on ${env} (${g.mode})`, data: { ...g, id, plan, layout } }, g.mode === 'manual' || byAgent ? 'Sent. Waiting for the agent' : 'Sent. Koppler is starting it', text + '\n\n' + JSON.stringify(g, null, 2))
         .then(ok => { if (!ok) return; noteSent({ id, kind: 'run', env: g.env, mode: g.mode, ...KopplerPlan.board(g), plan }); });
     },
   });
