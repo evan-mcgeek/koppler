@@ -154,7 +154,7 @@ function followIdeLogs() {
   }
 }
 
-const writeAtomic = (file, body) => { fs.writeFileSync(file + '.tmp', body); fs.renameSync(file + '.tmp', file); };
+const writeAtomic = (file, body) => { fs.writeFileSync(file + '.tmp', body, { mode: 0o600 }); fs.renameSync(file + '.tmp', file); };
 
 // Presets: a name, apps with how they run, cables between them, and where an opened one came from.
 export function sanitizePresets(list) {
@@ -221,8 +221,15 @@ export function sanitizeLayout(input) {
   return { env: text(input.env, 8), mode: text(input.mode, 8), ...(dismissed.length && { dismissed }), ...(typeof input.keptLive === 'string' && /^[a-z0-9]{6,40}$/.test(input.keptLive) && { keptLive: input.keptLive }), ...(Object.keys(infra).length && { infra }), ...(['down', 'right'].includes(input.tidy) && { tidy: input.tidy }), ...(input.scratch === true && { scratch: true }), ...(presets.length && { presets }), ...(trash.length && { trash }), ...(recent.length && { recent }), ...(typeof input.preset === 'string' && input.preset && { preset: text(input.preset, 80) }), ...(typeof input.note === 'string' && input.note && { note: text(input.note, MAX_NOTE) }), zoom: num(input.zoom) || 1, pan: { x: num(input.pan?.x), y: num(input.pan?.y) }, nodes, edges };
 }
 
-let saveTarget = null, promptTarget = null;
-export const PAGE_FILES = { '': 'canvas.html', 'ports.js': 'ports.js', 'kinds.js': 'kinds.js', 'presets.js': 'presets.js', 'plan.js': 'plan.js', 'logfmt.js': 'logfmt.js', 'temp/registry.js': 'temp/registry.js', 'temp/local.js': 'temp/local.js', 'temp/repos.js': 'temp/repos.js', 'temp/state.js': 'temp/state.js', 'temp/status.js': 'temp/status.js', 'temp/debug.jsonl': 'temp/debug.jsonl' };
+let serving = false;
+const FONTS = fs.readdirSync(path.join(here, 'fonts')).filter(f => /\.(woff2|css)$/.test(f)).map(f => `fonts/${f}`);
+export const PAGE_FILES = { '': 'canvas.html', 'ports.js': 'ports.js', 'kinds.js': 'kinds.js', 'presets.js': 'presets.js', 'plan.js': 'plan.js', 'logfmt.js': 'logfmt.js', 'temp/registry.js': 'temp/registry.js', 'temp/local.js': 'temp/local.js', 'temp/repos.js': 'temp/repos.js', 'temp/state.js': 'temp/state.js', 'temp/status.js': 'temp/status.js', 'temp/debug.jsonl': 'temp/debug.jsonl', ...Object.fromEntries(FONTS.map(f => [f, f])) };
+const CONTENT_TYPES = { html: 'text/html; charset=utf-8', css: 'text/css; charset=utf-8', woff2: 'font/woff2', jsonl: 'text/plain; charset=utf-8' };
+// The page loads and calls nothing but this server, and no other page can frame it or learn its address.
+const SECURITY_HEADERS = {
+  'content-security-policy': "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; frame-ancestors 'none'; base-uri 'none'; form-action 'none'",
+  'referrer-policy': 'no-referrer', 'x-content-type-options': 'nosniff', 'x-frame-options': 'DENY', 'cross-origin-resource-policy': 'same-origin',
+};
 const PROMPT_TAGS = new Set(['koppler', 'koppler-stop', 'koppler-reply', 'koppler-fix', 'koppler-facts']);
 
 // A prompt from the standalone page: only the canvas's two kinds, with a bounded text and data object.
@@ -268,6 +275,12 @@ function startServer() {
   const server = http.createServer((req, res) => {
     const url = new URL(req.url, 'http://127.0.0.1');
     const prefix = `/s/${token}/`;
+    for (const [name, value] of Object.entries(SECURITY_HEADERS)) res.setHeader(name, value);
+    // Only this machine's own page is answered: not another site's name pointed here, nor a request another site makes.
+    const own = ['127.0.0.1', 'localhost'].map(h => `${h}:${server.address().port}`), origin = req.headers.origin;
+    // The answer is sent whole before the connection closes, whatever is still on its way in.
+    const refuse = code => { res.writeHead(code, { connection: 'close' }).end(); req.resume(); };
+    if (!own.includes(req.headers.host) || (origin !== undefined && !own.includes(origin.replace(/^http:\/\//, '')))) return refuse(403);
     if (req.method === 'GET' && url.pathname.startsWith(prefix)) {
       // The open log tab reads its app's log here, much longer than the short tail every status carries.
       if (url.pathname.slice(prefix.length) === 'log') {
@@ -284,13 +297,15 @@ function startServer() {
       const full = file.startsWith('temp/') ? path.join(TEMP, file.slice(5)) : path.join(here, file);
       fs.readFile(full, (err, body) => {
         if (err) { res.writeHead(404).end(); return; }
-        res.writeHead(200, { 'content-type': file.endsWith('.html') ? 'text/html; charset=utf-8' : 'text/javascript; charset=utf-8', 'cache-control': 'no-store' }).end(body);
+        res.writeHead(200, { 'content-type': CONTENT_TYPES[path.extname(file).slice(1)] ?? 'text/javascript; charset=utf-8', 'cache-control': file.endsWith('.woff2') ? 'private, max-age=604800' : 'no-store' }).end(body);
       });
       return;
     }
     const given = Buffer.from(url.searchParams.get('token') || ''), expected = Buffer.from(token);
     const authorized = given.length === expected.length && crypto.timingSafeEqual(given, expected);
-    if (req.method !== 'POST' || !authorized || !['/state', '/prompt', '/preset', '/discover', '/discover-apply', '/stack', '/stack-update', '/stack-discard', '/stack-pr', '/apps', '/apps-remove', '/secret', '/secret-remove', '/secret-test', '/cable-test', '/messages-clear', '/message-dismiss', '/shutdown', '/stop-apps', '/debug-log', '/debug-clear', '/needs'].includes(url.pathname)) { res.writeHead(404).end(); req.destroy(); return; }
+    if (req.method !== 'POST' || !authorized || !['/state', '/prompt', '/preset', '/discover', '/discover-apply', '/stack', '/stack-update', '/stack-discard', '/stack-pr', '/apps', '/apps-remove', '/secret', '/secret-remove', '/secret-test', '/cable-test', '/messages-clear', '/message-dismiss', '/shutdown', '/stop-apps', '/debug-log', '/debug-clear', '/needs'].includes(url.pathname)) return refuse(404);
+    // A form on another site cannot send JSON without asking first, and that question is never answered.
+    if (!/^application\/json\b/i.test(req.headers['content-type'] ?? '')) return refuse(415);
     readBody(req, res, body => {
       if (url.pathname === '/preset') {
         fetchPresets(typeof body?.url === 'string' ? body.url.slice(0, 500) : '').then(result => res.writeHead(result.error ? 400 : 200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' }).end(JSON.stringify(result)));
@@ -436,8 +451,7 @@ function startServer() {
   });
   server.listen(PORT, '127.0.0.1', () => {
     const base = `http://127.0.0.1:${server.address().port}`;
-    saveTarget = `${base}/state?token=${token}`;
-    promptTarget = `${base}/prompt?token=${token}`;
+    serving = true;
     const page = `${base}/s/${token}/`;
     fs.writeFileSync(path.join(TEMP, 'canvas-url'), page + '\n', { mode: 0o600 });
     console.log(`canvas: ${page}`);
@@ -668,8 +682,8 @@ async function snapshot() {
   status.runningEnvs = runningEnvs();
   status.runs = runs().slice(-20).map(({ nodes, edges, ...r }) => ({ ...r, nodes, edges }));
   status.at = new Date().toISOString();
-  if (saveTarget) status.save = saveTarget;
-  if (promptTarget) status.prompt = promptTarget;
+  // The page works out the server's addresses from its own, so the token is in no file but its own.
+  if (serving) status.server = true;
   try { status.pageVersion = fs.statSync(path.join(here, 'canvas.html')).mtimeMs; } catch {}
   // The page reloads itself; the server's own code only takes effect after a restart.
   status.startedAt = STARTED_AT;

@@ -30,6 +30,13 @@ Back this up with deny rules in your agent's settings; [secrets.md](../plugin/sk
 - Koppler works in your real clones, so your IDE sees the changes, but it never commits, stashes or discards your work.
 - Apps you started yourself are left alone.
 
+## The canvas stays on your machine
+
+- The canvas server listens on this machine only, and its address holds a random token; the files that keep the token are readable by you alone.
+- It answers its own page and nothing else: a request made by another site, or under another site's name pointed at your machine, is refused.
+- The page loads nothing from the network, fonts included, and cannot be shown inside another page.
+- The limit: the port is fixed. A program already running on your machine could take it while the canvas is stopped and answer a tab you left open. Open the canvas with `koppler canvas` after a restart instead of reloading an old tab.
+
 ## What stays on your machine
 
 The shared `stack.json` holds facts about the apps: names, addresses, how to run them, the names of the secrets they need and how to fetch each one.
