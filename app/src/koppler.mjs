@@ -26,6 +26,7 @@ import { APPROVE, approved, missingTunnels, startsFromStack } from './checks.mjs
 import { APP, BIN, LOGS, STATE, TEMP } from './paths.mjs';
 import { readActions, updateActions } from './actions.mjs';
 import { appEnv } from './safe-env.mjs';
+import { redact, scrub } from './scrub.mjs';
 import kp from './plan.js';
 
 // A first-time setup ends with the full picture: ports, conflicts and calls of every app.
@@ -278,7 +279,7 @@ async function run(args) {
 }
 const START_WAIT = Number(process.env.KOPPLER_START_WAIT) * 1000 || 300000;
 
-const tailOf = (file, n) => { try { return fs.readFileSync(file, 'utf8').trimEnd().split('\n').slice(-n).join('\n'); } catch { return ''; } };
+const tailOf = (file, n) => { try { return redact(fs.readFileSync(file, 'utf8').trimEnd().split('\n').slice(-n).join('\n')); } catch { return ''; } };
 
 async function stopOne(rec) {
   if (!alive(rec)) { for (const [cmd, ...cmdArgs] of rec.onStop ?? []) sh(cmd, cmdArgs); fs.rmSync(recordPath(rec.name), { force: true }); return `${rec.name}: was not running`; }
@@ -318,7 +319,7 @@ const table = rows => {
 // What a bug report needs, ready to paste into a public issue: versions, then the tails of the canvas debug log, the
 // latest run log and each named log, all scrubbed of secrets and of everything that names the user or their stack.
 async function debugReport(names) {
-  const { scrub } = await import('./scrub.mjs'), { stacksHere } = await import('./sync.mjs');
+  const { stacksHere } = await import('./sync.mjs');
   const registries = [load('registry.js', 'REGISTRY'), load('state.js', 'SAVED_STATE'), ...stacksHere().map(s => { try { return JSON.parse(fs.readFileSync(path.join(s.dir, 'stack.json'), 'utf8')); } catch { return null; } })];
   const tailOf = (file, n) => { try { return fs.readFileSync(file, 'utf8').trimEnd().split('\n').slice(-n).join('\n'); } catch { return null; } };
   const newest = dir => { try { return fs.readdirSync(dir).filter(f => /^up-.*\.log$/.test(f)).map(f => path.join(dir, f)).sort((a, b) => fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs)[0]; } catch { return null; } };
@@ -726,7 +727,6 @@ async function logs(args) {
   if (!NAME.test(want)) fail(`${want} is not a name Koppler gives its processes`);
   const file = path.join(LOGS, `${want}.log`);
   if (!fs.existsSync(file)) fail(`no log for ${want}; koppler status lists what runs`);
-  const { redact } = await import('./status-watch.mjs');
   process.stdout.write(redact(fs.readFileSync(file, 'utf8').trimEnd().split('\n').slice(-lines).join('\n')) + '\n');
   if (!args.includes('-f') && !args.includes('--follow')) return;
   let at = fs.statSync(file).size;

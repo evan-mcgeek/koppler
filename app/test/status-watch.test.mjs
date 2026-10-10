@@ -2,13 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { cableTest, declaredSecrets, fromKoppler, githubFile, presetsIn, redact, sanitizeLayout, sanitizePrompt, tail } from '../src/status-watch.mjs';
-
-assert.equal(redact('Host=db;Password=s3cr3t!;Database=orders'), 'Host=db;Password=***;Database=orders');
-assert.equal(redact('"client_secret": "abc123", "x": 1'), '"client_secret": "***", "x": 1');
-assert.equal(redact('Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.abcdefgh'), 'Authorization: Bearer ***jwt***');
-assert.equal(redact('key AKIAABCDEFGHIJKLMNOP used'), 'key ***aws-key*** used');
-assert.equal(redact('\x1b[32minfo\x1b[0m: Now listening on: http://localhost:58000'), 'info: Now listening on: http://localhost:58000');
+import { cableTest, declaredSecrets, fromKoppler, githubFile, presetsIn, sanitizeLayout, sanitizePrompt, tail } from '../src/status-watch.mjs';
 
 const file = path.join(os.tmpdir(), `ls-tail-${process.pid}.log`);
 fs.writeFileSync(file, Array.from({ length: 1000 }, (_, i) => `line ${i}`).join('\n') + '\n');

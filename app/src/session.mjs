@@ -3,6 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { redact } from './scrub.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 export const isDev = () => !fs.realpathSync(here).split(path.sep).join('/').includes('/plugins/cache/');
@@ -26,12 +27,12 @@ export function collectSession({ temp, logsDir, stop, runs }) {
   write('debug.jsonl', clicks.map(o => JSON.stringify(o)).join('\n'));
   const messages = jsonl(read(path.join(temp, 'messages.jsonl'))).filter(o => !o.at || inRange(o));
   write('messages.jsonl', messages.map(o => JSON.stringify(o)).join('\n'));
-  const ups = session.map(r => [r.id, read(path.join(temp, `up-${r.id}.log`))]).filter(([, t]) => t);
+  const ups = session.map(r => [r.id, redact(read(path.join(temp, `up-${r.id}.log`)))]).filter(([, t]) => t);
   for (const [id, t] of ups) write(`up-${id}.log`, t);
   const apps = [...new Set(session.flatMap(r => Object.keys(r.nodes ?? {})))];
-  const appLogs = apps.map(id => [id, lastLines(read(path.join(logsDir, `${id}.log.history`)) + read(path.join(logsDir, `${id}.log`)), 3000)]).filter(([, t]) => t.trim());
+  const appLogs = apps.map(id => [id, redact(lastLines(read(path.join(logsDir, `${id}.log.history`)) + read(path.join(logsDir, `${id}.log`)), 3000))]).filter(([, t]) => t.trim());
   for (const [id, t] of appLogs) fs.writeFileSync(path.join(dir, 'logs', `${id}.log`), t, { mode: 0o600 });
-  write('canvas.log', lastLines(read(path.join(logsDir, 'canvas.log')), 400));
+  write('canvas.log', redact(lastLines(read(path.join(logsDir, 'canvas.log')), 400)));
 
   // What went wrong, at a glance; the details are in the files next to it.
   const failed = session.filter(r => r.state === 'failed'), left = ups.filter(([, t]) => /Left for the agent:/.test(t));

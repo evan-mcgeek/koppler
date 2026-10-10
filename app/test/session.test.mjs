@@ -25,14 +25,19 @@ fs.writeFileSync(path.join(dir, 'debug.jsonl'), [
   ...Array.from({ length: 5 }, () => ({ at: '2026-01-01T10:05:00Z', kind: 'click', what: 'button#stop' })),
   { at: '2026-01-01T10:06:00Z', kind: 'error', what: 'x is undefined' },
 ].map(o => JSON.stringify(o)).join('\n'));
-fs.writeFileSync(path.join(dir, 'up-r1.log'), 'started api\n\nLeft for the agent:\n  - A -> local B: point it at http://x\n');
+fs.writeFileSync(path.join(dir, 'up-r1.log'), 'started api\napi exited: Password=up-not-real\n\nLeft for the agent:\n  - A -> local B: point it at http://x\n');
+fs.appendFileSync(log, 'fail: postgres://admin:app-not-real@db/orders refused\n');
+fs.writeFileSync(path.join(logs, 'canvas.log'), 'Authorization: Bearer canvas-not-real\n');
 const out = collectSession({ temp: dir, logsDir: logs, stop: runs[3], runs });
+// Every log gathered for the agent has its secrets masked.
+for (const f of ['up-r1.log', 'logs/api.log', 'canvas.log']) assert.doesNotMatch(fs.readFileSync(path.join(out, f), 'utf8'), /not-real/, f);
+assert.match(fs.readFileSync(path.join(out, 'logs/api.log'), 'utf8'), /postgres:\/\/\*\*\*:\*\*\*@db\/orders refused/);
 const summary = fs.readFileSync(path.join(out, 'summary.md'), 'utf8');
 assert.deepEqual(JSON.parse(fs.readFileSync(path.join(out, 'runs.json'), 'utf8')).map(r => r.id), ['r1', 'stop2']);
 assert.match(summary, /Failed run r1: port held/);
 assert.match(summary, /Koppler left work for the agent in r1/);
 assert.match(summary, /1 page errors: x is undefined/);
 assert.match(summary, /button#stop x5/);
-assert.match(summary, /api 1/);
+assert.match(summary, /api 2/);
 assert.doesNotMatch(fs.readFileSync(path.join(out, 'debug.jsonl'), 'utf8'), /old click/);
 console.log('session tests ok');

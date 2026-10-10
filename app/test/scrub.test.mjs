@@ -1,5 +1,22 @@
 import assert from 'node:assert/strict';
-import { scrub } from '../src/scrub.mjs';
+import { redact, scrub } from '../src/scrub.mjs';
+
+// Secrets are masked; what is around them stays readable.
+for (const [raw, masked] of [
+  ['Host=db;Password=s3cr3t!;Database=orders', 'Host=db;Password=***;Database=orders'],
+  ['Host=db;Password="two words";Database=orders', 'Host=db;Password="***";Database=orders'],
+  ['"client_secret": "abc123", "x": 1', '"client_secret": "***", "x": 1'],
+  ['{\\"password\\":\\"two words\\",\\"x\\":1}', '{\\"password\\":\\"***\\",\\"x\\":1}'],
+  ['aws_secret_access_key=wJalrXUtnFEMIK7MDENGbPxRfiCYEXAMPLEKEY region eu', 'aws_secret_access_key=*** region eu'],
+  ['DB_PASSWORD: hunter2', 'DB_PASSWORD: ***'],
+  ['Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.abcdefgh', 'Authorization: Bearer ***jwt***'],
+  ['Authorization: Bearer abcdefghijklmnop rejected', 'Authorization: Bearer *** rejected'],
+  ['postgres://admin:pa55word@db.internal/orders refused', 'postgres://***:***@db.internal/orders refused'],
+  ['pushed with ghp_abcdefghijklmnopqrstuv and xoxb-1234567890-abc', 'pushed with ***token*** and ***token***'],
+  ['key AKIAABCDEFGHIJKLMNOP used', 'key ***aws-key*** used'],
+  ['\x1b[32minfo\x1b[0m: Now listening on: http://localhost:58000', 'info: Now listening on: http://localhost:58000'],
+  ['TokenCount=5, secretsmanager:GetSecretValue denied', 'TokenCount=5, secretsmanager:GetSecretValue denied'],
+]) assert.equal(redact(raw), masked);
 
 const registry = {
   name: 'Acme Shop',

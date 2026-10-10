@@ -22,6 +22,7 @@ import { githubFile, readFile } from './github.mjs';
 import kinds from './kinds.js';
 import { recipesFor } from './recipes.mjs';
 import { APP, BIN, LOGS, STATE as STATE_HOME, TEMP } from './paths.mjs';
+import { redact } from './scrub.mjs';
 import kp from './plan.js';
 export { githubFile };
 
@@ -50,13 +51,6 @@ const portOpen = port => new Promise(resolve => {
   socket.once('timeout', () => done(false));
   socket.once('error', () => done(false));
 });
-
-// Logs can echo connection strings or tokens on errors; mask them before they reach the page.
-export const redact = text => text
-  .replace(/\x1b\[[0-9;]*[A-Za-z]/g, '')
-  .replace(/\b(password|pwd|secret|token|apikey|api_key|client_secret)(["']?\s*[=:]\s*["']?)[^;"'\s,}]+/gi, '$1$2***')
-  .replace(/\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{5,}/g, '***jwt***')
-  .replace(/\b(AKIA|ASIA)[A-Z0-9]{16}\b/g, '***aws-key***');
 
 // The debug log: what the user did on the canvas, one JSON line each, so a concern can be traced afterwards.
 // Kept to the last MAX_DEBUG_LINES lines; every text goes through `redact`, and only known fields are kept.
@@ -248,7 +242,7 @@ function startRun(prompt, record, args) {
     // A Stop from switching stacks switches once everything is stopped and reverted.
     if (code === 0 && record.kind === 'stop' && typeof prompt.data?.switchTo === 'string') execFile(process.execPath, [path.join(here, 'koppler.mjs'), 'use', prompt.data.switchTo], { timeout: 60000 }, () => {});
     if (code === 0) return;
-    const said = (() => { try { return fs.readFileSync(log, 'utf8').trim().split('\n').slice(-40).join('\n'); } catch { return ''; } })();
+    const said = (() => { try { return redact(fs.readFileSync(log, 'utf8')).trim().split('\n').slice(-40).join('\n'); } catch { return ''; } })();
     const handed = { ...prompt, text: `${prompt.text}\n\nKoppler already did what it could (koppler ${args[0]} --run ${record.id}); finish the rest, then koppler history --done ${record.kind === 'stop' ? record.id : ''}:\n${said}`, data: { ...prompt.data, koppler: { exit: code, log } } };
     fs.appendFileSync(PROMPTS, JSON.stringify(handed) + '\n', { mode: 0o600 });
   });
