@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { localQueues, queueEnv, ENDPOINT, KAFKA } from '../src/queues.mjs';
+import { localQueues, queueEnv, ENDPOINT, KAFKA, EMULATOR, BROKER, STOP_EMULATOR, STOP_BROKER } from '../src/queues.mjs';
 
 const registry = {
   queues: { thumbs: { name: 'Thumbnails', type: 'sqs', queue: 'thumbs-qa', envs: { prod: { queue: 'thumbs-prod' } } }, feed: { name: 'Feed', type: 'kafka' }, alerts: { name: 'Alerts', type: 'sns' } },
@@ -26,4 +26,7 @@ const url = 'http://127.0.0.1:4566/000000000000/thumbs-prod';
 const env = queueEnv(registry, queues, { thumbs: url });
 assert.deepEqual(env.set, { api: { AWS_ENDPOINT_URL_SQS: ENDPOINT, Queues__Thumbs: url }, worker: { AWS_ENDPOINT_URL_SQS: ENDPOINT } });
 assert.match(env.left[0], /^Fn: point it at the local Thumbnails queue/);
+// Stop removes the very containers the emulator and the broker start.
+assert.ok(EMULATOR.at(-1).includes(`--name ${STOP_EMULATOR.at(-1)} `));
+assert.ok(BROKER.at(-1).includes(`--name ${STOP_BROKER.at(-1)} `));
 console.log('queues tests ok');

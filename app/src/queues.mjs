@@ -10,6 +10,8 @@ import kp from './plan.js';
 export const PORT = 4566, ENDPOINT = `http://127.0.0.1:${PORT}`;
 // Stopping the Docker client does not stop its container: it is removed on stop, and a leftover one before starting.
 const RM = 'docker rm -f koppler-queues >/dev/null 2>&1';
+// Run by Stop as well: the shell's own cleanup never happens when it has to be killed.
+export const STOP_EMULATOR = ['docker', 'rm', '-f', 'koppler-queues'], STOP_BROKER = ['docker', 'rm', '-f', 'koppler-kafka'];
 export const EMULATOR = ['sh', '-c', `${RM}; trap '${RM}; exit 0' TERM INT HUP; docker run --rm --name koppler-queues -p 127.0.0.1:${PORT}:4566 floci/floci:latest & wait`];
 export const KAFKA_PORT = 9092, KAFKA = `localhost:${KAFKA_PORT}`;
 const RM_KAFKA = 'docker rm -f koppler-kafka >/dev/null 2>&1';
