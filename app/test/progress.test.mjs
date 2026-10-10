@@ -4,6 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { allowStack } from './allow.mjs';
 
 // koppler up writes each app's steps for its card as it goes; the step a failed run stopped on is marked failed.
 const here = path.dirname(fileURLToPath(import.meta.url)), dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-progress-'));
@@ -11,11 +12,13 @@ const env = { ...process.env, KOPPLER_STATE: dir, KOPPLER_TEMP: dir, KOPPLER_CON
 const koppler = (...args) => { const r = spawnSync('node', [path.join(here, '..', 'src', 'koppler.mjs'), ...args], { encoding: 'utf8', env, timeout: 60000 }); return { out: (r.stdout + r.stderr).trim(), code: r.status }; };
 fs.mkdirSync(path.join(dir, 'repo'));
 const serve = port => `node -e "require('http').createServer((q,s)=>s.end('ok')).listen(${port})"`;
-fs.writeFileSync(path.join(dir, 'registry.js'), `window.REGISTRY = ${JSON.stringify({ envs: ['qa'], apps: {
+const stack = { envs: ['qa'], apps: {
   api: { name: 'API', kind: 'other', slug: 'x/api', url: 'http://localhost:5811', start: serve(5811) },
   web: { name: 'Web', kind: 'other', slug: 'x/web', url: 'http://localhost:5812', start: 'exit 1' },
   app: { name: 'App', kind: 'other', slug: 'x/app', start: 'true' },
-} })};`);
+} };
+fs.writeFileSync(path.join(dir, 'registry.js'), `window.REGISTRY = ${JSON.stringify(stack)};`);
+allowStack(dir, stack);
 fs.writeFileSync(path.join(dir, 'local.js'), `window.LOCAL = ${JSON.stringify({ apps: { api: { path: path.join(dir, 'repo') }, web: { path: path.join(dir, 'repo') } } })};`);
 fs.writeFileSync(path.join(dir, 'history.jsonl'), JSON.stringify({ id: 'prog0001', at: new Date().toISOString(), kind: 'run', env: 'qa', mode: 'auto', nodes: { api: { branch: '', run: 'cli' }, web: { branch: '', run: 'cli' }, app: { branch: '', run: 'ide' } }, edges: [], plan: {} }) + '\n');
 

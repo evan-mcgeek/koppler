@@ -14,7 +14,7 @@ Apps and tunnels that `koppler` starts run detached, so they keep running after 
 | `koppler doctor [app...] [--env <env>]` | Can it run here: the tools your stack needs, then what you still have to do for these apps |
 | `koppler doctor --secrets [app...]` | Also test that each stored secret works, for example that the database connects |
 | `koppler doctor --flow` | Test every connection of what runs now, like the canvas's Flow check |
-| `koppler doctor --approve` | Review the stack's own check commands and allow them to run; asks you, never a script |
+| `koppler doctor --approve` | Review everything the stack would run or write (checks, start commands, code changes) and allow it; asks you, never a script |
 | `koppler secret set\|list\|remove\|psql <app>[@<env>] [<NAME>]` | Store and manage secrets; a value never shows |
 | `koppler status [--apps] [--debug [name...]]` | What Koppler runs; `--apps` adds the stack's apps and clones; `--debug` gives versions and scrubbed logs for a bug report |
 | `koppler logs <name> [-f] [-n <lines>]` | Show or follow a log, secrets masked |

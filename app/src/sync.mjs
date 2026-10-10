@@ -156,6 +156,9 @@ export function validateStack(stack) {
     if (k?.start !== undefined && typeof k.start !== 'string') errors.push(`kinds.${id}.start: a shell command`);
     if (k?.detect !== undefined && ![].concat(k.detect).every(f => typeof f === 'string')) errors.push(`kinds.${id}.detect: file names`);
   }
+  // What gets approved is what runs: a check list or command too long to show in full is refused, never cut short.
+  if (stack?.checks !== undefined && (!Array.isArray(stack.checks) || stack.checks.length > 50)) errors.push('checks: a list of at most 50 checks');
+  for (const [n, c] of (Array.isArray(stack?.checks) ? stack.checks : []).entries()) if (typeof c?.name !== 'string' || !c.name || c.name.length > 80 || typeof c?.run !== 'string' || !c.run || c.run.length > 2000) errors.push(`checks[${n}]: needs a name (up to 80 characters) and a run command (up to 2000)`);
   for (const [id, q] of Object.entries(stack?.queues ?? {})) {
     for (const [where, name] of [['queue', q?.queue], ...Object.entries(q?.envs ?? {}).map(([env, e]) => [`envs.${env}.queue`, e?.queue])]) if (name !== undefined && !(typeof name === 'string' && NAME.test(name))) errors.push(`queues.${id}.${where}: a queue or topic name`);
     if (!/^[a-z0-9-]{1,64}$/.test(id)) errors.push(`queues.${id}: id must be lowercase letters, digits and dashes`);
@@ -173,6 +176,7 @@ export function validateStack(stack) {
     for (const [n, c] of (Array.isArray(app?.localChanges) ? app.localChanges : app?.localChanges === undefined ? [] : [null]).entries())
       if (!c || typeof c.file !== 'string' || !c.file || typeof c.find !== 'string' || !c.find || typeof c.replace !== 'string' || path.isAbsolute(c.file) || c.file.split(/[\\/]/).includes('..'))
         errors.push(`apps.${id}.localChanges[${n}]: needs file (a path inside the app's clone, no .. or leading /), find and replace`);
+    for (const [where, start] of [['start', app?.start], ...Object.entries(app?.envs ?? {}).map(([env, e]) => [`envs.${env}.start`, e?.start])]) if (start !== undefined && (typeof start !== 'string' || !start || start.length > 2000)) errors.push(`apps.${id}.${where}: a shell command (up to 2000 characters)`);
     // Values that end up in commands (tunnels, sign-ins, hosts entries, secret steps, clone commands) must look like
     // what they are, so a shared stack.json cannot smuggle shell syntax into them.
     if (app?.slug !== undefined && !(typeof app.slug === 'string' && SLUG.test(app.slug))) errors.push(`apps.${id}.slug: owner/repo, or host/path/to/repo`);

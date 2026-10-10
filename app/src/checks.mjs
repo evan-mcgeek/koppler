@@ -65,20 +65,39 @@ export function envGaps(registry, only) {
 export const missingTunnels = (registry, env) => [...new Set(envGaps(registry, env).filter(g => g.kind === 'tunnel').map(g => g.app))];
 
 // Changes whenever a command of the stack's own checks changes; names and order of safe checks do not count.
-export const fingerprint = checks => crypto.createHash('sha256').update(JSON.stringify(checks.filter(c => !c.safe).map(c => [c.name, c.run]))).digest('hex');
-const approvals = () => { try { return JSON.parse(fs.readFileSync(approvalsFile(), 'utf8')); } catch { return {}; } };
-export const approved = (source, checks) => !checks.some(c => !c.safe) || approvals()[source] === fingerprint(checks);
-export function approve(source, checks) {
-  fs.mkdirSync(path.dirname(approvalsFile()), { recursive: true });
-  fs.writeFileSync(approvalsFile(), JSON.stringify({ ...approvals(), [source]: fingerprint(checks) }, null, 2) + '\n', { mode: 0o600 });
+// Everything in the stack that Koppler would run or write on this Mac, beyond the stack's facts: its own checks, the
+// start commands it gives (per app, per environment, and per kind it defines), and the code changes it remembers.
+// A shared stack can be edited by anyone on the team, so none of it happens until the user has seen exactly this list.
+export function stackCommands(registry) {
+  const out = [], add = (what, name, run) => { if (typeof run === 'string' && run) out.push({ what, name, run }); };
+  for (const c of checksFor(registry).filter(c => !c.safe)) add('check', c.name, c.run);
+  for (const [id, k] of Object.entries(registry?.kinds ?? {})) { add('start of every', `${id} app`, k?.start); add('stop of every', `${id} app`, k?.stop); }
+  for (const [id, app] of Object.entries(registry?.apps ?? {})) {
+    add('start', app?.name ?? id, app?.start);
+    for (const [env, e] of Object.entries(app?.envs ?? {})) add(`start on ${env}`, app?.name ?? id, e?.start);
+    for (const c of Array.isArray(app?.localChanges) ? app.localChanges : []) add('code change', `${app?.name ?? id}, ${c?.file}`, `${c?.find}\n  becomes\n${c?.replace}`);
+  }
+  return out;
 }
+// Whether this app's start runs a command the stack wrote, on that environment.
+export const startsFromStack = (registry, id, env) => { const a = registry?.apps?.[id]; return !!(a && (a.start || a.envs?.[env]?.start || registry?.kinds?.[a.kind]?.start)); };
+
+export const fingerprint = commands => crypto.createHash('sha256').update(JSON.stringify(commands.map(c => [c.what, c.name, c.run]))).digest('hex');
+const approvals = () => { try { return JSON.parse(fs.readFileSync(approvalsFile(), 'utf8')); } catch { return {}; } };
+// Approved when the stack runs nothing of its own, or the user approved exactly what it runs now.
+export const approved = (source, registry) => { const commands = stackCommands(registry); return !commands.length || approvals()[source] === fingerprint(commands); };
+export function approve(source, registry) {
+  fs.mkdirSync(path.dirname(approvalsFile()), { recursive: true });
+  fs.writeFileSync(approvalsFile(), JSON.stringify({ ...approvals(), [source]: fingerprint(stackCommands(registry)) }, null, 2) + '\n', { mode: 0o600 });
+}
+export const APPROVE = 'koppler doctor --approve';
 
 const has = tool => { try { execFileSync('/bin/sh', ['-c', `command -v ${tool}`], { stdio: 'ignore' }); return true; } catch { return false; } };
 const passes = run => { try { execFileSync('/bin/sh', ['-c', run], { stdio: 'ignore', timeout: 20000 }); return true; } catch { return false; } };
 
 // Runs what may run. A stack check that was not approved stays `pending`: listed, not run.
 export function runChecks(registry, { source = registry?.source ?? '', exists = has, shell = passes } = {}) {
-  const checks = checksFor(registry), ok = approved(source, checks);
+  const checks = checksFor(registry), ok = approved(source, registry);
   const gaps = envGaps(registry).map(g => ({ name: `${g.app} ${g.env}`, from: 'stack', state: 'gap', detail: g.detail, app: g.app, env: g.env, kind: g.kind }));
   return [...checks.map(c => {
     const base = { name: c.name, from: c.safe ? 'tool' : 'stack', ...(c.for?.length && { for: c.for }) };
@@ -107,15 +126,15 @@ export function checkStack({ quiet = false } = {}) {
 export async function checkTools({ approve: wantApprove = false, confirm = async () => false } = {}) {
   const registry = registryNow();
   if (!registry) return { error: 'no stack loaded (koppler init)' };
-  const checks = checksFor(registry), own = checks.filter(c => !c.safe), source = registry.source ?? '';
+  const commands = stackCommands(registry), source = registry.source ?? '';
   if (wantApprove) {
-    if (!own.length) console.log('This stack has no checks of its own to approve.');
+    if (!commands.length) console.log('This stack runs nothing of its own, so there is nothing to approve.');
     else {
-      console.log(`The stack at ${source} runs these commands on this Mac as its checks:\n`);
-      for (const c of own) console.log(`  ${c.name}\n    ${c.run}\n`);
-      if (!await confirm('Allow these commands to run?')) return { error: 'not approved; the stack\'s own checks stay off' };
-      approve(source, checks);
-      console.log('Approved. They run from now on, until one of them changes.\n');
+      console.log(`The stack at ${source} would run or write these on this Mac. Anyone who can edit the stack wrote them:\n`);
+      for (const c of commands) console.log(`  ${c.what}: ${c.name}\n${c.run.split('\n').map(l => `    ${l}`).join('\n')}\n`);
+      if (!await confirm('Allow all of these?')) return { error: 'not approved; the stack\'s own commands and code changes stay off' };
+      approve(source, registry);
+      console.log('Approved. They are allowed from now on, until any of them changes.\n');
     }
   }
   const results = runChecks(registry);

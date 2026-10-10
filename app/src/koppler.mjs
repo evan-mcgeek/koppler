@@ -22,7 +22,7 @@ import { appliedCommand as applied, historyCommand, planCommand, runningNames, a
 import tunnelPlan from './ports.js';
 import kinds from './kinds.js';
 import { needs as needsFor } from './needs.mjs';
-import { missingTunnels } from './checks.mjs';
+import { APPROVE, approved, missingTunnels, startsFromStack } from './checks.mjs';
 import { APP, BIN, LOGS, STATE, TEMP } from './paths.mjs';
 import { readActions, updateActions } from './actions.mjs';
 
@@ -186,6 +186,8 @@ function appCommand(id, opts) {
   const env = opts.env ?? registry.envs[0];
   if (!registry.envs.includes(env)) fail(`unknown env ${env}; the stack has ${registry.envs.join(', ')}`);
   const app = env === registry.envs[0] ? base : { ...base, ...(base.envs?.[env] ?? {}) };
+  // A start command written in the shared stack runs only once the user has seen and allowed it, and again after it changes.
+  if (startsFromStack(registry, id, env) && !approved(registry.source ?? '', registry)) fail(`${base.name ?? id} is started by a command from the stack that you have not allowed yet, or that changed since. Review it in your own terminal: ${APPROVE}`);
   const repo = load('local.js', 'LOCAL')?.apps?.[id]?.path ?? fail(`${id} is not cloned (koppler sync --rescan after cloning)`);
   // Settings given for this start (a cable's local address) come from the environment and must win over the launch profile.
   const ctx = { repo, env, id, engine: here, override: Object.keys(opts.setEnv ?? START_ENV ?? {}), envNames: [env, ...(registry.envAliases?.[env] ?? [])] };
@@ -413,6 +415,9 @@ async function up(args) {
   const ids = board ? Object.keys(board.nodes).filter(id => registry.apps[id]) : args.filter((a, i) => !a.startsWith('--') && !['--env', '--run'].includes(args[i - 1]));
   if (!ids.length && !board) fail('usage: koppler up <app...> [--env <env>] | koppler up --run <id>');
   for (const id of ids) if (!registry.apps[id]) fail(`${id} is not an app in the stack`);
+  // Checked before anything starts: a run never gets half-way and then stops at a command that needs the user's yes.
+  const waiting = ids.filter(id => startsFromStack(registry, id, env));
+  if (waiting.length && !approved(registry.source ?? '', registry)) fail(`${waiting.map(id => registry.apps[id].name ?? id).join(', ')}: started by a command from the stack that the user has not allowed yet, or that changed since. They review it in their own terminal: ${APPROVE}`);
   const node = id => latest?.nodes?.[id] ?? {}, edges = (latest?.edges ?? []).filter(e => ids.includes(e.from) && ids.includes(e.to));
   const running = name => { const r = readRecord(name); return r && alive(r); };
   // Each app's steps as the run goes, shown on its card (temp/progress.json); if the run stops on an error, the step it was on fails.
@@ -455,7 +460,12 @@ async function up(args) {
       catch (e) { left.push(`${registry.apps[id].name}: ${e.message}`); step(id, 'Libraries', 'failed', e.message); }
     }
     // Remembered changes that match this board.
-    const { prepare, recipesFor, matches } = await import('./recipes.mjs');
+    const { prepare: applyRemembered, recipesFor, matches } = await import('./recipes.mjs');
+    // A code change the stack remembers is the stack's own doing: applied only once the user allowed it.
+    const allowed = approved(registry.source ?? '', registry);
+    const sharedChanges = ids.filter(id => registry.apps[id].localChanges?.length);
+    if (!allowed && sharedChanges.length) left.push(`${sharedChanges.map(id => registry.apps[id].name).join(', ')}: the stack's code changes were not applied; the user has to allow them first, in their own terminal: ${APPROVE}`);
+    const prepare = args => allowed ? applyRemembered(args) : applyRemembered({ ...args, registry: { ...registry, apps: Object.fromEntries(Object.entries(registry.apps).map(([id, a]) => [id, { ...a, localChanges: [] }])) } });
     const calls = Object.fromEntries(ids.map(a => [a, edges.filter(e => e.from === a).map(e => e.to)]));
     for (const r of prepare({ registry, apps: ids.filter(id => !skip.has(id)), env, calls, repoOf: a => local[a]?.path, logFile })) {
       if (r.state === 'applied') { console.log(`${r.app}: remembered change applied (${r.why})`); step(r.app, 'Remembered change', 'done', r.why); }
@@ -770,7 +780,14 @@ const use = args => {
 // A stack shared on GitHub: link it, then see its changes, bring in GitHub's, drop yours, or propose yours.
 const link = async args => {
   const url = positional(args)[0];
-  if (url) { const r = await linkStack(url); if (r.error) fail(r.error); console.log(`USING ${r.name}, linked from ${url}`); return sync([]); }
+  if (url) {
+    const r = await linkStack(url); if (r.error) fail(r.error);
+    console.log(`USING ${r.name}, linked from ${url}`); sync([]);
+    // A linked stack is someone else's file: say so when it brings commands of its own.
+    const { stackCommands } = await import('./checks.mjs'), own = stackCommands(load('registry.js', 'REGISTRY'));
+    if (own.length) console.log(`\nThis stack carries ${own.length} ${own.length === 1 ? 'command or code change' : 'commands and code changes'} of its own. None runs until you have reviewed them: ${APPROVE}`);
+    return;
+  }
   const dir = load('registry.js', 'REGISTRY')?.source?.replace(/\/stack\.json$/, '') ?? fail('no stack in use');
   const st = linkedStatus(dir) ?? fail('the stack in use is not linked to GitHub; link one with: koppler link <GitHub link to a stack.json>');
   if (args.includes('--update')) { const r = await updateStack(dir); if (r.error) fail(r.error); console.log(r.message); return sync([]); }
