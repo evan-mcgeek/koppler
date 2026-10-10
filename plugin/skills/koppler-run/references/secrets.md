@@ -20,14 +20,15 @@ An app that loads its own secrets at runtime with the user's AWS login (e.g. fro
 ## Store
 
 Values live in the macOS Keychain, one item per secret (service `koppler:<app>` or `koppler:<app>@<env>`, account = the name); `bin/secret-store` is the only code that touches them, and the other scripts go through it.
-A production store (`@prod`, `@production`, `@live`) is created so that every read shows a Keychain prompt; the others are readable without one.
+A protected environment's store is created so that every read shows a Keychain prompt; the others are readable without one, by anything running as the user, so only the deny rules above keep an agent from them.
+Which environments are protected is the stack's call (`protected` in `stack.json`), and without it every environment except the first; it is never decided by an environment's name.
 Where there is no Keychain (or when `KOPPLER_SECRETS` names a folder) values live in private files instead: `<folder>/<app>.env`, default `~/.config/koppler/secrets` (dir 700, files 600). `bin/secret-store migrate` moves such files into the Keychain.
 On the canvas, the Credentials panel lists what the apps on the board need for the chosen environment and can Set, Test and Remove a value; it never shows one, and fetching stays a command the user copies into their own terminal.
 Each environment after the stack's first has its own store, named `<app>@<env>` (`koppler secret set orders-api@prod <NAME>`): `koppler run <app> --env <env>` loads only that one and refuses to start while a declared secret is missing from it, so a PROD value never replaces or leaks into QA.
 `koppler doctor --secrets <app> [--env <env>]` tries each stored secret the app declares and prints only the outcome (`connected`, or a plain reason).
 It tests Postgres (needs `psql`), MySQL (needs the `mysql` client) and Redis or Valkey (no client needed), in .NET `Key=Value;` form, as a URL, or as `host:port,password=...` for Redis.
 A secret's optional `type` in `stack.json` (`postgres`, `mysql`, `redis`) says which one it is; without it the value's shape decides, and an ambiguous `Server=...;User Id=...` string asks for the type.
-`koppler run <app>` runs the same test before it starts the app and refuses to start on a failure (`--no-test` starts anyway). A production store is only tested when asked (`--test`), because each read of it shows a Keychain prompt.
+`koppler run <app>` runs the same test before it starts the app and refuses to start on a failure (`--no-test` starts anyway). A protected environment's store is only tested when asked (`--test`), because each read of it shows a Keychain prompt.
 A value is only ever sent to the host named inside it. API keys and tokens are not tested: that would mean sending them to an address taken from `stack.json`, which anyone editing that file could point elsewhere.
 `bin/secret-psql <app or app@env> <NAME>` opens `psql` with a stored connection string, and `... --pgpass` adds its line to `~/.pgpass` (for `localhost` and `127.0.0.1`) so other database tools find the password; both are for the user's own terminal.
 Scripts are in the skill's `bin/`:

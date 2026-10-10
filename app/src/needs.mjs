@@ -6,6 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import tunnelPlan from './ports.js';
+import kp from './plan.js';
 
 // "Cache (Valkey)" -> "Valkey cache", "Database" -> "database": what an address leads to, in plain words.
 const friendly = host => { const k = tunnelPlan.tunnelKind({ tunnel: host }); const m = k.match(/^(\w+) \((.+)\)$/); return m ? `${m[2]} ${m[1].toLowerCase()}` : k === 'Tunnel' ? 'private' : k.toLowerCase(); };
@@ -112,8 +113,8 @@ export function needs(args, { load, skill, fail, collect = false }) {
   // An app not set up yet has no prerequisites recorded, so an empty list would wrongly read as "ready".
   const notSetUp = ids.filter(id => registry.apps[id].pending);
   console.log(`Before ${ids.map(id => registry.apps[id].name).join(', ')} can run on ${env.toUpperCase()}:`);
-  // On production, say up front what stays with the user and what Koppler does.
-  if (/^prod/i.test(env)) console.log(`\n  On ${env.toUpperCase()} only you can: sign in to AWS in your browser, store secrets in your own terminal, run sudo steps, and query data (koppler query, in your terminal). Koppler opens the production tunnels and starts the apps when you press Send to ${env.toUpperCase()}.`);
+  // On a protected environment, say up front what stays with the user and what Koppler does.
+  if (kp.isProtected(registry, env)) console.log(`\n  On ${env.toUpperCase()} only you can: sign in to AWS in your browser, store secrets in your own terminal, run sudo steps, and query data (koppler query, in your terminal). Koppler opens the production tunnels and starts the apps when you press Send to ${env.toUpperCase()}.`);
   if (notSetUp.length) console.log(`\n  Not known yet: ${notSetUp.map(id => registry.apps[id].name).join(', ')} ${notSetUp.length === 1 ? 'is' : 'are'} not set up, so what ${notSetUp.length === 1 ? 'it needs' : 'they need'} (sign-ins, tunnels, secrets) is not known. The agent reads ${notSetUp.length === 1 ? 'its repo' : 'their repos'} first, then lists it here.`);
   if (!todo.length && !notSetUp.length) console.log('  Nothing for you to do.');
   todo.forEach((s, i) => {

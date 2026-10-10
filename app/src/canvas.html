@@ -42,8 +42,8 @@
     }
   :root[data-theme="light"] { color-scheme: light; }
   /* PROD is red on the frame only (banner, top rule, toggle, Send), so red inside the board still means something failed. */
-  body[data-env="prod"] .send-split .btn.primary { background: var(--prod); }
-  body[data-env="prod"] .send-split .btn.primary:hover { background: color-mix(in oklab, var(--prod) 85%, var(--ink)); }
+  body[data-protected] .send-split .btn.primary { background: var(--prod); }
+  body[data-protected] .send-split .btn.primary:hover { background: color-mix(in oklab, var(--prod) 85%, var(--ink)); }
 
   *, *::before, *::after { box-sizing: border-box; }
   [hidden] { display: none !important; }
@@ -72,7 +72,7 @@
   .board-tools { max-width: calc(100% - 32px); flex-wrap: wrap; justify-content: flex-end; }
 
   .topbar { display: flex; align-items: center; gap: 12px; padding: 10px 16px; border-bottom: 1px solid var(--line); background: var(--panel); }
-  body[data-env="prod"] .topbar { border-bottom: 3px solid var(--prod); }
+  body[data-protected] .topbar { border-bottom: 3px solid var(--prod); }
   .title { font-size: 17px; font-weight: 700; letter-spacing: -0.01em; }
   .spacer { flex: 1; }
   .hint { position: absolute; left: 16px; bottom: 12px; margin: 0; padding: 4px 10px; border-radius: 6px; background: color-mix(in oklab, var(--panel) 85%, transparent); color: var(--muted); font-size: 12.5px; z-index: 1; pointer-events: none; }
@@ -81,7 +81,7 @@
   .seg input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; }
   /* The chosen option is a raised chip, the same weight in both themes. */
   .seg label:has(input:checked) { background: var(--surface); color: var(--ink); font-weight: 600; box-shadow: 0 0 0 1px var(--line), 0 1px 2px rgb(0 0 0 / 0.12); }
-  body[data-env="prod"] .seg label:has(input[value="prod"]:checked) { background: var(--prod); color: var(--on-accent); }
+  body[data-protected] #env label:has(input:checked) { background: var(--prod); color: var(--on-accent); }
   .seg label:has(input:focus-visible) { outline: 2px solid var(--cable); outline-offset: -2px; }
   .btn { border: 1px solid transparent; background: none; border-radius: 8px; padding: 6px 12px; font-weight: 600; font-size: 13px; color: var(--ink); }
   .btn:hover { background: color-mix(in oklab, var(--ink) 7%, transparent); }
@@ -104,7 +104,7 @@
   .zoom #zoom-reset { min-width: 56px; font-variant-numeric: tabular-nums; }
   .btn.primary:hover { background: color-mix(in oklab, var(--cable) 85%, var(--ink)); }
   .prod-banner { display: none; padding: 6px 16px; background: color-mix(in oklab, var(--prod) 14%, var(--panel)); color: var(--prod-ink); font-weight: 600; font-size: 13px; }
-  body[data-env="prod"] .prod-banner { display: block; }
+  body[data-protected] .prod-banner { display: block; }
   @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .prod-banner { color: var(--prod); } }
   :root[data-theme="dark"] .prod-banner { color: var(--prod); }
 
@@ -120,7 +120,7 @@
   .rail-btn { position: relative; display: grid; justify-items: center; gap: 2px; width: 40px; padding: 7px 0 6px; border: 0; border-radius: 8px; background: none; color: var(--muted); cursor: pointer; }
   .rail-btn:hover { background: color-mix(in oklab, var(--ink) 8%, transparent); color: var(--ink); }
   .rail-env, .rail-count { font: 600 12px/1 var(--sans); color: var(--ink); }
-  body[data-env="prod"] .rail-env { color: var(--prod); }
+  body[data-protected] .rail-env { color: var(--prod); }
   .search { width: 100%; height: 32px; padding: 0 10px; border: 1px solid var(--line); border-radius: 7px; background: var(--paper); color: var(--ink); font-size: 13px; }
   .search::placeholder { color: var(--muted); }
   .search::-webkit-search-cancel-button { cursor: pointer; }
@@ -448,7 +448,7 @@
   .plan-lines .verb[data-verb="restarts"] { color: var(--warn); }
   .plan-lines .verb[data-verb="stops"] { color: var(--bad); }
   .plan-lines .verb[data-verb="keeps"] { color: var(--muted); }
-  body[data-env="prod"] .plan-lines .verb[data-verb="starts"] { color: var(--ink); }
+  body[data-protected] .plan-lines .verb[data-verb="starts"] { color: var(--ink); }
   .plan-lines .verb[data-verb="calls"] { color: var(--muted); }
   .plan-lines .off, .plan-lines .off small { color: var(--warn); font-weight: 600; }
   .tunnel.borrowed { border-color: var(--warn); border-style: solid; }
@@ -871,7 +871,7 @@
   .call-chip { max-width: 180px; min-height: 24px; padding: 3px 8px; border: 1px dashed color-mix(in oklab, var(--muted) 70%, transparent); border-radius: 999px; background: none; color: var(--ink); font-size: 12px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
   .call-chip:hover { border-style: solid; border-color: var(--cable); color: var(--cable); }
   .call-chip:disabled { color: var(--muted); cursor: default; }
-  body[data-env="prod"] .node .calls-label { color: var(--ink); font-weight: 700; }
+  body[data-protected] .node .calls-label { color: var(--ink); font-weight: 700; }
   .port { position: absolute; width: 16px; height: 16px; margin: -8px 0 0 -8px; border-radius: 50%; background: var(--surface); border: 2px solid var(--muted); opacity: 0; pointer-events: none; transition: opacity .1s; }
   /* On the card's outer edge, where cables end: absolute positions start inside its 1px border. */
   .port[data-side="top"] { left: 50%; top: -1px; } .port[data-side="right"] { left: calc(100% + 1px); top: 50%; }
@@ -1020,7 +1020,7 @@
   </div>
   </div>
 </div>
-<div class="prod-banner" role="alert">PROD: local code runs against production data and secrets.</div>
+<div class="prod-banner" role="alert"></div>
 <div class="main">
   <aside id="side" data-lavish-action>
     <div class="side-head">
@@ -1106,7 +1106,7 @@
     <dt><span class="lg-tunnel"></span></dt><dd>A tunnel to a database or cache the app uses</dd>
     <dt><span class="lg-cable lg-queue"></span></dt><dd>A queue between apps: dashed while it is the deployed one, solid once its switch runs it locally</dd>
     <dt><span class="lg-tunnel outside"></span></dt><dd>An outside system, such as Firebase: it never runs here</dd>
-    <dt><span class="lg-prod">PROD</span></dt><dd>Red marks only the frame (top rule, banner, Run). Red on the board always means something failed.</dd>
+    <dt><span class="lg-prod">Protected</span></dt><dd>A protected environment (production, usually): red marks only the frame (top rule, banner, Run). Red on the board always means something failed.</dd>
     <dt><span class="lg-calls">Calls QA</span><span class="call-chip">Web Portal</span></dt><dd>Apps this one still calls in the deployed environment. Click one to run it locally too.</dd>
     <dt>Zoomed out</dt><dd>Cards show only their state; zoom in to change them</dd>
   </dl>
@@ -3714,8 +3714,12 @@ function paintSidebarLive() {
 function renderEnv() {
   document.getElementById('rail-env').textContent = envName();
   document.body.dataset.env = state.env;
+  // The careful treatment (red frame, blocking review) follows what the stack protects, never an environment's name.
+  const guarded = KopplerPlan.isProtected(registry, state.env);
+  if (guarded) document.body.dataset.protected = ''; else delete document.body.dataset.protected;
+  document.querySelector('.prod-banner').textContent = `${envName()}: local code runs against real ${envName()} data and secrets.`;
   // A tab left open for hours says which stack and environment it drives.
-  document.title = [state.env === 'prod' && 'PROD', registry.name, 'Koppler'].filter(Boolean).join(' - ');
+  document.title = [guarded && envName(), registry.name, 'Koppler'].filter(Boolean).join(' - ');
   document.querySelectorAll('#env input').forEach(i => { i.checked = i.value === state.env; });
   document.getElementById('hint').textContent = `Drag a cable from any side of an app to what it should call locally. Everything else calls ${envName()}.`;
 }
@@ -4121,7 +4125,7 @@ function callsHtml(g, env) {
   const lines = [...by].map(([to, from]) => `<span class="call-line"><span>${name(to)}<small>from ${from.map(name).join(', ')}</small></span>${local(to, from)}</span>`).join('');
   // More than a few fold into a count, so the plan stays readable; each can still be opened and run locally.
   const list = by.size > 3 ? `<details class="review-calls"><summary>${by.size} apps<small>${[...by.keys()].slice(0, 2).map(name).join(', ')} and ${by.size - 2} more</small></summary>${lines}</details>` : lines;
-  return `<ul class="plan-lines"><li><span class="verb" data-verb="calls">Calls ${env === 'PROD' ? 'PROD' : `deployed ${env}`}</span><span class="apps">${list}</span></li></ul>`;
+  return `<ul class="plan-lines"><li><span class="verb" data-verb="calls">Calls ${KopplerPlan.isProtected(registry, env.toLowerCase()) ? env : `deployed ${env}`}</span><span class="apps">${list}</span></li></ul>`;
 }
 const blindNotice = () => status?.live === undefined ? '<p class="notice">Koppler cannot see what is running from this page, so everything is listed as starting.</p>' : '';
 
@@ -4147,7 +4151,7 @@ function startSend(note, mode = 'auto') {
   lastSend = { note, mode };
   const g = { ...graph(), mode, ...(note && { note }) };
   if (!g.nodes.length) return toast('Add at least one app first', 'warning');
-  const p = planFor(g), env = g.env.toUpperCase(), isProd = document.body.dataset.env === 'prod';
+  const p = planFor(g), env = g.env.toUpperCase(), isProd = KopplerPlan.isProtected(registry, g.env);
   // A note is for the agent: such a Send goes to it first, since Koppler cannot act on free text.
   const byAgent = !!g.note || g.nodes.some(n => n.note);
   // Apps with no prerequisites of their own for this environment: their tunnels, sign-ins and hosts belong to another one.
@@ -4160,13 +4164,13 @@ function startSend(note, mode = 'auto') {
     // What blocks the Send comes first, so the reason the button is off is the first thing read.
     body: (noTunnel.length ? `<p class="notice prod block"><span>The stack has no ${esc(env)} sign-in or tunnel for ${esc(noTunnel.map(id => registry.apps[id]?.name ?? id).join(', '))}. Koppler will not use another environment's.</span><button class="btn" type="button" data-open-needs>What to do</button></p>` : '')
       + (missing.length && isProd ? `<p class="notice prod block"><span>Store first, then send: ${esc(missingText)}.</span><button class="btn" type="button" data-open-needs>What to do</button></p>` : '')
-      + (isProd ? `<p class="notice prod">PROD: your local code reads and writes production data.${boardPlan().length ? ` Sending opens the production ${boardPlan().length === 1 ? 'tunnel' : 'tunnels'} listed below.` : ''}</p>` : '')
+      + (isProd ? `<p class="notice prod">${esc(env)}: your local code reads and writes real ${esc(env)} data.${boardPlan().length ? ` Running opens the ${esc(env)} ${boardPlan().length === 1 ? 'tunnel' : 'tunnels'} listed below.` : ''}</p>` : '')
       + (p.nothing ? '<p class="review-sub" style="margin:0 0 12px">Nothing to change: the board matches what is running.</p>' : '') + planHtml(p, runsHtml(g)) + callsHtml(g, env) + tunnelsHtml()
       + (note ? `<p class="notice">Note for the agent: ${esc(note)}</p>` : '') + blindNotice()
       + (waitingRun() ? '<p class="notice">An earlier run is still waiting for the agent. This one replaces it.</p>' : '')
       + (agentState() === 'none' && (byAgent || g.mode === 'manual') ? '<p class="notice">No agent is listening, so this waits until one is. Run <code>/koppler-run connect</code> in your agent session.</p>' : '')
       + (missing.length && !isProd ? `<p class="notice"><span>Not stored yet, the agent will ask for it: ${esc(missingText)}.</span></p>` : ''),
-    ok: g.mode === 'manual' ? 'Get the checklist' : p.nothing ? 'Run anyway' : isProd ? 'Run on PROD' : 'Run', prod: isProd,
+    ok: g.mode === 'manual' ? 'Get the checklist' : p.nothing ? 'Run anyway' : isProd ? `Run on ${env}` : 'Run', prod: isProd,
     confirm: () => {
       const plan = Object.fromEntries(VERBS.map(([k]) => [k, p[k]]));
       const text = 'Set up and run this stack using the koppler-run skill and temp/registry.js.\n' + describe(g) + '\nPLAN the user confirmed on the canvas (do exactly this; check it first with koppler plan):\n' + KopplerPlan.describe(p, { name: id => registry.apps[id]?.name ?? id }).map(l => '  ' + l).join('\n');

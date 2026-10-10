@@ -26,6 +26,7 @@ import { APPROVE, approved, missingTunnels, startsFromStack } from './checks.mjs
 import { APP, BIN, LOGS, STATE, TEMP } from './paths.mjs';
 import { readActions, updateActions } from './actions.mjs';
 import { appEnv } from './safe-env.mjs';
+import kp from './plan.js';
 
 // A first-time setup ends with the full picture: ports, conflicts and calls of every app.
 // With --pick, or on a stack that has no apps yet, init ends on the canvas, where the user ticks the clones that belong to the stack.
@@ -210,7 +211,7 @@ function appCommand(id, opts) {
   // Before starting, each stored secret is tried against the address inside it. A production store asks you on every read,
   // so it is only tried when asked (--test); --no-test skips the check everywhere.
   const tests = (app.secrets ?? []).filter(s => s.env);
-  if (!opts.dryRun && tests.length && (opts.test ?? !/@(prod|production|live)$/.test(store))) {
+  if (!opts.dryRun && tests.length && (opts.test ?? !kp.isProtected(registry, env))) {
     for (const s of tests) {
       const r = secretTest(store, s);
       if (r.code === 1) fail(`${id}: ${s.env} for ${env.toUpperCase()} ${r.message.replace(/^failed: /, 'did not pass its test: ')}. Fix it, or start anyway with --no-test.`);
@@ -764,7 +765,10 @@ function secret(args) {
     return process.exit(spawnSync(path.join(BIN, 'secret-store'), ['remove', store, name], { stdio: 'inherit' }).status ?? 1);
   }
   if (!script) fail('usage: koppler secret set|list|remove|psql <app>[@<env>] [<NAME>]');
-  process.exit(spawnSync(path.join(BIN, script), rest, { stdio: 'inherit' }).status ?? 1);
+  // A protected environment's value is stored so that every read asks the user (the stack says which; else all but the first).
+  const registry = load('registry.js', 'REGISTRY'), env = String(rest[0] ?? '').split('@')[1] ?? registry?.envs?.[0];
+  const mark = action === 'set' && registry ? { KOPPLER_SECRET_PROTECTED: kp.isProtected(registry, env) ? '1' : '0' } : {};
+  process.exit(spawnSync(path.join(BIN, script), rest, { stdio: 'inherit', env: { ...process.env, ...mark } }).status ?? 1);
 }
 
 // Stacks on this Mac, or switch to one; --boards lists the boards of the stack in use (the team's presets and your own).

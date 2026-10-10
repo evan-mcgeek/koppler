@@ -169,6 +169,13 @@ console.log('ok');
   assert.match(validateStack({ ...base, checks: Array.from({ length: 51 }, (_, n) => ({ name: `c${n}`, run: 'true' })) }).join(), /at most 50/);
   assert.match(validateStack({ ...base, apps: { a: { ...base.apps.a, start: 'x'.repeat(2001) } } }).join(), /apps\.a\.start/);
 }
+// `protected` names environments the stack has.
+{
+  const st = p => ({ envs: ['qa', 'prod'], protected: p, apps: {} });
+  assert.deepEqual(validateStack(st(['prod'])), []);
+  assert.match(validateStack(st(['production'])).join(), /protected/);
+  assert.match(validateStack(st('prod')).join(), /protected/);
+}
 console.log('switch stacks ok');
   }
 }

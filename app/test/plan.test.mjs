@@ -45,6 +45,12 @@ assert.deepEqual(ids(stray), { starts: [], restarts: ['api'], stops: ['wallet'],
 assert.equal(kp.same(change, JSON.parse(JSON.stringify(change))), true);
 assert.equal(kp.same(change, less), false);
 assert.deepEqual(kp.describe(kp.plan(live, { env: 'qa', nodes: {}, edges: [] })), ['STOP AND REVERT: app, api, db-api']);
+// Protected environments come from the stack, or are every one but the first: never from a name.
+assert.deepEqual(kp.protectedEnvs({ envs: ['qa', 'staging', 'live-eu'] }), ['staging', 'live-eu']);
+assert.deepEqual(kp.protectedEnvs({ envs: ['prod'] }), []);
+assert.deepEqual(kp.protectedEnvs({ envs: ['prod', 'qa'], protected: ['prod'] }), ['prod']);
+assert.deepEqual(kp.protectedEnvs({ envs: ['qa', 'prod'], protected: [] }), []);
+assert.equal(kp.isProtected({ envs: ['qa', 'prd'] }, 'prd'), true);
 console.log('plan tests ok');
 // Started by id with koppler run on the same environment, current branch, no local calls: kept, not restarted.
 {
