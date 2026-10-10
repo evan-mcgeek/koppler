@@ -21,6 +21,14 @@ export function appEnv(env = process.env) {
 // For a database client: the caller's environment without anything that steers it, plus what Koppler sets.
 export const clientEnv = (own, env = process.env) => ({ ...without(env, [...LOADS_CODE, ...STEERS_CLIENT]), ...own });
 
+// For a runner that holds an app's stored secrets (KOPPLER_SECRET_NAMES lists them): hands over the values and takes
+// them out of the environment, so the tools it starts never carry them.
+export function takeSecrets(env = process.env) {
+  const taken = {};
+  for (const name of (env.KOPPLER_SECRET_NAMES ?? '').split(' ').filter(Boolean)) { taken[name] = env[name]; delete env[name]; }
+  return taken;
+}
+
 // A database client from where it is installed (Homebrew, the system), not from whatever is first on the PATH.
 export function findClient(name, formula) {
   const places = [`/opt/homebrew/opt/${formula}/bin`, `/usr/local/opt/${formula}/bin`, '/opt/homebrew/bin', '/usr/local/bin', '/usr/bin', '/bin'];
