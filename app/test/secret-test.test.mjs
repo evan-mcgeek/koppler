@@ -23,19 +23,37 @@ assert.deepEqual(run('orders-api@prod', 'ConnectionStrings__DB'), [2, 'not store
 fs.rmSync(dir, { recursive: true });
 console.log('secret-test tests ok');
 
-// secret-psql --pgpass writes the line tools look up, replaces an older one, and prints no password.
+// secret-psql --pgpass writes the line tools look up, replaces an older one, prints no password and refuses a protected store.
 {
   const psqlBin = path.join(path.dirname(bin), 'secret-psql');
   const d = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-secret-psql-')), pgpass = path.join(d, 'pgpass');
-  fs.writeFileSync(path.join(d, 'orders-api@prod.env'), "export ConnectionStrings__DB='Host=localhost;Port=5437;Database=orders;Username=root;Password=p:w\\d-not-real'\n");
+  const local = "Host=localhost;Port=5437;Database=orders;Username=root;Password=p:w\\d-not-real", remote = 'Host=db.internal;Database=or.ers;Username=root;Password=remote-not-real';
+  fs.writeFileSync(path.join(d, 'orders-api.env'), `export ConnectionStrings__DB='${local}'\nexport REMOTE='${remote}'\n`);
+  fs.writeFileSync(path.join(d, 'orders-api@prod.env'), `export ConnectionStrings__DB='${local}'\n`);
   fs.writeFileSync(pgpass, 'other.host:5432:x:y:keep-me\nlocalhost:5437:orders:root:old\n');
-  const go = (...a) => spawnSync(psqlBin, a, { encoding: 'utf8', env: { ...process.env, KOPPLER_SECRETS: d, PGPASSFILE: pgpass } });
-  const r = go('orders-api@prod', 'ConnectionStrings__DB', '--pgpass');
+  const env = { ...process.env, KOPPLER_SECRETS: d, PGPASSFILE: pgpass };
+  delete env.KOPPLER_SECRET_PROTECTED;
+  const go = (args, extra) => spawnSync(psqlBin, args, { encoding: 'utf8', env: { ...env, ...extra } });
+  const lines = () => fs.readFileSync(pgpass, 'utf8').trim().split('\n');
+  const r = go(['orders-api', 'ConnectionStrings__DB', '--pgpass']);
   assert.equal(r.status, 0, r.stderr);
   assert.equal(r.stdout.includes('not-real'), false);
-  assert.deepEqual(fs.readFileSync(pgpass, 'utf8').trim().split('\n'), ['other.host:5432:x:y:keep-me', 'localhost:5437:orders:root:p\\:w\\\\d-not-real', '127.0.0.1:5437:orders:root:p\\:w\\\\d-not-real']);
+  const written = ['other.host:5432:x:y:keep-me', 'localhost:5437:orders:root:p\\:w\\\\d-not-real', '127.0.0.1:5437:orders:root:p\\:w\\\\d-not-real'];
+  assert.deepEqual(lines(), written);
   assert.equal(fs.statSync(pgpass).mode & 0o777, 0o600);
-  assert.equal(go('orders-api', 'ConnectionStrings__DB', '--pgpass').status, 2);
+  assert.equal(go(['orders-api', 'MISSING', '--pgpass']).status, 2);
+  // A protected store never reaches the file: an environment's own store, unless Koppler says the stack leaves it open.
+  const refused = go(['orders-api@prod', 'ConnectionStrings__DB', '--pgpass']);
+  assert.equal(refused.status, 2);
+  assert.match(refused.stderr, /is protected/);
+  assert.equal(go(['orders-api', 'ConnectionStrings__DB', '--pgpass'], { KOPPLER_SECRET_PROTECTED: '1' }).status, 2);
+  assert.deepEqual(lines(), written);
+  assert.equal(go(['orders-api@prod', 'ConnectionStrings__DB', '--pgpass'], { KOPPLER_SECRET_PROTECTED: '0' }).status, 0);
+  assert.deepEqual(lines(), written);
+  // Another host: a second run replaces its line, and a name is matched as plain text.
+  fs.appendFileSync(pgpass, 'db.internal:5432:orxers:root:keep-me-too\n');
+  for (let i = 0; i < 2; i++) assert.equal(go(['orders-api', 'REMOTE', '--pgpass']).status, 0);
+  assert.deepEqual(lines(), [...written, 'db.internal:5432:orxers:root:keep-me-too', 'db.internal:5432:or.ers:root:remote-not-real']);
   fs.rmSync(d, { recursive: true });
   console.log('secret-psql tests ok');
 }

@@ -6,6 +6,8 @@ Back this up with deny rules in the user's `~/.claude/settings.json` (`permissio
 ```json
 "Read(~/.config/koppler/secrets/**)",
 "Read(**/appsettings.secrets.json)",
+"Read(~/.pgpass)",
+"Bash(*pgpass*)",
 "Bash(*koppler/secrets*)",
 "Bash(*with-secrets*)",
 "Bash(*secret-store*)",
@@ -30,7 +32,8 @@ It tests Postgres (needs `psql`), MySQL (needs the `mysql` client) and Redis or 
 A secret's optional `type` in `stack.json` (`postgres`, `mysql`, `redis`) says which one it is; without it the value's shape decides, and an ambiguous `Server=...;User Id=...` string asks for the type.
 `koppler run <app>` runs the same test before it starts the app and refuses to start on a failure (`--no-test` starts anyway). A protected environment's store is only tested when asked (`--test`), because each read of it shows a Keychain prompt.
 A value is only ever sent to the host named inside it. API keys and tokens are not tested: that would mean sending them to an address taken from `stack.json`, which anyone editing that file could point elsewhere.
-`bin/secret-psql <app or app@env> <NAME>` opens `psql` with a stored connection string, and `... --pgpass` adds its line to `~/.pgpass` (for `localhost` and `127.0.0.1`) so other database tools find the password; both are for the user's own terminal.
+`koppler secret psql <app or app@env> <NAME>` opens `psql` with a stored connection string, and `... --pgpass` adds its line to `~/.pgpass` (for `localhost` and `127.0.0.1`) so other database tools find the password; both are for the user's own terminal.
+`--pgpass` refuses a protected environment's store: that password stays behind its Keychain prompt and is never copied into a plain file.
 Scripts are in the skill's `bin/`:
 
 | Script | Who runs it | What it does |

@@ -767,7 +767,7 @@ function secret(args) {
   if (!script) fail('usage: koppler secret set|list|remove|psql <app>[@<env>] [<NAME>]');
   // A protected environment's value is stored so that every read asks the user (the stack says which; else all but the first).
   const registry = load('registry.js', 'REGISTRY'), env = String(rest[0] ?? '').split('@')[1] ?? registry?.envs?.[0];
-  const mark = action === 'set' && registry ? { KOPPLER_SECRET_PROTECTED: kp.isProtected(registry, env) ? '1' : '0' } : {};
+  const mark = registry ? { KOPPLER_SECRET_PROTECTED: kp.isProtected(registry, env) ? '1' : '0' } : {};
   process.exit(spawnSync(path.join(BIN, script), rest, { stdio: 'inherit', env: { ...process.env, ...mark } }).status ?? 1);
 }
 
