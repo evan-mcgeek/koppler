@@ -7,6 +7,7 @@ import path from 'node:path';
 import vm from 'node:vm';
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { isDeepStrictEqual } from 'node:util';
 import { init as initStack, removeApp, stacksCommand, sync, updateClones, useCommand } from './sync.mjs';
 import { discardChanges, linkStack, linkedStatus, proposeChanges, updateStack } from './linked.mjs';
 import { discoverCommand } from './discover.mjs';
@@ -539,6 +540,18 @@ async function up(args) {
   if (board) await applied([board.id]);
 }
 
+// A changed JSON file as text, written the way the file was: its indent, line ends and byte order mark. When the result
+// holds what git has, it is git's own text, so the file is clean again.
+// ponytail: with the user's own uncommitted changes in the file, lists kept on one line are spread out; a text-level edit would keep those
+function jsonTextLike(file, raw, json) {
+  try {
+    const committed = execFileSync('git', ['-C', path.dirname(file), 'show', `HEAD:./${path.basename(file)}`], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+    if (isDeepStrictEqual(JSON.parse(committed.replace(/^﻿/, '')), json)) return committed;
+  } catch { /* not in git, or not committed yet */ }
+  const indent = raw.match(/\n([ \t]+)"/)?.[1] ?? '  ', eol = raw.includes('\r\n') ? '\r\n' : '\n';
+  return (raw.startsWith('﻿') ? '﻿' : '') + JSON.stringify(json, null, indent).replace(/\n/g, eol) + (raw.endsWith('\n') ? eol : '');
+}
+
 // Stop and revert, done by Koppler: stop what it runs, undo the action log in reverse (code edits, env-file lines, launch
 // profiles, then branches back with set-aside changes), and look for unlogged temporary edits. What it cannot undo
 // safely stays in the log and is listed for the agent (exit 3); otherwise, with --run, the Stop is marked done.
@@ -548,7 +561,7 @@ async function down(args) {
   for (const rec of records().filter(r => r.name !== 'canvas')) console.log(await stopOne(rec));
   fs.rmSync(path.join(TEMP, 'progress.json'), { force: true });
   let log; try { log = readActions(logFile); } catch (e) { fail(e.message); }
-  const left = [], keep = [], bom = t => t.startsWith('﻿') ? '﻿' : '';
+  const left = [], keep = [], { unlink } = await import('./libraries.mjs');
   const name = a => load('registry.js', 'REGISTRY')?.apps?.[a.app]?.name ?? a.app ?? a.repo ?? '';
   for (const a of [...log].reverse()) {
     try {
@@ -557,18 +570,21 @@ async function down(args) {
         if (n === 1) { fs.writeFileSync(a.file, body.replace(a.after, () => a.before)); console.log(`${name(a)}: reverted ${path.basename(a.file)}`); continue; }
         if (body.includes(a.before) && !n) { console.log(`${name(a)}: ${path.basename(a.file)} already as before`); continue; }
         left.push(`${name(a)}: ${a.file} changed since Koppler edited it; put back by hand: ${JSON.stringify(a.before).slice(0, 200)}`);
-      } else if (a.kind === 'file' || a.kind === 'npm-local') {
-        try { console.log(`${name(a)}: ${(await import('./libraries.mjs')).unlink(a)}`); continue; } catch (e) { left.push(`${name(a)}: ${e.message}`); }
+      } else if (a.kind === 'file') {
+        try { console.log(`${name(a)}: ${unlink(a)}`); continue; } catch (e) { left.push(`${name(a)}: ${e.message}`); }
+      } else if (a.kind === 'npm-local') {
+        // Installed again further down, once the branch its lockfile belongs to is back.
       } else if (a.kind === 'env-file') {
-        const lines = [].concat(a.lines ?? []), body = fs.readFileSync(a.file, 'utf8');
-        const rest = body.split('\n').filter(l => !lines.includes(l)).join('\n');
-        if (a.created && !rest.trim()) fs.rmSync(a.file); else fs.writeFileSync(a.file, rest);
+        // One line out per line added, the last one: a line of the user's own that reads the same stays.
+        const rest = fs.readFileSync(a.file, 'utf8').split('\n');
+        for (const line of [].concat(a.lines ?? [])) { const at = rest.lastIndexOf(line); if (at >= 0) rest.splice(at, 1); }
+        if (a.created && !rest.join('').trim()) fs.rmSync(a.file); else fs.writeFileSync(a.file, rest.join('\n'));
         console.log(`${name(a)}: removed Koppler's lines from ${path.basename(a.file)}`); continue;
       } else if (a.kind === 'profile') {
         const raw = fs.readFileSync(a.file, 'utf8'), json = JSON.parse(raw.replace(/^﻿/, ''));
         if (a.created) delete json.profiles?.[a.name];
         else if (json.profiles?.[a.name] && a.previous) json.profiles[a.name].environmentVariables = a.previous;
-        fs.writeFileSync(a.file, bom(raw) + JSON.stringify(json, null, 2) + (raw.endsWith('\n') ? '\n' : ''));
+        fs.writeFileSync(a.file, jsonTextLike(a.file, raw, json));
         console.log(`${name(a)}: ${a.created ? 'removed' : 'restored'} launch profile ${a.name}`); continue;
       } else if (a.kind === 'process' && a.pid) {
         try { process.kill(a.pid, 0); left.push(`${a.label ?? a.command}: still running as pid ${a.pid}; not started through koppler, so check it before stopping`); } catch { continue; }
@@ -581,10 +597,17 @@ async function down(args) {
   // What could not be undone stays; entries added meanwhile (another command, the agent) are kept too.
   const handled = new Set(log.map(a => JSON.stringify(a))), kept = keep.reverse();
   updateActions(logFile, list => { const added = list.filter(a => !handled.has(JSON.stringify(a))); list.splice(0, list.length, ...kept, ...added); });
-  const { switchBack } = await import('./branch.mjs');
+  const { switchBack } = await import('./branch.mjs'), stuck = new Set();
   for (const a of keep.filter(a => a.kind === 'checkout').reverse()) {
     const r = switchBack({ app: a.app, logFile });
-    if (r.error) left.push(r.error); else console.log(r.message);
+    if (r.error) { left.push(r.error); stuck.add(a.app); } else console.log(r.message);
+  }
+  for (const a of keep.filter(a => a.kind === 'npm-local')) {
+    if (stuck.has(a.app)) { left.push(`${name(a)}: run npm install once its branch is back, to get the published ${a.packages.join(', ')} again`); continue; }
+    try {
+      console.log(`${name(a)}: ${unlink(a)}`);
+      updateActions(logFile, list => { const at = list.findIndex(x => JSON.stringify(x) === JSON.stringify(a)); if (at >= 0) list.splice(at, 1); });
+    } catch (e) { left.push(`${name(a)}: ${e.message}`); }
   }
   // Temporary edits nobody logged still carry their marker.
   const local = load('local.js', 'LOCAL')?.apps ?? {}, marker = ['koppler:.*do not', 'commit'].join(' ');

@@ -48,13 +48,14 @@ export function link(appId, appDir, libs, logFile) {
   const dart = libs.filter(l => l.ecosystem === 'dart'), npm = libs.filter(l => l.ecosystem === 'npm');
   if (dart.length) {
     const file = path.join(appDir, OVERRIDES), before = read(file);
-    // The file as it was before the first change of this run is what Stop puts back.
-    if (!log.some(a => a.kind === 'file' && a.file === file)) record({ kind: 'file', app: appId, file, before });
     const lines = dart.map(l => `  ${l.name}:\n    path: ${l.path}`).join('\n');
     const base = before && !before.includes(MARK) ? before : null;
     const text = base
       ? (/^dependency_overrides:\s*$/m.test(base) ? base.replace(/^dependency_overrides:\s*$/m, () => `dependency_overrides:\n${lines}`) : `${base.trimEnd()}\n\ndependency_overrides:\n${lines}\n`)
       : `${MARK}\ndependency_overrides:\n${lines}\n`;
+    // Stop puts back the file as it was before the first change of this run, if it still holds what Koppler wrote last.
+    if (!log.some(a => a.kind === 'file' && a.file === file)) record({ kind: 'file', app: appId, file, before, after: text });
+    else updateActions(logFile, list => { const entry = list.find(a => a.kind === 'file' && a.file === file); if (entry) entry.after = text; });
     fs.writeFileSync(file, text);
   }
   if (npm.length) {
@@ -67,6 +68,9 @@ export function link(appId, appDir, libs, logFile) {
 // Undoes one entry from link(); returns what happened, in words.
 export function unlink(entry) {
   if (entry.kind === 'file') {
+    const now = read(entry.file);
+    if (now === (entry.before ?? null)) return `${path.basename(entry.file)} already as before`;
+    if (entry.after !== undefined && now !== entry.after) throw new Error(`${path.basename(entry.file)} changed since Koppler wrote it; take Koppler's lines out by hand`);
     if (entry.before === null || entry.before === undefined) fs.rmSync(entry.file, { force: true }); else fs.writeFileSync(entry.file, entry.before);
     return `${path.basename(entry.file)} ${entry.before == null ? 'removed' : 'restored'}`;
   }

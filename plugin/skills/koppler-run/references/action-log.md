@@ -16,8 +16,8 @@ The log says how to undo things; which runs and Stops happened, and how they end
 | `profile` | `app`, `file`, `name`, `created` (bool), `previous` (env object, when an existing profile was updated) |
 | `process` | `name` (the `koppler run` name), `command`, `port?`. For the rare process not started through `koppler` (e.g. `flutter run` in the background): `label`, `pid` (the program's own pid, not a shell wrapper: find it by the listening port or the first word of `ps -o command=`, never with a bare `pgrep -f`), `command`, `port?` |
 | `env-file` | `app`, `file` (e.g. `.env.local`), `lines` added, `created` (bool: Koppler created the file) |
-| `file` | `app`, `file`, `before` (the file's text before the run, `null` when Koppler created it): a local library's `pubspec_overrides.yaml`; Stop puts `before` back or removes the file |
-| `npm-local` | `app`, `repo`, `packages`: local libraries installed with `npm install --no-save`; Stop runs `npm install` to go back to the published ones |
+| `file` | `app`, `file`, `before` (the file's text before the run, `null` when Koppler created it), `after` (the text Koppler wrote last): a local library's `pubspec_overrides.yaml`; Stop puts `before` back or removes the file, and leaves a file that no longer reads as `after` for you to sort out |
+| `npm-local` | `app`, `repo`, `packages`: local libraries installed with `npm install --no-save`; Stop runs `npm install` to go back to the published ones, after the branch is back |
 | `checkout` | `app`, `repo`, `from`, `to`, `stash?` (its label), `carried?`; written by `koppler switch`, do not add it yourself |
 | `secret` | `app`, `env` (name only) |
 
@@ -42,7 +42,7 @@ Leave running: anything the user started (IDE sessions, their own terminals, tun
 
 1. **Logged edits**, in reverse order: replace `after` with `before`. If `after` is no longer in the file, report it and leave the file alone.
 2. **Unlogged edits:** search each stack repo for `koppler:` markers (`git -C <repo> grep -nE "koppler:.*do not commit"`). Revert each with the matching `edit` entry's `before`; if there is none, restore that line from `git show HEAD:<file>` when the rest of the file has no other changes, otherwise show the line and ask.
-3. **Env files:** remove the logged `lines` from `file`; delete the file if Koppler `created` it and nothing else is left in it.
+3. **Env files:** remove the logged `lines` from `file`, one occurrence each, the last one, so a line of the user's own that reads the same stays; delete the file if Koppler `created` it and nothing else is left in it.
 4. **Launch profiles:** remove profiles the skill added (logged `created` profiles, plus any profile whose name ends in `-LOCAL`); restore `previous` env for updated ones. Keep the rest of `launchSettings.json` byte-for-byte; if the file then equals `HEAD`, it is clean again.
 5. **Checkouts:** `koppler switch <app> --back` for each: it switches back and brings set-aside changes back. If it reports new uncommitted changes, tell the user and leave that app on its branch.
 6. **Secrets:** leave stored values; mention `bin/secret-list` so the user can decide.
