@@ -60,6 +60,31 @@ console.log('ok');
   assert.match(koppler('up', 'a', 'b'), /a: already running[\s\S]*b: already running|b: already running[\s\S]*a: already running/);
   koppler('stop', '--all', '--yes');
 }
+// koppler up: two tunnels that want the same port. The one that moves takes its app with it, so the app never dials the other one's database.
+{
+  const { spawnSync } = await import('node:child_process');
+  const fs = await import('node:fs'), os = await import('node:os'), path = await import('node:path'), { fileURLToPath } = await import('node:url');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-uptunnel-')), bin = path.join(dir, 'bin');
+  const env = { ...process.env, KOPPLER_STATE: dir, KOPPLER_TEMP: dir, KOPPLER_CONFIG_DIR: dir, PATH: `${bin}:${process.env.PATH}` };
+  cleanups.push(() => spawnSync('node', [path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'src', 'koppler.mjs'), 'stop', '--all', '--yes'], { env }));
+  const koppler = (...args) => { const r = spawnSync('node', [path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'src', 'koppler.mjs'), ...args], { encoding: 'utf8', env }); return { out: (r.stdout + r.stderr).trim(), code: r.status }; };
+  // A stand-in for the tunnel program: it listens where it is told to.
+  fs.mkdirSync(bin);
+  fs.writeFileSync(path.join(bin, 'cloudflared'), '#!/bin/sh\nfor last; do :; done\nexec python3 -m http.server "${last##*:}" --bind 127.0.0.1\n', { mode: 0o755 });
+  const app = (port, tunnel) => ({ name: `App ${port}`, kind: 'other', start: `echo "DB_ADDR=\${DB_ADDR:-unset}"; exec python3 -m http.server ${port} --bind 127.0.0.1`, url: `http://localhost:${port}`, prereqs: [tunnel] });
+  const stack = { envs: ['qa'], apps: { a: app(59941, { tunnel: 'db-a.internal', port: 59951 }), b: app(59942, { tunnel: 'db-b.internal', port: 59951, env: 'DB_ADDR' }) } };
+  fs.writeFileSync(path.join(dir, 'registry.js'), `window.REGISTRY = ${JSON.stringify(stack)};`); allowStack(dir, stack);
+  fs.writeFileSync(path.join(dir, 'local.js'), `window.LOCAL = ${JSON.stringify({ apps: { a: { path: dir }, b: { path: dir } } })};`);
+  const r = koppler('up', 'a', 'b');
+  assert.equal(r.code, 0, r.out);
+  assert.match(r.out, /started tunnel-db-a-59951/);
+  assert.match(r.out, /started tunnel-db-b-59953/);
+  const log = id => fs.readFileSync(path.join(dir, 'logs', `${id}.log`), 'utf8');
+  assert.match(log('b'), /DB_ADDR=localhost:59953/);
+  assert.match(log('a'), /DB_ADDR=unset/);
+  koppler('stop', '--all', '--yes');
+  console.log('moved tunnel ok');
+}
 // koppler up --run: a confirmed Send carried out by Koppler itself; a cable's address reaches its caller at start, and the run is done.
 {
   const { spawnSync } = await import('node:child_process');
