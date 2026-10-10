@@ -23,6 +23,7 @@ import kinds from './kinds.js';
 import { recipesFor } from './recipes.mjs';
 import { APP, BIN, LOGS, STATE as STATE_HOME, TEMP } from './paths.mjs';
 import { redact } from './scrub.mjs';
+import { listenerPid } from './listen.mjs';
 import kp from './plan.js';
 export { githubFile };
 
@@ -385,7 +386,7 @@ function startServer() {
       // Shut down: the agent's listener, then this server through koppler (so its record goes too). Apps and tunnels keep running.
       if (url.pathname === '/shutdown') {
         res.writeHead(204).end();
-        try { const { pid } = JSON.parse(fs.readFileSync(path.join(TEMP, 'listener.json'), 'utf8')); if (pid) process.kill(pid, 'SIGTERM'); } catch {}
+        try { const pid = listenerPid(JSON.parse(fs.readFileSync(path.join(TEMP, 'listener.json'), 'utf8'))); if (pid) process.kill(pid, 'SIGTERM'); } catch {}
         try { fs.rmSync(path.join(TEMP, 'listener.json'), { force: true }); } catch {}
         spawn(process.execPath, [path.join(here, 'koppler.mjs'), 'stop', 'canvas'], { detached: true, stdio: 'ignore' }).unref();
         setTimeout(() => process.exit(0), 3000).unref();
@@ -671,7 +672,7 @@ async function snapshot() {
   // Whether an agent session takes Sends: listening now, working on one it took (for up to two hours), or none.
   status.agent = (() => {
     let l; try { l = JSON.parse(fs.readFileSync(path.join(TEMP, 'listener.json'), 'utf8')); } catch { return { state: 'none' }; }
-    if (l.pid) { try { process.kill(l.pid, 0); return { state: 'listening', since: l.since }; } catch { return { state: 'none' }; } }
+    if (l.pid) return listenerPid(l) ? { state: 'listening', since: l.since } : { state: 'none' };
     // Working on what it took, until it marks a run done or failed after that: then it has finished and is not listening.
     const ended = Math.max(0, ...runs().map(r => Date.parse(r.endedAt ?? '') || 0));
     return l.busy && Date.parse(l.busy) > ended && Date.now() - Date.parse(l.busy) < 2 * 3600 * 1000 ? { state: 'busy', since: l.since, busy: l.busy } : { state: 'none' };
