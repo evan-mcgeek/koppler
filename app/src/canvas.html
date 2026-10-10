@@ -5,9 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Koppler</title>
 <link rel="icon" href="data:,">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Schibsted+Grotesk:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="fonts/fonts.css">
 <script>try { const t = localStorage.getItem('koppler-theme'); if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; } catch {}</script>
 <style>
   :root {
@@ -1227,6 +1225,7 @@
 // The board is kept per stack, so switching stacks never mixes boards.
 const KEY = 'koppler:v1:' + (window.REGISTRY?.source ?? 'none');
 const SVG = 'http://www.w3.org/2000/svg';
+const JSON_POST = { method: 'POST', headers: { 'content-type': 'application/json' } };
 const board = document.getElementById('board');
 // Below this zoom, cards show in their compact form.
 const FAR_ZOOM = 0.6;
@@ -1279,7 +1278,7 @@ let autosaveTimer, autosaved = '';
 function autosave() {
   const target = status?.save, json = JSON.stringify(state);
   if (!target || json === autosaved) return;
-  fetch(target, { method: 'POST', mode: 'no-cors', body: json }).then(() => { autosaved = json; }, () => {});
+  fetch(target, { ...JSON_POST, body: json }).then(() => { autosaved = json; }, () => {});
 }
 // Undo and redo: every board change is a step (cards, cables, notes, branches, environment, presets); zoom and panning are not.
 // Changes within a moment of each other, like typing a note, are one step.
@@ -1427,7 +1426,7 @@ function renderApps() {
       confirm: async () => {
         const url = status?.save?.replace('/state?', '/apps-remove?');
         if (!url) return toast('This needs the Koppler canvas running.', 'warning');
-        const r = await fetch(url, { method: 'POST', body: JSON.stringify({ id }) }).then(x => x.json()).catch(() => ({ error: 'Could not reach the canvas server.' }));
+        const r = await fetch(url, { ...JSON_POST, body: JSON.stringify({ id }) }).then(x => x.json()).catch(() => ({ error: 'Could not reach the canvas server.' }));
         if (r.error) return toast(r.error, 'warning');
         location.reload();
       },
@@ -1494,7 +1493,7 @@ const pickShutdown = () => {
     ok: 'Shut down', prod: true,
     confirm: async () => {
       const url = status?.save?.replace('/state?', '/shutdown?'), startCommand = status?.start ?? 'koppler run canvas';
-      const res = url ? await fetch(url, { method: 'POST', body: '{}' }).catch(() => null) : null;
+      const res = url ? await fetch(url, { ...JSON_POST, body: '{}' }).catch(() => null) : null;
       if (!res?.ok) return toast(res?.status === 404 ? 'The canvas server is older than this page. Stop it in your terminal: koppler stop canvas' : 'Could not reach the canvas server.', 'warning');
       if (status) status.agent = { state: 'none' };
       paintAgent();
@@ -1516,7 +1515,7 @@ const pickStopApps = () => {
     ok: 'Stop apps', prod: true,
     confirm: async () => {
       const url = status?.save?.replace('/state?', '/stop-apps?');
-      const r = url ? await fetch(url, { method: 'POST', body: '{}' }).then(x => x.json()).catch(() => null) : null;
+      const r = url ? await fetch(url, { ...JSON_POST, body: '{}' }).then(x => x.json()).catch(() => null) : null;
       toast(r ? `Stopped ${r.stopped.length} ${r.stopped.length === 1 ? 'process' : 'processes'}. Your changes stay until you Revert.` : 'Could not reach the canvas server.', r ? '' : 'warning');
     },
   });
@@ -1550,7 +1549,7 @@ const credEndpoint = action => status?.save?.replace('/state?', `/${action}?`);
 async function credCall(action, payload) {
   const url = credEndpoint(action);
   if (!url) return { error: 'Credentials need the Koppler canvas running (koppler run canvas).' };
-  try { return await (await fetch(url, { method: 'POST', body: JSON.stringify(payload) })).json(); }
+  try { return await (await fetch(url, { ...JSON_POST, body: JSON.stringify(payload) })).json(); }
   catch { return { error: 'Credentials work only in the standalone canvas.' }; }
 }
 // Credentials an app on the board always needs and that are not stored for the current environment.
@@ -2157,7 +2156,7 @@ async function openPresetLink(link) {
   if (!status?.save) return fail('Links need the Koppler canvas running (koppler run canvas). Open a file instead.');
   go.disabled = true; hintPreset('Opening…');
   let result;
-  try { result = await (await fetch(status.save.replace('/state?', '/preset?'), { method: 'POST', body: JSON.stringify({ url: link }) })).json(); }
+  try { result = await (await fetch(status.save.replace('/state?', '/preset?'), { ...JSON_POST, body: JSON.stringify({ url: link }) })).json(); }
   catch { return fail('Links open only in the standalone canvas. Open a file instead.'); }
   if (result.error) return fail(result.error);
   go.disabled = false; presetLink.value = ''; go.hidden = true;
@@ -3619,6 +3618,8 @@ function revealBoard() {
   requestAnimationFrame(() => requestAnimationFrame(() => { makeRoom(); if (Object.keys(state.nodes).length && !viewShowsCards()) fit(); else applyPan(); board.classList.remove('booting'); }));
 }
 window.__kopplerStatus = next => {
+  // The server's addresses come from the page's own, which holds the token.
+  if (next.server) { const token = location.pathname.split('/')[2]; next.save = `${location.origin}/state?token=${token}`; next.prompt = `${location.origin}/prompt?token=${token}`; }
   onRunsEnded(next);
   status = next;
   setTimeout(revealBoard, 0);
@@ -3635,7 +3636,7 @@ const midTask = () => setupEnvs.length || picks.size || document.getElementById(
 function reloadNewer() {
   save();
   const done = () => location.reload();
-  status?.save ? fetch(status.save, { method: 'POST', mode: 'no-cors', body: JSON.stringify(state) }).then(done, done) : done();
+  status?.save ? fetch(status.save, { ...JSON_POST, body: JSON.stringify(state) }).then(done, done) : done();
 }
 function pollStatus() {
   const tag = document.createElement('script');
@@ -3864,7 +3865,7 @@ async function answer(id, payload) {
   if (!m || !status?.prompt) return toast('Answering needs the Koppler canvas running.', 'warning');
   const choice = m.choices?.find(c => c.id === payload.choice);
   const text = `Answer to your question "${m.title}"${m.run ? ` (run ${m.run})` : ''}: ${choice ? `${choice.label}${payload.text ? `. ${payload.text}` : ''}` : payload.text}`;
-  const res = await fetch(status.prompt, { method: 'POST', body: JSON.stringify({ tag: 'koppler-reply', text, data: { message: id, ...payload } }) }).catch(() => null);
+  const res = await fetch(status.prompt, { ...JSON_POST, body: JSON.stringify({ tag: 'koppler-reply', text, data: { message: id, ...payload } }) }).catch(() => null);
   if (!res?.ok) return toast(res?.status === 409 ? 'That question was already answered.' : 'Could not send the answer.', 'warning');
   m.answered = { at: new Date().toISOString(), ...payload, via: 'canvas' };
   if (agentState() === 'none') toast('Answer saved. The agent gets it when one connects.');
@@ -3880,7 +3881,7 @@ document.getElementById('inbox-list').addEventListener('click', async e => {
   const b = e.target.closest('[data-dismiss]'); if (!b) return;
   const id = b.closest('.msg').dataset.id, m = (status?.messages ?? []).find(x => x.id === id), url = status?.save?.replace('/state?', '/message-dismiss?');
   if (!m || !url) return toast('Dismissing needs the Koppler canvas running.', 'warning');
-  const res = await fetch(url, { method: 'POST', body: JSON.stringify({ id }) }).catch(() => null);
+  const res = await fetch(url, { ...JSON_POST, body: JSON.stringify({ id }) }).catch(() => null);
   if (!res?.ok && res?.status !== 409) return toast(res?.status === 404 ? 'The canvas server is older than this page. Restart it, then dismiss again.' : 'Could not dismiss it.', 'warning');
   m.answered = { at: new Date().toISOString(), via: 'dismissed' };
   renderInbox(); paintAgent();
@@ -4187,7 +4188,7 @@ async function postStack(payload, error, button) {
   if (!url) { error.textContent = 'This needs the Koppler canvas running (koppler init --pick).'; return; }
   button.disabled = true; error.textContent = '';
   let result;
-  try { result = await (await fetch(url, { method: 'POST', body: JSON.stringify(payload) })).json(); }
+  try { result = await (await fetch(url, { ...JSON_POST, body: JSON.stringify(payload) })).json(); }
   catch { result = { error: 'This works only in the standalone canvas.' }; }
   if (result.error) { error.textContent = result.error; button.disabled = false; return; }
   location.reload();
@@ -4317,7 +4318,7 @@ pickerOk.onclick = async () => {
   if (!url) { error.textContent = 'Adding repos needs the Koppler canvas running (koppler run canvas).'; return; }
   pickerOk.disabled = true; pickerOk.textContent = 'Adding…';
   let result;
-  try { result = await (await fetch(url, { method: 'POST', body: JSON.stringify({ apps: [...picks].map(([slug, p]) => ({ slug, name: p.name, kind: p.kind })) }) })).json(); }
+  try { result = await (await fetch(url, { ...JSON_POST, body: JSON.stringify({ apps: [...picks].map(([slug, p]) => ({ slug, name: p.name, kind: p.kind })) }) })).json(); }
   catch { result = { error: 'Adding repos works only in the standalone canvas.' }; }
   if (result.error) { error.textContent = result.error; return paintPickerFooter(); }
   history.replaceState(null, '', location.pathname + location.search);
@@ -4331,7 +4332,7 @@ async function reviewFindings({ afterAdding = false } = {}) {
   const url = status?.save?.replace('/state?', '/discover?');
   if (!url) return afterAdding ? location.reload() : toast('This needs the Koppler canvas running.', 'warning');
   toast('Looking through the repos…');
-  let r; try { r = await (await fetch(url, { method: 'POST', body: '{}' })).json(); } catch { r = { error: 'This works only in the standalone canvas.' }; }
+  let r; try { r = await (await fetch(url, { ...JSON_POST, body: '{}' })).json(); } catch { r = { error: 'This works only in the standalone canvas.' }; }
   if (r.error) { toast(r.error, 'warning'); return afterAdding && setTimeout(() => location.reload(), 1500); }
   if (!r.findings.length) { if (afterAdding) return location.reload(); return toast('Nothing new found in the repos.'); }
   // The stack on the page may be older than what was just added; names come from the finding when missing.
@@ -4347,7 +4348,7 @@ async function reviewFindings({ afterAdding = false } = {}) {
     confirm: async () => {
       const ids = [...document.querySelectorAll('#review-body .finding input:checked')].map(i => i.value);
       if (!ids.length) return afterAdding && location.reload();
-      const res = await (await fetch(status.save.replace('/state?', '/discover-apply?'), { method: 'POST', body: JSON.stringify({ ids }) })).json().catch(() => ({ error: 'Could not write the stack.' }));
+      const res = await (await fetch(status.save.replace('/state?', '/discover-apply?'), { ...JSON_POST, body: JSON.stringify({ ids }) })).json().catch(() => ({ error: 'Could not write the stack.' }));
       if (res.error) return toast(res.error, 'warning');
       location.reload();
     },
@@ -4419,7 +4420,7 @@ function leaveStack(to) {
 async function stackCall(action) {
   const url = status?.save?.replace('/state?', `/${action}?`);
   if (!url) return { error: 'This needs the Koppler canvas running.' };
-  try { return await (await fetch(url, { method: 'POST', body: '{}' })).json(); } catch { return { error: 'This works only in the standalone canvas.' }; }
+  try { return await (await fetch(url, { ...JSON_POST, body: '{}' })).json(); } catch { return { error: 'This works only in the standalone canvas.' }; }
 }
 function reviewChanges() {
   const l = status.linked, list = `<ul class="plan-lines">${l.changes.map(c => `<li style="grid-template-columns:1fr"><span>${esc(c[0].toUpperCase() + c.slice(1))}</span></li>`).join('')}</ul>`;
@@ -4574,7 +4575,7 @@ function debugNote(kind, what, detail) {
 }
 function flushDebug() {
   const url = status?.save?.replace('/state?', '/debug-log?'), entries = debugLog.queue.splice(0);
-  if (url && entries.length) fetch(url, { method: 'POST', body: JSON.stringify({ entries }), keepalive: true }).catch(() => {});
+  if (url && entries.length) fetch(url, { ...JSON_POST, body: JSON.stringify({ entries }), keepalive: true }).catch(() => {});
 }
 // Typed text is never kept: from fields only their name, and from a credential form nothing at all.
 const secretField = el => !!el.closest?.('.cred-form, [type="password"], [data-secret]');
@@ -4605,7 +4606,7 @@ document.getElementById('debug-copy').onclick = async () => {
   if (!text.trim()) return toast('The debug log is empty. Turn it on, then do what went wrong.');
   copyWithToast(text.trim().split('\n').slice(-300).join('\n'), 'Last 300 entries copied', 'Copy is blocked here: the log is temp/debug.jsonl in the skill folder');
 };
-document.getElementById('debug-clear').onclick = () => { debugLog.queue = []; const url = status?.save?.replace('/state?', '/debug-clear?'); if (url) fetch(url, { method: 'POST', body: '{}' }); toast('Debug log cleared'); };
+document.getElementById('debug-clear').onclick = () => { debugLog.queue = []; const url = status?.save?.replace('/state?', '/debug-clear?'); if (url) fetch(url, { ...JSON_POST, body: '{}' }); toast('Debug log cleared'); };
 // "Before this runs on PROD": what the user has to do, worked out live (sign-ins, hosts, secrets, what the stack is missing),
 // in the order it can be done, each with its command. What the stack is missing can be handed to the agent to find.
 const checklist = document.getElementById('checklist');
@@ -4625,7 +4626,7 @@ async function openChecklist() {
   list.innerHTML = '<li><span class="mark"></span><span class="what">Working out what is needed…</span></li>';
   checklist.hidden = false; document.getElementById('checklist-done').focus();
   const url = status?.save?.replace('/state?', '/needs?');
-  const r = url ? await fetch(url, { method: 'POST', body: JSON.stringify({ env: state.env, apps, noTunnels: apps.filter(id => state.nodes[id].hideTunnels) }) }).then(x => x.json()).catch(() => ({ error: 'Could not reach the canvas server.' })) : { error: 'This needs the Koppler canvas running.' };
+  const r = url ? await fetch(url, { ...JSON_POST, body: JSON.stringify({ env: state.env, apps, noTunnels: apps.filter(id => state.nodes[id].hideTunnels) }) }).then(x => x.json()).catch(() => ({ error: 'Could not reach the canvas server.' })) : { error: 'This needs the Koppler canvas running.' };
   if (r.error) { list.innerHTML = `<li><span class="mark">!</span><span class="what">${esc(r.error)}</span></li>`; return; }
   const steps = r.steps ?? [];
   if (!steps.length) { list.innerHTML = `<li class="done"><span class="mark">✓</span><span class="what">Nothing for you to do. Koppler does the rest.</span></li>`; return; }
@@ -4675,7 +4676,7 @@ async function deliver(text, prompt, sent, fallback = text) {
   }
   if (status?.prompt) {
     try {
-      const res = await fetch(status.prompt, { method: 'POST', body: JSON.stringify({ ...prompt, text }) });
+      const res = await fetch(status.prompt, { ...JSON_POST, body: JSON.stringify({ ...prompt, text }) });
       if (res.ok) { toast(sent); return true; }
     } catch {}
   }

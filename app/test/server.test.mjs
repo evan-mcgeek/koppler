@@ -1,0 +1,59 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import http from 'node:http';
+import os from 'node:os';
+import path from 'node:path';
+import { spawn } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+
+// The canvas server answers its own page only, and keeps its token to itself.
+const PORT = 4797, dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-server-')), temp = path.join(dir, 'state', 'run');
+fs.mkdirSync(temp, { recursive: true });
+const env = { ...process.env, KOPPLER_STATE: path.join(dir, 'state'), KOPPLER_TEMP: temp, KOPPLER_LOGS: path.join(dir, 'state', 'logs'), KOPPLER_CONFIG_DIR: path.join(dir, 'cfg'), KOPPLER_PORT: String(PORT) };
+const server = spawn(process.execPath, [path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'src', 'status-watch.mjs')], { env, stdio: 'ignore' });
+const until = async (what, done) => { for (let i = 0; i < 100; i++) { if (done()) return; await new Promise(r => setTimeout(r, 100)); } assert.fail(`${what} did not happen`); };
+const call = (method, pathname, headers = {}, body) => new Promise((resolve, reject) => {
+  const req = http.request({ host: '127.0.0.1', port: PORT, method, path: pathname, headers }, res => { const chunks = []; res.on('data', c => chunks.push(c)); res.on('end', () => resolve({ status: res.statusCode, headers: res.headers, body: Buffer.concat(chunks) })); });
+  req.on('error', reject); req.end(body);
+});
+
+try {
+  const urlFile = path.join(temp, 'canvas-url'), statusFile = path.join(temp, 'status.js');
+  await until('the server starting', () => fs.existsSync(urlFile));
+  const page = new URL(fs.readFileSync(urlFile, 'utf8').trim()), token = page.pathname.split('/')[2];
+  const own = `http://127.0.0.1:${PORT}`, json = { 'content-type': 'application/json' }, clear = `/debug-clear?token=${token}`;
+
+  const got = await call('GET', page.pathname);
+  assert.equal(got.status, 200);
+  assert.match(got.headers['content-security-policy'], /default-src 'self'.*frame-ancestors 'none'/);
+  assert.equal(got.headers['referrer-policy'], 'no-referrer');
+  assert.equal(got.headers['x-content-type-options'], 'nosniff');
+  // The page asks no other site for anything.
+  assert.doesNotMatch(got.body.toString(), /(href|src)="https?:\/\//);
+  assert.equal((await call('GET', `${page.pathname}fonts/fonts.css`)).headers['content-type'], 'text/css; charset=utf-8');
+  assert.equal((await call('GET', `${page.pathname}fonts/SchibstedGrotesk-latin.woff2`)).headers['content-type'], 'font/woff2');
+  assert.equal((await call('GET', `${page.pathname}fonts/JetBrainsMono-OFL.txt`)).status, 404);
+  assert.equal((await call('GET', `/s/${'0'.repeat(48)}/`)).status, 404);
+
+  // Another site's name pointed at this machine, or a request another site makes, is refused.
+  assert.equal((await call('GET', page.pathname, { host: `evil.example:${PORT}` })).status, 403);
+  assert.equal((await call('GET', page.pathname, { host: `localhost:${PORT}` })).status, 200);
+  assert.equal((await call('POST', clear, { ...json, origin: 'https://evil.example' }, '{}')).status, 403);
+  assert.equal((await call('POST', clear, { ...json, origin: 'null' }, '{}')).status, 403);
+  // What a form on another site can send is not JSON.
+  assert.equal((await call('POST', clear, { 'content-type': 'text/plain', origin: own }, '{}')).status, 415);
+  assert.equal((await call('POST', clear, { origin: own }, '{}')).status, 415);
+  assert.equal((await call('POST', clear, { ...json, origin: own }, '{}')).status, 200);
+  assert.equal((await call('POST', clear, json, '{}')).status, 200);
+  assert.equal((await call('POST', '/debug-clear?token=wrong', { ...json, origin: own }, '{}')).status, 404);
+
+  // The status file is private and does not hold the token.
+  const status = () => { try { return fs.readFileSync(statusFile, 'utf8'); } catch { return ''; } };
+  await until('a status from the running server', () => status().includes('"server":true'));
+  assert.equal(fs.statSync(statusFile).mode & 0o777, 0o600);
+  assert.equal(status().includes(token), false);
+  console.log('server tests ok');
+} finally {
+  server.kill();
+  fs.rmSync(dir, { recursive: true, force: true });
+}
