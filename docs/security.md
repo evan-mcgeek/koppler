@@ -9,7 +9,8 @@ These are the rules it follows, including the ones that hold whatever an agent d
 - You store them yourself, in your own terminal, with a hidden prompt: `koppler secret set <app> <NAME>`, or piped from a fetch command with `--stdin`.
 - The agent can list secret names and start an app with its secrets (`koppler run <app>`), and nothing else. A command it runs never gets them.
 - Each environment has its own store, so a production value never replaces or leaks into a test environment.
-- Production secrets show a Keychain prompt on every read.
+- Secrets of a protected environment show a Keychain prompt on every read. The stack says which environments are protected (`protected` in `stack.json`); without that, every environment except the first. It never depends on what an environment is called.
+- Secrets of the other environments (usually just the first, your test environment) can be read without a prompt by anything running as you. For an agent, only the deny rules stand in the way; treat those values accordingly.
 - The canvas Credentials panel can set, test and remove a value, and never shows one.
 - `koppler doctor --secrets <app>` checks that a stored database or Redis secret connects and prints only the outcome. A value is only ever sent to the host named inside it.
 - A process that holds a secret does not trust the environment Koppler was started in: variables that make a runtime load extra code (`NODE_OPTIONS`, `DOTNET_STARTUP_HOOKS`, `DYLD_*` and the like) are left out of an app's environment, and database clients are found where they are installed, not through the `PATH`, with nothing that could send them to another host.

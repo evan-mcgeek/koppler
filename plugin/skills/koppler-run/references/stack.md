@@ -42,6 +42,7 @@ It holds facts about the apps, never secret values.
 | Field | Meaning |
 |---|---|
 | `envs` | Deployed environments, first one is the default; app fields apply to it, `apps[id].envs.<env>` overrides them for the others. |
+| `protected` | The environments where a mistake costs something (production, usually): a list of names from `envs`. Without it, every environment except the first. They get the red frame and the blocking review on the canvas, and their secrets ask on every read. |
 | `envAliases` | Other names the repos use for an environment, e.g. `{ "qa": ["dev"] }`; `koppler discover --deployed` reads Terraform written for `dev` as QA. |
 | `notes` | Stack-wide facts. |
 | `checks` | The stack's own health checks, run when it loads (`koppler doctor`): `name`, `run` (a shell command), `ok` and `fix` texts, `kinds` to limit it to stacks with those app kinds. At most 50, each `run` up to 2000 characters. They are someone's commands, so they run only after the user approved them with `koppler doctor --approve`, and again after one changes. The same approval covers everything else the stack would run or write: an app's `start` (also per environment), a custom kind's `start` and `stop`, and `localChanges`. |

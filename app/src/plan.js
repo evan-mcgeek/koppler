@@ -64,7 +64,12 @@
   // The queues an app publishes to or reads, from the stack.
   const queuesOf = (registry, id) => { const a = registry?.apps?.[id] ?? {}; return [...new Set([...Object.keys(a.publishes ?? {}), ...Object.keys(a.reads ?? {})])]; };
 
-  const api = { board, plan, describe, same, queuesOf, QUEUE_TYPES, LOCAL_QUEUE_TYPES };
+  // The environments where a mistake costs something (production, usually): the stack names them in `protected`;
+  // without that, every environment except the first. They get the red frame, a review that blocks on what is
+  // missing, and secrets that ask on every read. Never decided by an environment's name.
+  const protectedEnvs = registry => { const envs = (registry && registry.envs) || []; return Array.isArray(registry && registry.protected) ? envs.filter(e => registry.protected.includes(e)) : envs.slice(1); };
+  const isProtected = (registry, env) => protectedEnvs(registry).includes(env);
+  const api = { board, plan, describe, same, queuesOf, QUEUE_TYPES, LOCAL_QUEUE_TYPES, protectedEnvs, isProtected };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.KopplerPlan = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);

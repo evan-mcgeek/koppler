@@ -22,6 +22,7 @@ import { githubFile, readFile } from './github.mjs';
 import kinds from './kinds.js';
 import { recipesFor } from './recipes.mjs';
 import { APP, BIN, LOGS, STATE as STATE_HOME, TEMP } from './paths.mjs';
+import kp from './plan.js';
 export { githubFile };
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -465,8 +466,8 @@ export function declaredSecrets(registry) {
   }
   return out;
 }
-const runScript = (name, args, input) => new Promise(resolve => {
-  const child = execFile(path.join(BIN, name), args, { timeout: 60000, maxBuffer: 64 * 1024 }, (err, stdout) => resolve({ code: err ? (err.code ?? 1) : 0, out: String(stdout).trim() }));
+const runScript = (name, args, input, env) => new Promise(resolve => {
+  const child = execFile(path.join(BIN, name), args, { timeout: 60000, maxBuffer: 64 * 1024, ...(env && { env: { ...process.env, ...env } }) }, (err, stdout) => resolve({ code: err ? (err.code ?? 1) : 0, out: String(stdout).trim() }));
   if (input !== undefined) child.stdin.end(input); else child.stdin.end();
 });
 let storedNames = {}, storedAt = 0;
@@ -492,7 +493,8 @@ async function secretRequest(action, body) {
   const store = storeOf(registry, app, env);
   if (action === 'set') {
     if (typeof body.value !== 'string' || !body.value.trim() || body.value.length > 16384) return { status: 400, body: { error: 'Paste the value first.' } };
-    const { code } = await runScript('secret-store', ['set', store, name], body.value.replace(/\r?\n$/, ''));
+    // A protected environment's value is stored so that every read asks the user.
+    const { code } = await runScript('secret-store', ['set', store, name], body.value.replace(/\r?\n$/, ''), { KOPPLER_SECRET_PROTECTED: kp.isProtected(registry, env) ? '1' : '0' });
     await refreshStored(true);
     return code === 0 ? { status: 200, body: { ok: true } } : { status: 500, body: { error: 'Could not store it.' } };
   }
@@ -591,7 +593,7 @@ export async function cableTest(registry, body, probe = { answers, opens, speaks
   for (const name of (app.prereqs ?? []).map(p => p?.hosts).filter(n => typeof n === 'string' && /^[a-z0-9.-]{1,253}$/i.test(n)))
     if (!await probe.leadsHere(name)) return { ok: false, text: 'Name not redirected', detail: `A ${KIND_NAME[kind]} server answers on ${where}, but ${name}, the name ${app.name} dials, does not lead to this Mac. Add its hosts entry (koppler doctor).` };
   const reached = `A ${KIND_NAME[kind]} server answers through the tunnel on ${where}`, mine = (declaredSecrets(registry)[body.app]?.[env] ?? []).filter(x => x.type === kind);
-  const production = /^(prod|production|live)$/.test(env) && env !== registry.envs[0];
+  const production = kp.isProtected(registry, env);
   if (mine.length !== 1 || (body.auto && production)) return { ok: true, text: 'Reachable', detail: `${reached}. ${mine.length === 1 ? `${mine[0].name} was not tried: a production credential is only read when you press the test yourself.` : `${app.name} logs in with its own settings, which Koppler does not hold, so the login itself was not tried.`}` };
   const r = await probe.login(body.app, env, mine[0].name);
   if (r?.ok) return { ok: true, text: 'Logged in', detail: `${reached}, and ${app.name}'s ${mine[0].name} logs in.` };

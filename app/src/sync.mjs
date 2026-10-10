@@ -149,6 +149,7 @@ export function validateStack(stack) {
   const errors = [];
   if (!Array.isArray(stack?.envs) || !stack.envs.length || !stack.envs.every(e => /^[a-z0-9-]+$/.test(e))) errors.push('envs: a non-empty list of lowercase names');
   if (!stack?.apps || typeof stack.apps !== 'object' || Array.isArray(stack.apps)) errors.push('apps: an object keyed by app id');
+  if (stack?.protected !== undefined && !(Array.isArray(stack.protected) && stack.protected.every(e => stack.envs?.includes(e)))) errors.push('protected: a list of environments from envs (the ones that ask before every secret read and get the careful review)');
   for (const [env, names] of Object.entries(stack?.envAliases ?? {})) if (!stack.envs?.includes(env) || !Array.isArray(names) || !names.every(n => typeof n === 'string')) errors.push(`envAliases.${env}: must be one of envs, with a list of names`);
   for (const [id, k] of Object.entries(stack?.kinds ?? {})) {
     if (!/^[a-z0-9-]{1,32}$/.test(id)) errors.push(`kinds.${id}: id must be lowercase letters, digits and dashes`);
