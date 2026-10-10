@@ -160,4 +160,16 @@ console.log('deployed outside tests ok');
   const toml = 'version = 0.1\n[qa]\n[qa.deploy.parameters]\nparameter_overrides = "Environment=\\"QA\\" HostedZoneName=\\"cdr-qa.example.com\\" CatalogEndpoint=\\"https://other.example.com\\""\n[prod.deploy.parameters]\nparameter_overrides = "DomainName=\\"cdr.example.com\\""\n';
   assert.deepEqual(samDomains(toml), [{ token: 'qa', domains: [{ host: 'cdr-qa.example.com', from: 'api' }] }, { token: 'prod', domains: [{ host: 'cdr.example.com', from: 'api' }] }]);
 }
+// Nothing that could be a secret comes out of a draft: a webhook URL keeps only its origin, and an account is only
+// what a variable named for the account holds.
+assert.equal(addressOf('https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXXXXXXXXXXXXXX'), 'https://hooks.slack.com');
+assert.equal(addressOf('https://api.acme.dev/api/v1/'), 'https://api.acme.dev/api/v1');
+assert.equal(addressOf('https://api.acme.dev/Hook/9f8a7b6c'), 'https://api.acme.dev');
+{
+  const account = text => readModule([{ name: 'main.tf', text }])[0]?.account ?? null;
+  assert.equal(account('variable "service_account_key" { default = "SUPERSECRETVALUE" }'), null);
+  assert.equal(account('variable "account_id" { default = "123456789012" }'), '123456789012');
+  assert.equal(account('variable "account_name" { default = "acme-dev" }'), 'acme-dev');
+  assert.equal(account('variable "account_name" { default = "not a name: a sentence" }'), null);
+}
 console.log('deployed sam tests ok');
