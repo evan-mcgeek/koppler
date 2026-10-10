@@ -49,4 +49,13 @@ fs.writeFileSync(logFile, JSON.stringify([{ kind: 'edit', app: 'api', recipe: re
 markRuns(logFile, true);
 assert.equal(recipesFor(registry(), 'api')[0].here.ok, true);
 assert.equal(JSON.stringify(registry()).includes('"ok"'), false);
+// A remembered change whose text holds $& or $' is applied exactly, not as replacement patterns.
+{
+  const d = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-recipe-dollar-')), f = path.join(d, 'a.js');
+  fs.writeFileSync(f, 'const x = 1;\n');
+  const reg = { envs: ['qa'], apps: { api: { name: 'API', localChanges: [{ id: 'r1', file: 'a.js', find: 'const x = 1;', replace: "const x = s.replace(/a$/, '$&$\\'');", why: 'test', when: { always: true } }] } } };
+  const [r] = prepare({ registry: reg, apps: ['api'], env: 'qa', calls: { api: [] }, repoOf: () => d, logFile: path.join(d, 'actions.json') });
+  assert.equal(r.state, 'applied');
+  assert.equal(fs.readFileSync(f, 'utf8'), "const x = s.replace(/a$/, '$&$\\'');\n");
+}
 console.log('recipes tests ok');

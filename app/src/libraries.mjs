@@ -50,7 +50,7 @@ export function link(appId, appDir, libs, logFile) {
     const lines = dart.map(l => `  ${l.name}:\n    path: ${l.path}`).join('\n');
     const base = before && !before.includes(MARK) ? before : null;
     const text = base
-      ? (/^dependency_overrides:\s*$/m.test(base) ? base.replace(/^dependency_overrides:\s*$/m, `dependency_overrides:\n${lines}`) : `${base.trimEnd()}\n\ndependency_overrides:\n${lines}\n`)
+      ? (/^dependency_overrides:\s*$/m.test(base) ? base.replace(/^dependency_overrides:\s*$/m, () => `dependency_overrides:\n${lines}`) : `${base.trimEnd()}\n\ndependency_overrides:\n${lines}\n`)
       : `${MARK}\ndependency_overrides:\n${lines}\n`;
     fs.writeFileSync(file, text);
   }

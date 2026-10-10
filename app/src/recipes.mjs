@@ -68,7 +68,7 @@ export function prepare({ registry, apps, env, calls, repoOf, logFile }) {
     const count = body.split(find).length - 1;
     if (body.includes(replace)) { out.push({ app, id: r.id, state: 'already', why: r.why }); continue; }
     if (count !== 1) { out.push({ app, id: r.id, state: 'moved', why: r.why, detail: `${r.file}: the original text is ${count ? 'there more than once' : 'no longer there'}` }); continue; }
-    fs.writeFileSync(file, body.replace(find, replace));
+    fs.writeFileSync(file, body.replace(find, () => replace));
     log.push({ kind: 'edit', app, file, before: find, after: replace, recipe: r.id });
     out.push({ app, id: r.id, state: 'applied', why: r.why, scope: r.scope });
   }
