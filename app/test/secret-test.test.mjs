@@ -58,11 +58,18 @@ console.log('secret-test tests ok');
   console.log('secret-psql tests ok');
 }
 
-// The Keychain store (macOS): the same set / names / value / remove, under a throwaway prefix.
+// The Keychain store (macOS): the same set / names / value / remove, in a keychain of its own inside a throwaway home,
+// so the user's own keychain is never touched and the test does not depend on it.
 if (process.platform === 'darwin') {
   const store = path.join(path.dirname(bin), 'secret-store');
-  const env = { ...process.env, KOPPLER_SECRET_BACKEND: 'keychain', KOPPLER_KEYCHAIN_PREFIX: `koppler-selftest-${process.pid}` };
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-keychain-')), keychain = path.join(home, 'Library', 'Keychains', 'test.keychain-db');
+  const env = { ...process.env, HOME: home, KOPPLER_SECRET_BACKEND: 'keychain', KOPPLER_KEYCHAIN: keychain, KOPPLER_KEYCHAIN_PREFIX: `koppler-selftest-${process.pid}` };
   delete env.KOPPLER_SECRETS;
+  fs.mkdirSync(path.dirname(keychain), { recursive: true });
+  for (const args of [['create-keychain', '-p', 'test', keychain], ['unlock-keychain', '-p', 'test', keychain]]) {
+    const made = spawnSync('security', args, { encoding: 'utf8', env });
+    assert.equal(made.status, 0, `security ${args[0]}: ${made.stderr}`);
+  }
   const ks = (args, input) => { const r = spawnSync(store, args, { encoding: 'utf8', env, input, timeout: 15000 }); return [r.status, r.stdout.trim()]; };
   const tricky = 'Host=db;Password=a "quoted" $val\\ue with spaces & ünïcode';
   try {
@@ -80,5 +87,6 @@ if (process.platform === 'darwin') {
     for (const n of ['ConnectionStrings__DB', 'API_KEY']) ks(['remove', 'orders-api', n]);
   }
   assert.equal(ks(['names', 'orders-api'])[1], '');
+  fs.rmSync(home, { recursive: true, force: true });
   console.log('keychain store tests ok');
 }
