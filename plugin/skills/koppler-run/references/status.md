@@ -37,7 +37,8 @@ node <app>/src/status-watch.mjs --once                                # publish 
 ```
 
 Every 1.5 seconds it writes `<state>/status.js` from `<state>/status.json`, adding `listening` (a TCP connect to the port) and `logTail` (last 80 lines).
-Log lines are masked for passwords, tokens, JWTs and AWS keys before they reach the page.
+Log lines are masked for passwords, tokens, JWTs, AWS keys and credentials inside addresses before they reach the page, `koppler logs`, a failed start's output or a run handed to the agent.
+The files in the logs folder are not masked: read a log with `koppler logs <name>`, never the file itself.
 Writes under `<state>/` do not reload the Lavish page.
 Started through `koppler`, it keeps running across agent sessions; record it in the action log as `canvas`.
 

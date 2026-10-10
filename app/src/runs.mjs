@@ -10,6 +10,7 @@ import vm from 'node:vm';
 import { fileURLToPath } from 'node:url';
 import kp from './plan.js';
 import { STATE, TEMP } from './paths.mjs';
+import { redact } from './scrub.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const temp = () => process.env.KOPPLER_TEMP || TEMP;
@@ -139,7 +140,6 @@ export async function appliedCommand(args) {
   // The code changes in effect after this run are kept with it; ones a previous run already showed are not marked new.
   let changes = [];
   try {
-    const { redact } = await import('./status-watch.mjs');
     const seen = new Set(all.filter(r => r.id !== run.id).flatMap(r => r.changes ?? []).map(c => JSON.stringify({ ...c, fresh: undefined })));
     changes = codeChanges(JSON.parse(fs.readFileSync(path.join(temp(), 'actions.json'), 'utf8')), { clean: redact, profileEnv: profileEnvIn(localClones()) })
       .map(c => ({ ...c, ...(!seen.has(JSON.stringify(c)) && { fresh: true }) }));

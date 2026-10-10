@@ -1,7 +1,16 @@
 // Text made safe to post in a public issue: secrets masked, and everything that names the user, their company or their
 // stack (apps, repos, hosts, queues, paths, ticket ids, accounts) replaced by stable placeholders, so a log keeps its shape.
 import os from 'node:os';
-import { redact } from './status-watch.mjs';
+
+// Logs can echo connection strings or tokens on errors; mask them before they reach the page or an agent.
+export const redact = text => text
+  .replace(/\x1b\[[0-9;]*[A-Za-z]/g, '')
+  .replace(/(password|passwd|pwd|secret|token|api[_-]?key|access[_-]?key)(\\?["']?\s*[=:]\s*)(?:(\\?["'])[^\n]*?\3|[^;"'\s,}&]+)/gi, (m, key, sep, quote = '') => `${key}${sep}${quote}***${quote}`)
+  .replace(/\b([a-z][a-z0-9+.-]*:\/\/)[^\s/:@]+:[^\s/@]+@/gi, '$1***:***@')
+  .replace(/\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{5,}/g, '***jwt***')
+  .replace(/\b(Bearer\s+)[A-Za-z0-9._~+/=-]{8,}/g, '$1***')
+  .replace(/\b(gh[pousr]_|github_pat_|glpat-|npm_|xox[abpsr]-|sk-|[sr]k_(?:live|test)_)[A-Za-z0-9_-]{10,}/g, '***token***')
+  .replace(/\b(AKIA|ASIA)[A-Z0-9]{16}\b/g, '***aws-key***');
 
 const HOST = /\b(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z][a-z0-9-]*[a-z0-9]\b/gi;
 const GENERIC = new Set(['localhost', 'example.com', 'github.com', 'host.docker.internal']);
@@ -32,10 +41,7 @@ export function namesOf(registries) {
 }
 
 export function scrub(text, registries, { home = os.homedir(), user = os.userInfo().username } = {}) {
-  let s = redact(String(text))
-    .replace(/\b([a-z][a-z0-9+.-]*:\/\/)[^\s/:@]+:[^\s/@]+@/gi, '$1***:***@')
-    .replace(/\b(Bearer\s+)[A-Za-z0-9._~+/=-]{8,}/g, '$1***')
-    .replace(/\b(gh[pousr]_|github_pat_|xox[abpsr]-|sk-)[A-Za-z0-9_-]{10,}/g, '***token***');
+  let s = redact(String(text));
   if (home) s = s.split(home).join('~');
   // Longest first, so "orders-api.acme.dev" goes before "orders-api".
   for (const { term, as } of [...namesOf(registries).values()].sort((a, b) => b.term.length - a.term.length))
