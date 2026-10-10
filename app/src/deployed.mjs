@@ -75,13 +75,16 @@ export function resolve(raw, ctx, depth = 0) {
   return null;
 }
 
-// An address safe to show: a host, or an http(s) URL with no credentials and no query.
+// An address safe to show: a host, or an http(s) URL with no credentials, no query and no path that could be a token.
 export function addressOf(value) {
   if (typeof value !== 'string') return null;
   if (HOST.test(value)) return value.toLowerCase();
   try {
     const u = new URL(value);
-    return /^https?:$/.test(u.protocol) && !u.username && !u.password && !u.search && HOST.test(u.hostname) ? `${u.origin}${u.pathname.replace(/\/$/, '')}` : null;
+    if (!/^https?:$/.test(u.protocol) || u.username || u.password || u.search || !HOST.test(u.hostname)) return null;
+    // A path is kept only when it reads as a plain API prefix (/api/v1); anything else may be a token (a webhook URL).
+    const segments = u.pathname.split('/').filter(Boolean);
+    return segments.length <= 3 && segments.every(x => /^[a-z][a-z0-9-]{0,19}$/.test(x)) ? `${u.origin}${u.pathname.replace(/\/$/, '')}` : u.origin;
   } catch { return null; }
 }
 // The smallest {...} around position `at` in `text`.
@@ -151,7 +154,8 @@ export function readModule(files, workspaces = []) {
   return contexts.map(ctx => ({
     token: ctx.token,
     queues: queues.map(q => { const name = resolve(q.raw, ctx); return { ...q, name: typeof name === 'string' ? name : null }; }).filter(q => !DEAD_LETTER.test(q.name ?? '')),
-    account: Object.entries(ctx.vars).filter(([k]) => /account/i.test(k)).map(([, raw]) => resolve(raw, ctx)).find(v => typeof v === 'string') ?? null,
+    // Only a variable that names the account, with a value that reads as an id or a name: never a key or a token.
+    account: Object.entries(ctx.vars).filter(([k]) => /^(aws_)?account(_?(id|name|alias))?$/i.test(k)).map(([, raw]) => resolve(raw, ctx)).find(v => typeof v === 'string' && /^[\w.-]{1,64}$/.test(v)) ?? null,
     domains: declared.domains.map(d => ({ host: addressOf(resolve(d.raw, ctx) ?? ''), from: d.from })).filter(d => d.host && !d.host.includes('/')),
     settings: declared.settings.filter(([name]) => !TOOLING.test(name)).map(([name, raw]) => ({ name, address: addressOf(resolve(raw, ctx)), secret: SECRETISH.test(name) || /secret|sensitive/i.test(raw) })),
     // A name partly built at deploy time keeps its written form ("svc-${random}"); one that is all code is only counted.
