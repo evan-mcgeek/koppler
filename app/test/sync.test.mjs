@@ -143,6 +143,13 @@ console.log('ok');
   assert.deepEqual(validateStack(withChange('src/a.js')), []);
   for (const bad of ['../x', '/etc/hosts', 'a/../../x']) assert.match(validateStack(withChange(bad)).join(), /localChanges\[0\]/, bad);
 }
+    // A tunnel's port must be a number: it reaches the page, shell commands and the port probe.
+{
+  const st = port => ({ envs: ['qa', 'prod'], apps: { a: { name: 'A', kind: 'node', slug: 'acme/a', prereqs: [{ tunnel: 'db.acme.dev', port }], envs: { prod: { prereqs: [{ tunnel: 'db.acme.dev', port }] } } } } });
+  assert.deepEqual(validateStack(st(5432)), []);
+  assert.equal(validateStack(st('5432"><img src=x onerror=alert(1)>')).length, 2);
+  assert.match(validateStack(st(70000)).join(), /prereqs\[0\]\.port/);
+}
 console.log('switch stacks ok');
   }
 }

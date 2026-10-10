@@ -1903,10 +1903,13 @@ const boardLayout = () => ({
 function applyLayout(layout, edges) {
   const ids = Object.keys(state.nodes);
   if (!ids.length || !ids.every(id => layout?.nodes?.[id])) return false;
-  for (const id of ids) Object.assign(state.nodes[id], layout.nodes[id]);
-  state.tidy = layout.tidy ?? state.tidy;
-  state.infra = { ...(state.infra ?? {}), ...(layout.infra ?? {}) };
-  state.edges = edges.map(e => { const [fromSide, toSide, , , fromSlot, toSlot, points] = layout.sides?.[`${e.from}>${e.to}`] ?? []; return { from: e.from, to: e.to, ...(fromSide && toSide ? { fromSide, toSide } : sidesFor(state.nodes, e, state.tidy)), ...(Number.isInteger(fromSlot) && { fromSlot }), ...(Number.isInteger(toSlot) && { toSlot }), ...(Array.isArray(points) && points.every(q => Number.isFinite(q?.x) && Number.isFinite(q?.y)) && { points: points.slice(0, 20).map(q => ({ x: q.x, y: q.y })) }) }; });
+  // A layout only places things: a board from a link or a file can set where cards sit, never what they run (a note
+  // for the agent, a branch, how it starts), which comes only from the board's own nodes after its checks.
+  const at = p => Number.isFinite(p?.x) && Number.isFinite(p?.y) ? { x: p.x, y: p.y } : null;
+  for (const id of ids) Object.assign(state.nodes[id], at(layout.nodes[id]) ?? {});
+  state.tidy = ['down', 'right'].includes(layout.tidy) ? layout.tidy : state.tidy;
+  state.infra = { ...(state.infra ?? {}), ...Object.fromEntries(Object.entries(layout.infra ?? {}).map(([k, p]) => [k, at(p) && { ...at(p), ...(p.away === true && { away: true }) }]).filter(([k, p]) => p && /^[\w:.@-]{1,300}$/.test(k))) };
+  state.edges = edges.map(e => { const [fromSide, toSide, , , fromSlot, toSlot, points] = layout.sides?.[`${e.from}>${e.to}`] ?? []; return { from: e.from, to: e.to, ...(SIDES[fromSide] && SIDES[toSide] ? { fromSide, toSide } : sidesFor(state.nodes, e, state.tidy)), ...(Number.isInteger(fromSlot) && { fromSlot }), ...(Number.isInteger(toSlot) && { toSlot }), ...(Array.isArray(points) && points.every(q => Number.isFinite(q?.x) && Number.isFinite(q?.y)) && { points: points.slice(0, 20).map(q => ({ x: q.x, y: q.y })) }) }; });
   return true;
 }
 const boardAsPreset = name => ({ name, version: KopplerPresets.VERSION, nodes: Object.fromEntries(Object.entries(state.nodes).map(([id, n]) => [id, { run: n.run, ...(n.platform && { platform: n.platform }), ...(n.branch && { branch: n.branch }), ...(n.note && { note: n.note }), ...(n.hideTunnels && { tunnels: false }), ...(queuesHidden(id).all && { queues: false }) }])),
@@ -2379,7 +2382,8 @@ function callsHtmlFor(id) {
 function tunnelsOf(id) {
   const app = registry.apps[id], env = app.envs?.[state.env];
   const prereqs = state.env !== registry.envs[0] && env?.prereqs ? env.prereqs : app.prereqs ?? [];
-  return prereqs.filter(p => p.tunnel && p.port);
+  // A port that is not a number (a broken or hostile stack.json) never reaches the page or the probe.
+  return prereqs.filter(p => p.tunnel && Number.isInteger(p.port) && p.port > 0 && p.port < 65536);
 }
 // Apps whose stack entry has no tunnels for this environment, so the first environment's hosts are used instead.
 const borrowedTunnels = () => state.env === registry.envs[0] ? [] : Object.keys(state.nodes).filter(id => !registry.apps[id].envs?.[state.env]?.prereqs && tunnelsOn(id).length);
@@ -2411,7 +2415,7 @@ function tunnelEl(t) {
   el.dataset.id = key;
   el.style.left = pos.x + 'px'; el.style.top = pos.y + 'px';
   el.title = [t.host, borrowed ? `The stack has no ${envName()} entry for this tunnel, so this is the ${registry.envs[0].toUpperCase()} host. Check stack.json.` : '', t.settings ? `Moved from port ${t.original} so it does not clash with another tunnel on the board.` : '', t.needsAlias ? `Keeps port ${t.port} on its own loopback address, ${t.bind}, so it does not clash (needs sudo once).` : '', note].filter(Boolean).join('\n');
-  el.innerHTML = `<span class="live" data-port="${t.port}" aria-hidden="true"></span><span class="what">${esc(t.what)}</span><span class="local-port${t.settings || t.needsAlias ? ' changed' : ''}">${esc(t.bind)}:${t.port}</span><button class="hide" type="button" aria-label="Run without this tunnel" title="Turn it off: the tunnel is not opened, so calls to it fail. Turn Tunnels back on on the app's card to bring it back.">×</button><span class="host" title="${esc(t.host)}">${esc(t.host)}</span>`;
+  el.innerHTML = `<span class="live" data-port="${esc(t.port)}" aria-hidden="true"></span><span class="what">${esc(t.what)}</span><span class="local-port${t.settings || t.needsAlias ? ' changed' : ''}">${esc(t.bind)}:${esc(t.port)}</span><button class="hide" type="button" aria-label="Run without this tunnel" title="Turn it off: the tunnel is not opened, so calls to it fail. Turn Tunnels back on on the app's card to bring it back.">×</button><span class="host" title="${esc(t.host)}">${esc(t.host)}</span>`;
   // ponytail: turns off all tunnels of the apps using this one; per-tunnel if apps get several
   el.querySelector('.hide').onclick = () => { for (const id of t.apps) if (state.nodes[id]) state.nodes[id].hideTunnels = true; render(); };
   el.onpointerdown = e => { if (e.button === 0) grabCard(e, key, pos, el); };
@@ -4105,7 +4109,7 @@ function tunnelsHtml() {
   if (!plan.length) return skipHtml;
   const first = registry.envs[0].toUpperCase();
   return `<ul class="plan-lines"><li><span class="verb" data-verb="calls">Opens tunnels</span><span class="apps">${plan.map(t => { const off = t.apps.some(a => borrowed.has(a));
-    return `<span${off ? ' class="off"' : ''}>${esc(t.what)} on ${esc(t.bind)}:${t.port}${status?.ports?.[t.port] ? ' (already open)' : ''}<small class="host">${esc(t.host)}</small>${off ? `<small>${esc(first)} host: the stack has no ${esc(envName())} entry for ${esc(t.apps.filter(a => borrowed.has(a)).map(a => registry.apps[a]?.name ?? a).join(', '))}</small>` : ''}</span>`; }).join('')}</span></li></ul>` + skipHtml;
+    return `<span${off ? ' class="off"' : ''}>${esc(t.what)} on ${esc(t.bind)}:${esc(t.port)}${status?.ports?.[t.port] ? ' (already open)' : ''}<small class="host">${esc(t.host)}</small>${off ? `<small>${esc(first)} host: the stack has no ${esc(envName())} entry for ${esc(t.apps.filter(a => borrowed.has(a)).map(a => registry.apps[a]?.name ?? a).join(', '))}</small>` : ''}</span>`; }).join('')}</span></li></ul>` + skipHtml;
 }
 // The deployed apps the local ones will call, by callee: on PROD this is production traffic.
 function callsHtml(g, env) {
