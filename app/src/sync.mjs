@@ -41,7 +41,8 @@ export function remoteKey(url) {
   if (/^[a-z][a-z0-9+.-]*:\/\//i.test(url)) {
     let u;
     try { u = new URL(url); } catch { return null; }
-    host = u.hostname; repoPath = decodeURIComponent(u.pathname);
+    // A stray % (not an escape) is kept as written.
+    host = u.hostname; try { repoPath = decodeURIComponent(u.pathname); } catch { repoPath = u.pathname; }
   } else if (scp) [, host, repoPath] = scp;
   else return null;
   host = host.toLowerCase();
@@ -147,8 +148,14 @@ const HOST = /^(?=.{1,253}$)[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A
 const NAME = /^[\w.-]{1,128}$/, SETTING = /^[A-Za-z_][\w.:-]{0,127}$/, SLUG = /^[\w.-]+(?:\/[\w.-]+)+$/;
 export function validateStack(stack) {
   const errors = [];
-  if (!Array.isArray(stack?.envs) || !stack.envs.length || !stack.envs.every(e => /^[a-z0-9-]+$/.test(e))) errors.push('envs: a non-empty list of lowercase names');
-  if (!stack?.apps || typeof stack.apps !== 'object' || Array.isArray(stack.apps)) errors.push('apps: an object keyed by app id');
+  // Names are looked up as a stack's own (`constructor` is no app), and every part has the shape the later steps rely on.
+  const isObject = v => !!v && typeof v === 'object' && !Array.isArray(v), has = (o, key) => isObject(o) && Object.hasOwn(o, key);
+  if (!isObject(stack)) return ['a stack is an object with envs and apps'];
+  if (!Array.isArray(stack.envs) || !stack.envs.length || !stack.envs.every(e => typeof e === 'string' && /^[a-z0-9-]+$/.test(e)) || new Set(stack.envs).size !== stack.envs.length) errors.push('envs: a non-empty list of lowercase names, each once');
+  if (!isObject(stack.apps)) errors.push('apps: an object keyed by app id');
+  for (const [key, what] of [['kinds', 'kind id'], ['queues', 'queue id'], ['envAliases', 'environment']]) if (stack[key] !== undefined && !isObject(stack[key])) errors.push(`${key}: an object keyed by ${what}`);
+  if (stack.presets !== undefined && !Array.isArray(stack.presets)) errors.push('presets: a list');
+  if (errors.length) return errors;
   if (stack?.protected !== undefined && !(Array.isArray(stack.protected) && stack.protected.every(e => stack.envs?.includes(e)))) errors.push('protected: a list of environments from envs (the ones that ask before every secret read and get the careful review)');
   for (const [env, names] of Object.entries(stack?.envAliases ?? {})) if (!stack.envs?.includes(env) || !Array.isArray(names) || !names.every(n => typeof n === 'string')) errors.push(`envAliases.${env}: must be one of envs, with a list of names`);
   for (const [id, k] of Object.entries(stack?.kinds ?? {})) {
@@ -169,11 +176,22 @@ export function validateStack(stack) {
   }
   for (const [id, app] of Object.entries(stack?.apps ?? {})) {
     if (!/^[a-z0-9-]+$/.test(id)) errors.push(`apps.${id}: id must be lowercase letters, digits and dashes`);
-    if (typeof app?.kind === 'string' && app.kind && !BUILT_IN_KINDS.includes(app.kind) && !stack.kinds?.[app.kind]) errors.push(`apps.${id}.kind: "${app.kind}" is not a kind Koppler knows; define it under "kinds", or use "other" with a "start" command`);
+    const shapes = [...['consumes', 'publishes', 'reads', 'envs'].map(key => [key, isObject, 'an object']), ...['prereqs', 'secrets'].map(key => [key, Array.isArray, 'a list'])];
+    const wrong = !isObject(app) ? [`apps.${id}: an object`] : [
+      ...shapes.filter(([key, ok]) => app[key] !== undefined && !ok(app[key])).map(([key, , what]) => `apps.${id}.${key}: ${what}`),
+      ...(isObject(app.consumes) ? Object.entries(app.consumes).filter(([, call]) => !isObject(call)).map(([dep]) => `apps.${id}.consumes.${dep}: an object (how the call is made; {} when not known yet)`) : []),
+      ...(isObject(app.envs) ? Object.entries(app.envs).flatMap(([env, e]) => [
+        ...(stack.envs.includes(env) ? [] : [`apps.${id}.envs.${env}: not one of envs (${stack.envs.join(', ')})`]),
+        ...(isObject(e) ? ['prereqs', 'secrets'].filter(key => e[key] !== undefined && !Array.isArray(e[key])).map(key => `apps.${id}.envs.${env}.${key}: a list`) : [`apps.${id}.envs.${env}: an object`]),
+      ]) : []),
+    ];
+    // An app with a part of the wrong shape is not looked into further.
+    if (wrong.length) { errors.push(...wrong); continue; }
+    if (typeof app?.kind === 'string' && app.kind && !BUILT_IN_KINDS.includes(app.kind) && !has(stack.kinds, app.kind)) errors.push(`apps.${id}.kind: "${app.kind}" is not a kind Koppler knows; define it under "kinds", or use "other" with a "start" command`);
     // An outside system (Salesforce, a SaaS) may have no repo of its own.
     for (const key of app?.outside ? ['name', 'kind'] : ['name', 'kind', 'slug']) if (typeof app?.[key] !== 'string' || !app[key]) errors.push(`apps.${id}.${key}: required`);
-    for (const dep of Object.keys(app?.consumes ?? {})) if (!stack.apps[dep]) errors.push(`apps.${id}.consumes.${dep}: no such app`);
-    for (const key of ['publishes', 'reads']) for (const q of Object.keys(app?.[key] ?? {})) if (!stack.queues?.[q]) errors.push(`apps.${id}.${key}.${q}: no such queue under "queues"`);
+    for (const dep of Object.keys(app?.consumes ?? {})) if (!has(stack.apps, dep)) errors.push(`apps.${id}.consumes.${dep}: no such app`);
+    for (const key of ['publishes', 'reads']) for (const q of Object.keys(app?.[key] ?? {})) if (!has(stack.queues, q)) errors.push(`apps.${id}.${key}.${q}: no such queue under "queues"`);
     // A remembered change edits one file inside the app's own clone: a path that could leave it is refused.
     for (const [n, c] of (Array.isArray(app?.localChanges) ? app.localChanges : app?.localChanges === undefined ? [] : [null]).entries())
       if (!c || typeof c.file !== 'string' || !c.file || typeof c.find !== 'string' || !c.find || typeof c.replace !== 'string' || path.isAbsolute(c.file) || c.file.split(/[\\/]/).includes('..'))
@@ -199,11 +217,20 @@ export function validateStack(stack) {
       for (const s of list ?? []) if (s?.type !== undefined && !SECRET_TYPES.includes(s.type)) errors.push(`apps.${id}.${where}: type "${s.type}" is not one Koppler tests (${SECRET_TYPES.join(', ')})`);
   }
   for (const [i, p] of (stack?.presets ?? []).entries()) {
+    if (!isObject(p)) { errors.push(`presets[${i}]: an object`); continue; }
+    if (p.nodes !== undefined && !isObject(p.nodes)) { errors.push(`presets[${i}].nodes: an object keyed by app id`); continue; }
+    if (p.edges !== undefined && !Array.isArray(p.edges)) { errors.push(`presets[${i}].edges: a list of { from, to }`); continue; }
     if (typeof p?.name !== 'string' || !p.name) errors.push(`presets[${i}].name: required`);
     if (!Number.isInteger(p?.version)) errors.push(`presets[${i}].version: required (the current preset format is ${presets.VERSION})`);
     else if (p.version > presets.VERSION) errors.push(`presets[${i}].version: ${p.version} is newer than this Koppler reads (${presets.VERSION}); update Koppler`);
-    for (const id of Object.keys(p?.nodes ?? {})) if (!stack.apps?.[id]) errors.push(`presets[${i}].nodes.${id}: no such app`);
-    for (const e of p?.edges ?? []) if (!p.nodes?.[e.from] || !p.nodes?.[e.to]) errors.push(`presets[${i}].edges: ${e.from} -> ${e.to} needs both apps in the preset`);
+    for (const [id, n] of Object.entries(p.nodes ?? {})) {
+      if (!has(stack.apps, id)) errors.push(`presets[${i}].nodes.${id}: no such app`);
+      if (!isObject(n)) errors.push(`presets[${i}].nodes.${id}: an object ({} for the defaults)`);
+    }
+    for (const [n, e] of (p.edges ?? []).entries()) {
+      if (typeof e?.from !== 'string' || typeof e?.to !== 'string') errors.push(`presets[${i}].edges[${n}]: needs from and to`);
+      else if (!has(p.nodes, e.from) || !has(p.nodes, e.to)) errors.push(`presets[${i}].edges: ${e.from} -> ${e.to} needs both apps in the preset`);
+    }
   }
   return errors;
 }

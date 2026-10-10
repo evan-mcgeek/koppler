@@ -37,7 +37,7 @@ assert.deepEqual(sanitizeLayout({ trash: [{ name: 'Old', nodes: { a: { run: 'cli
 assert.equal('hideTunnels' in sanitizeLayout({ nodes: { a: { hideTunnels: 'yes' } }, edges: [] }).nodes.a, false);
 assert.deepEqual(githubFile('https://github.com/acme/stacks/blob/main/presets/pr-12.json'), { owner: 'acme', repo: 'stacks', ref: 'main', path: 'presets/pr-12.json' });
 assert.deepEqual(githubFile('https://raw.githubusercontent.com/acme/stacks/refs/heads/main/p.json'), { owner: 'acme', repo: 'stacks', ref: 'main', path: 'p.json' });
-for (const bad of ['http://github.com/a/b/blob/main/p.json', 'https://evil.test/a/b/blob/main/p.json', 'https://github.com/a/b/blob/main/../../x', 'https://u:p@github.com/a/b/blob/main/p.json', 'file:///etc/passwd', 'https://github.com/a/b', 'https://127.0.0.1/a/b/blob/m/p.json']) assert.equal(githubFile(bad), null, bad);
+for (const bad of ['https://github.com/a/b/blob/main/100%-done.json', 'http://github.com/a/b/blob/main/p.json', 'https://evil.test/a/b/blob/main/p.json', 'https://github.com/a/b/blob/main/../../x', 'https://u:p@github.com/a/b/blob/main/p.json', 'file:///etc/passwd', 'https://github.com/a/b', 'https://127.0.0.1/a/b/blob/m/p.json']) assert.equal(githubFile(bad), null, bad);
 const one = { name: 'PR 12', version: 1, source: 'pr-12.json', evil: 1, nodes: { api: { run: 'cli', branch: 'feat/x', extra: 1 }, '../x': { run: 'cli' } }, edges: [{ from: 'api', to: 'db', x: 1 }, { from: 'a b', to: 'api' }] };
 const clean = { name: 'PR 12', version: 1, nodes: { api: { run: 'cli', branch: 'feat/x' } }, edges: [{ from: 'api', to: 'db' }], source: 'pr-12.json' };
 assert.deepEqual(presetsIn(one), [clean]);

@@ -18,6 +18,8 @@
     if (from > VERSION) return { error: `It was saved by a newer Koppler (preset format ${from}, this one reads up to ${VERSION}). Update Koppler.` };
     let p = preset;
     for (let v = from; v < VERSION; v++) p = { ...MIGRATIONS[v](p), version: v + 1 };
+    // Whatever wrote it: every app is an object and the cables are a list.
+    p = { ...p, nodes: Object.fromEntries(Object.entries(p.nodes).map(([id, n]) => [id, n && typeof n === 'object' && !Array.isArray(n) ? n : {}])), edges: Array.isArray(p.edges) ? p.edges : [] };
     return { preset: p, migratedFrom: from < VERSION ? from : null };
   }
 
@@ -59,7 +61,7 @@
     let dropped = 0;
     for (const e of p.edges) {
       const key = `${e?.from}>${e?.to}`;
-      if (!e || !nodes[e.from] || !nodes[e.to]) { if (e && stack.known(e.from) && stack.known(e.to)) dropped++; continue; }
+      if (!e || !Object.hasOwn(nodes, e.from) || !Object.hasOwn(nodes, e.to)) { if (e && stack.known(e.from) && stack.known(e.to)) dropped++; continue; }
       if (seen.has(key)) continue;
       if (!stack.canCall(e.from, e.to)) { notes.push(`${name(e.from)} does not call ${name(e.to)}, cable left out`); continue; }
       seen.add(key); edges.push({ from: e.from, to: e.to });

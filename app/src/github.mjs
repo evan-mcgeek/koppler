@@ -4,7 +4,7 @@ import { execFile } from 'node:child_process';
 export function githubFile(link) {
   let u; try { u = new URL(link); } catch { return null; }
   if (u.protocol !== 'https:' || u.username || u.password) return null;
-  const parts = u.pathname.split('/').filter(Boolean).map(decodeURIComponent);
+  let parts; try { parts = u.pathname.split('/').filter(Boolean).map(decodeURIComponent); } catch { return null; }
   const safe = parts.every(x => /^[\w.@+-]+$/.test(x) && x !== '..');
   // ponytail: a branch name containing "/" is read as ref + path; link to a commit or a plain branch instead
   if (u.hostname === 'github.com' && parts[2] === 'blob' && parts.length > 4 && safe) return { owner: parts[0], repo: parts[1], ref: parts[3], path: parts.slice(4).join('/') };

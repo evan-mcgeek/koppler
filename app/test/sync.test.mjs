@@ -10,6 +10,8 @@ const { branchList, hostOwners, missingCalls, remoteKey, slugMatches, validateSt
 
 assert.equal(remoteKey('git@github.com:acme/orders-api.git'), 'github.com/acme/orders-api');
 assert.equal(remoteKey('https://github.com/Acme/Orders-API/'), 'github.com/acme/orders-api');
+// A stray % in an address is no reason to stop reading the other repos.
+assert.equal(remoteKey('https://git.acme.dev/team/100%-done.git'), 'git.acme.dev/team/100%-done');
 assert.equal(remoteKey('ssh://git@github.com/acme/x.y'), 'github.com/acme/x.y');
 assert.equal(remoteKey('https://user@gitlab.com/group/sub/repo.git'), 'gitlab.com/group/sub/repo');
 assert.equal(remoteKey('ssh://git@git.acme.dev:2222/team/app.git'), 'git.acme.dev/team/app');
@@ -50,10 +52,41 @@ const found = missingCalls(stack, id => repos[id] ?? []);
 assert.deepEqual(Object.keys(found), ['pay']);
 assert.deepEqual(Object.keys(found.pay), ['orders']);
 assert.deepEqual(validateStack({ envs: ['qa'], apps: { orders: app }, presets: [{ name: 'Just orders', version: 1, nodes: { orders: {} } }] }), []);
-assert.deepEqual(validateStack({ envs: ['qa'], apps: { orders: { ...app, secrets: [{ env: 'DB', type: 'postgres' }], envs: { prod: { secrets: [{ env: 'DB', type: 'oracle' }] } } } } }), ['apps.orders.envs.prod.secrets: type "oracle" is not one Koppler tests (postgres, mysql, redis)']);
+assert.deepEqual(validateStack({ envs: ['qa', 'prod'], apps: { orders: { ...app, secrets: [{ env: 'DB', type: 'postgres' }], envs: { prod: { secrets: [{ env: 'DB', type: 'oracle' }] } } } } }), ['apps.orders.envs.prod.secrets: type "oracle" is not one Koppler tests (postgres, mysql, redis)']);
 assert.deepEqual(validateStack({ envs: ['qa'], apps: { orders: app }, presets: [{ name: 'No version', nodes: { orders: {} } }] }), ['presets[0].version: required (the current preset format is 1)']);
 assert.match(validateStack({ envs: ['qa'], apps: { orders: app }, presets: [{ name: 'Future', version: 99, nodes: { orders: {} } }] })[0], /newer than this Koppler reads/);
 assert.ok(validateStack({ envs: ['qa'], apps: { orders: app }, presets: [{ name: 'Bad', version: 1, nodes: { ghost: {} }, edges: [{ from: 'orders', to: 'ghost' }] }] }).length === 2);
+// Shapes that would crash a later step are refused here, each with a reason, and never by throwing.
+{
+  const stack = extra => ({ envs: ['qa', 'prod'], apps: { orders: app, web: { ...app } }, ...extra }), web = extra => stack({ apps: { orders: app, web: { ...app, ...extra } } });
+  for (const [bad, reason] of [
+    [web({ consumes: { orders: null } }), /apps\.web\.consumes\.orders/],
+    [web({ consumes: { constructor: {} } }), /consumes\.constructor: no such app/],
+    [web({ consumes: [] }), /apps\.web\.consumes/],
+    [web({ envs: { prod: null } }), /apps\.web\.envs\.prod/],
+    [web({ envs: { staging: {} } }), /apps\.web\.envs\.staging: not one of envs/],
+    [web({ envs: [] }), /apps\.web\.envs/],
+    [web({ kind: 'constructor' }), /kind: "constructor" is not a kind/],
+    [web({ publishes: { constructor: {} } }), /publishes\.constructor: no such queue/],
+    [web({ prereqs: {} }), /apps\.web\.prereqs: a list/],
+    [web({ secrets: 'DB' }), /apps\.web\.secrets: a list/],
+    [stack({ apps: { orders: app, web: null } }), /apps\.web/],
+    [stack({ envs: ['qa', 'qa'] }), /envs: .*each once/],
+    [stack({ presets: {} }), /presets: a list/],
+    [stack({ presets: [null] }), /presets\[0\]/],
+    [stack({ presets: [{ name: 'P', version: 1, nodes: { orders: null } }] }), /presets\[0\]\.nodes\.orders/],
+    [stack({ presets: [{ name: 'P', version: 1, nodes: [] }] }), /presets\[0\]\.nodes/],
+    [stack({ presets: [{ name: 'P', version: 1, nodes: { orders: {} }, edges: { from: 'orders', to: 'web' } }] }), /presets\[0\]\.edges: a list/],
+    [stack({ presets: [{ name: 'P', version: 1, nodes: { orders: {} }, edges: [null] }] }), /presets\[0\]\.edges/],
+    [stack({ presets: [{ name: 'P', version: 1, nodes: { constructor: {} } }] }), /nodes\.constructor: no such app/],
+    [stack({ queues: [] }), /queues: an object/],
+    [stack({ kinds: null }), /kinds: an object/],
+  ]) {
+    let errors; assert.doesNotThrow(() => { errors = validateStack(bad); }, JSON.stringify(bad));
+    assert.match(errors.join('\n'), reason, JSON.stringify(bad));
+  }
+  assert.deepEqual(validateStack(web({ consumes: { orders: {} }, envs: { prod: { start: 'run' } } })), []);
+}
 console.log('ok');
 
 // The picker's candidates and adding the picked ones: only clones from the index, never one already in the stack.
