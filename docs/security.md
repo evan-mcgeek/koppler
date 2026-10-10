@@ -12,6 +12,7 @@ These are the rules it follows, including the ones that hold whatever an agent d
 - Production secrets show a Keychain prompt on every read.
 - The canvas Credentials panel can set, test and remove a value, and never shows one.
 - `koppler doctor --secrets <app>` checks that a stored database or Redis secret connects and prints only the outcome. A value is only ever sent to the host named inside it.
+- A process that holds a secret does not trust the environment Koppler was started in: variables that make a runtime load extra code (`NODE_OPTIONS`, `DOTNET_STARTUP_HOOKS`, `DYLD_*` and the like) are left out of an app's environment, and database clients are found where they are installed, not through the `PATH`, with nothing that could send them to another host.
 
 Back this up with deny rules in your agent's settings; [secrets.md](../plugin/skills/koppler-run/references/secrets.md) lists them.
 

@@ -5,6 +5,7 @@ import net from 'node:net';
 import tls from 'node:tls';
 import fs from 'node:fs';
 import { execFile, execFileSync } from 'node:child_process';
+import { clientEnv, findClient } from './safe-env.mjs';
 
 export const TYPES = ['postgres', 'mysql', 'redis'];
 const PORTS = { postgres: 5432, mysql: 3306, redis: 6379 };
@@ -44,11 +45,7 @@ export function parse(value, type) {
   return { type: kind, host: host.split(',')[0], port: port ?? PORTS[kind], user, password: pick(kv, 'password', 'pwd') ?? '', database: pick(kv, 'database', 'db', 'initial catalog') ?? '' };
 }
 
-const client = (name, formula) => {
-  for (const p of [...(process.env.PATH ?? '').split(':').map(d => `${d}/${name}`), `/opt/homebrew/opt/${formula}/bin/${name}`, `/usr/local/opt/${formula}/bin/${name}`]) { try { fs.accessSync(p, fs.constants.X_OK); return p; } catch {} }
-  return null;
-};
-const run = (cmd, args, env) => new Promise(resolve => execFile(cmd, args, { env: { ...process.env, ...env }, timeout: 20000, maxBuffer: 256 * 1024 }, (err, stdout, stderr) => resolve({ ok: !err, text: `${stdout}${stderr}` })));
+const run = (cmd, args, env) => new Promise(resolve => execFile(cmd, args, { env: clientEnv(env), timeout: 20000, maxBuffer: 256 * 1024 }, (err, stdout, stderr) => resolve({ ok: !err, text: `${stdout}${stderr}` })));
 // The server's message decides the wording; the message itself is never passed on.
 const reason = text => /password authentication failed|access denied|no pg_hba\.conf entry|WRONGPASS|NOAUTH|invalid username-password|invalid password/i.test(text) ? 'failed: it refused the user name or password'
   : /connection refused|could not connect|can't connect|timeout|timed out|server closed the connection|could not translate|unknown (mysql )?server host|ECONNREFUSED|ENOTFOUND|ECONNRESET|EHOSTUNREACH/i.test(text) ? 'failed: nothing answers at its address (is the tunnel up?)'
@@ -56,13 +53,13 @@ const reason = text => /password authentication failed|access denied|no pg_hba\.
   : 'failed: it rejected the connection';
 
 async function postgres(c) {
-  const psql = client('psql', 'libpq');
+  const psql = findClient('psql', 'libpq');
   if (!psql) return { code: 2, message: 'cannot test: psql is not installed (brew install libpq)' };
   const r = await run(psql, ['-h', c.host, '-p', String(c.port), '-U', c.user, '-d', c.database || 'postgres', '-XAtc', 'select 1'], { PGPASSWORD: c.password, PGCONNECT_TIMEOUT: '10' });
   return r.ok ? { code: 0, message: 'connected' } : { code: 1, message: reason(r.text) };
 }
 async function mysql(c) {
-  const bin = client('mysql', 'mysql-client');
+  const bin = findClient('mysql', 'mysql-client');
   if (!bin) return { code: 2, message: 'cannot test: the mysql client is not installed (brew install mysql-client)' };
   const r = await run(bin, ['--connect-timeout=10', '-h', c.host, '-P', String(c.port), '-u', c.user, ...(c.database ? ['-D', c.database] : []), '-N', '-e', 'select 1'], { MYSQL_PWD: c.password });
   return r.ok ? { code: 0, message: 'connected' } : { code: 1, message: reason(r.text) };

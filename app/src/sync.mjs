@@ -17,6 +17,7 @@ import { detectKind } from './investigate.mjs';
 import { packageOf, librariesFor } from './libraries.mjs';
 import { checkStack as checkLoadedStack } from './checks.mjs';
 import { TEMP } from './paths.mjs';
+import { loadsCode } from './safe-env.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
@@ -190,6 +191,9 @@ export function validateStack(stack) {
       }
     for (const [where, list] of [['secrets', app?.secrets], ...Object.entries(app?.envs ?? {}).map(([env, e]) => [`envs.${env}.secrets`, e?.secrets])])
       for (const [n, sec] of (Array.isArray(list) ? list : []).entries()) if (sec?.env !== undefined && !(typeof sec.env === 'string' && SETTING.test(sec.env))) errors.push(`apps.${id}.${where}[${n}].env: a setting name`);
+    // A secret or a cable's setting named like a variable that makes a runtime load code would run the stack author's code in the app.
+    const settings = [...[app?.secrets, ...Object.values(app?.envs ?? {}).map(e => e?.secrets)].flatMap(l => Array.isArray(l) ? l.map(x => x?.env) : []), ...Object.values(app?.consumes ?? {}).flatMap(c => [].concat(c?.env ?? []))];
+    for (const name of settings) if (typeof name === 'string' && (loadsCode(name) || name === 'PATH')) errors.push(`apps.${id}: "${name}" cannot be a secret or a cable setting; it changes what code the app runs`);
     for (const [where, list] of [['secrets', app?.secrets], ...Object.entries(app?.envs ?? {}).map(([env, e]) => [`envs.${env}.secrets`, e?.secrets])])
       for (const s of list ?? []) if (s?.type !== undefined && !SECRET_TYPES.includes(s.type)) errors.push(`apps.${id}.${where}: type "${s.type}" is not one Koppler tests (${SECRET_TYPES.join(', ')})`);
   }
