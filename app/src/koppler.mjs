@@ -224,9 +224,9 @@ function appCommand(id, opts) {
   return { ...start, command: [path.join(BIN, 'with-secrets'), store, '--', ...start.command], device: ctx.device, env };
 }
 
-async function run(args) {
+async function run(args, extra = {}) {
   let opts;
-  try { opts = parseRun(args); } catch (e) { fail(`${e.message}\nusage: koppler run <app> | koppler run <name> [--cwd <dir>] [--port <n>] [--restart] -- <command...>`); }
+  try { opts = { ...parseRun(args), ...extra }; } catch (e) { fail(`${e.message}\nusage: koppler run <app> | koppler run <name> [--cwd <dir>] [--port <n>] [--restart] -- <command...>`); }
   // Only a stack app started by id gets its stored secrets; an arbitrary command never does.
   if (!opts.command.length) {
     const app = appCommand(opts.name, opts) ?? fail(`${opts.name} is not an app in the stack; to run a command: koppler run ${opts.name} -- <command>`);
@@ -285,10 +285,12 @@ const tailOf = (file, n) => { try { return redact(fs.readFileSync(file, 'utf8').
 async function stopOne(rec) {
   if (!alive(rec)) { for (const [cmd, ...cmdArgs] of rec.onStop ?? []) sh(cmd, cmdArgs); fs.rmSync(recordPath(rec.name), { force: true }); return `${rec.name}: was not running`; }
   const kill = signal => { try { process.kill(-rec.pid, signal); } catch {} };
+  // Every process of the app counts, not only the one Koppler started: a worker that outlives it keeps holding its port.
+  const running = () => { try { process.kill(-rec.pid, 0); return true; } catch { return false; } };
   kill('SIGTERM');
-  for (let i = 0; i < 80 && alive(rec); i++) await sleep(100);
-  const forced = alive(rec);
-  if (forced) kill('SIGKILL');
+  for (let i = 0; i < 80 && running(); i++) await sleep(100);
+  const forced = running();
+  if (forced) { kill('SIGKILL'); for (let i = 0; i < 20 && running(); i++) await sleep(100); }
   // Some apps outlive their process, e.g. a mobile app on a simulator: close them too.
   for (const [cmd, ...cmdArgs] of rec.onStop ?? []) sh(cmd, cmdArgs);
   fs.rmSync(recordPath(rec.name), { force: true });
@@ -505,8 +507,8 @@ async function up(args) {
     const q = await import('./queues.mjs');
     const lq = q.localQueues(registry, board.queues, ids.filter(id => !skip.has(id)), env), urls = {};
     left.push(...lq.left);
-    if (lq.queues.some(one => one.type !== 'kafka') && !running('queues')) await run(['queues', '--port', String(q.PORT), '--', ...q.EMULATOR]);
-    if (lq.queues.some(one => one.type === 'kafka') && !running('kafka')) await run(['kafka', '--port', String(q.KAFKA_PORT), '--', ...q.BROKER]);
+    if (lq.queues.some(one => one.type !== 'kafka') && !running('queues')) await run(['queues', '--port', String(q.PORT), '--', ...q.EMULATOR], { onStop: [q.STOP_EMULATOR] });
+    if (lq.queues.some(one => one.type === 'kafka') && !running('kafka')) await run(['kafka', '--port', String(q.KAFKA_PORT), '--', ...q.BROKER], { onStop: [q.STOP_BROKER] });
     for (const one of lq.queues) {
       // The port answers before the emulator or broker is ready; it takes a few seconds.
       for (let i = 0; i < 30 && !urls[one.id]; i++) { try { urls[one.id] = one.type === 'kafka' ? `${q.KAFKA}/${q.createTopic(one.queue)}` : q.createQueue(one.queue); } catch (e) { if (i === 29) left.push(`${one.name}: the local queue could not be created (${String(e.stderr || e.message).trim().split('\n').pop()})`); else await new Promise(r => setTimeout(r, 1000)); } }

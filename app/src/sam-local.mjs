@@ -57,8 +57,13 @@ if (process.argv[1] && fs.realpathSync(process.argv[1]) === fileURLToPath(import
   fs.mkdirSync(work, { recursive: true });
   // Built with the tools on this Mac; when its runtime is not installed, in the runtime's own container.
   say('building the functions');
-  const build = args => spawnSync('sam', ['build', '--template', templatePath, '--build-dir', buildDir, '--cache-dir', cacheDir, ...args, ...(params ? ['--parameter-overrides', params.value] : [])], { stdio: 'inherit', env, cwd: work });
-  if (build(['--cached']).status !== 0) { say('building in the runtime container instead'); if (build(['--use-container']).status !== 0) stop(1); }
+  // Not blocking, so a Stop during the build is heard at once. A build cut short is the end, not a reason to build another way.
+  const build = args => new Promise(done => {
+    child = spawn('sam', ['build', '--template', templatePath, '--build-dir', buildDir, '--cache-dir', cacheDir, ...args, ...(params ? ['--parameter-overrides', params.value] : [])], { stdio: 'inherit', env, cwd: work });
+    child.on('error', () => done(1));
+    child.on('exit', (code, signal) => signal ? stop(0) : done(code));
+  });
+  if (await build(['--cached']) !== 0) { say('building in the runtime container instead'); if (await build(['--use-container']) !== 0) stop(1); }
 
   say(`starting the API on port ${port}`);
   child = spawn('sam', ['local', 'start-api', '--template', path.join(buildDir, 'template.yaml'), '--port', String(port), '--host', '127.0.0.1', '--env-vars', envFile, ...(params ? ['--parameter-overrides', params.value] : [])], { stdio: 'inherit', env, cwd: work });

@@ -36,6 +36,10 @@ console.log('ok');
   assert.match(koppler('status'), /handover\s+running/);
   assert.match(koppler('stop', 'handover'), /handover: stopped/);
   assert.doesNotMatch(koppler('status'), /handover\s+running/);
+  // A worker that ignores the polite signal does not outlive its app.
+  assert.match(koppler('run', 'stubborn', '--', 'sh', '-c', '(trap "" TERM; exec sleep 31339) & wait'), /started stubborn/);
+  assert.match(koppler('stop', 'stubborn'), /stubborn: stopped \(killed after 8s\)/);
+  assert.equal(spawnSync('pgrep', ['-f', 'sleep 31339']).status, 1);
   fs.rmSync(dir, { recursive: true });
   console.log('handover ok');
 }

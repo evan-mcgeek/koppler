@@ -57,3 +57,20 @@ const cmd = kinds.startCommand({ kind: 'sam', url: 'http://localhost:3011' }, { 
 assert.deepEqual(cmd.command, ['node', '/e/sam-local.mjs', '3011', '{"envs":["qa","dev"]}']);
 assert.equal(kinds.KINDS.sam.needs.map(n => n.tool).join(), 'docker,sam');
 console.log('sam tests ok');
+
+// Stopped while it builds, it ends there: no second build another way, and no API started.
+{
+  const fs = await import('node:fs'), os = await import('node:os'), path = await import('node:path'), { spawnSync } = await import('node:child_process'), { fileURLToPath } = await import('node:url');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-sam-stop-')), calls = path.join(dir, 'calls');
+  fs.mkdirSync(path.join(dir, 'bin')); fs.mkdirSync(path.join(dir, 'app'));
+  fs.writeFileSync(path.join(dir, 'app', 'template.yaml'), 'Resources: {}\n');
+  // A stand-in for sam that is stopped in the middle of its first build.
+  fs.writeFileSync(path.join(dir, 'bin', 'sam'), `#!/bin/sh\necho "$1 $2 $*" >> "${calls}"\ncase " $* " in *" --cached "*) kill -TERM $$ ;; esac\n`, { mode: 0o755 });
+  const r = spawnSync('node', [path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'src', 'sam-local.mjs'), '3999', '{}'], { cwd: path.join(dir, 'app'), encoding: 'utf8', env: { ...process.env, PATH: `${path.join(dir, 'bin')}:${process.env.PATH}`, HOME: dir, KOPPLER_STATE: path.join(dir, 'state'), DOCKER_HOST: 'unix:///nowhere' } });
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  const ran = fs.readFileSync(calls, 'utf8').trim().split('\n');
+  assert.equal(ran.length, 1, ran.join('\n'));
+  assert.match(ran[0], /^build .* --cached/);
+  fs.rmSync(dir, { recursive: true });
+  console.log('sam stop tests ok');
+}
