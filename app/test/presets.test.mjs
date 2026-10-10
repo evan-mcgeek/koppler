@@ -34,4 +34,7 @@ assert.deepEqual(presets.check({ name: 'Ok', version: 1, nodes: { app: { run: 'i
 // Nothing left to open is an error, not an empty board.
 assert.match(presets.check({ name: 'x', nodes: { gone: {} } }, stack).error, /None of its apps are in this stack/);
 assert.match(presets.check({ name: 'x', nodes: { far: {} } }, stack).error, /None of its apps are cloned here/);
+// A preset of the current format written by hand: an app without settings, cables that are not a list, a cable naming something every object has.
+assert.deepEqual(presets.check({ name: 'Odd', version: 1, nodes: { app: null, api: {} }, edges: { from: 'app', to: 'api' } }, stack).preset.edges, []);
+assert.deepEqual(presets.check({ name: 'Odd', version: 1, nodes: { app: {}, api: {} }, edges: [null, { from: 'constructor', to: 'api' }, { from: 'app', to: 'api' }] }, stack).preset.edges, [{ from: 'app', to: 'api' }]);
 console.log('presets tests ok');
