@@ -24,14 +24,43 @@ const SECRETISH = /secret|password|passwd|token|api_?key|private|credential|conn
 // Settings and parameters of AWS's own tooling, which say nothing about the app.
 const TOOLING = /^(PARAMETERS_SECRETS_EXTENSION|SECRETS_MANAGER_TTL|AWS_|POWERTOOLS_|\/aws\/)/;
 
+// Terraform text of the same length and lines, with what is inside quotes turned into "_" and comments into spaces, so
+// that braces, brackets and comment marks can be counted without mistaking text for code.
+// ponytail: heredocs (<<EOF) are read as code; mask them too if a policy written that way is ever misread
+function masked(text) {
+  let out = '';
+  const inside = [];
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i], two = text.slice(i, i + 2), top = inside.at(-1);
+    const keep = n => { const part = text.slice(i, i + n); i += n - 1; return part; }, hide = (n, fill) => keep(n).replace(/[^\n]/g, fill);
+    if (top === 'text') {
+      if (c === '\\') out += hide(2, '_');
+      else if (c === '"') { inside.pop(); out += c; }
+      else if (two === '${') { inside.push(0); out += hide(2, '_'); }
+      else out += hide(1, '_');
+    } else if (c === '"') { inside.push('text'); out += typeof top === 'number' ? '_' : c; }
+    else if (typeof top === 'number') {
+      if (c === '{') inside[inside.length - 1]++;
+      else if (c === '}') { if (top === 0) inside.pop(); else inside[inside.length - 1]--; }
+      out += hide(1, '_');
+    }
+    else if (c === '#' || two === '//') { const end = text.indexOf('\n', i); out += hide((end < 0 ? text.length : end) - i, ' '); }
+    else if (two === '/*') { const end = text.indexOf('*/', i + 2); out += hide((end < 0 ? text.length : end + 2) - i, ' '); }
+    else out += c;
+  }
+  return out;
+}
+
 // The body between the braces that follow each match of `head`.
 export function blocks(text, head) {
-  const out = [];
+  const out = [], code = masked(text);
   for (const m of text.matchAll(head)) {
-    const open = text.indexOf('{', m.index + m[0].length - 1);
+    // Named inside a comment or a quoted text, it is not a block.
+    if (code[m.index] !== text[m.index]) continue;
+    const open = code.indexOf('{', m.index + m[0].length - 1);
     if (open < 0) continue;
     let depth = 0, i = open;
-    for (; i < text.length; i++) { if (text[i] === '{') depth++; else if (text[i] === '}' && !--depth) break; }
+    for (; i < code.length; i++) { if (code[i] === '{') depth++; else if (code[i] === '}' && !--depth) break; }
     out.push({ match: m, body: text.slice(open + 1, i) });
   }
   return out;
@@ -39,14 +68,13 @@ export function blocks(text, head) {
 
 // `key = value` pairs written directly in a block, with a nested map or list kept whole.
 export function assignments(body) {
-  const out = [], lines = body.split('\n');
+  const out = [], code = masked(body).split('\n'), lines = body.split('\n').map((l, i) => l.slice(0, code[i].trimEnd().length));
+  const count = s => (s.match(/[{[(]/g) ?? []).length - (s.match(/[}\])]/g) ?? []).length;
   for (let i = 0, depth = 0; i < lines.length; i++) {
-    const line = lines[i].replace(/\s+(#|\/\/).*$/, '');
-    const m = depth === 0 && line.match(/^\s*"?([\w.-]+)"?\s*=\s*(.*)$/);
-    const count = s => (s.match(/[{[(]/g) ?? []).length - (s.match(/[}\])]/g) ?? []).length;
-    if (!m) { depth += count(line); continue; }
-    let value = m[2], open = count(value);
-    while (open > 0 && ++i < lines.length) { value += '\n' + lines[i]; open += count(lines[i]); }
+    const m = depth === 0 && lines[i].match(/^\s*"?([\w.-]+)"?\s*=\s*(.*)$/);
+    if (!m) { depth += count(code[i]); continue; }
+    let value = m[2], open = count(code[i]);
+    while (open > 0 && ++i < lines.length) { value += '\n' + lines[i]; open += count(code[i]); }
     out.push([m[1], value.trim().replace(/,$/, '')]);
   }
   return out;
@@ -115,8 +143,11 @@ export function queueUses(tf) {
       else if (type === 'aws_lambda_event_source_mapping') q.reads = true;
       else if (type === 'aws_s3_bucket_notification') q.fedBy.add('S3 bucket notifications');
       else if (type === 'aws_cloudwatch_event_target') q.fedBy.add('an EventBridge rule');
-      else if (/sqs:SendMessage|sns:Publish|"sqs:\*"/.test(near)) q.sends = true;
-      else if (/sqs:ReceiveMessage/.test(near)) q.reads = true;
+      else {
+        // One statement can allow both.
+        if (/sqs:SendMessage|sns:Publish|"sqs:\*"/.test(near)) q.sends = true;
+        if (/sqs:ReceiveMessage|"sqs:\*"/.test(near)) q.reads = true;
+      }
     }
   }
   // Settings whose value is the queue's address: what a local run sets to the local queue.
@@ -174,8 +205,12 @@ export function stackEnv(token, stack) {
 export function samDomains(toml) {
   const out = [];
   for (const m of toml.matchAll(/\[([\w-]+)\.deploy\.parameters\]([\s\S]*?)(?=\n\[|$)/g)) {
-    const line = m[2].match(/parameter_overrides\s*=\s*"((?:[^"\\]|\\.)*)"/)?.[1].replace(/\\"/g, '"') ?? '';
-    const domains = [...line.matchAll(/(\w+)="([^"]*)"/g)].filter(([, k, v]) => /(domain|hostedzone|host)(name)?$/i.test(k) && addressOf(v) && !v.includes('/')).map(([, , v]) => ({ host: v.toLowerCase(), from: 'api' }));
+    // One text or a list of them, in double or single quotes; a commented-out line is not read.
+    const value = m[2].match(/^[ \t]*parameter_overrides\s*=\s*(\[[\s\S]*?\]|"(?:[^"\\]|\\.)*"|'[^']*')/m)?.[1] ?? '';
+    const line = [...value.matchAll(/"((?:[^"\\]|\\.)*)"|'([^']*)'/g)].map(t => t[2] ?? t[1].replace(/\\(.)/g, '$1')).join(' ');
+    // Only parameters that name the app's own domain: a database or cache host is someone else's address.
+    const domains = [...line.matchAll(/(\w+)=(?:"([^"]*)"|(\S+))/g)].map(([, k, quoted, bare]) => [k, quoted ?? bare])
+      .filter(([k, v]) => /(domain|hostedzone)(name)?$/i.test(k) && addressOf(v) && !v.includes('/')).map(([, v]) => ({ host: v.toLowerCase(), from: 'api' }));
     out.push({ token: m[1].toLowerCase(), domains });
   }
   return out.filter(x => x.domains.length);

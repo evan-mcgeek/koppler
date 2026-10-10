@@ -173,3 +173,34 @@ assert.equal(addressOf('https://api.acme.dev/Hook/9f8a7b6c'), 'https://api.acme.
   assert.equal(account('variable "account_name" { default = "not a name: a sentence" }'), null);
 }
 console.log('deployed sam tests ok');
+
+// samconfig.toml as people write it: a commented-out line, a list, values without quotes, and hosts that are not the app's own.
+{
+  const { samDomains } = await import('../src/deployed.mjs');
+  const hosts = toml => samDomains(toml).map(x => `${x.token}: ${x.domains.map(d => d.host).join(' ')}`);
+  assert.deepEqual(hosts('[prod.deploy.parameters]\n# parameter_overrides = "DomainName=\\"old.acme.dev\\""\nparameter_overrides = "DomainName=\\"api.acme.dev\\""\n'), ['prod: api.acme.dev']);
+  assert.deepEqual(hosts('[qa.deploy.parameters]\nparameter_overrides = [\n  "DomainName=api.qa.acme.dev",\n  "Stage=qa",\n]\n[prod.deploy.parameters]\nparameter_overrides = ["DomainName=api.acme.dev"]\n'), ['qa: api.qa.acme.dev', 'prod: api.acme.dev']);
+  assert.deepEqual(hosts('[prod.deploy.parameters]\nparameter_overrides = "Stage=prod DomainName=api.acme.dev"\n'), ['prod: api.acme.dev']);
+  assert.deepEqual(hosts("[prod.deploy.parameters]\nparameter_overrides = 'HostedZoneName=\"acme.dev\"'\n"), ['prod: acme.dev']);
+  assert.deepEqual(hosts('[prod.deploy.parameters]\nparameter_overrides = "DbHost=\\"db.acme.dev\\" RedisHost=cache.acme.dev DomainName=\\"api.acme.dev\\""\n'), ['prod: api.acme.dev']);
+}
+
+// Terraform text inside quotes is text: braces, brackets and comment marks in it do not end a block or cut a value.
+{
+  const tf = 'resource "aws_sqs_queue" "jobs" {\n  name = "jobs #1 // main"\n  tags = { note = "closes } early (maybe" }\n  delay = 5 # seconds\n}\nresource "aws_sqs_queue" "other" {\n  name = "other"\n}\n';
+  const found = blocks(tf, /resource\s+"aws_sqs_queue"\s+"([\w-]+)"\s*\{/g);
+  assert.deepEqual(found.map(b => b.match[1]), ['jobs', 'other']);
+  assert.deepEqual(assignments(found[0].body), [['name', '"jobs #1 // main"'], ['tags', '{ note = "closes } early (maybe" }'], ['delay', '5']]);
+  assert.deepEqual(assignments(found[1].body), [['name', '"other"']]);
+  assert.deepEqual(assignments('a = "x${var.b["k"]}y" # note\nb = [\n  "(", # one\n]\nc = 1\n'), [['a', '"x${var.b["k"]}y"'], ['b', '[\n  "(",\n]'], ['c', '1']]);
+  // A block named inside a comment is not a block.
+  assert.deepEqual(blocks('# resource "aws_sqs_queue" "gone" {\nresource "aws_sqs_queue" "real" {\n}\n', /resource\s+"aws_sqs_queue"\s+"([\w-]+)"\s*\{/g).map(b => b.match[1]), ['real']);
+}
+
+// A policy that lets the app both send to a queue and read from it records both.
+{
+  const tf = 'resource "aws_sqs_queue" "jobs" {\n  name = "jobs"\n}\nresource "aws_iam_role_policy" "app" {\n  policy = jsonencode({ Statement = [{ Action = ["sqs:SendMessage", "sqs:ReceiveMessage"], Resource = aws_sqs_queue.jobs.arn }] })\n}\n';
+  const q = queueUses(tf).find(x => x.address === 'aws_sqs_queue.jobs');
+  assert.deepEqual([q.sends, q.reads], [true, true]);
+}
+console.log('deployed misreads tests ok');
