@@ -1,6 +1,6 @@
 // What the user has to do before a set of apps can start, in plain words with one command each, checked live.
 // Usage: koppler doctor [app...] [--env <env>] [--no-tunnels <app,app>] [--json]   (default: the apps on the canvas)
-import { approved, checksFor, envGaps } from './checks.mjs';
+import { APPROVE, approved, checksFor, envGaps, stackCommands, startsFromStack } from './checks.mjs';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -42,6 +42,7 @@ export function isDone(check, env = {}) {
   if (check.devCerts) return run('dotnet', ['dev-certs', 'https', '--check', '--trust']).ok;
   if (check.secret) return run(path.join(env.skill, 'bin', 'secret-list'), [check.secret[0]]).out.split(/\s+/).includes(check.secret[1]);
   if (check.file) return check.file ? fs.existsSync(check.file) : null;
+  if (check.approved) return false;
   if (check.stackCheck) { const c = (env.checks ?? []).find(c => check.stackCheck.test(c.name)); return c ? run('sh', ['-c', c.run], 20000).ok : null; }
   return null;
 }
@@ -88,15 +89,18 @@ export function needs(args, { load, skill, fail, collect = false }) {
     byId.set(`alias:${t.bind}`, { id: `alias:${t.bind}`, title: `Give ${t.host.split('.')[0]} its own local address`, why: `Another tunnel needs port ${t.port}; this one keeps it on ${t.bind}.`, command: steps.sudo.join(' && '), where: 'your terminal (asks for your Mac password)', undo: steps.undo.join(' && '), apps: t.apps.map(id => registry.apps[id].name), check: { manual: true } });
   }
   const kindsInRun = new Set(ids.map(id => registry.apps[id].kind));
-  for (const c of (registry.checks ?? []).filter(c => !c.kinds || c.kinds.some(k => kindsInRun.has(k)))) {
+  for (const c of checksFor(registry).filter(c => !c.safe && (!c.kinds || c.kinds.some(k => kindsInRun.has(k))))) {
     if ([...byId.values()].some(s => s.check.stackCheck?.test(c.name))) continue;
     byId.set(`check:${c.name}`, { id: `check:${c.name}`, title: c.fix ?? c.name, doneTitle: c.ok ?? c.name, why: `The stack checks this before a run (${c.name}).`, command: null, apps: [], check: { stackCheck: new RegExp(`^${c.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`) } });
   }
   // The stack's own checks are shell commands: they run only once the user approved them (koppler doctor --approve).
-  const mayRun = approved(registry.source ?? '', checksFor(registry));
+  const mayRun = approved(registry.source ?? '', registry);
+  // What the stack runs or writes for these apps needs the user's yes first: its checks, a start command it gives, a code change.
+  const needsYes = !mayRun && (stackCommands(registry).some(c => c.what === 'check') || ids.some(id => startsFromStack(registry, id, env) || registry.apps[id].localChanges?.length));
+  if (needsYes) byId.set('approve-stack', { id: 'approve-stack', title: 'Review and allow what this stack runs on your Mac', why: 'The stack carries its own commands or code changes, written by whoever edits it. Koppler runs none of them until you have seen them.', command: APPROVE, where: 'your own terminal', apps: [], check: { approved: true } });
   // In the order they can be done: what the stack is missing, then sign-ins (a secret's fetch needs them), then the rest, secrets last.
   const rank = s => s.gap ? 0 : s.check?.sso ? 1 : s.id.startsWith('secret:') ? 3 : 2;
-  const steps = [...byId.values()].sort((a, b) => rank(a) - rank(b)).map(s => { const done = s.gap ? false : isDone(s.check, { skill, checks: mayRun ? registry.checks : [] }); return { ...s, done, title: done && s.doneTitle ? s.doneTitle : s.title }; });
+  const steps = [...byId.values()].sort((a, b) => rank(a) - rank(b)).map(s => { const done = s.gap ? false : isDone(s.check, { skill, checks: mayRun ? checksFor(registry).filter(c => !c.safe) : [] }); return { ...s, done, title: done && s.doneTitle ? s.doneTitle : s.title }; });
   // A tunnel whose port already answers is not opened again.
   const open = port => /\bLISTEN\b/.test(run('lsof', ['-nP', `-iTCP:${port}`, '-sTCP:LISTEN']).out);
   const koppler = [...plan.map(t => `tunnel to ${t.host.split('.')[0]} on ${t.bind}:${t.port}${open(t.port) ? ' (already open)' : ''}`), ...ids.map(id => `start ${registry.apps[id].name}`)];

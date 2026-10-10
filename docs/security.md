@@ -18,6 +18,7 @@ Back this up with deny rules in your agent's settings; [secrets.md](../plugin/sk
 ## Nothing runs without your yes
 
 - Run shows the plan first: what starts, restarts and stops.
+- A shared stack can carry commands and code changes of its own: checks, start commands, remembered code changes. Koppler runs none of them until you have reviewed the exact list with `koppler doctor --approve`, in your own terminal, and asks again whenever any of it changes. An agent or a script cannot approve.
 - The agent always stops and asks before it switches a branch over uncommitted changes, before anything that needs you in a browser or terminal (sign-ins, `sudo`, secrets), and before it opens a production database tunnel.
 - On production, pressing Run in the review is the confirmation, and `koppler query` results stay in your own terminal.
 
