@@ -52,6 +52,21 @@ try {
   await until('a status from the running server', () => status().includes('"server":true'));
   assert.equal(fs.statSync(statusFile).mode & 0o777, 0o600);
   assert.equal(status().includes(token), false);
+
+  // A request that fails is answered, and the server keeps running: a save while its folder cannot be written, a body too large.
+  const save = `/state?token=${token}`, board = JSON.stringify({ nodes: {}, edges: [], env: 'qa', mode: 'auto' });
+  assert.equal((await call('POST', save, json, board)).status, 204);
+  if (process.getuid?.() !== 0) {
+    fs.chmodSync(temp, 0o500);
+    try {
+      const failed = await call('POST', save, json, board);
+      assert.equal(failed.status, 500);
+      assert.match(JSON.parse(failed.body.toString()).error, /^Koppler could not do that: /);
+    } finally { fs.chmodSync(temp, 0o700); }
+  }
+  assert.equal((await call('POST', save, json, 'a'.repeat(9_000_000))).status, 413);
+  assert.equal((await call('POST', save, json, board)).status, 204);
+  assert.equal((await call('GET', page.pathname)).status, 200);
   console.log('server tests ok');
 } finally {
   server.kill();

@@ -1278,7 +1278,7 @@ let autosaveTimer, autosaved = '';
 function autosave() {
   const target = status?.save, json = JSON.stringify(state);
   if (!target || json === autosaved) return;
-  fetch(target, { ...JSON_POST, body: json }).then(() => { autosaved = json; }, () => {});
+  fetch(target, { ...JSON_POST, body: json }).then(r => { if (r.ok) autosaved = json; }, () => {});
 }
 // Undo and redo: every board change is a step (cards, cables, notes, branches, environment, presets); zoom and panning are not.
 // Changes within a moment of each other, like typing a note, are one step.
