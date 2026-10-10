@@ -93,6 +93,7 @@ export function parseRun(args) {
     if (head[i] === '--restart') opts.restart = true;
     else if (head[i] === '--cwd') opts.cwd = head[++i];
     else if (head[i] === '--port') opts.port = Number(head[++i]);
+    else if (head[i] === '--bind') opts.bind = head[++i];
     else if (head[i] === '--env') opts.env = head[++i];
     else if (head[i] === '--device') opts.device = head[++i];
     else if (head[i] === '--dry-run') opts.dryRun = true;
@@ -104,6 +105,7 @@ export function parseRun(args) {
   if (!NAME.test(opts.name ?? '')) throw new Error('name must be lowercase letters, digits and dashes');
   if (dash >= 0 && !command.length) throw new Error('nothing to run after --');
   if (opts.port !== undefined && !(opts.port > 0 && opts.port < 65536)) throw new Error('--port must be a TCP port');
+  if (opts.bind !== undefined && !/^(localhost|127\.\d{1,3}\.\d{1,3}\.\d{1,3})$/.test(opts.bind)) throw new Error('--bind must be an address of this machine (localhost or 127.x.x.x)');
   return opts;
 }
 
@@ -120,10 +122,15 @@ function alive(rec) {
   return rec.psStart ? psStart(rec.pid) === rec.psStart : psCommand(rec.pid) === rec.psCommand;
 }
 
-function listener(port) {
-  const out = sh('lsof', ['-nP', `-iTCP:${port}`, '-sTCP:LISTEN', '-Fpc']);
-  const pid = out.match(/^p(\d+)/m)?.[1];
-  return pid ? { pid: Number(pid), command: out.match(/^c(.+)/m)?.[1] } : null;
+// What listens on a port. With an address of its own (a tunnel on 127.0.0.2), only what listens there or on every address counts.
+function listener(port, bind) {
+  const out = sh('lsof', ['-nP', `-iTCP:${port}`, '-sTCP:LISTEN', '-Fpcn']);
+  const own = bind && !['localhost', '127.0.0.1'].includes(bind) ? [`${bind}:${port}`, `*:${port}`] : null;
+  for (const block of out.split(/^(?=p\d)/m)) {
+    const pid = block.match(/^p(\d+)/m)?.[1], at = [...block.matchAll(/^n(.+)/gm)].map(m => m[1]);
+    if (pid && (!own || at.some(a => own.includes(a)))) return { pid: Number(pid), command: block.match(/^c(.+)/m)?.[1] };
+  }
+  return null;
 }
 
 const readJsonFile = file => { try { return JSON.parse(fs.readFileSync(file, 'utf8').replace(/^\uFEFF/, '')); } catch { return null; } };
@@ -226,7 +233,7 @@ function appCommand(id, opts) {
 
 async function run(args, extra = {}) {
   let opts;
-  try { opts = { ...parseRun(args), ...extra }; } catch (e) { fail(`${e.message}\nusage: koppler run <app> | koppler run <name> [--cwd <dir>] [--port <n>] [--restart] -- <command...>`); }
+  try { opts = { ...parseRun(args), ...extra }; } catch (e) { fail(`${e.message}\nusage: koppler run <app> | koppler run <name> [--cwd <dir>] [--port <n>] [--bind <address>] [--restart] -- <command...>`); }
   // Only a stack app started by id gets its stored secrets; an arbitrary command never does.
   if (!opts.command.length) {
     const app = appCommand(opts.name, opts) ?? fail(`${opts.name} is not an app in the stack; to run a command: koppler run ${opts.name} -- <command>`);
@@ -241,7 +248,7 @@ async function run(args, extra = {}) {
   const existing = readRecord(opts.name);
   if (existing && alive(existing)) fail(`${opts.name} is already running (pid ${existing.pid}); koppler stop ${opts.name} first`);
   if (opts.port) {
-    const held = listener(opts.port);
+    const held = listener(opts.port, opts.bind);
     if (held) fail(`port ${opts.port} is already held by pid ${held.pid} (${held.command}); stop it or reuse it`);
   }
 
@@ -265,16 +272,16 @@ async function run(args, extra = {}) {
   await sleep(300);
   if (spawnError || !child.pid) fail(`could not start ${opts.name}: ${spawnError?.message ?? 'no pid'}`);
 
-  const rec = { name: opts.name, pid: child.pid, command: display, cwd, restart: opts.restart, port: opts.port ?? null, ...(opts.env && { env: opts.env }), onStop: opts.onStop ?? [], log, startedAt: new Date().toISOString(), psCommand: psCommand(child.pid), psStart: psStart(child.pid) };
+  const rec = { name: opts.name, pid: child.pid, command: display, cwd, restart: opts.restart, port: opts.port ?? null, ...(opts.bind && { bind: opts.bind }), ...(opts.env && { env: opts.env }), onStop: opts.onStop ?? [], log, startedAt: new Date().toISOString(), psCommand: psCommand(child.pid), psStart: psStart(child.pid) };
   fs.writeFileSync(recordPath(opts.name), JSON.stringify(rec, null, 2) + '\n', { mode: 0o600 });
   await sleep(700);
   if (!alive(rec)) fail(`${opts.name} exited right away; last lines of ${log}:\n${tailOf(log, 15)}`);
   // An app with a port is started once that port answers; a build can take minutes, and a crash during it is reported, not "started".
   if (rec.port) {
     console.log(`waiting for ${opts.name} on port ${rec.port}…`);
-    for (const until = Date.now() + START_WAIT; Date.now() < until && alive(rec) && !listener(rec.port);) await sleep(1000);
+    for (const until = Date.now() + START_WAIT; Date.now() < until && alive(rec) && !listener(rec.port, rec.bind);) await sleep(1000);
     if (!alive(rec)) fail(`${opts.name} exited before answering on port ${rec.port}; last lines of ${log}:\n${tailOf(log, 15)}`);
-    if (!listener(rec.port)) { console.error(`koppler: ${opts.name} is running (pid ${rec.pid}) but nothing answers on port ${rec.port} after ${START_WAIT / 1000}s; see ${log}`); process.exit(2); }
+    if (!listener(rec.port, rec.bind)) { console.error(`koppler: ${opts.name} is running (pid ${rec.pid}) but nothing answers on port ${rec.port} after ${START_WAIT / 1000}s; see ${log}`); process.exit(2); }
   }
   console.log(`started ${opts.name} (pid ${rec.pid})${rec.port ? `, answering on port ${rec.port}` : ''}, log ${log}`);
 }
@@ -364,7 +371,7 @@ function ports(args) {
     console.log(`\n${t.host} -> ${t.bind}:${t.port}  (for ${t.apps.map(name).join(', ')})`);
     for (const c of t.steps.sudo) console.log(`  you run: ${c}`);
     for (const c of t.steps.undo) console.log(`  undo:    ${c}`);
-    console.log(`  tunnel:  koppler run ${t.steps.name} --port ${t.port} --restart -- ${t.steps.tunnel}`);
+    console.log(`  tunnel:  koppler run ${t.steps.name} --port ${t.port}${t.needsAlias ? ` --bind ${t.bind}` : ''} --restart -- ${t.steps.tunnel}`);
     for (const s of t.steps.settings) console.log(`  setting: ${s.env}=${s.value} in ${name(s.app)}'s -LOCAL profile`);
   }
 }
@@ -445,7 +452,7 @@ async function up(args) {
     if (Object.keys(board?.queues ?? {}).some(q => registry.apps[id][`publishes`]?.[q] || registry.apps[id].reads?.[q])) step(id, 'Local queue', 'todo');
     step(id, 'Start', node(id).run === 'ide' ? 'user' : 'todo', node(id).run === 'ide' ? 'Start it in your IDE.' : null);
   }
-  const left = [], skip = new Set(), logFile = path.join(TEMP, 'actions.json');
+  const left = [], skip = new Set(), setEnv = {}, logFile = path.join(TEMP, 'actions.json');
   if (board) {
     // What the plan stops or restarts goes first; its own code changes stay for the agent to revert.
     let actions; try { actions = readActions(logFile); } catch (e) { fail(e.message); }
@@ -482,7 +489,6 @@ async function up(args) {
       if (r.state === 'refused') left.push(`${registry.apps[r.app].name}: remembered change "${r.why}" was refused: ${r.detail}. Check it in stack.json`);
     }
     // Each cable: the caller gets its local callee's address at start, or a remembered change already points it there.
-    var setEnv = {};
     for (const e of edges) {
       const info = wireInfo(registry, local, e.from, e.to, env, node(e.from).platform);
       const viaRecipe = recipesFor(registry, e.from).some(r => r.when?.calls === e.to && matches(r, { env, calls: [e.to] }));
@@ -497,9 +503,15 @@ async function up(args) {
   const appPorts = ids.map(id => Number(new URL(registry.apps[id].url ?? 'http://x').port)).filter(Boolean);
   for (const t of tunnelPlan.planTunnels(entries, appPorts)) {
     const steps = tunnelPlan.planSteps(t);
-    if (running(steps.name) || listener(t.port)) { console.log(`${steps.name}: already open on ${t.port}`); continue; }
-    if (steps.sudo.length) fail(`${steps.name} needs its own local address first; in your terminal:\n  ${steps.sudo.join('\n  ')}\nthen run koppler up again`);
-    await run([steps.name, '--port', String(t.port), '--restart', '--', ...steps.tunnelArgs]);
+    // A tunnel that moved takes its apps with it: each is started with the new address, so none dials whatever holds the old port.
+    for (const s of steps.settings) {
+      if (node(s.app).run === 'ide') left.push(`${registry.apps[s.app].name}: its ${t.what} tunnel moved to port ${t.port}; set ${[].concat(s.env).join(', ')}=${s.value} where you start it`);
+      else for (const name of [].concat(s.env)) (setEnv[s.app] ??= {})[name] = s.value;
+    }
+    if (running(steps.name) || listener(t.port, t.bind)) { console.log(`${steps.name}: already open on ${t.port}`); continue; }
+    const hosts = (() => { try { return fs.readFileSync('/etc/hosts', 'utf8'); } catch { return ''; } })();
+    if (steps.sudo.length && !tunnelPlan.aliasReady(t, hosts, process.platform === 'darwin' ? sh('ifconfig', ['lo0']) : null)) fail(`${steps.name} needs its own local address first; in your terminal:\n  ${steps.sudo.join('\n  ')}\nthen run koppler up again`);
+    await run([steps.name, '--port', String(t.port), '--bind', t.bind, '--restart', '--', ...steps.tunnelArgs]);
   }
   for (const id of new Set(entries.map(e => e.app))) step(id, 'Tunnels', 'done', `${entries.filter(e => e.app === id).map(e => e.what ?? e.tunnel).join(', ')} open`);
   // Queues switched to local: the emulator, each queue in it, and every app on one started with its local address.
@@ -528,7 +540,7 @@ async function up(args) {
     if (skip.has(id)) continue;
     if (node(id).run === 'ide') { yours.push(registry.apps[id].name); continue; }
     if (running(id)) { console.log(`${id}: already running`); step(id, 'Start', 'done', 'Already running.'); continue; }
-    START_ENV = (typeof setEnv !== 'undefined' && setEnv[id]) || null;
+    START_ENV = setEnv[id] ?? null;
     const saved = { ...process.env }; Object.assign(process.env, START_ENV ?? {});
     await run([id, '--env', env, ...(node(id).platform ? ['--device', node(id).platform] : [])]);
     process.env = saved; START_ENV = null;
@@ -768,7 +780,7 @@ async function logs(args) {
 function status(args = []) {
   if (args.includes('--debug')) return debugReport(positional(args));
   const json = args.includes('--json'), recs = records();
-  const procs = recs.map(r => { const up = alive(r); return { name: r.name, state: up ? 'running' : 'exited', pid: r.pid, up: up ? uptime(r.startedAt) : null, port: r.port ?? null, open: !!(r.port && up && listener(r.port)), command: r.command }; });
+  const procs = recs.map(r => { const up = alive(r); return { name: r.name, state: up ? 'running' : 'exited', pid: r.pid, up: up ? uptime(r.startedAt) : null, port: r.port ?? null, open: !!(r.port && up && listener(r.port, r.bind)), command: r.command }; });
   const registry = args.includes('--apps') ? registryOrFail() : null, local = load('local.js', 'LOCAL')?.apps ?? {};
   const apps = registry && Object.entries(registry.apps).map(([id, app]) => ({ id, name: app.name, kind: app.kind, clone: local[id] ? { branch: local[id].branch ?? null, changed: local[id].dirty ?? 0 } : null, state: procs.find(p => p.name === id)?.state ?? null }));
   if (json) return console.log(JSON.stringify({ processes: procs, ...(apps && { stack: registry.name ?? null, apps }) }, null, 2));
@@ -911,7 +923,7 @@ const COMMANDS = [
   { name: 'plan', who: 'agent', args: '[app...] [--env <env>] [--wire <caller> <callee>] [--json]', about: 'what the newest Send does; the tunnels apps need; what one cable changes', run: plan, example: 'koppler plan orders-api payments-api --env qa' },
   { name: 'up', who: 'agent', args: '<app...> [--cable <caller>:<callee>]... [--env <env>] | --board "<name>" | --run <id>', about: 'start a run, recorded like Run on the canvas: tunnels, local queues, then apps, callees first', run: up, example: 'koppler up orders-api payments-api --cable orders-api:payments-api --env qa' },
   { name: 'down', who: 'agent', args: '[--run <stop id>]', about: 'stop and revert: stop what Koppler runs, undo every change, branches back', run: down, example: 'koppler down' },
-  { name: 'run', who: 'agent', args: '<app> [--env <env>] [--device ios|android|phone|<id>] [--lan] [--dry-run] | <name> [--cwd <dir>] [--port <n>] [--restart] -- <command...>', about: 'start one stack app, or any command, detached and logged', run, example: 'koppler run orders-api --env qa' },
+  { name: 'run', who: 'agent', args: '<app> [--env <env>] [--device ios|android|phone|<id>] [--lan] [--dry-run] | <name> [--cwd <dir>] [--port <n>] [--bind <address>] [--restart] -- <command...>', about: 'start one stack app, or any command, detached and logged', run, example: 'koppler run orders-api --env qa' },
   { name: 'switch', who: 'agent', args: '<app> <branch> [--set-aside | --take-along] | <app> --back', about: 'switch a clone to the board\'s branch, and back', run: switchBranch, example: 'koppler switch orders-api feature/refunds --set-aside' },
   { name: 'recipes', who: 'agent', args: '[app] | --remember <app> --why "<why>" [--when ...] | --apply <app...>', about: 'remembered code changes: list, keep the last edit, apply the matching ones', run: recipes, example: 'koppler recipes orders-api' },
   { name: 'listen', who: 'agent', args: '--take | --as <id> | --stop', about: 'wait for Sends from the canvas (one agent session at a time)', run: listen, example: 'koppler listen --take' },

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import ports from '../src/ports.js';
-const { planTunnels, describePlan, planSteps, tunnelKind } = ports;
+const { planTunnels, describePlan, planSteps, tunnelKind, aliasReady } = ports;
 
 assert.equal(tunnelKind({ tunnel: 'valkey-connect-cc-dev.internal' }), 'Cache (Valkey)');
 assert.equal(tunnelKind({ tunnel: 'db-atlantis-academics-qa.internal' }), 'Database');
@@ -33,6 +33,19 @@ assert.equal(aliased.bind, '127.0.0.2');
 assert.equal(aliased.port, 5432);
 assert.deepEqual(planSteps(aliased).sudo, ['sudo ifconfig lo0 alias 127.0.0.2 up', "sudo sed -i .koppler.bak -E 's/[[:space:]]+h2([[:space:]]|$)/\\1/' /etc/hosts", "echo '127.0.0.2 h2' | sudo tee -a /etc/hosts"]);
 assert.deepEqual(planSteps(aliased).undo, ['sudo mv /etc/hosts.koppler.bak /etc/hosts', 'sudo ifconfig lo0 -alias 127.0.0.2']);
+// Two tunnels on one port are told apart by name, and the aliased one can start once its address is in place.
+assert.equal(planSteps(aliased).name, 'tunnel-h2-5432-on-127-0-0-2');
+assert.notEqual(planSteps(aliased).name, planSteps(plan.find(t => !t.needsAlias)).name);
+{
+  const lo0 = 'lo0: flags=8049<UP,LOOPBACK,RUNNING,MULTICAST> mtu 16384\n\tinet 127.0.0.1 netmask 0xff000000\n\tinet 127.0.0.2 netmask 0xff000000\n';
+  assert.equal(aliasReady(aliased, '127.0.0.1 localhost\n127.0.0.2 h2\n', lo0), true);
+  assert.equal(aliasReady(aliased, '127.0.0.1 localhost\n127.0.0.2 h2\n', null), true);
+  assert.equal(aliasReady(aliased, '127.0.0.1 localhost\n', lo0), false);
+  assert.equal(aliasReady(aliased, '127.0.0.1 localhost h2\n127.0.0.2 h2\n', lo0), false);
+  assert.equal(aliasReady(aliased, '# 127.0.0.2 h2\n', lo0), false);
+  assert.equal(aliasReady(aliased, '127.0.0.2 h2\n', lo0.replace('\tinet 127.0.0.2 netmask 0xff000000\n', '')), false);
+  assert.equal(aliasReady({ ...aliased, bind: '127.0.0.2' }, '127.0.0.20 h2\n', lo0), false);
+}
 // The app dials another name (e.g. a database endpoint from a secret): that name is the one that moves.
 const dialed = planTunnels([{ app: 'a', tunnel: 'h1', port: 5432 }, { app: 'b', tunnel: 'aurora.internal', port: 5432, connectsAs: 'db.cluster.rds.amazonaws.com' }]).find(t => t.needsAlias);
 assert.equal(planSteps(dialed).sudo[2], "echo '127.0.0.2 db.cluster.rds.amazonaws.com' | sudo tee -a /etc/hosts");

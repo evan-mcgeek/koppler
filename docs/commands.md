@@ -40,7 +40,7 @@ You can run these yourself too; the agent uses them to do its part.
 | `koppler up --board "<name>" \| --run <id>` | Start a saved board, or a recorded run: tunnels, local queues, then apps, callees first, each waited for |
 | `koppler down` | Stop and revert: stop what Koppler runs, undo every change, put branches back |
 | `koppler run <app> [--env <env>] [--device ...] [--lan] [--dry-run]` | Start one stack app, any kind |
-| `koppler run <name> [--cwd <dir>] [--port <n>] [--restart] -- <command...>` | Start any command, detached and logged; it never gets secrets |
+| `koppler run <name> [--cwd <dir>] [--port <n>] [--bind <address>] [--restart] -- <command...>` | Start any command, detached and logged; it never gets secrets. `--bind` says which local address it listens on, when two share a port |
 | `koppler switch <app> <branch> [--set-aside \| --take-along]` | Switch a clone to the board's branch; `--back` undoes it |
 | `koppler recipes [app] \| --remember <app> --why "..." \| --apply <app...>` | Remembered code changes: list them, keep the last edit, apply the matching ones |
 | `koppler listen --take \| --as <id> \| --stop` | Wait for requests from the canvas; one agent session at a time |

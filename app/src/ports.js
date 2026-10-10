@@ -69,7 +69,8 @@
   function planSteps(t) {
     const url = `${t.bind}:${t.port}`, dialed = t.connectsAs || t.host, pattern = dialed.replace(/[^\w-]/g, c => `\\${c}`);
     return {
-      name: `tunnel-${t.host.split('.')[0]}-${t.port}`.toLowerCase().replace(/[^a-z0-9-]/g, '-'),
+      // Two tunnels can share a port, each on its own address: the address is then part of the name.
+      name: `tunnel-${t.host.split('.')[0]}-${t.port}${t.needsAlias ? `-on-${t.bind}` : ''}`.toLowerCase().replace(/[^a-z0-9-]/g, '-'),
       sudo: t.needsAlias ? [
         `sudo ifconfig lo0 alias ${q(t.bind)} up`,
         `sudo sed -i .koppler.bak -E ${q(`s/[[:space:]]+${pattern}([[:space:]]|$)/\\1/`)} /etc/hosts`,
@@ -83,7 +84,16 @@
     };
   }
 
-  const api = { tunnelKind, planTunnels, describePlan, planSteps };
+  // A tunnel on its own address can start once the name its app dials leads there (the first hosts line that names it
+  // wins) and the address exists: `addresses` is the loopback interface as ifconfig prints it, or null where every
+  // 127.x.x.x address exists without being added.
+  function aliasReady(t, hosts, addresses) {
+    const dialed = t.connectsAs || t.host;
+    const first = String(hosts).split('\n').map(l => l.replace(/#.*/, '').trim().split(/\s+/)).find(([, ...names]) => names.includes(dialed));
+    return first?.[0] === t.bind && (addresses == null || String(addresses).split('\n').some(l => l.trim().split(/\s+/).slice(0, 2).join(' ') === `inet ${t.bind}`));
+  }
+
+  const api = { tunnelKind, planTunnels, describePlan, planSteps, aliasReady };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.KopplerPorts = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);
