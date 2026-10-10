@@ -1,6 +1,6 @@
 # 1. TypeScript and a framework for the canvas
 
-Status: proposed.
+Status: accepted on 2026-10-10.
 Decides issue [#64](https://github.com/evan-mcgeek/koppler/issues/64) and sets the plan for [#65](https://github.com/evan-mcgeek/koppler/issues/65).
 
 ## Where the code is today
@@ -41,7 +41,7 @@ Two things found on the way:
 | B. JSDoc types checked by `tsc` | No build step | Verbose, weaker, and unusual for a codebase this size |
 | **C. TypeScript, strict** | The standard; types for the stack, board and run are shared by the engine and the canvas; the compiler checks every refactor step | A build step for what is published |
 
-**Proposed: C.**
+**Decided: C.**
 TypeScript in strict mode everywhere.
 Node runs TypeScript directly from 24.12, but not for files inside `node_modules`, so the published package ships compiled JavaScript and keeps Node 22 as its minimum.
 Development and tests run the TypeScript sources.
@@ -51,14 +51,15 @@ Development and tests run the TypeScript sources.
 | Option | For | Against |
 |---|---|---|
 | A. Framework-free modules and a bundler | Smallest change, no new concepts | Keeps hand-written rendering and 247 hand-wired handlers; the spaghetti moves into files but stays |
-| B. Svelte 5, with Svelte Flow | Least boilerplate, styles scoped per component | Smaller community; Svelte Flow reached 1.0 only in 2025 |
-| **C. React, with React Flow** | The industry default for node editors; React Flow 12 is mature and widely used; the largest pool of people, examples and tools | More boilerplate than Svelte; hooks need discipline |
+| **B. Svelte 5, with Svelte Flow** | Least boilerplate; markup, script and styles of a component sit in one file, with styles scoped to it; the result reads closest to plain HTML and CSS | Smaller community than React; Svelte Flow reached 1.0 in 2025 |
+| C. React, with React Flow | The most widely used; React Flow 12 is the more mature of the two | More boilerplate; hooks need discipline |
 
-**Proposed: C, React with TypeScript, built with Vite.**
+**Decided: B, Svelte 5 with TypeScript, built with Vite.**
+The goal is code a person can read, and a Svelte component is the shortest path from today's page to that.
 
-React Flow (and Svelte Flow, from the same team on the same core) covers what the canvas needs:
+Svelte Flow (from the same team and on the same core as React Flow) covers what the canvas needs:
 
-| Canvas feature | With React Flow |
+| Canvas feature | With Svelte Flow |
 |---|---|
 | Pan, zoom, drag, select, keyboard access | Built in; replaces most of the roughly 250 lines of pointer code |
 | App, tunnel, queue and outside cards | Custom node components |
@@ -72,13 +73,13 @@ What it does not give us, and stays our code: the cable geometry, the slot order
 Those move out of the page into plain typed modules with unit tests first, so they survive the move unchanged.
 
 The risk is the socket behaviour (sliding, reordering, starting a cable from an occupied socket), which took several rounds to get right.
-So the first canvas step is a spike: one card type, cables with waypoints and sliding sockets on React Flow, compared against today's canvas.
-If the spike fights the library, the fallback is React for everything around the board and our own SVG layer for cables.
+So the first canvas step is a spike: one card type, cables with waypoints and sliding sockets on Svelte Flow, compared against today's canvas.
+If the spike fights the library, the fallback is Svelte for everything around the board and our own SVG layer for cables.
 
 Around the board:
 
 - **State:** one typed store for the board, and a small data layer that polls the server; no data as script tags, the server answers with JSON.
-- **Styles:** the existing design tokens in one file, and a CSS module per component.
+- **Styles:** the existing design tokens in one file, and each component's styles scoped inside it.
 - **Icons:** one icon set as components, replacing 33 inline SVG strings.
 - **Lavish:** opening the canvas as a file inside Lavish is dropped; it is already broken, and the canvas has its own messages panel. The canvas is always served by Koppler's server.
 
@@ -92,14 +93,14 @@ app/src/
   engine/   processes, tunnels, queues, branches, the action log, secrets, discovery
   cli/      one file per command, argument parsing, help
   server/   the HTTP server: router, one handler per endpoint, status publishing
-  canvas/   the React app
+  canvas/   the Svelte app
 ```
 
 - **Tests:** Vitest for units; Playwright for the canvas, starting from the checks already scripted by hand (Arrange, reload, cables, recent boards, the Run review).
 - **Lint and format:** ESLint with typescript-eslint, and Prettier at 120 columns.
 - **CI:** type check, lint, unit tests, canvas tests, package check.
 - **Validation:** the stack schema defined once (Zod), which also gives the JSON Schema that issue #42 asks for.
-- **Dependencies:** build-time only for the canvas (React, React Flow, Vite are bundled into it); the CLI gets the schema library as its one runtime dependency.
+- **Dependencies:** build-time only for the canvas (Svelte, Svelte Flow and Vite are bundled into it); the CLI gets the schema library as its one runtime dependency.
 
 The standards the refactor holds to:
 
@@ -120,12 +121,12 @@ Behaviour does not change during the refactor; each step is one pull request tha
 5. **CLI and engine.** `koppler.mjs` splits into commands, the run engine, and Stop and revert; each engine area converts to TypeScript in its own pull request.
 6. **Server.** A router and one handler per endpoint; the remaining server issues (#20, #27) are fixed as part of it.
 7. **Canvas logic out.** Cable geometry, slots, Arrange and the plan view move into typed, tested modules, still used by the old page.
-8. **Canvas spike** on React Flow, then the decision to proceed or fall back.
+8. **Canvas spike** on Svelte Flow, then the decision to proceed or fall back.
 9. **Canvas rebuild,** area by area: shell and toolbar, side panel, cards, cables, popovers, the Run review; the old page is deleted when the Playwright tests pass on the new one.
 
 Steps 1 to 6 do not depend on the canvas choice and can start as soon as Decision 1 is accepted.
 
-## Open questions
+## Order
 
-- React or Svelte: the proposal is React for its standing and React Flow's maturity; Svelte would give less code per component.
-- Whether the remaining security issues are fixed before the refactor, or inside it as each area is rewritten.
+The remaining security and bug issues are fixed first, on the current code.
+The refactor starts after them, so it does not carry known holes and each fix is reviewed on its own.
