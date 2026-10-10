@@ -256,10 +256,17 @@ function startRun(prompt, record, args) {
   });
 }
 
-const readBody = (req, res, onBody) => {
-  let size = 0; const chunks = [];
-  req.on('data', chunk => { size += chunk.length; if (size > MAX_STATE_BYTES) { res.writeHead(413).end(); req.destroy(); } else chunks.push(chunk); });
-  req.on('end', () => { let body = null; try { body = JSON.parse(Buffer.concat(chunks).toString('utf8')); } catch {} onBody(body); });
+// A request that fails (a full disk, a file that cannot be written) is answered and logged; the server keeps running.
+const failRequest = (res, e) => {
+  console.error(`status-watch: ${e?.stack ?? e}`);
+  try { if (res.headersSent) res.end(); else res.writeHead(500, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' }).end(JSON.stringify({ error: `Koppler could not do that: ${String(e?.message ?? e).slice(0, 300)}` })); } catch {}
+};
+const guarded = handle => (req, res) => { try { handle(req, res); } catch (e) { failRequest(res, e); } };
+const readBody = (req, res, onError, onBody) => {
+  let size = 0, done = false; const chunks = [];
+  // Too large a body is answered once, and what still arrives is dropped.
+  req.on('data', chunk => { if (done) return; size += chunk.length; if (size > MAX_STATE_BYTES) { done = true; res.writeHead(413, { connection: 'close' }).end(); req.resume(); } else chunks.push(chunk); });
+  req.on('end', () => { if (done) return; done = true; let body = null; try { body = JSON.parse(Buffer.concat(chunks).toString('utf8')); } catch {} try { onBody(body); } catch (e) { onError(e); } });
 };
 
 // Loopback only, token-protected. Serves the canvas standalone (no Lavish), takes layout autosaves and Send/Stop prompts.
@@ -273,7 +280,8 @@ function startServer() {
     fs.mkdirSync(STATE_DIR, { recursive: true, mode: 0o700 });
     fs.writeFileSync(tokenFile, token + '\n', { mode: 0o600 });
   }
-  const server = http.createServer((req, res) => {
+  const server = http.createServer(guarded((req, res) => {
+    const oops = e => failRequest(res, e);
     const url = new URL(req.url, 'http://127.0.0.1');
     const prefix = `/s/${token}/`;
     for (const [name, value] of Object.entries(SECURITY_HEADERS)) res.setHeader(name, value);
@@ -307,9 +315,9 @@ function startServer() {
     if (req.method !== 'POST' || !authorized || !['/state', '/prompt', '/preset', '/discover', '/discover-apply', '/stack', '/stack-update', '/stack-discard', '/stack-pr', '/apps', '/apps-remove', '/secret', '/secret-remove', '/secret-test', '/cable-test', '/messages-clear', '/message-dismiss', '/shutdown', '/stop-apps', '/debug-log', '/debug-clear', '/needs'].includes(url.pathname)) return refuse(404);
     // A form on another site cannot send JSON without asking first, and that question is never answered.
     if (!/^application\/json\b/i.test(req.headers['content-type'] ?? '')) return refuse(415);
-    readBody(req, res, body => {
+    readBody(req, res, oops, body => {
       if (url.pathname === '/preset') {
-        fetchPresets(typeof body?.url === 'string' ? body.url.slice(0, 500) : '').then(result => res.writeHead(result.error ? 400 : 200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' }).end(JSON.stringify(result)));
+        fetchPresets(typeof body?.url === 'string' ? body.url.slice(0, 500) : '').then(result => res.writeHead(result.error ? 400 : 200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' }).end(JSON.stringify(result))).catch(oops);
         return;
       }
       if (['/stack-update', '/stack-discard', '/stack-pr'].includes(url.pathname)) {
@@ -319,7 +327,7 @@ function startServer() {
         work.then(result => {
           if (result.error || url.pathname === '/stack-pr') return send(result.error ? 400 : 200, result);
           execFile('node', [path.join(here, 'koppler.mjs'), 'sync'], { timeout: 120000 }, () => send(200, result));
-        });
+        }).catch(oops);
         return;
       }
       if (url.pathname === '/discover' || url.pathname === '/discover-apply') {
@@ -341,7 +349,7 @@ function startServer() {
           if (result.error) return res.writeHead(400, { 'content-type': 'application/json; charset=utf-8' }).end(JSON.stringify(result));
           forgetStacks();
           execFile('node', [path.join(here, 'koppler.mjs'), 'sync'], { timeout: 120000 }, err => res.writeHead(err ? 500 : 200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' }).end(JSON.stringify(err ? { error: 'The stack was linked, but could not be loaded. Run koppler sync.' } : { ok: true })));
-        });
+        }).catch(oops);
         return;
       }
       if (url.pathname === '/stack') {
@@ -410,12 +418,12 @@ function startServer() {
         const lane = typeof body?.port === 'number' ? `${body.host}:${body.port}` : null, before = lane ? tunnelLanes.get(lane) ?? Promise.resolve() : Promise.resolve();
         const run = before.then(() => cableTest(loadRegistry(), body));
         if (lane) tunnelLanes.set(lane, run.catch(() => {}));
-        run.then(result => res.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' }).end(JSON.stringify(result)));
+        run.then(result => res.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' }).end(JSON.stringify(result))).catch(oops);
         return;
       }
       if (url.pathname.startsWith('/secret')) {
         secretRequest({ '/secret': 'set', '/secret-remove': 'remove', '/secret-test': 'test' }[url.pathname], body)
-          .then(result => res.writeHead(result.status, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' }).end(JSON.stringify(result.body)));
+          .then(result => res.writeHead(result.status, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' }).end(JSON.stringify(result.body))).catch(oops);
         return;
       }
       if (url.pathname === '/state') {
@@ -445,7 +453,7 @@ function startServer() {
       }
       res.writeHead(204).end();
     });
-  });
+  }));
   server.on('error', e => {
     console.error(e.code === 'EADDRINUSE' ? `status-watch: port ${PORT} is in use (another watcher? koppler status)` : `status-watch: ${e.message}`);
     process.exit(1);
@@ -703,5 +711,9 @@ if (process.argv[1] && fs.realpathSync(process.argv[1]) === fileURLToPath(import
   const once = process.argv.includes('--once');
   if (!once) startServer();
   await publish();
-  if (!once) setInterval(() => publish().catch(() => {}), INTERVAL_MS);
+  // A slow publish is not started again on top of itself.
+  let publishing = false;
+  if (!once) setInterval(() => { if (publishing) return; publishing = true; publish().catch(e => console.error(`status-watch: ${e?.message ?? e}`)).finally(() => { publishing = false; }); }, INTERVAL_MS);
+  // Whatever still slips through (a callback of a finished request) is logged; the canvas stays up.
+  if (!once) for (const event of ['uncaughtException', 'unhandledRejection']) process.on(event, e => console.error(`status-watch: ${e?.stack ?? e}`));
 }
