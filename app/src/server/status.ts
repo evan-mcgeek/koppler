@@ -257,9 +257,14 @@ async function snapshot(serving: boolean): Promise<Status> {
   return status;
 }
 
+let latest: string | null = null;
+/** The status as last put together, as JSON, for the page that asks for it instead of loading it as a script. */
+export const statusJson = () => latest;
+
 /** Writes the status where the page loads it from, whole or not at all. */
 export async function publish(serving: boolean): Promise<void> {
-  const body = `window.__kopplerStatus && window.__kopplerStatus(${JSON.stringify(await snapshot(serving))});\n`;
+  latest = JSON.stringify(await snapshot(serving));
+  const body = `window.__kopplerStatus && window.__kopplerStatus(${latest});\n`;
   fs.writeFileSync(OUT + '.tmp', body, { mode: 0o600 });
   fs.renameSync(OUT + '.tmp', OUT);
 }

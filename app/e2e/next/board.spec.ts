@@ -5,6 +5,7 @@ import { test, expect } from '../canvas.ts';
 const card = (page: Page, id: string) => page.locator(`.svelte-flow__node[data-id="${id}"]`);
 const cable = (page: Page, id: string) => page.locator(`.svelte-flow__edge[data-id="${id}"]`);
 const socket = (page: Page, id: string) => page.locator(`.ends .socket[data-cable="${id}"]`);
+const view = (page: Page) => page.locator('.svelte-flow__viewport').evaluate(el => getComputedStyle(el).transform);
 const middle = async (of: Locator) => {
   const box = await of.boundingBox();
   if (!box) throw new Error('not on the page');
@@ -140,7 +141,14 @@ test('Arrange places every card, and zoomed out a card shows its short form', as
   await page.getByRole('button', { name: 'Arrange' }).click();
   await expect.poll(async () => (await middle(card(page, 'orders'))).y).not.toBe(before.y);
   await expect(card(page, 'orders').locator('.body')).toBeVisible();
-  // Arrange is still moving the view when the first click lands: zoom out until the short form shows.
+  // Arrange fits the view when it is done placing: zoom out only once the view has come to rest.
+  await expect
+    .poll(async () => {
+      const before = await view(page);
+      await page.waitForTimeout(150);
+      return before === (await view(page));
+    })
+    .toBe(true);
   await expect(async () => {
     await page.getByRole('button', { name: 'Zoom out' }).click({ timeout: 500 });
     await expect(card(page, 'orders').locator('.glance')).toBeVisible({ timeout: 300 });
@@ -148,7 +156,6 @@ test('Arrange places every card, and zoomed out a card shows its short form', as
   await expect(card(page, 'orders').locator('.body')).toHaveCount(0);
 });
 
-const view = (page: Page) => page.locator('.svelte-flow__viewport').evaluate(el => getComputedStyle(el).transform);
 const centre = (of: Locator) =>
   of.evaluate(el => {
     const box = el.getBoundingClientRect();
