@@ -272,6 +272,8 @@ const readBody = (req, res, onError, onBody) => {
 
 // Loopback only, token-protected. Serves the canvas standalone (no Lavish), takes layout autosaves and Send/Stop prompts.
 function startServer() {
+  // Said from the very first status on: a page that loaded can only have come from this server.
+  serving = true;
   // A stable token keeps an open canvas tab working across watcher restarts.
   const tokenFile = path.join(STATE_DIR, 'canvas-token');
   let token = '';
@@ -461,7 +463,6 @@ function startServer() {
   });
   server.listen(PORT, '127.0.0.1', () => {
     const base = `http://127.0.0.1:${server.address().port}`;
-    serving = true;
     const page = `${base}/s/${token}/`;
     fs.writeFileSync(path.join(TEMP, 'canvas-url'), page + '\n', { mode: 0o600 });
     console.log(`canvas: ${page}`);
