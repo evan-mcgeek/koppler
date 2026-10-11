@@ -1222,6 +1222,7 @@
 <script src="page/plan.js"></script>
 <script src="page/logfmt.js"></script>
 <script src="page/arrange.js"></script>
+<script src="page/cables.js"></script>
 <script src="temp/registry.js"></script>
 <script src="temp/local.js"></script>
 <script src="temp/repos.js"></script>
@@ -2990,7 +2991,7 @@ function size(id) {
 
 function portPoint(id, side) {
   const n = state.nodes[id] ?? state.infra[id], { w, h } = size(id);
-  const p = { top: { x: n.x + w / 2, y: n.y }, right: { x: n.x + w, y: n.y + h / 2 }, bottom: { x: n.x + w / 2, y: n.y + h }, left: { x: n.x, y: n.y + h / 2 } }[side];
+  const p = KopplerCables.sidePoint({ x: n.x, y: n.y, w, h }, side);
   // A card's port ring is snapped to whole pixels: the cable ends on the ring as drawn, so the plug sits in its middle.
   const r = state.nodes[id] && world.querySelector(`.node[data-id="${CSS.escape(id)}"] .port[data-side="${side}"]`)?.getBoundingClientRect();
   if (!r?.width) return p;
@@ -3005,30 +3006,8 @@ function nearestSide(id, p) {
   }, { side: 'left', d: Infinity }).side;
 }
 
-// Cable leaves and enters along each socket's side; a null side means a free end.
-function cableCurve(a, aSide, b, bSide) {
-  const lead = clamp(Math.hypot(b.x - a.x, b.y - a.y) * 0.4, 30, 140);
-  const [ax, ay] = SIDES[aSide], [bx, by] = bSide ? SIDES[bSide] : [0, 0];
-  return [a, { x: a.x + ax * lead, y: a.y + ay * lead }, { x: b.x + bx * lead, y: b.y + by * lead }, b];
-}
-// Every cable is a curve, through the waypoints the user placed if any.
-function cablePath(a, aSide, b, bSide) {
-  const [, c1, c2] = cableCurve(a, aSide, b, bSide);
-  return `M${a.x},${a.y} C${c1.x},${c1.y} ${c2.x},${c2.y} ${b.x},${b.y}`;
-}
-// A cable through the waypoints the user placed: it leaves and enters along the sockets' sides and bends smoothly at
-// each point (Catmull-Rom, as Béziers).
-function throughPath(a, aSide, b, bSide, points) {
-  const lead = 40, A = { x: a.x + SIDES[aSide][0] * lead, y: a.y + SIDES[aSide][1] * lead }, B = bSide ? { x: b.x + SIDES[bSide][0] * lead, y: b.y + SIDES[bSide][1] * lead } : b;
-  const pts = [A, ...points, B];
-  let d = `M${a.x},${a.y} L${A.x},${A.y}`;
-  for (let i = 0; i < pts.length - 1; i++) {
-    const p0 = pts[i - 1] ?? a, p1 = pts[i], p2 = pts[i + 1], p3 = pts[i + 2] ?? b;
-    d += ` C${p1.x + (p2.x - p0.x) / 6},${p1.y + (p2.y - p0.y) / 6} ${p2.x - (p3.x - p1.x) / 6},${p2.y - (p3.y - p1.y) / 6} ${p2.x},${p2.y}`;
-  }
-  return `${d} L${b.x},${b.y}`;
-}
-
+// The curve a cable is drawn as, plain or through the waypoints the user placed, is core/cables.
+const { cablePath, throughPath } = KopplerCables;
 
 function cableEl(a, aSide, b, bSide, cls, route) {
   const g = document.createElementNS(SVG, 'g');
@@ -3064,15 +3043,9 @@ function setCable(g, a, aSide, b, bSide, route) {
 
 // Arrange sets the order of the cables along each side of a card, by where their other end sits, and clears any
 // waypoints: every cable is a plain curve after it, the same as one the user draws.
-const across = side => side === 'left' || side === 'right';
 function styleCables() {
-  const boxes = [...Object.keys(state.nodes).map(id => ({ id, ...state.nodes[id], ...size(id) })), ...Object.entries(state.infra ?? {}).map(([id, p]) => ({ id, ...p, ...size(id) }))];
-  const slots = new Map();
-  for (const e of state.edges) for (const [end, id, side, other] of [['from', e.from, e.fromSide, e.to], ['to', e.to, e.toSide, e.from]]) { const k = `${id}|${side}`; if (!slots.has(k)) slots.set(k, []); slots.get(k).push({ e, end, side, other }); }
-  for (const list of slots.values()) {
-    const at = x => { const o = boxes.find(b => b.id === x.other); return across(x.side) ? o.y + o.h / 2 : o.x + o.w / 2; };
-    list.sort((p, q) => at(p) - at(q)).forEach((x, n) => { x.e[`${x.end}Slot`] = n; });
-  }
+  const boxes = Object.fromEntries([...Object.keys(state.nodes).map(id => [id, { ...state.nodes[id], ...size(id) }]), ...Object.entries(state.infra ?? {}).map(([id, p]) => [id, { ...p, ...size(id) }])]);
+  KopplerCables.orderSlots(state.edges, id => boxes[id]);
   for (const e of state.edges) { delete e.style; delete e.via; delete e.points; }
 }
 
@@ -3287,32 +3260,14 @@ function drawWires() {
   }
   drawFlowLinks();
   // Several cables on one side of a card spread along it, ordered by where they go, so they fan out instead of leaving from one point.
-  const ends = new Map(), offset = {};
-  state.edges.forEach((e, i) => { for (const [end, id, side, other, slot] of [['from', e.from, e.fromSide, e.to, e.fromSlot], ['to', e.to, e.toSide, e.from, e.toSlot]]) { const k = `${id}|${side}`; if (!ends.has(k)) ends.set(k, []); ends.get(k).push({ key: `${i}|${end}`, other, slot: slot ?? Infinity, i }); } });
-  for (const [k, list] of ends) {
-    const [id, side] = k.split('|'), along = SIDES[side][0] === 0 ? 'x' : 'y', room = along === 'x' ? size(id).w : size(id).h;
-    // The order Arrange gave them; cables drawn since go after, in the order they were drawn. Moving a card never reorders them.
-    list.sort((a, b) => a.slot - b.slot || a.i - b.i);
-    // Tunnels stacked under a card cover the left of its bottom edge: cables leave from what is still free.
-    const under = side === 'bottom' ? tunnelsLedBy(id).filter(t => t.pos.y > state.nodes[id].y && t.pos.x < state.nodes[id].x + room && t.pos.x + t.el.offsetWidth > state.nodes[id].x) : [];
-    const atRight = under.length && under.every(t => Math.abs(t.pos.x + t.el.offsetWidth - state.nodes[id].x - room) < 2);
-    const covered = under.length ? Math.max(...under.map(t => t.el.offsetWidth + 12)) : 0;
-    const free = covered && room - covered >= 56 ? room - covered : 0, shift = !free ? 0 : atRight ? free / 2 - room / 2 : covered + free / 2 - room / 2;
-    const spread = (len, n) => n > 1 ? Math.min(26, (len - 48) / (n - 1)) : 0;
-    let step = list.length > 1 ? Math.min(26, ((free || room) - (free ? 20 : 48)) / (list.length - 1)) : 0, centre = shift;
-    // Cables that all go to one card, onto the side facing this one, spread around the middle of the stretch both cards
-    // share, with the same spacing on both, so they run straight across instead of slanting into each other.
-    const other = list.every(x => x.other === list[0].other) && state.nodes[list[0].other] ? list[0].other : null;
-    const facing = other && list.every(x => { const e = state.edges[x.i]; return (x.key.endsWith('|from') ? e.toSide : e.fromSide) === OPPOSITE[side]; });
-    if (facing && !shift) {
-      const start = n => state.nodes[n][along], length = n => along === 'x' ? size(n).w : size(n).h;
-      const lo = Math.max(start(id), start(other)), hi = Math.min(start(id) + room, start(other) + length(other));
-      const both = Math.min(step, spread(length(other), list.length));
-      if (hi - lo >= both * (list.length - 1) + 32) { step = both; centre = (lo + hi) / 2 - (start(id) + room / 2); }
-    }
-    list.forEach((x, j) => { offset[x.key] = centre + (j - (list.length - 1) / 2) * step; });
-    if (list.length === 1 && !centre) world.querySelector(`.node[data-id="${id}"] .port[data-side="${side}"]`)?.classList.add('on');
-  }
+  // Tunnels stacked under a card cover part of its bottom edge: cables leave from what is still free.
+  const coveredBelow = id => {
+    const node = state.nodes[id], room = size(id).w;
+    const under = tunnelsLedBy(id).filter(t => t.pos.y > node.y && t.pos.x < node.x + room && t.pos.x + t.el.offsetWidth > node.x);
+    return { covered: under.length ? Math.max(...under.map(t => t.el.offsetWidth + 12)) : 0, atRight: !!under.length && under.every(t => Math.abs(t.pos.x + t.el.offsetWidth - node.x - room) < 2) };
+  };
+  const { offset, onPort } = KopplerCables.endOffsets(state.edges, { cardOf: id => state.nodes[id] && { ...state.nodes[id], ...size(id) }, coveredBelow });
+  for (const { id, side } of onPort) world.querySelector(`.node[data-id="${id}"] .port[data-side="${side}"]`)?.classList.add('on');
   const endPoint = (id, side, key) => { const p = portPoint(id, side), d = offset[key] ?? 0; return SIDES[side][0] === 0 ? { ...p, x: p.x + d } : { ...p, y: p.y + d }; };
   state.edges.forEach((edge, i) => {
     const tip = endPoint(edge.to, edge.toSide, `${i}|to`);

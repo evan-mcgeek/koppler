@@ -14,6 +14,7 @@ const app = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'),
 // page is built from the same modules.
 const forPage = {
   arrange: 'KopplerArrange',
+  cables: 'KopplerCables',
   kinds: 'KopplerKinds',
   plan: 'KopplerPlan',
   ports: 'KopplerPorts',
