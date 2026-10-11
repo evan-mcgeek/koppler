@@ -6,10 +6,36 @@
   const { id, data, selected }: NodeProps<CardNode> = $props();
   const SIDES: Side[] = ['top', 'right', 'bottom', 'left'];
   const FAR_ZOOM = 0.6;
+  const STARTERS = [
+    ['cli', 'Koppler'],
+    ['ide', 'Me'],
+  ] as const;
   const viewport = useViewport();
   const far = $derived(viewport.current.zoom < FAR_ZOOM);
+  const app = $derived(board.apps.find(one => one.id === id));
+  const current = $derived(app?.current || 'current branch');
+  /** The branches to pick from: the clone's own first, then whatever the board names that the clone does not list. */
+  const branches = $derived([...new Set([...(app?.branches ?? []), data.branch].filter(Boolean))]);
+  const mobile = $derived(!!app?.platforms.length && data.run === 'cli');
+  const platform = $derived(app?.platforms.find(([value]) => value === data.platform)?.[1]);
+  /** What the short card says about how it runs. */
+  const runLabel = $derived(data.run === 'ide' ? 'Started by you' : mobile ? platform : undefined);
+  /** Worked out when the menu is opened. */
+  let cables = $state<ReturnType<typeof board.cablesOf>>({ can: [], wired: [] });
+  let noting = $state(false);
   /** A side whose one cable sits on the port: the ring stays lit under its end. */
   const lit = (side: Side) => board.ends.onPort.some(port => port.id === id && port.side === side);
+  const wire = (ev: Event) => {
+    const menu = ev.currentTarget as HTMLSelectElement;
+    const [what, to] = [menu.value[0], menu.value.slice(1)];
+    if (what === '+') board.connect(id, to);
+    else if (what === '-') board.cut(id, to);
+    menu.value = '';
+  };
+  const grow = (box: HTMLTextAreaElement) => {
+    box.style.height = 'auto';
+    box.style.height = `${String(box.scrollHeight + 2)}px`;
+  };
 </script>
 
 <article
@@ -20,22 +46,131 @@
   class:wiring={!!board.draft}
 >
   <header>
+    <span class="grip" aria-hidden="true" title="Drag to move">
+      <svg viewBox="0 0 8 14" width="8" height="14">
+        {#each [2.5, 7, 11.5] as cy (cy)}<circle cx="2" {cy} r="1.2" /><circle cx="6" {cy} r="1.2" />{/each}
+      </svg>
+    </span>
+    <span class="name" title={data.name}>{data.name}</span>
     <span class="kind">{data.kindLabel}</span>
-    <span class="name">{data.name}</span>
+    <button
+      class="remove nodrag"
+      type="button"
+      aria-label="Remove {data.name}"
+      onclick={() => {
+        board.remove(id);
+      }}>×</button
+    >
   </header>
   {#if far}
-    <p class="glance"><span>{data.branch}</span></p>
+    <p class="glance">
+      <span title="Branch: {data.branch || current}">{data.branch || current}</span>
+      {#if runLabel}<span>{runLabel}</span>{/if}
+    </p>
   {:else}
-    <dl>
-      <div>
-        <dt>Branch</dt>
-        <dd>{data.branch}</dd>
-      </div>
-      <div>
-        <dt>Address</dt>
-        <dd>{data.address}</dd>
-      </div>
-    </dl>
+    <div class="body nodrag nopan">
+      <label class="field">
+        Branch
+        <span class="combo">
+          <select
+            class="mono"
+            value={data.branch === app?.current ? '' : data.branch}
+            onchange={ev => {
+              board.set(id, { branch: ev.currentTarget.value });
+            }}
+          >
+            <option value="">{current}{app?.dirty ? ', with your uncommitted changes' : ''}</option>
+            {#each branches.filter(branch => branch !== app?.current) as branch (branch)}
+              <option value={branch}>{branch}</option>
+            {/each}
+          </select>
+        </span>
+      </label>
+      {#if app?.runIn.some(([value]) => value === 'ide')}
+        <div class="row">
+          <div
+            class="field"
+            role="group"
+            aria-label="Who starts it"
+            title="Koppler: the agent starts it. Me: you start it yourself (IDE, terminal, anything); the agent only prepares it."
+          >
+            Started by
+            <span class="seg">
+              {#each STARTERS as [value, label] (value)}
+                <label>
+                  <input
+                    type="radio"
+                    name="run-{id}"
+                    {value}
+                    checked={data.run === value}
+                    onchange={() => {
+                      board.set(id, { run: value });
+                    }}
+                  />{label}
+                </label>
+              {/each}
+            </span>
+          </div>
+          {#if mobile}
+            <label class="field">
+              Platform
+              <span class="combo">
+                <select
+                  class="mono"
+                  value={data.platform}
+                  onchange={ev => {
+                    board.set(id, { platform: ev.currentTarget.value });
+                  }}
+                >
+                  {#each app.platforms as [value, label] (value)}<option {value}>{label}</option>{/each}
+                </select>
+              </span>
+            </label>
+          {/if}
+        </div>
+      {/if}
+      <label class="field">
+        Cables
+        <span class="combo">
+          <select
+            aria-label="Add or remove a cable from {data.name}"
+            onfocus={() => (cables = board.cablesOf(id))}
+            onpointerdown={() => (cables = board.cablesOf(id))}
+            onchange={wire}
+          >
+            <option value="">Add or remove…</option>
+            {#if cables.can.length}
+              <optgroup label="Call a local app">
+                {#each cables.can as other (other.id)}<option value="+{other.id}">{other.name}</option>{/each}
+              </optgroup>
+            {/if}
+            {#if cables.wired.length}
+              <optgroup label="Remove the cable to">
+                {#each cables.wired as other (other.id)}<option value="-{other.id}">{other.name}</option>{/each}
+              </optgroup>
+            {/if}
+          </select>
+        </span>
+      </label>
+      {#if data.note || noting}
+        <label class="field">
+          Note for the agent
+          <textarea
+            rows="2"
+            placeholder="e.g. run with the new pricing flag on"
+            value={data.note}
+            {@attach grow}
+            oninput={ev => {
+              grow(ev.currentTarget);
+              board.set(id, { note: ev.currentTarget.value });
+            }}
+            onblur={() => (noting = false)}
+          ></textarea>
+        </label>
+      {:else}
+        <button class="note-toggle" type="button" onclick={() => (noting = true)}>Add a note for the agent</button>
+      {/if}
+    </div>
   {/if}
   <!-- The one anchor Svelte Flow needs to draw this card's cables; the ports below are ours. -->
   <Handle type="source" position={Position.Top} isConnectable={false} class="anchor" />
@@ -44,6 +179,7 @@
       class="port {side} nodrag nopan"
       class:on={lit(side)}
       aria-label="Draw a cable from the {side} of {data.name}"
+      title="Drag a cable to an app this one should call locally"
       tabindex="-1"
       onpointerdown={ev => {
         if (ev.button !== 0) return;
@@ -76,23 +212,36 @@
     outline: 2px solid var(--ok);
     outline-offset: 3px;
   }
+  /* Only the title sets a card's width: everything below it fits whatever width the title makes. */
+  .body,
+  .glance {
+    contain: inline-size;
+  }
   header {
     display: flex;
     align-items: center;
     gap: 8px;
     min-height: 44px;
-    padding: 6px 16px;
+    padding: 6px 8px 6px 16px;
     border-bottom: 1px solid var(--line);
     cursor: grab;
   }
   .far header {
     border-bottom: 0;
   }
+  .grip {
+    display: grid;
+    margin-left: -6px;
+    fill: var(--muted);
+    opacity: 0.6;
+  }
   .kind {
     flex: none;
+    margin-left: 10px;
     padding: 1px 7px;
     border-radius: 999px;
     font: 600 12px/1.5 var(--sans);
+    white-space: nowrap;
     color: var(--kind);
     background: color-mix(in oklab, var(--kind) 14%, transparent);
   }
@@ -102,32 +251,160 @@
     font-weight: 700;
     font-size: 15px;
     line-height: 1.2;
+    text-wrap: balance;
+    overflow-wrap: anywhere;
   }
   .far .name {
     font-size: 26px;
   }
-  dl {
+  .remove {
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    border: 0;
+    border-radius: 6px;
+    background: none;
+    color: var(--muted);
+    font-size: 16px;
+    line-height: 1;
+    cursor: pointer;
+  }
+  .remove:hover {
+    background: color-mix(in oklab, var(--ink) 8%, transparent);
+    color: var(--ink);
+  }
+  .body {
     display: grid;
     gap: 8px;
-    margin: 0;
-    padding: 10px 16px 14px;
+    padding: 10px 14px 14px 16px;
+    cursor: default;
   }
-  dl div {
+  .row {
     display: grid;
-    grid-template-columns: 76px 1fr;
-    align-items: baseline;
+    grid-template-columns: 1fr 1fr;
     gap: 8px;
   }
-  dt {
+  .field {
+    display: grid;
+    gap: 3px;
     font-size: 12px;
     color: var(--muted);
   }
-  dd {
-    margin: 0;
+  .combo {
+    position: relative;
+    display: block;
+  }
+  .combo::after {
+    content: '';
+    position: absolute;
+    right: 11px;
+    top: 50%;
+    width: 6px;
+    height: 6px;
+    border-right: 1.5px solid var(--muted);
+    border-bottom: 1.5px solid var(--muted);
+    transform: translateY(-70%) rotate(45deg);
+    pointer-events: none;
+  }
+  select {
+    width: 100%;
+    height: 30px;
+    padding: 0 26px 0 8px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: var(--paper);
+    color: var(--ink);
+    font: 13px var(--sans);
+    appearance: none;
+    cursor: pointer;
+    text-overflow: ellipsis;
+  }
+  select.mono {
     font: 12px var(--mono);
+  }
+  .seg {
+    display: flex;
+    gap: 2px;
+    height: 30px;
+    padding: 2px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: color-mix(in oklab, var(--ink) 5%, transparent);
+  }
+  .seg label {
+    position: relative;
+    flex: 1;
+    display: grid;
+    place-items: center;
+    padding: 0 10px;
+    border-radius: 6px;
+    color: var(--muted);
+    font-weight: 600;
+    font-size: 12.5px;
+    cursor: pointer;
+  }
+  .seg input {
+    position: absolute;
+    inset: 0;
+    margin: 0;
+    opacity: 0;
+    cursor: pointer;
+  }
+  .seg label:has(input:checked) {
+    background: var(--surface);
+    color: var(--ink);
+    box-shadow:
+      0 0 0 1px var(--line),
+      0 1px 2px rgb(0 0 0 / 0.12);
+  }
+  .seg label:has(input:focus-visible) {
+    outline: 2px solid var(--cable);
+    outline-offset: -2px;
+  }
+  .note-toggle {
+    display: inline-flex;
+    justify-self: start;
+    align-items: center;
+    gap: 5px;
+    min-height: 24px;
+    padding: 2px 0;
+    border: 0;
+    background: none;
+    color: var(--muted);
+    font: 500 12.5px var(--sans);
+    cursor: pointer;
+  }
+  .note-toggle::before {
+    content: '+';
+    font-size: 16px;
+    line-height: 1;
+  }
+  .note-toggle:hover {
+    color: var(--cable);
+  }
+  textarea {
+    width: 100%;
+    min-height: 52px;
+    padding: 6px 8px;
+    resize: none;
+    overflow: hidden;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: var(--paper);
+    color: var(--ink);
+    font: 13px/1.4 var(--sans);
+  }
+  textarea::placeholder {
+    color: var(--muted);
+  }
+  :is(select, textarea, .remove, .note-toggle):focus-visible {
+    outline: 2px solid var(--cable);
+    outline-offset: 1px;
   }
   .glance {
     display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
     margin: 0;
     padding: 0 16px 10px;
   }

@@ -14,19 +14,43 @@ export interface CableData extends Record<string, unknown> {
   points?: Point[];
 }
 export type CableEdge = Edge<CableData, 'cable'> & { data: CableData };
-export type CardNode = Node<{ name: string; kind: string; kindLabel: string; branch: string; address: string }, 'app'>;
+/** What a card holds: what the app is, and what the user chose for it. */
+export interface CardData extends Record<string, unknown> {
+  name: string;
+  kind: string;
+  kindLabel: string;
+  /** The branch to run; empty for the one the clone is on. */
+  branch: string;
+  /** Who starts it: Koppler, or the user (an IDE, a terminal). */
+  run: string;
+  /** The device a mobile app runs on. */
+  platform?: string;
+  /** The user's own instruction for the agent. */
+  note: string;
+}
+export type CardNode = Node<CardData, 'app'>;
 export type End = 'from' | 'to';
 export interface StackApp {
   id: string;
   name: string;
   kind: string;
   kindLabel: string;
-  address: string;
   /** Its repository, as owner/name. */
   slug: string;
   cloned: boolean;
   /** Why it does not run on this machine. */
   outside?: string;
+  /** The apps the stack says it calls, and the calls found in its code. */
+  calls: string[];
+  /** Whether anything can call it: it serves, or some app is known to call it. */
+  answers: boolean;
+  /** Who may start it and, for a mobile app, on what. */
+  runIn: readonly (readonly [string, string])[];
+  platforms: readonly (readonly [string, string])[];
+  /** The clone's branch, its other branches, and how many files it has changed. */
+  current: string;
+  branches: string[];
+  dirty: number;
 }
 interface Draft {
   a: Point;
@@ -264,15 +288,23 @@ class Board {
   /** Set by the flow once it is up: the board's place on the page, and a way to bring a card to its middle. */
   area: () => DOMRect = () => new DOMRect();
   show: (id: string) => void = () => undefined;
-  #branches: Record<string, string> = {};
-
-  #card(app: StackApp, at: Point, branch = ''): CardNode {
-    const { id, name, kind, kindLabel, address } = app;
+  #card(app: StackApp, at: Point, chosen: Partial<CardData> = {}): CardNode {
+    const { id, name, kind, kindLabel, runIn, platforms } = app;
+    const run = runIn.some(([value]) => value === chosen.run) ? chosen.run : runIn[0]?.[0];
+    const platform = platforms.some(([value]) => value === chosen.platform) ? chosen.platform : platforms[0]?.[0];
     return {
       id,
       type: 'app',
       position: at,
-      data: { name, kind, kindLabel, address, branch: branch || (this.#branches[id] ?? '') },
+      data: {
+        name,
+        kind,
+        kindLabel,
+        branch: chosen.branch ?? '',
+        run: run ?? 'cli',
+        ...(platform && { platform }),
+        note: chosen.note ?? '',
+      },
     };
   }
 
@@ -282,20 +314,29 @@ class Board {
     this.envs = stack.envs;
     this.env = saved?.env ?? stack.envs[0] ?? '';
     this.roots = roots;
-    this.#branches = Object.fromEntries(Object.entries(clones).map(([id, clone]) => [id, clone?.branch ?? '']));
     this.apps = Object.entries(stack.apps).map(([id, app]) => ({
       id,
       name: app.name,
       kind: app.kind,
       kindLabel: kindOf(app).label,
-      address: (app.url ?? '').replace(/^https?:\/\//, ''),
       slug: app.slug ?? '',
       cloned: !!clones[id],
+      calls: [...new Set([...Object.keys(app.consumes ?? {}), ...Object.keys(stack.found?.[id] ?? {})])],
+      answers:
+        kindOf(app).serves ||
+        Object.entries(stack.apps).some(
+          ([from, other]) => from !== id && (other.consumes?.[id] ?? stack.found?.[from]?.[id]),
+        ),
+      runIn: kindOf(app).runIn,
+      platforms: kindOf(app).platforms ?? [],
+      current: clones[id]?.branch ?? '',
+      branches: clones[id]?.branches ?? [],
+      dirty: clones[id]?.dirty ?? 0,
       ...(app.outside && { outside: typeof app.outside === 'string' ? app.outside : 'an outside system' }),
     }));
     this.nodes = this.apps.flatMap(app => {
       const at = saved?.nodes?.[app.id];
-      return at ? [this.#card(app, { x: at.x, y: at.y }, at.branch)] : [];
+      return at ? [this.#card(app, { x: at.x, y: at.y }, at)] : [];
     });
     const onBoard = new Set(this.nodes.map(({ id }) => id));
     this.edges = (saved?.edges ?? [])
@@ -326,6 +367,37 @@ class Board {
       for (let x = from.x + 40; !spot && x + PLACE.w <= to.x; x += 40) if (free(x, y)) spot = { x, y };
     const step = this.nodes.length * 32;
     this.nodes = [...this.nodes, this.#card(app, spot ?? { x: from.x + 48 + step, y: from.y + 48 + step })];
+  }
+
+  /** Changes what the user chose on a card. */
+  set(id: string, chosen: Partial<CardData>): void {
+    this.nodes = this.nodes.map(node => (node.id === id ? { ...node, data: { ...node.data, ...chosen } } : node));
+  }
+
+  /**
+   * The cables a card can gain and lose: the apps on the board it calls, or, when the stack knows of none, the ones
+   * it may call that do not call it; and the apps it is cabled to.
+   */
+  cablesOf(id: string): { can: StackApp[]; wired: StackApp[] } {
+    const app = (which: string) => this.apps.find(one => one.id === which);
+    const others = this.nodes.flatMap(node => (node.id === id ? [] : (app(node.id) ?? [])));
+    const wired = others.filter(other => this.edges.some(edge => edge.id === `${id}>${other.id}`));
+    const free = others.filter(other => !wired.includes(other));
+    const known = free.filter(other => app(id)?.calls.includes(other.id));
+    const may = free.filter(other => !other.outside && other.answers && !other.calls.includes(id));
+    return { can: known.length ? known : may, wired };
+  }
+
+  /** A cable between two cards, on the sides that face each other. */
+  connect(from: string, to: string): void {
+    const size = (id: string) => this.boxes.get(id) ?? { w: 260, h: 160 };
+    const at = Object.fromEntries([...this.boxes].map(([id, { x, y }]) => [id, { x, y }]));
+    const drawn = cable(from, to, sidesFor(at, { from, to }, 'down', size));
+    this.edges = [...this.edges.filter(edge => edge.id !== drawn.id), drawn];
+  }
+
+  cut(from: string, to: string): void {
+    this.edges = this.edges.filter(edge => edge.id !== `${from}>${to}`);
   }
 
   /** Takes an app off the board, with its cables. */
