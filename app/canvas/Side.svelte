@@ -154,6 +154,9 @@
     </div>
     <p class="note" role="status">{copied}</p>
   </section>
+  {#if board.unsaved}
+    <p class="unsaved" role="alert">Not saved: the canvas server is not answering. Changes stay on this page.</p>
+  {/if}
 </aside>
 
 <style>
@@ -363,6 +366,12 @@
     margin: 0;
     padding: 0 8px;
     color: var(--muted);
+  }
+  .unsaved {
+    margin: auto 0 0;
+    padding: 0 8px;
+    color: var(--warn);
+    font-weight: 600;
   }
   .note:empty {
     display: none;

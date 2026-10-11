@@ -18,7 +18,7 @@ test.use({
     env: 'qa',
     mode: 'auto',
     zoom: 1,
-    pan: { x: 0, y: 0 },
+    pan: { x: 120, y: 80 },
     nodes: { web: at(0, 0), orders: at(420, 0), catalog: at(210, 280), payments: at(700, 300) },
     edges: [
       { from: 'web', to: 'catalog', fromSide: 'bottom', toSide: 'top' },
