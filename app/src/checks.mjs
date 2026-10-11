@@ -9,11 +9,9 @@ import path from 'node:path';
 import vm from 'node:vm';
 import crypto from 'node:crypto';
 import { execFileSync } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
-import kinds from './kinds.js';
+import kinds from './kinds.cjs';
 import { TEMP } from './paths.mjs';
 
-const here = path.dirname(fileURLToPath(import.meta.url));
 const temp = () => process.env.KOPPLER_TEMP || TEMP;
 const approvalsFile = () => path.join(process.env.KOPPLER_CONFIG_DIR || path.join(os.homedir(), '.config', 'koppler'), 'approved-checks.json');
 const TOOL = /^[A-Za-z0-9._+-]{1,64}$/;

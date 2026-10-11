@@ -97,7 +97,7 @@ console.log('ok');
   cleanups.push(() => spawnSync('node', [path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'src', 'koppler.mjs'), 'stop', '--all', '--yes'], { env }));
   const koppler = (...args) => { const r = spawnSync('node', [path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'src', 'koppler.mjs'), ...args], { encoding: 'utf8', env }); return { out: (r.stdout + r.stderr).trim(), code: r.status }; };
   const apps = {
-    a: { name: 'A', kind: 'other', start: `echo "B_URL=\$B_URL"; exec python3 -m http.server ${runA} --bind 127.0.0.1`, url: `http://localhost:${runA}`, consumes: { b: { how: 'env', env: 'B_URL' } } },
+    a: { name: 'A', kind: 'other', start: `echo "B_URL=$B_URL"; exec python3 -m http.server ${runA} --bind 127.0.0.1`, url: `http://localhost:${runA}`, consumes: { b: { how: 'env', env: 'B_URL' } } },
     b: { name: 'B', kind: 'other', start: `exec python3 -m http.server ${runB} --bind 127.0.0.1`, url: `http://localhost:${runB}` },
   };
   { const stack = { envs: ['qa'], apps }; fs.writeFileSync(path.join(dir, 'registry.js'), `window.REGISTRY = ${JSON.stringify(stack)};`); allowStack(dir, stack); }
@@ -120,7 +120,7 @@ console.log('ok');
   cleanups.push(() => spawnSync('node', [path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'src', 'koppler.mjs'), 'stop', '--all', '--yes'], { env }));
   const koppler = (...args) => { const r = spawnSync('node', [path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'src', 'koppler.mjs'), ...args], { encoding: 'utf8', env }); return { out: (r.stdout + r.stderr).trim(), code: r.status }; };
   const apps = {
-    a: { name: 'A', kind: 'other', start: `echo "B_URL=\$B_URL"; exec python3 -m http.server ${agentA} --bind 127.0.0.1`, url: `http://localhost:${agentA}`, consumes: { b: { how: 'env', env: 'B_URL' } } },
+    a: { name: 'A', kind: 'other', start: `echo "B_URL=$B_URL"; exec python3 -m http.server ${agentA} --bind 127.0.0.1`, url: `http://localhost:${agentA}`, consumes: { b: { how: 'env', env: 'B_URL' } } },
     b: { name: 'B', kind: 'other', start: `exec python3 -m http.server ${agentB} --bind 127.0.0.1`, url: `http://localhost:${agentB}` },
   };
   { const stack = { envs: ['qa'], apps }; fs.writeFileSync(path.join(dir, 'registry.js'), `window.REGISTRY = ${JSON.stringify(stack)};`); allowStack(dir, stack); }

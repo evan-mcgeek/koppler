@@ -78,6 +78,7 @@ Everything else depends on your stack (the .NET SDK, Flutter, Docker, the AWS CL
 
 Run the tests with `npm test` in `app/`.
 The canvas has tests of its own that drive it in a browser: `npm install`, `npx playwright install chromium` once, then `npm run test:canvas`.
+`npm run lint`, `npm run types` and `npm run format:check` are what CI checks besides the tests; `npm run format` formats.
 
 ## Reporting bugs
 

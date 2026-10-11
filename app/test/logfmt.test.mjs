@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
-const { parseLine, parseLog } = createRequire(import.meta.url)('../src/logfmt.js');
+const { parseLine, parseLog } = createRequire(import.meta.url)('../src/logfmt.cjs');
 
 const serilog = parseLine('{"@t":"2026-10-06T17:00:00.0446470Z","@m":"HTTP \\"GET\\" \\"/\\" responded 200","@i":"x"}');
 assert.equal(serilog.level, 'info'); assert.equal(serilog.text, 'HTTP "GET" "/" responded 200'); assert.match(serilog.time, /^\d{2}:\d{2}:\d{2}$/);

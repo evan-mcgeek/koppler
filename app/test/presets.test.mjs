@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import presets from '../src/presets.js';
+import presets from '../src/presets.cjs';
 
 const stack = {
   known: id => ['app', 'api', 'db-api', 'far'].includes(id), cloned: id => id !== 'far',

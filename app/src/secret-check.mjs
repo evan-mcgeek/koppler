@@ -3,7 +3,6 @@
 // A value is only ever sent to the host it names; nothing in stack.json can point a test somewhere else.
 import net from 'node:net';
 import tls from 'node:tls';
-import fs from 'node:fs';
 import { execFile, execFileSync } from 'node:child_process';
 import { clientEnv, findClient } from './safe-env.mjs';
 

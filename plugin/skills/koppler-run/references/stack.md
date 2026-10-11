@@ -68,7 +68,7 @@ Local libraries need nothing in `stack.json`: `koppler sync` matches each app's 
 Top-level `presets` are the team boards: `[{ "name": "Mobile App + Mobile API", "version": 1, "nodes": { "<app>": { "run": "cli", "platform"?, "branch"?, "note"? } }, "edges": [{ "from", "to" }] }]`. The canvas lays them out by who calls whom; `koppler sync` checks every app and cable exists. Every board a user builds is kept as their own, saved as they change it; Share copies it as JSON to add here.
 A single preset in its own `.json` file (the JSON that Share copies), a list of them, or a whole `stack.json` can be opened from the canvas's board selector, as a file or as a GitHub link.
 
-Every preset carries the `version` of the preset format it was saved in (`presets.js`: `VERSION`, currently 1); `koppler sync` requires it on shared presets.
+Every preset carries the `version` of the preset format it was saved in (`presets.cjs`: `VERSION`, currently 1); `koppler sync` requires it on shared presets.
 Before any preset opens, its version is compared with the one this Koppler reads:
 - older: it is brought up to date one step at a time (`MIGRATIONS[n]` turns version n into n + 1; a file without a version is read as version 0);
 - newer: it is refused, with a message to update Koppler.
@@ -122,7 +122,7 @@ Callers post to `url` plus a route, as they post to API Gateway when deployed.
 A callee whose address lives inside that secret is repointed by writing `{ "set": { "<key>": "http://host.docker.internal:<port>/" } }` to `<state>/lambda-<app id>.json` before the start (the function runs in Docker, where `localhost` is not the Mac); log it as an `env-file` action.
 
 When a recipe cannot tell how the app starts (several Go commands, a Python repo with no known framework, plain Maven), `koppler run` says so and asks for `start`.
-The port in the app's `url` wins over the usual one. The recipes live in `kinds.js` (`RECIPES`); only .NET, Flutter, Node and the web frameworks have been run for real so far.
+The port in the app's `url` wins over the usual one. The recipes live in `kinds.cjs` (`RECIPES`); only .NET, Flutter, Node and the web frameworks have been run for real so far.
 
 ## Adding apps
 

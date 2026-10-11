@@ -20,15 +20,15 @@ import { findCommand } from './research.mjs';
 import { investigate, repoFiles } from './investigate.mjs';
 import { deployed } from './deployed.mjs';
 import { appliedCommand as applied, historyCommand, planCommand, runningNames, appendRun, runRecord, runs as runHistory } from './runs.mjs';
-import tunnelPlan from './ports.js';
-import kinds from './kinds.js';
+import tunnelPlan from './ports.cjs';
+import kinds from './kinds.cjs';
 import { needs as needsFor } from './needs.mjs';
 import { APPROVE, approved, missingTunnels, startsFromStack } from './checks.mjs';
 import { APP, BIN, LOGS, STATE, TEMP } from './paths.mjs';
 import { readActions, updateActions } from './actions.mjs';
 import { appEnv } from './safe-env.mjs';
 import { redact, scrub } from './scrub.mjs';
-import kp from './plan.js';
+import kp from './plan.cjs';
 
 // A first-time setup ends with the full picture: ports, conflicts and calls of every app.
 // With --pick, or on a stack that has no apps yet, init ends on the canvas, where the user ticks the clones that belong to the stack.
@@ -186,7 +186,7 @@ function secretTest(store, secret) {
   catch (e) { return { code: e.status ?? 1, message: String(e.stdout ?? '').trim() || 'failed: the check did not finish' }; }
 }
 
-// How to start a stack app by id, for its kind (kinds.js), in the chosen environment.
+// How to start a stack app by id, for its kind (kinds.cjs), in the chosen environment.
 function appCommand(id, opts) {
   const registry = load('registry.js', 'REGISTRY');
   const base = registry?.apps?.[id];
@@ -560,7 +560,7 @@ async function up(args) {
 function jsonTextLike(file, raw, json) {
   try {
     const committed = execFileSync('git', ['-C', path.dirname(file), 'show', `HEAD:./${path.basename(file)}`], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
-    if (isDeepStrictEqual(JSON.parse(committed.replace(/^﻿/, '')), json)) return committed;
+    if (isDeepStrictEqual(JSON.parse(committed.replace(/^\uFEFF/, '')), json)) return committed;
   } catch { /* not in git, or not committed yet */ }
   const indent = raw.match(/\n([ \t]+)"/)?.[1] ?? '  ', eol = raw.includes('\r\n') ? '\r\n' : '\n';
   return (raw.startsWith('﻿') ? '﻿' : '') + JSON.stringify(json, null, indent).replace(/\n/g, eol) + (raw.endsWith('\n') ? eol : '');
@@ -595,7 +595,7 @@ async function down(args) {
         if (a.created && !rest.join('').trim()) fs.rmSync(a.file); else fs.writeFileSync(a.file, rest.join('\n'));
         console.log(`${name(a)}: removed Koppler's lines from ${path.basename(a.file)}`); continue;
       } else if (a.kind === 'profile') {
-        const raw = fs.readFileSync(a.file, 'utf8'), json = JSON.parse(raw.replace(/^﻿/, ''));
+        const raw = fs.readFileSync(a.file, 'utf8'), json = JSON.parse(raw.replace(/^\uFEFF/, ''));
         if (a.created) delete json.profiles?.[a.name];
         else if (json.profiles?.[a.name] && a.previous) json.profiles[a.name].environmentVariables = a.previous;
         fs.writeFileSync(a.file, jsonTextLike(a.file, raw, json));

@@ -39,7 +39,7 @@ assert.deepEqual(Object.keys(runRecord(send('run0003', [{ id: 'api', run: 'cli' 
 delete process.env.KOPPLER_TEMP;
 assert.match(koppler('up', 'docs'), /Docs does not run on this Mac: a library, nothing to run/);
 add(runRecord(send('run0004', [{ id: 'api', run: 'cli' }, { id: 'web', run: 'cli' }, { id: 'app', run: 'ide' }])));
-assert.match(koppler('plan'), /START: Orders API, Web, app\n  This is what the user confirmed on the canvas\./);
+assert.match(koppler('plan'), /START: Orders API, Web, app\n {2}This is what the user confirmed on the canvas\./);
 // Only what really runs is recorded: api runs, the user starts app in the IDE, web never started and is named.
 koppler('run', 'api', '--', 'sleep', '30');
 const done = koppler('history', '--done');
@@ -52,7 +52,7 @@ koppler('stop', 'api');
 const second = send('run0005', [{ id: 'api', run: 'cli' }, { id: 'web', run: 'cli' }, { id: 'app', run: 'ide' }]);
 second.data.plan = { starts: [{ id: 'web', why: [] }], restarts: [], stops: [], keeps: [{ id: 'api', why: [] }, { id: 'app', why: [] }] };
 add(runRecord(second));
-assert.match(koppler('plan'), /START: Orders API \(it was started before but is not running now\), Web\n  KEEP RUNNING: app\n  DIFFERS from what the user confirmed/);
+assert.match(koppler('plan'), /START: Orders API \(it was started before but is not running now\), Web\n {2}KEEP RUNNING: app\n {2}DIFFERS from what the user confirmed/);
 assert.match(koppler('history', '--done', '--failed', 'web would not build'), /failed \(web would not build\)/);
 add(runRecord({ tag: 'koppler-stop', at: 't', data: { id: 'stop0006' } }));
 assert.match(koppler('history', '--done', 'stop0006'), /Stop stop0006: done; live state is now empty/);

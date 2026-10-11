@@ -65,7 +65,7 @@
   // The commands and settings that carry a plan out. A loopback alias moves the name the app dials (`connectsAs`, else
   // the tunnel host) to the alias: off any line that maps it already, since the first match wins, with a backup to undo.
   // A value as one shell word, for the commands shown to the user to paste.
-  const q = v => /^[\w.:@\/-]+$/.test(String(v)) ? String(v) : `'${String(v).replace(/'/g, `'\\''`)}'`;
+  const q = v => /^[\w.:@/-]+$/.test(String(v)) ? String(v) : `'${String(v).replace(/'/g, `'\\''`)}'`;
   function planSteps(t) {
     const url = `${t.bind}:${t.port}`, dialed = t.connectsAs || t.host, pattern = dialed.replace(/[^\w-]/g, c => `\\${c}`);
     return {

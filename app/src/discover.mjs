@@ -4,14 +4,12 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import vm from 'node:vm';
-import { fileURLToPath } from 'node:url';
 import { localPorts } from './investigate.mjs';
 import { ENV_TOKEN, draftApp, readRepo, stackEnv } from './deployed.mjs';
 import { grepClone, hostsByApp, missingCalls, urlsInClone, validateStack } from './sync.mjs';
-import kinds from './kinds.js';
+import kinds from './kinds.cjs';
 import { TEMP } from './paths.mjs';
 
-const here = path.dirname(fileURLToPath(import.meta.url));
 const temp = () => process.env.KOPPLER_TEMP || TEMP;
 const load = (file, key) => { try { const sb = { window: {} }; vm.runInNewContext(fs.readFileSync(path.join(temp(), file), 'utf8'), sb); return sb.window[key]; } catch { return null; } };
 const deployedOf = (app, env, first) => env === first ? app.deployedUrl : app.envs?.[env]?.deployedUrl;

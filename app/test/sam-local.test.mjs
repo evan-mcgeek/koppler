@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { declared, functions, overrides } from '../src/sam-local.mjs';
-import kinds from '../src/kinds.js';
+import kinds from '../src/kinds.cjs';
 
 // What a SAM template declares: the settings its functions read, and which functions run here (API ones).
 const template = `Transform: AWS::Serverless-2016-10-31

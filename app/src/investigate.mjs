@@ -6,11 +6,10 @@ import path from 'node:path';
 import vm from 'node:vm';
 import { fileURLToPath } from 'node:url';
 import { hostsByApp } from './sync.mjs';
-import tunnelPlan from './ports.js';
-import kinds from './kinds.js';
+import tunnelPlan from './ports.cjs';
+import kinds from './kinds.cjs';
 import { TEMP } from './paths.mjs';
 
-const here = path.dirname(fileURLToPath(import.meta.url));
 
 const SKIP = new Set(['node_modules', '.git', 'bin', 'obj', 'build', 'dist', '.dart_tool', 'Pods', 'coverage', '.next', 'vendor', 'target']);
 
@@ -37,8 +36,8 @@ export const portsIn = text => [...new Set([...String(text).matchAll(/(?:localho
 
 // .NET: every launch profile's applicationUrl.
 export function dotnetPorts(launchSettingsText) {
-  let profiles = {};
-  try { profiles = JSON.parse(launchSettingsText.replace(/^﻿/, '')).profiles ?? {}; }
+  let profiles;
+  try { profiles = JSON.parse(launchSettingsText.replace(/^\uFEFF/, '')).profiles ?? {}; }
   catch { return portsIn(launchSettingsText).map(port => ({ port, where: 'launchSettings.json' })); }
   return Object.entries(profiles).flatMap(([name, p]) => urlsIn(p.applicationUrl ?? '').map(u => ({ ...u, where: `profile ${name}` })));
 }
@@ -59,7 +58,7 @@ export function nodePorts(files) {
   return out;
 }
 
-// A clone as the kind recipes see it (kinds.js): which files it has, their text, what a folder holds.
+// A clone as the kind recipes see it (kinds.cjs): which files it has, their text, what a folder holds.
 export const repoFiles = repo => ({
   has: f => fs.existsSync(path.join(repo, f)),
   read: f => { try { return fs.statSync(path.join(repo, f)).size < 512 * 1024 ? fs.readFileSync(path.join(repo, f), 'utf8') : null; } catch { return null; } },
@@ -96,11 +95,11 @@ export function conflicts(apps) {
     if (own) claim(own, `app:${a.id}`, a.id);
     for (const t of a.tunnels) claim(t.port, `tunnel:${t.tunnel}`, `tunnel to ${t.tunnel} (for ${a.id})`);
   }
-  // Two tunnels on one port are planned by ports.js (share, move or loopback); only clashes involving an app are reported here.
+  // Two tunnels on one port are planned by ports.cjs (share, move or loopback); only clashes involving an app are reported here.
   return [...owners].filter(([, m]) => m.size > 1 && [...m.keys()].some(k => k.startsWith('app:'))).map(([port, m]) => ({ port, who: [...m.values()].map(labels => labels.join(', ')) }));
 }
 
-export function investigate(args = [], { afterSync = false } = {}) {
+export function investigate(_args = [], { afterSync = false } = {}) {
   const registry = load('registry.js', 'REGISTRY'), local = load('local.js', 'LOCAL')?.apps ?? {};
   if (!registry) { console.error('koppler: no stack loaded (koppler init)'); process.exit(1); }
   kinds.register(registry.kinds);
@@ -129,7 +128,7 @@ export function investigate(args = [], { afterSync = false } = {}) {
   for (const c of conflicts(apps)) console.log(`CONFLICT port ${c.port}: ${c.who.join(', ')}`);
   // Tunnels that clash when the apps needing them run together, and how koppler plan resolves it.
   const entries = apps.flatMap(a => a.tunnels.map(t => ({ app: a.id, tunnel: t.tunnel, port: t.port, env: t.env, connectsAs: t.connectsAs })));
-  const clashing = new Set(entries.map(e => e.port).filter((port, i, all) => entries.filter(e => e.port === port && e.tunnel !== entries[i].tunnel).length));
+  const clashing = new Set(entries.map(e => e.port).filter((port, i) => entries.filter(e => e.port === port && e.tunnel !== entries[i].tunnel).length));
   for (const port of clashing) {
     const plan = tunnelPlan.planTunnels(entries.filter(e => e.port === port));
     console.log(`TUNNELS port ${port}: ${plan.map(t => `${t.host.split('.')[0]} (${t.apps.join(', ')})`).join(' and ')} clash when run together`);

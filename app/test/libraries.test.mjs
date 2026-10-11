@@ -25,7 +25,7 @@ assert.equal(fs.existsSync(overrides), false);
 // A file the developer already had keeps its own overrides and comes back exactly as it was.
 fs.writeFileSync(overrides, 'dependency_overrides:\n  http: ^1.1.0\n');
 const again = link('mobile-app', app, libs, path.join(dir, 'actions2.json'));
-assert.match(fs.readFileSync(overrides, 'utf8'), /acme_design:\n    path: .*\n  http: \^1\.1\.0/);
+assert.match(fs.readFileSync(overrides, 'utf8'), /acme_design:\n {4}path: .*\n {2}http: \^1\.1\.0/);
 unlink(again[0]);
 assert.equal(fs.readFileSync(overrides, 'utf8'), 'dependency_overrides:\n  http: ^1.1.0\n');
 fs.rmSync(dir, { recursive: true });
