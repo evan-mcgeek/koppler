@@ -39,7 +39,9 @@ export interface CodeChange {
   fresh?: true;
 }
 export type RunState = 'waiting' | 'applying' | 'done' | 'failed' | 'replaced';
-export interface Run extends RunRecord {
+/** A run as the history file has it: a record written by an older Koppler may lack its plan. */
+export interface Run extends Omit<RunRecord, 'plan'> {
+  plan?: Partial<Steps>;
   state: RunState;
   endedAt?: string;
   changes?: CodeChange[];

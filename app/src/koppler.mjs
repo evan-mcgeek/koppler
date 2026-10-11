@@ -12,22 +12,22 @@ import { discoverCommand } from './discover.mjs';
 import { sayCommand } from './messages.mjs';
 import { switchCommand } from './engine/branch.ts';
 import { down } from './engine/down.ts';
-import { readActions } from './engine/actions.ts';
-import { appStart, secretTest } from './engine/app-start.ts';
-import { wire, wireInfo } from './engine/wire.ts';
+import { secretTest } from './engine/app-start.ts';
+import { wire } from './engine/wire.ts';
+import { run } from './engine/run.ts';
+import { up } from './engine/up.ts';
 import { recipesCommand } from './engine/recipes.ts';
 import { queryCommand } from './query.mjs';
 import { findCommand } from './research.mjs';
 import { investigate } from './investigate.mjs';
 import { deployed } from './deployed.mjs';
-import { appliedCommand as applied, historyCommand, planCommand, runningNames, appendRun, runRecord, runs as runHistory } from './engine/runs.ts';
+import { appliedCommand as applied, historyCommand, planCommand, runningNames } from './engine/runs.ts';
 import * as tunnelPlan from './core/ports.ts';
-import * as kinds from './core/kinds.ts';
 import { needs as needsFor } from './needs.mjs';
-import { APPROVE, approved, missingTunnels, startsFromStack } from './engine/checks.ts';
+import { APPROVE, missingTunnels } from './engine/checks.ts';
 import { APP, BIN, LOGS, TEMP } from './paths.ts';
-import { confirm, fail, flagValue, positional, table } from './cli/output.ts';
-import { alive, listener, NAME, parseRun, readRecord, records, sh, sleep, startProcess, stopOne, uptime } from './engine/processes.ts';
+import { confirm, envOf, fail, flagValue, positional, table } from './cli/output.ts';
+import { alive, listener, NAME, readRecord, records, sh, sleep, stopOne, uptime } from './engine/processes.ts';
 import { redact, scrub } from './scrub.ts';
 import * as kp from './core/plan.ts';
 import { readData } from './data.ts';
@@ -56,24 +56,6 @@ const init = async args => {
   await canvas(['--pick']);
 };
 const here = path.dirname(fileURLToPath(import.meta.url));
-
-
-async function run(args, extra = {}) {
-  let opts;
-  try { opts = { ...parseRun(args), ...extra }; } catch (e) { fail(`${e.message}\nusage: koppler run <app> | koppler run <name> [--cwd <dir>] [--port <n>] [--bind <address>] [--restart] -- <command...>`); }
-  // Only a stack app started by id gets its stored secrets; an arbitrary command never does.
-  if (!opts.command.length) {
-    const app = appStart(opts.name, opts) ?? fail(`${opts.name} is not an app in the stack; to run a command: koppler run ${opts.name} -- <command>`);
-    Object.assign(opts, { cwd: app.cwd, command: app.command, port: opts.port ?? app.port, onStop: app.onStop ?? [], env: app.env, holdsSecrets: true });
-    if (app.device) console.log(`device: ${app.device.name} (${app.device.platform})`);
-  }
-  if (opts.dryRun) {
-    console.log(`would run in ${opts.cwd ?? process.cwd()}${opts.port ? `, port ${opts.port}` : ''}:\n  ${opts.command.map(a => /\s/.test(a) ? JSON.stringify(a) : a).join(' ')}`);
-    for (const c of opts.onStop ?? []) console.log(`on stop: ${c.join(' ')}`);
-    return;
-  }
-  await startProcess(opts);
-}
 
 
 async function stop(args) {
@@ -139,186 +121,7 @@ function ports(args) {
   }
 }
 
-// Everything a run needs, started in one go: its tunnels, then its apps with the ones called first, each waited for.
-// With --run <id> it carries out that confirmed Send: stops and restarts, branches as chosen on the cards, remembered changes,
-// each cable's local address passed to its caller, then starts. What it cannot do alone is listed for the agent (exit 3).
-// Records a board as a run, with its plan against what runs now, as a Run from the canvas would; returns its id.
-async function recordRun(registry, board, label) {
-  const { planFor } = await import('./engine/runs.ts');
-  const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
-  const data = { id, env: board.env, mode: 'auto', nodes: Object.entries(board.nodes).map(([node, n]) => ({ id: node, ...n })), edges: board.edges, queues: board.queues };
-  const plan = planFor({ ...data, nodes: board.nodes });
-  const record = runRecord({ tag: 'koppler', data: { ...data, plan } }) ?? fail(`could not start ${label}`);
-  appendRun(record);
-  const list = (word, xs) => xs.length ? `${word} ${xs.map(x => registry.apps[x.id]?.name ?? x.id).join(', ')}` : null;
-  console.log(`Running ${label} on ${board.env.toUpperCase()} (run ${id}); the canvas shows it.`);
-  const said = [list('starts', plan.starts), list('restarts', plan.restarts), list('stops', plan.stops)].filter(Boolean);
-  if (said.length) console.log(`It ${said.join(', ')}.`);
-  return id;
-}
-
-async function up(args) {
-  const registry = readData('registry') ?? fail('no stack loaded (koppler init)');
-  // Every run is recorded like a Run from the canvas, so the canvas, the history and Stop all know it: a saved board
-  // (--board), or apps from the terminal or chat, added to what already runs on that environment.
-  if (args.includes('--board')) {
-    const want = flagValue(args, '--board') ?? fail('usage: koppler up --board "<board or preset name>" [--env <env>]');
-    const boards = [...(readData('state')?.presets ?? []), ...(registry.presets ?? [])];
-    const b = boards.find(p => p.name === want) ?? boards.find(p => p.name?.toLowerCase() === want.toLowerCase()) ?? fail(`no board called ${want}; koppler use --boards lists them`);
-    return up(['--run', await recordRun(registry, { env: envOf(registry, args), nodes: b.nodes ?? {}, edges: b.edges ?? [], queues: b.queues ?? {} }, b.name)]);
-  }
-  if (!args.includes('--run')) {
-    const ids = positional(args, ['--env', '--cable']);
-    if (!ids.length) fail('usage: koppler up <app...> [--cable <caller>:<callee>]... [--env <env>] | --board "<name>" | --run <id>');
-    for (const id of ids) if (!registry.apps[id]) fail(`${id} is not an app in the stack`);
-    for (const id of ids) if (registry.apps[id].outside) fail(`${registry.apps[id].name ?? id} does not run on this Mac: ${registry.apps[id].outside}`);
-    const env = envOf(registry, args), { live } = await import('./engine/runs.ts'), now = live();
-    const kept = now?.env === env ? now : { nodes: {}, edges: [], queues: {} };
-    const cables = args.flatMap((a, i) => args[i - 1] === '--cable' ? [a] : []).map(c => {
-      const [from, to] = c.split(':');
-      if (!registry.apps[from] || !registry.apps[to]) fail(`usage: --cable <caller>:<callee>, both apps in the stack (got ${c})`);
-      if (!ids.includes(from) && !kept.nodes[from] || !ids.includes(to) && !kept.nodes[to]) fail(`${c}: both ends must run; add them to the apps`);
-      return { from, to };
-    });
-    const nodes = { ...kept.nodes, ...Object.fromEntries(ids.map(id => [id, kept.nodes[id] ?? { run: 'cli' }])) };
-    const edges = [...(kept.edges ?? []), ...cables].filter((e, i, all) => all.findIndex(x => x.from === e.from && x.to === e.to) === i);
-    return up(['--run', await recordRun(registry, { env, nodes, edges, queues: kept.queues ?? {} }, ids.map(id => registry.apps[id].name).join(', '))]);
-  }
-  const local = readData('local')?.apps ?? {};
-  const flag = n => { const i = args.indexOf(`--${n}`); return i >= 0 ? args[i + 1] : undefined; };
-  const runId = flag('run'), all = [...runHistory()];
-  const board = runId ? all.find(r => r.id === runId) ?? fail(`no run ${runId} in the history`) : null;
-  const env = board?.env ?? flag('env') ?? registry.envs[0];
-  const latest = board ?? all.reverse().find(r => r.kind === 'run' && r.env === env) ?? null;
-  const ids = board ? Object.keys(board.nodes).filter(id => registry.apps[id]) : args.filter((a, i) => !a.startsWith('--') && !['--env', '--run'].includes(args[i - 1]));
-  if (!ids.length && !board) fail('usage: koppler up <app...> [--env <env>] | koppler up --run <id>');
-  for (const id of ids) if (!registry.apps[id]) fail(`${id} is not an app in the stack`);
-  // Checked before anything starts: a run never gets half-way and then stops at a command that needs the user's yes.
-  const waiting = ids.filter(id => startsFromStack(registry, id, env));
-  if (waiting.length && !approved(registry.source ?? '', registry)) fail(`${waiting.map(id => registry.apps[id].name ?? id).join(', ')}: started by a command from the stack that the user has not allowed yet, or that changed since. They review it in their own terminal: ${APPROVE}`);
-  const node = id => latest?.nodes?.[id] ?? {}, edges = (latest?.edges ?? []).filter(e => ids.includes(e.from) && ids.includes(e.to));
-  const running = name => { const r = readRecord(name); return r && alive(r); };
-  // Each app's steps as the run goes, shown on its card (temp/progress.json); if the run stops on an error, the step it was on fails.
-  const progressFile = path.join(TEMP, 'progress.json'), progress = { run: board?.id ?? null, env, at: new Date().toISOString(), apps: {} };
-  const step = (id, label, state, detail) => {
-    if (!board) return;
-    const list = progress.apps[id] ||= [], s = list.find(x => x.label === label), next = { label, state, ...(detail && { detail: String(detail).slice(0, 300) }) };
-    if (s) Object.assign(s, next); else list.push(next);
-    fs.writeFileSync(progressFile, JSON.stringify(progress) + '\n', { mode: 0o600 });
-  };
-  process.on('exit', code => { if (!code || code === 3) return; for (const list of Object.values(progress.apps)) { const s = list.find(x => x.state === 'todo'); if (s) { s.state = 'failed'; s.detail = 'The run stopped here; the error is in the run log, and the agent takes over.'; } } if (board) fs.writeFileSync(progressFile, JSON.stringify(progress) + '\n', { mode: 0o600 }); });
-  const prereqsFor = id => { const a = registry.apps[id]; return env !== registry.envs[0] && a.envs?.[env]?.prereqs ? a.envs[env].prereqs : a.prereqs ?? []; };
-  for (const id of ids) {
-    if (node(id).branch) step(id, 'Branch', 'todo', `Switch to ${node(id).branch}`);
-    if (node(id).tunnels !== false && prereqsFor(id).some(p => p.tunnel && p.port)) step(id, 'Tunnels', 'todo');
-    if (Object.keys(board?.queues ?? {}).some(q => registry.apps[id][`publishes`]?.[q] || registry.apps[id].reads?.[q])) step(id, 'Local queue', 'todo');
-    step(id, 'Start', node(id).run === 'ide' ? 'user' : 'todo', node(id).run === 'ide' ? 'Start it in your IDE.' : null);
-  }
-  const left = [], skip = new Set(), setEnv = {}, logFile = path.join(TEMP, 'actions.json');
-  if (board) {
-    // What the plan stops or restarts goes first; its own code changes stay for the agent to revert.
-    let actions; try { actions = readActions(logFile); } catch (e) { fail(e.message); }
-    for (const { id } of [...(board.plan?.stops ?? []), ...(board.plan?.restarts ?? [])]) {
-      const rec = readRecord(id); if (rec && alive(rec)) console.log(await stopOne(rec));
-      if ((board.plan?.stops ?? []).some(x => x.id === id) && actions.some(a => a.app === id && a.kind !== 'process')) left.push(`revert ${registry.apps[id]?.name ?? id}'s changes (it left the board)`);
-    }
-    // Branches as the board asks, uncommitted changes as chosen on the card.
-    const { switchTo } = await import('./engine/branch.ts');
-    for (const id of ids) {
-      const want = node(id).branch, repo = local[id]?.path;
-      if (!want || !repo) continue;
-      const r = switchTo({ app: id, repo, to: want, how: node(id).changes ?? null, logFile });
-      if (r.error) { left.push(r.error); skip.add(id); step(id, 'Branch', 'failed', r.error); step(id, 'Start', 'failed', 'Not started: its branch could not be switched.'); } else { console.log(r.message); step(id, 'Branch', 'done', r.message); }
-    }
-    // Local libraries the board asks for, linked before the app starts.
-    const libs = await import('./engine/libraries.ts');
-    for (const id of ids.filter(id => !skip.has(id) && node(id).libraries?.length)) {
-      const wanted = (local[id]?.libraries ?? []).filter(l => node(id).libraries.includes(l.name));
-      try { libs.link(id, local[id].path, wanted, logFile); console.log(`${id}: local ${wanted.map(l => l.name).join(', ')}`); step(id, 'Libraries', 'done', `Local ${wanted.map(l => l.name).join(', ')}`); }
-      catch (e) { left.push(`${registry.apps[id].name}: ${e.message}`); step(id, 'Libraries', 'failed', e.message); }
-    }
-    // Remembered changes that match this board.
-    const { prepare: applyRemembered, recipesFor, matches } = await import('./engine/recipes.ts');
-    // A code change the stack remembers is the stack's own doing: applied only once the user allowed it.
-    const allowed = approved(registry.source ?? '', registry);
-    const sharedChanges = ids.filter(id => registry.apps[id].localChanges?.length);
-    if (!allowed && sharedChanges.length) left.push(`${sharedChanges.map(id => registry.apps[id].name).join(', ')}: the stack's code changes were not applied; the user has to allow them first, in their own terminal: ${APPROVE}`);
-    const prepare = args => allowed ? applyRemembered(args) : applyRemembered({ ...args, registry: { ...registry, apps: Object.fromEntries(Object.entries(registry.apps).map(([id, a]) => [id, { ...a, localChanges: [] }])) } });
-    const calls = Object.fromEntries(ids.map(a => [a, edges.filter(e => e.from === a).map(e => e.to)]));
-    for (const r of prepare({ registry, apps: ids.filter(id => !skip.has(id)), env, calls, repoOf: a => local[a]?.path, logFile })) {
-      if (r.state === 'applied') { console.log(`${r.app}: remembered change applied (${r.why})`); step(r.app, 'Remembered change', 'done', r.why); }
-      if (r.state === 'moved' || r.state === 'missing') left.push(`${registry.apps[r.app].name}: remembered change "${r.why}" no longer fits (${r.detail})`);
-      if (r.state === 'refused') left.push(`${registry.apps[r.app].name}: remembered change "${r.why}" was refused: ${r.detail}. Check it in stack.json`);
-    }
-    // Each cable: the caller gets its local callee's address at start, or a remembered change already points it there.
-    for (const e of edges) {
-      const info = wireInfo(registry, local, e.from, e.to, env, node(e.from).platform);
-      const viaRecipe = recipesFor(registry, e.from).some(r => r.when?.calls === e.to && matches(r, { env, calls: [e.to] }));
-      if (info.error) { if (!viaRecipe) left.push(info.error); continue; }
-      if (info.how === 'env' && !kinds.of(registry.apps[e.from]).platforms) for (const name of [].concat(info.call.env)) (setEnv[e.from] ??= {})[name] = info.value;
-      else if (!viaRecipe) left.push(`${registry.apps[e.from].name} -> local ${registry.apps[e.to].name}: point it at ${info.value} (${info.how === 'unknown' ? 'how it picks the address is not recorded yet' : `${info.how}${info.call.file ? ` in ${info.call.file}` : ''}`})`);
-    }
-  }
-  // Tunnels first; the board's "no tunnels" choice is kept.
-  const prereqsOf = id => { const a = registry.apps[id]; return env !== registry.envs[0] && a.envs?.[env]?.prereqs ? a.envs[env].prereqs : a.prereqs ?? []; };
-  const entries = ids.filter(id => node(id).tunnels !== false && !skip.has(id)).flatMap(id => prereqsOf(id).filter(p => p.tunnel && p.port).map(p => ({ app: id, tunnel: p.tunnel, port: p.port, env: p.env, what: p.what, connectsAs: p.connectsAs })));
-  const appPorts = ids.map(id => Number(new URL(registry.apps[id].url ?? 'http://x').port)).filter(Boolean);
-  for (const t of tunnelPlan.planTunnels(entries, appPorts)) {
-    const steps = tunnelPlan.planSteps(t);
-    // A tunnel that moved takes its apps with it: each is started with the new address, so none dials whatever holds the old port.
-    for (const s of steps.settings) {
-      if (node(s.app).run === 'ide') left.push(`${registry.apps[s.app].name}: its ${t.what} tunnel moved to port ${t.port}; set ${[].concat(s.env).join(', ')}=${s.value} where you start it`);
-      else for (const name of [].concat(s.env)) (setEnv[s.app] ??= {})[name] = s.value;
-    }
-    if (running(steps.name) || listener(t.port, t.bind)) { console.log(`${steps.name}: already open on ${t.port}`); continue; }
-    const hosts = (() => { try { return fs.readFileSync('/etc/hosts', 'utf8'); } catch { return ''; } })();
-    if (steps.sudo.length && !tunnelPlan.aliasReady(t, hosts, process.platform === 'darwin' ? sh('ifconfig', ['lo0']) : null)) fail(`${steps.name} needs its own local address first; in your terminal:\n  ${steps.sudo.join('\n  ')}\nthen run koppler up again`);
-    await run([steps.name, '--port', String(t.port), '--bind', t.bind, '--restart', '--', ...steps.tunnelArgs]);
-  }
-  for (const id of new Set(entries.map(e => e.app))) step(id, 'Tunnels', 'done', `${entries.filter(e => e.app === id).map(e => e.what ?? e.tunnel).join(', ')} open`);
-  // Queues switched to local: the emulator, each queue in it, and every app on one started with its local address.
-  if (board?.queues) {
-    const q = await import('./engine/queues.ts');
-    const lq = q.localQueues(registry, board.queues, ids.filter(id => !skip.has(id)), env), urls = {};
-    left.push(...lq.left);
-    if (lq.queues.some(one => one.type !== 'kafka') && !running('queues')) await run(['queues', '--port', String(q.PORT), '--', ...q.EMULATOR], { onStop: [q.STOP_EMULATOR] });
-    if (lq.queues.some(one => one.type === 'kafka') && !running('kafka')) await run(['kafka', '--port', String(q.KAFKA_PORT), '--', ...q.BROKER], { onStop: [q.STOP_BROKER] });
-    for (const one of lq.queues) {
-      // The port answers before the emulator or broker is ready; it takes a few seconds.
-      for (let i = 0; i < 30 && !urls[one.id]; i++) { try { urls[one.id] = one.type === 'kafka' ? `${q.KAFKA}/${q.createTopic(one.queue)}` : q.createQueue(one.queue); } catch (e) { if (i === 29) left.push(`${one.name}: the local queue could not be created (${String(e.stderr || e.message).trim().split('\n').pop()})`); else await new Promise(r => setTimeout(r, 1000)); } }
-      if (urls[one.id]) console.log(`queues: ${one.name} is local at ${urls[one.id]}`);
-    }
-    const qe = q.queueEnv(registry, lq.queues.filter(one => urls[one.id]), urls);
-    left.push(...qe.left);
-    for (const [id, vars] of Object.entries(qe.set)) Object.assign(setEnv[id] ??= {}, vars);
-    for (const one of lq.queues) for (const a of one.apps) step(a.id, 'Local queue', urls[one.id] && qe.set[a.id] ? 'done' : 'failed', urls[one.id] ? `${one.name}: ${qe.set[a.id] ? 'local' : 'point it there yourself'}` : `${one.name} could not be created`);
-  }
-  // Apps the others call start first, so a caller finds its callee answering; a loop just starts in board order.
-  const calls = id => edges.filter(e => e.from === id).map(e => e.to), order = [], seen = new Set();
-  const visit = id => { if (seen.has(id)) return; seen.add(id); calls(id).forEach(visit); order.push(id); };
-  ids.forEach(visit);
-  const yours = [];
-  for (const id of order) {
-    if (skip.has(id)) continue;
-    if (node(id).run === 'ide') { yours.push(registry.apps[id].name); continue; }
-    if (running(id)) { console.log(`${id}: already running`); step(id, 'Start', 'done', 'Already running.'); continue; }
-    await run([id, '--env', env, ...(node(id).platform ? ['--device', node(id).platform] : [])], setEnv[id] ? { setEnv: setEnv[id] } : {});
-    step(id, 'Start', 'done', 'Running.');
-  }
-  if (yours.length) console.log(`Start ${yours.join(', ')} in your IDE.`);
-  // What runs now is this board, even while something is left for the agent: the canvas shows it running straight away.
-  if (board) { const { nodes, edges } = (await import('./engine/runs.ts')).runningPart(board); fs.writeFileSync(path.join(TEMP, 'live.json'), JSON.stringify({ id: board.id, at: new Date().toISOString(), env, nodes, edges, ...(board.queues && { queues: board.queues }) }, null, 2) + '\n', { mode: 0o600 }); }
-  if (left.length) { console.log(`\nLeft for the agent:\n${left.map(l => `  - ${l}`).join('\n')}`); process.exit(3); }
-  console.log(`Up on ${env.toUpperCase()}.`);
-  if (board) await applied([board.id]);
-}
-
 const registryOrFail = () => readData('registry') ?? fail('no stack loaded (koppler init)');
-const envOf = (registry, args) => {
-  const env = flagValue(args, '--env') ?? registry.envs[0];
-  if (!registry.envs.includes(env)) fail(`unknown env ${env}; the stack has ${registry.envs.join(', ')}`);
-  return env;
-};
 
 // Tries each stored secret the apps declare and says only whether it works; the values stay in their store.
 function secretTests(registry, ids, env) {
