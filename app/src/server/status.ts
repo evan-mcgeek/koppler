@@ -9,7 +9,7 @@ import { linkedStatus } from '../engine/linked.ts';
 import { listenerPid } from '../engine/listen.ts';
 import { readMessages } from '../engine/messages.ts';
 import { recipesFor } from '../engine/recipes.ts';
-import { live, runningEnvs, runningNames, runs } from '../engine/runs.ts';
+import { live, notes, runningEnvs, runningNames, runs } from '../engine/runs.ts';
 import { currentStack, stacksHere } from '../engine/sync.ts';
 import { CODE, LOGS, STATE, TEMP } from '../paths.ts';
 import { redact } from '../scrub.ts';
@@ -241,6 +241,7 @@ async function snapshot(serving: boolean): Promise<Status> {
   status['runs'] = runs()
     .slice(-20)
     .map(({ nodes, edges, ...run }) => ({ ...run, nodes, edges }));
+  status['notes'] = notes().slice(-20);
   status['at'] = new Date().toISOString();
   // The page works out the server's addresses from its own, so the token is in no file but its own.
   if (serving) status['server'] = true;

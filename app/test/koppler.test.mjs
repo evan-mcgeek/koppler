@@ -197,7 +197,11 @@ const [crashy, upA, upB, tunA, tunB, runA, runB, agentA, agentB, leftA, leftB] =
   const out = koppler('stop', '--apps', '--yes');
   assert.match(out, /api: stopped/); assert.match(out, /tunnel-db-5432: stopped/); assert.doesNotMatch(out, /canvas/);
   assert.match(koppler('status'), /canvas\s+running/);
+  // Not a run, so the history gets a note: afterwards it still says why nothing runs.
+  assert.match(koppler('history'), /apps stopped, changes kept: (api, tunnel-db-5432|tunnel-db-5432, api)/);
   koppler('stop', '--all', '--yes');
+  assert.match(koppler('history'), /everything stopped, changes kept: canvas/);
+  assert.equal(koppler('plan'), 'No Send is waiting to be applied.');
 }
 // An action that is not one of the secrets commands gets the usage line, also when it is named like a built-in property.
 {
