@@ -159,7 +159,7 @@ export async function doctor(args: string[]): Promise<void> {
     process.exitCode = 1;
 }
 
-const SCRIPTS: Record<string, string> = { set: 'secret-set', list: 'secret-list', psql: 'secret-psql' };
+const SCRIPTS: Record<string, string | undefined> = { set: 'secret-set', list: 'secret-list', psql: 'secret-psql' };
 /** Secrets, in the user's own terminal: the values never pass through Koppler's output. */
 export function secret(args: string[]): never {
   const [action = '', ...rest] = args;
@@ -168,9 +168,7 @@ export function secret(args: string[]): never {
     if (!store || !name) fail('usage: koppler secret remove <app>[@<env>] <NAME>');
     process.exit(spawnSync(path.join(BIN, 'secret-store'), ['remove', store, name], { stdio: 'inherit' }).status ?? 1);
   }
-  const script =
-    (Object.hasOwn(SCRIPTS, action) ? SCRIPTS[action] : undefined) ??
-    fail('usage: koppler secret set|list|remove|psql <app>[@<env>] [<NAME>]');
+  const script = SCRIPTS[action] ?? fail('usage: koppler secret set|list|remove|psql <app>[@<env>] [<NAME>]');
   // A protected environment's value is stored so that every read asks the user (the stack says which; else all but
   // the first).
   const stack = readStack();
