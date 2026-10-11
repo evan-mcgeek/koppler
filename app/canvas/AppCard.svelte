@@ -2,6 +2,7 @@
   import { Handle, Position, useViewport, type NodeProps } from '@xyflow/svelte';
   import type { Side } from '../src/core/arrange.ts';
   import { board, type CardNode } from './board.svelte.ts';
+  import { live, progress } from './live.svelte.ts';
 
   const { id, data, selected }: NodeProps<CardNode> = $props();
   const SIDES: Side[] = ['top', 'right', 'bottom', 'left'];
@@ -34,6 +35,18 @@
   /** Worked out when the menu is opened. */
   let cables = $state<ReturnType<typeof board.cablesOf>>({ can: [], wired: [] });
   let noting = $state(false);
+  const up = $derived(live.up(id));
+  const where = $derived(live.where(id));
+  const steps = $derived(live.steps(id));
+  const [tone, said] = $derived(steps.length ? progress(steps) : ['todo', '']);
+  const failed = $derived(steps.find(step => step.state === 'failed'));
+  let open = $state(false);
+  let copiedStep = $state(-1);
+  const copyStep = async (command: string, at: number) => {
+    await navigator.clipboard.writeText(command).catch(() => undefined);
+    copiedStep = at;
+    setTimeout(() => (copiedStep = -1), 1500);
+  };
   /** A side whose one cable sits on the port: the ring stays lit under its end. */
   const lit = (side: Side) => board.ends.onPort.some(port => port.id === id && port.side === side);
   const wire = (ev: Event) => {
@@ -63,6 +76,10 @@
         {#each [2.5, 7, 11.5] as cy (cy)}<circle cx="2" {cy} r="1.2" /><circle cx="6" {cy} r="1.2" />{/each}
       </svg>
     </span>
+    {#if up !== null}
+      <span class="live" data-on={up} role="img" aria-label={up ? 'Running' : 'Not answering'} title={live.about(id)}
+      ></span>
+    {/if}
     <span class="name" title={data.name}>{data.name}</span>
     <span class="kind">{data.kindLabel}</span>
     <button
@@ -241,6 +258,39 @@
         <button class="note-toggle" type="button" onclick={() => (noting = true)}>Add a note for the agent</button>
       {/if}
     </div>
+  {/if}
+  {#if where}<p class="where nodrag" data-on={up ?? 'other'}>{where}</p>{/if}
+  {#if steps.length}
+    <button class="progress nodrag" type="button" data-tone={tone} aria-expanded={open} onclick={() => (open = !open)}>
+      <span class="marks">
+        {#each steps as step, at (at)}<i data-state={step.state} title={step.label}></i>{/each}
+      </span>
+      <span class="text">{said}</span>
+      <span class="chev">{open ? 'Hide' : 'Details'}</span>
+    </button>
+    {#if failed?.detail && !open}<p class="why nodrag">{failed.detail}</p>{/if}
+    {#if open}
+      <ul class="steps nodrag nopan">
+        {#each steps as step, at (at)}
+          <li class="step" data-state={step.state}>
+            <span class="mark" aria-hidden="true"
+              >{step.state === 'done' ? '✓' : step.state === 'failed' ? '!' : ''}</span
+            >
+            <span class="what">{step.label}</span>
+            {#if step.detail}<span class="detail">{step.detail}</span>{/if}
+            {#if step.copy}
+              {@const command = step.copy}
+              <div class="cmd-box">
+                <code class="cmd">{command}</code>
+                <button class="copy" type="button" title="Copy this command" onclick={() => copyStep(command, at)}>
+                  {copiedStep === at ? 'Copied' : 'Copy'}
+                </button>
+              </div>
+            {/if}
+          </li>
+        {/each}
+      </ul>
+    {/if}
   {/if}
   {#if calls.length}
     <div class="calls nodrag nopan">
@@ -510,6 +560,176 @@
     .track::after {
       transition: none;
     }
+  }
+  .live {
+    flex: none;
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: var(--bad);
+  }
+  .live[data-on='true'] {
+    background: var(--ok);
+  }
+  .where {
+    contain: inline-size;
+    margin: 0;
+    padding: 0 14px 10px 16px;
+    color: var(--muted);
+    font-size: 12px;
+    user-select: text;
+    cursor: auto;
+  }
+  .where[data-on='true'] {
+    color: var(--ok);
+  }
+  .progress {
+    contain: inline-size;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 9px 14px 9px 16px;
+    border: 0;
+    border-top: 1px solid var(--line);
+    background: none;
+    color: var(--ink);
+    font: 600 12.5px var(--sans);
+    text-align: left;
+    cursor: pointer;
+  }
+  .progress:hover {
+    background: color-mix(in oklab, var(--ink) 5%, transparent);
+  }
+  .marks {
+    display: flex;
+    gap: 4px;
+  }
+  .marks i {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: var(--line);
+  }
+  .marks i[data-state='done'] {
+    background: var(--ok);
+  }
+  .marks i[data-state='user'] {
+    background: var(--warn);
+  }
+  .marks i[data-state='failed'] {
+    background: var(--bad);
+  }
+  .text {
+    flex: 1;
+    min-width: 0;
+  }
+  .progress[data-tone='user'] .text {
+    color: var(--warn);
+  }
+  .progress[data-tone='failed'] .text {
+    color: var(--bad);
+  }
+  .chev {
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 500;
+  }
+  .why {
+    contain: inline-size;
+    display: -webkit-box;
+    margin: -4px 0 0;
+    padding: 0 14px 10px 16px;
+    overflow: hidden;
+    font-size: 12.5px;
+    line-height: 1.4;
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
+    -webkit-box-orient: vertical;
+  }
+  .steps {
+    contain: inline-size;
+    display: grid;
+    gap: 7px;
+    margin: 0;
+    padding: 4px 14px 12px 16px;
+    list-style: none;
+    user-select: text;
+    cursor: auto;
+  }
+  .step {
+    display: grid;
+    grid-template-columns: 18px 1fr;
+    column-gap: 8px;
+    font-size: 12.5px;
+    line-height: 1.3;
+  }
+  .mark {
+    display: grid;
+    place-items: center;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--line);
+    color: var(--on-accent);
+    font-size: 12px;
+    font-weight: 700;
+  }
+  .step[data-state='done'] .mark {
+    background: var(--ok);
+  }
+  .step[data-state='user'] .mark {
+    background: var(--warn);
+  }
+  .step[data-state='failed'] .mark {
+    background: var(--bad);
+  }
+  .step[data-state='todo'] .mark {
+    border: 2px solid var(--line);
+    background: none;
+  }
+  .what {
+    font-weight: 600;
+  }
+  .step[data-state='user'] .what::after {
+    content: ' (you)';
+    color: var(--warn);
+    font-weight: 500;
+  }
+  .detail {
+    grid-column: 2;
+    color: var(--muted);
+  }
+  .cmd-box {
+    position: relative;
+    grid-column: 2;
+    margin-top: 4px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: var(--paper);
+  }
+  .cmd {
+    display: block;
+    max-height: 132px;
+    margin-top: 30px;
+    padding: 0 10px 8px;
+    overflow-y: auto;
+    font: 12px/1.45 var(--mono);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    cursor: text;
+  }
+  .copy {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    padding: 2px 8px;
+    border: 1px solid var(--line);
+    border-radius: 5px;
+    background: var(--surface);
+    color: var(--ink);
+    font: 600 12px var(--sans);
+    cursor: pointer;
   }
   .link {
     justify-self: start;

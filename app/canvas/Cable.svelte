@@ -2,6 +2,7 @@
   import type { EdgeProps } from '@xyflow/svelte';
   import { cablePath, SIDES, throughPath } from '../src/core/cables.ts';
   import { board, type CableData } from './board.svelte.ts';
+  import { live } from './live.svelte.ts';
 
   const { id, source, target, data: given }: EdgeProps = $props();
   const data = $derived(given as CableData | undefined);
@@ -34,7 +35,12 @@
 
 {#if path}
   <!-- One group, so that the title in it is the SVG one: a cable that starts with <title> is taken for HTML. -->
-  <g role="presentation" onpointerenter={() => (board.hovered = id)} onpointerleave={() => (board.hovered = null)}>
+  <g
+    class:idle={!live.up(source) || !live.up(target)}
+    role="presentation"
+    onpointerenter={() => (board.hovered = id)}
+    onpointerleave={() => (board.hovered = null)}
+  >
     <title>{name(source)} calls local {name(target)}. Click to unplug.</title>
     <path class="svelte-flow__edge-interaction hit" d={path} />
     <path class="under" d={path} />
@@ -73,6 +79,14 @@
   }
   :global(.svelte-flow__edge:hover) :is(.wire, .head) {
     stroke: var(--bad);
+  }
+  /* Dashed until the apps at both ends run. */
+  .idle :is(.wire, .head) {
+    stroke: color-mix(in oklab, var(--cable) 38%, var(--line));
+  }
+  .idle .wire {
+    stroke-dasharray: 6 6;
+    stroke-linecap: butt;
   }
   .hit {
     stroke: transparent;

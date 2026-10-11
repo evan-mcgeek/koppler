@@ -18,6 +18,7 @@
   import Queue from './Queue.svelte';
   import Tunnel from './Tunnel.svelte';
   import { board, type CardNode, type InfraNode } from './board.svelte.ts';
+  import { live } from './live.svelte.ts';
   import { theme } from './theme.svelte.ts';
 
   const flow = useSvelteFlow();
@@ -107,7 +108,7 @@
     board.links.flatMap(({ from, to }) => {
       const app = board.boxes.get(from);
       const card = board.infraBoxes.get(to);
-      return app && card ? [{ key: `${from}>${to}`, d: linkPath(app, card) }] : [];
+      return app && card ? [{ key: `${from}>${to}`, d: linkPath(app, card), idle: !live.up(from) }] : [];
     }),
   );
   /** A message link or a call to an outside system, between the sides of its two cards that face each other. */
@@ -170,9 +171,13 @@
       (all: (CardNode | InfraNode)[]) => {
         // An app the library moved (a drag, the arrow keys) takes its tunnel cards along, in the same step.
         const was = new Map(board.nodes.map(node => [node.id, node.position]));
+        const tall = new Map(board.nodes.map(node => [node.id, node.measured?.height]));
         let infra = all.filter(node => node.type !== 'app');
         const apps = all.filter(node => node.type === 'app');
-        for (const { id, position } of apps) {
+        for (const { id, position, measured } of apps) {
+          // A card that grows or shrinks (its steps open, a note) moves the cards stacked under it by as much.
+          const [before, now] = [tall.get(id), measured?.height];
+          if (before && now && before !== now) infra = board.pushed(id, position.y + before, now - before, infra);
           const from = was.get(id);
           if (from && (from.x !== position.x || from.y !== position.y))
             infra = board.followed(id, { x: position.x - from.x, y: position.y - from.y }, infra);
@@ -288,7 +293,7 @@
           </marker>
         </defs>
         {#each links as link (link.key)}
-          <path class="link" d={link.d} />
+          <path class="link" class:idle={link.idle} d={link.d} />
         {/each}
         {#each flows as flow (flow.key)}
           <g class="flow {flow.kind}">
@@ -311,6 +316,7 @@
               role="presentation"
               class="plug nodrag nopan"
               class:cut={board.hovered === edge.id}
+              class:idle={!live.up(edge.source) || !live.up(edge.target)}
               data-cable={edge.id}
               class:grabbed={board.grabbed?.id === edge.id && board.grabbed.end === 'from'}
               cx={a.x}
@@ -380,12 +386,14 @@
     stroke-linecap: round;
     stroke-linejoin: round;
   }
-  /* Dashed until its app runs. */
   .link {
-    stroke-dasharray: 5 5;
-    stroke-linecap: butt;
     marker-start: url(#link-end);
     marker-end: url(#link-end);
+  }
+  /* Dashed until its app runs. */
+  .link.idle {
+    stroke-dasharray: 5 5;
+    stroke-linecap: butt;
   }
   /* Message links are teal, dashed while the queue is the deployed one; calls to an outside system are dotted grey. */
   .flow .under {
@@ -443,6 +451,9 @@
     fill: var(--cable);
     stroke: var(--surface);
     stroke-width: 2;
+  }
+  .plug.idle {
+    fill: color-mix(in oklab, var(--cable) 38%, var(--line));
   }
   .plug.cut {
     fill: var(--bad);

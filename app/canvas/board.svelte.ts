@@ -479,6 +479,15 @@ class Board {
   }
 
   /** An app that moves takes the tunnel cards it leads along. */
+  /** The cards an app leads that sit under what was its bottom edge, moved down or up as it grows or shrinks. */
+  pushed(id: string, bottom: number, by: number, cards: InfraNode[]): InfraNode[] {
+    const led = new Set(this.ledBy(id));
+    return cards.map(card =>
+      led.has(card.id) && card.position.y >= bottom
+        ? { ...card, position: { x: card.position.x, y: card.position.y + by } }
+        : card,
+    );
+  }
   followed(id: string, by: Point, cards: InfraNode[]): InfraNode[] {
     const led = new Set(this.ledBy(id));
     return cards.map(card =>

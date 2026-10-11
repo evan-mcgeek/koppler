@@ -7,10 +7,14 @@
   import Toast from './Toast.svelte';
   import { board } from './board.svelte.ts';
   import { load, save } from './data.ts';
+  import { live } from './live.svelte.ts';
 
   /** Asked for once, when the page opens. ponytail: no polling yet; it comes with the live state of the cards. */
   const opened = load().then(loaded => {
-    if (loaded) board.open(loaded);
+    if (loaded) {
+      board.open(loaded);
+      live.watch();
+    }
     return !!loaded;
   });
 
