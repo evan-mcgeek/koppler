@@ -5,7 +5,7 @@ import path from 'node:path';
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-recipes-'));
 process.env.KOPPLER_CONFIG_DIR = path.join(dir, 'config');
-const { markRuns, onlyHere, prepare, recipesFor, remember } = await import('../dist/recipes.mjs');
+const { markRuns, onlyHere, prepare, recipesFor, remember } = await import('../dist/engine/recipes.js');
 
 // Something only this Mac has keeps a recipe private.
 assert.equal(onlyHere('url: http://localhost:5001', 'jane', '/Users/jane'), false);
@@ -36,7 +36,7 @@ fs.writeFileSync(path.join(repo, 'src/Startup.cs'), 'rewritten\n'); fs.writeFile
 assert.equal(run(['wallet']).find(r => r.why.startsWith('trust')).state, 'moved');
 
 // Made on this OS it applies only here, unless widened; Windows line endings still match.
-const { matches } = await import('../dist/recipes.mjs');
+const { matches } = await import('../dist/engine/recipes.js');
 const r0 = registry().apps.api.localChanges[0];
 assert.equal(r0.os, process.platform);
 assert.equal(matches(r0, { calls: ['wallet'], platform: 'other' }), false);
@@ -60,7 +60,7 @@ assert.equal(JSON.stringify(registry()).includes('"ok"'), false);
 }
 // A shared stack cannot point a remembered change outside the app's clone: not with .., not through a symlink.
 {
-  const { insideClone } = await import('../dist/recipes.mjs');
+  const { insideClone } = await import('../dist/engine/recipes.js');
   const d = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-recipe-out-')), repo = path.join(d, 'repo');
   fs.mkdirSync(path.join(repo, 'src'), { recursive: true }); fs.writeFileSync(path.join(d, 'outside.rc'), 'export SAFE=1\n');
   fs.symlinkSync(d, path.join(repo, 'up'));

@@ -15,7 +15,7 @@ import { down } from './engine/down.ts';
 import { readActions } from './engine/actions.ts';
 import { appStart, secretTest } from './engine/app-start.ts';
 import { wire, wireInfo } from './engine/wire.ts';
-import { recipesCommand } from './recipes.mjs';
+import { recipesCommand } from './engine/recipes.ts';
 import { queryCommand } from './query.mjs';
 import { findCommand } from './research.mjs';
 import { investigate } from './investigate.mjs';
@@ -238,7 +238,7 @@ async function up(args) {
       catch (e) { left.push(`${registry.apps[id].name}: ${e.message}`); step(id, 'Libraries', 'failed', e.message); }
     }
     // Remembered changes that match this board.
-    const { prepare: applyRemembered, recipesFor, matches } = await import('./recipes.mjs');
+    const { prepare: applyRemembered, recipesFor, matches } = await import('./engine/recipes.ts');
     // A code change the stack remembers is the stack's own doing: applied only once the user allowed it.
     const allowed = approved(registry.source ?? '', registry);
     const sharedChanges = ids.filter(id => registry.apps[id].localChanges?.length);
@@ -496,9 +496,9 @@ const history = args => {
 
 // Remembered code changes: list them, keep the last edit, or apply the ones that match the latest Send.
 const recipes = args => {
-  if (args.includes('--remember')) return recipesCommand('remember', args.filter(a => a !== '--remember'), { fail, temp: TEMP });
-  if (args.includes('--apply')) return recipesCommand('prepare', args.filter(a => a !== '--apply'), { fail, temp: TEMP });
-  return recipesCommand('recipes', args, { fail, temp: TEMP });
+  if (args.includes('--remember')) return recipesCommand('remember', args.filter(a => a !== '--remember'));
+  if (args.includes('--apply')) return recipesCommand('prepare', args.filter(a => a !== '--apply'));
+  return recipesCommand('recipes', args);
 };
 
 // Apps join the stack from their clones: a repo name or slug from `koppler sync`, or a folder.
