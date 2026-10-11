@@ -4,9 +4,10 @@
 import net from 'node:net';
 import tls from 'node:tls';
 import { execFile, execFileSync } from 'node:child_process';
-import { clientEnv, findClient } from './safe-env.mjs';
+import { clientEnv, findClient } from './safe-env.ts';
+import { SECRET_TYPES } from './core/stack.ts';
 
-export const TYPES = ['postgres', 'mysql', 'redis'];
+export const TYPES = SECRET_TYPES;
 const PORTS = { postgres: 5432, mysql: 3306, redis: 6379 };
 
 // "Key=Value;Key=Value" as .NET writes it; a quoted value may hold a semicolon.

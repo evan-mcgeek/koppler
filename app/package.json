@@ -58,5 +58,8 @@
     "typescript-eslint": "^8.71.1",
     "vitest": "^4.1.11"
   },
-  "type": "module"
+  "type": "module",
+  "dependencies": {
+    "zod": "^4.6.5"
+  }
 }

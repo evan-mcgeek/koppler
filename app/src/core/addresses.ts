@@ -1,6 +1,8 @@
 // Pointing a caller at an app that runs on this machine: the address a device reaches it at, what a browser front end
 // needs from the API it calls, and the lines for a local env file.
-import type { App } from './stack.ts';
+import type { App as StackApp } from './stack.ts';
+
+type App = Partial<StackApp>;
 
 /** Where a mobile app runs: a simulator or emulator on this machine, or a real phone. */
 export interface Device {

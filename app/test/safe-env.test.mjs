@@ -4,8 +4,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { appEnv, clientEnv, findClient, loadsCode, takeSecrets } from '../dist/safe-env.mjs';
-import { validateStack } from '../dist/sync.mjs';
+import { appEnv, clientEnv, findClient, loadsCode, takeSecrets } from '../dist/safe-env.js';
+import { validateStack } from '../dist/core/stack.js';
 import { allowStack } from './allow.mjs';
 
 // An app started with its secrets keeps the caller's environment, minus what makes its runtime load other code.

@@ -9,7 +9,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { execFileSync, spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { takeSecrets } from './safe-env.mjs';
+import { takeSecrets } from './safe-env.ts';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 // Read once and taken out of the environment, so the build and Docker commands started below never carry them.

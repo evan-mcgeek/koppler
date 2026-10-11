@@ -9,15 +9,11 @@ import { execFile, execFileSync } from 'node:child_process';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import * as kinds from './core/kinds.ts';
-import * as presets from './core/presets.ts';
-import { TYPES as SECRET_TYPES } from './secret-check.mjs';
-import * as kp from './core/plan.ts';
-const QUEUE_TYPES = kp.QUEUE_TYPES;
 import { detectKind } from './investigate.mjs';
 import { packageOf, librariesFor } from './libraries.mjs';
 import { checkStack as checkLoadedStack } from './checks.mjs';
 import { TEMP } from './paths.ts';
-import { loadsCode } from './safe-env.mjs';
+import { validateStack } from './core/stack.ts';
 import { readData, writeData } from './data.ts';
 
 
@@ -143,98 +139,6 @@ export function urlsInClone(repo) {
   catch { return []; }
 }
 
-// The shared config is reviewed by people, so reject a malformed one loudly instead of drawing a broken canvas.
-const HOST = /^(?=.{1,253}$)[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*$/;
-const NAME = /^[\w.-]{1,128}$/, SETTING = /^[A-Za-z_][\w.:-]{0,127}$/, SLUG = /^[\w.-]+(?:\/[\w.-]+)+$/;
-export function validateStack(stack) {
-  const errors = [];
-  // Names are looked up as a stack's own (`constructor` is no app), and every part has the shape the later steps rely on.
-  const isObject = v => !!v && typeof v === 'object' && !Array.isArray(v), has = (o, key) => isObject(o) && Object.hasOwn(o, key);
-  if (!isObject(stack)) return ['a stack is an object with envs and apps'];
-  if (!Array.isArray(stack.envs) || !stack.envs.length || !stack.envs.every(e => typeof e === 'string' && /^[a-z0-9-]+$/.test(e)) || new Set(stack.envs).size !== stack.envs.length) errors.push('envs: a non-empty list of lowercase names, each once');
-  if (!isObject(stack.apps)) errors.push('apps: an object keyed by app id');
-  for (const [key, what] of [['kinds', 'kind id'], ['queues', 'queue id'], ['envAliases', 'environment']]) if (stack[key] !== undefined && !isObject(stack[key])) errors.push(`${key}: an object keyed by ${what}`);
-  if (stack.presets !== undefined && !Array.isArray(stack.presets)) errors.push('presets: a list');
-  if (errors.length) return errors;
-  if (stack?.protected !== undefined && !(Array.isArray(stack.protected) && stack.protected.every(e => stack.envs?.includes(e)))) errors.push('protected: a list of environments from envs (the ones that ask before every secret read and get the careful review)');
-  for (const [env, names] of Object.entries(stack?.envAliases ?? {})) if (!stack.envs?.includes(env) || !Array.isArray(names) || !names.every(n => typeof n === 'string')) errors.push(`envAliases.${env}: must be one of envs, with a list of names`);
-  for (const [id, k] of Object.entries(stack?.kinds ?? {})) {
-    if (!/^[a-z0-9-]{1,32}$/.test(id)) errors.push(`kinds.${id}: id must be lowercase letters, digits and dashes`);
-    else if (BUILT_IN_KINDS.includes(id)) errors.push(`kinds.${id}: Koppler already has a kind with this id`);
-    if (!k || typeof k !== 'object' || typeof k.label !== 'string' || !k.label) errors.push(`kinds.${id}.label: required`);
-    if (k?.start !== undefined && typeof k.start !== 'string') errors.push(`kinds.${id}.start: a shell command`);
-    if (k?.detect !== undefined && ![].concat(k.detect).every(f => typeof f === 'string')) errors.push(`kinds.${id}.detect: file names`);
-  }
-  // What gets approved is what runs: a check list or command too long to show in full is refused, never cut short.
-  if (stack?.checks !== undefined && (!Array.isArray(stack.checks) || stack.checks.length > 50)) errors.push('checks: a list of at most 50 checks');
-  for (const [n, c] of (Array.isArray(stack?.checks) ? stack.checks : []).entries()) if (typeof c?.name !== 'string' || !c.name || c.name.length > 80 || typeof c?.run !== 'string' || !c.run || c.run.length > 2000) errors.push(`checks[${n}]: needs a name (up to 80 characters) and a run command (up to 2000)`);
-  for (const [id, q] of Object.entries(stack?.queues ?? {})) {
-    for (const [where, name] of [['queue', q?.queue], ...Object.entries(q?.envs ?? {}).map(([env, e]) => [`envs.${env}.queue`, e?.queue])]) if (name !== undefined && !(typeof name === 'string' && NAME.test(name))) errors.push(`queues.${id}.${where}: a queue or topic name`);
-    if (!/^[a-z0-9-]{1,64}$/.test(id)) errors.push(`queues.${id}: id must be lowercase letters, digits and dashes`);
-    if (typeof q?.name !== 'string' || !q.name) errors.push(`queues.${id}.name: required`);
-    if (!QUEUE_TYPES.includes(q?.type)) errors.push(`queues.${id}.type: one of ${QUEUE_TYPES.join(', ')}`);
-  }
-  for (const [id, app] of Object.entries(stack?.apps ?? {})) {
-    if (!/^[a-z0-9-]+$/.test(id)) errors.push(`apps.${id}: id must be lowercase letters, digits and dashes`);
-    const shapes = [...['consumes', 'publishes', 'reads', 'envs'].map(key => [key, isObject, 'an object']), ...['prereqs', 'secrets'].map(key => [key, Array.isArray, 'a list'])];
-    const wrong = !isObject(app) ? [`apps.${id}: an object`] : [
-      ...shapes.filter(([key, ok]) => app[key] !== undefined && !ok(app[key])).map(([key, , what]) => `apps.${id}.${key}: ${what}`),
-      ...(isObject(app.consumes) ? Object.entries(app.consumes).filter(([, call]) => !isObject(call)).map(([dep]) => `apps.${id}.consumes.${dep}: an object (how the call is made; {} when not known yet)`) : []),
-      ...(isObject(app.envs) ? Object.entries(app.envs).flatMap(([env, e]) => [
-        ...(stack.envs.includes(env) ? [] : [`apps.${id}.envs.${env}: not one of envs (${stack.envs.join(', ')})`]),
-        ...(isObject(e) ? ['prereqs', 'secrets'].filter(key => e[key] !== undefined && !Array.isArray(e[key])).map(key => `apps.${id}.envs.${env}.${key}: a list`) : [`apps.${id}.envs.${env}: an object`]),
-      ]) : []),
-    ];
-    // An app with a part of the wrong shape is not looked into further.
-    if (wrong.length) { errors.push(...wrong); continue; }
-    if (typeof app?.kind === 'string' && app.kind && !BUILT_IN_KINDS.includes(app.kind) && !has(stack.kinds, app.kind)) errors.push(`apps.${id}.kind: "${app.kind}" is not a kind Koppler knows; define it under "kinds", or use "other" with a "start" command`);
-    // An outside system (Salesforce, a SaaS) may have no repo of its own.
-    for (const key of app?.outside ? ['name', 'kind'] : ['name', 'kind', 'slug']) if (typeof app?.[key] !== 'string' || !app[key]) errors.push(`apps.${id}.${key}: required`);
-    for (const dep of Object.keys(app?.consumes ?? {})) if (!has(stack.apps, dep)) errors.push(`apps.${id}.consumes.${dep}: no such app`);
-    for (const key of ['publishes', 'reads']) for (const q of Object.keys(app?.[key] ?? {})) if (!has(stack.queues, q)) errors.push(`apps.${id}.${key}.${q}: no such queue under "queues"`);
-    // A remembered change edits one file inside the app's own clone: a path that could leave it is refused.
-    for (const [n, c] of (Array.isArray(app?.localChanges) ? app.localChanges : app?.localChanges === undefined ? [] : [null]).entries())
-      if (!c || typeof c.file !== 'string' || !c.file || typeof c.find !== 'string' || !c.find || typeof c.replace !== 'string' || path.isAbsolute(c.file) || c.file.split(/[\\/]/).includes('..'))
-        errors.push(`apps.${id}.localChanges[${n}]: needs file (a path inside the app's clone, no .. or leading /), find and replace`);
-    for (const [where, start] of [['start', app?.start], ...Object.entries(app?.envs ?? {}).map(([env, e]) => [`envs.${env}.start`, e?.start])]) if (start !== undefined && (typeof start !== 'string' || !start || start.length > 2000)) errors.push(`apps.${id}.${where}: a shell command (up to 2000 characters)`);
-    // Values that end up in commands (tunnels, sign-ins, hosts entries, secret steps, clone commands) must look like
-    // what they are, so a shared stack.json cannot smuggle shell syntax into them.
-    if (app?.slug !== undefined && !(typeof app.slug === 'string' && SLUG.test(app.slug))) errors.push(`apps.${id}.slug: owner/repo, or host/path/to/repo`);
-    for (const [where, list] of [['prereqs', app?.prereqs], ...Object.entries(app?.envs ?? {}).map(([env, e]) => [`envs.${env}.prereqs`, e?.prereqs])])
-      for (const [n, p] of (Array.isArray(list) ? list : []).entries()) {
-        // A tunnel's port is a number: it reaches the page, shell commands and the port probe.
-        if (p?.port !== undefined && !(Number.isInteger(p.port) && p.port > 0 && p.port < 65536)) errors.push(`apps.${id}.${where}[${n}].port: a port number from 1 to 65535`);
-        for (const key of ['tunnel', 'connectsAs', 'hosts']) if (p?.[key] !== undefined && !(typeof p[key] === 'string' && HOST.test(p[key]))) errors.push(`apps.${id}.${where}[${n}].${key}: a host name`);
-        if (p?.sso !== undefined && !(typeof p.sso === 'string' && NAME.test(p.sso))) errors.push(`apps.${id}.${where}[${n}].sso: an AWS profile name`);
-        if (p?.env !== undefined && !(typeof p.env === 'string' && SETTING.test(p.env))) errors.push(`apps.${id}.${where}[${n}].env: a setting name`);
-      }
-    for (const [where, list] of [['secrets', app?.secrets], ...Object.entries(app?.envs ?? {}).map(([env, e]) => [`envs.${env}.secrets`, e?.secrets])])
-      for (const [n, sec] of (Array.isArray(list) ? list : []).entries()) if (sec?.env !== undefined && !(typeof sec.env === 'string' && SETTING.test(sec.env))) errors.push(`apps.${id}.${where}[${n}].env: a setting name`);
-    // A secret or a cable's setting named like a variable that makes a runtime load code would run the stack author's code in the app.
-    const settings = [...[app?.secrets, ...Object.values(app?.envs ?? {}).map(e => e?.secrets)].flatMap(l => Array.isArray(l) ? l.map(x => x?.env) : []), ...Object.values(app?.consumes ?? {}).flatMap(c => [].concat(c?.env ?? []))];
-    for (const name of settings) if (typeof name === 'string' && (loadsCode(name) || name === 'PATH')) errors.push(`apps.${id}: "${name}" cannot be a secret or a cable setting; it changes what code the app runs`);
-    for (const [where, list] of [['secrets', app?.secrets], ...Object.entries(app?.envs ?? {}).map(([env, e]) => [`envs.${env}.secrets`, e?.secrets])])
-      for (const s of list ?? []) if (s?.type !== undefined && !SECRET_TYPES.includes(s.type)) errors.push(`apps.${id}.${where}: type "${s.type}" is not one Koppler tests (${SECRET_TYPES.join(', ')})`);
-  }
-  for (const [i, p] of (stack?.presets ?? []).entries()) {
-    if (!isObject(p)) { errors.push(`presets[${i}]: an object`); continue; }
-    if (p.nodes !== undefined && !isObject(p.nodes)) { errors.push(`presets[${i}].nodes: an object keyed by app id`); continue; }
-    if (p.edges !== undefined && !Array.isArray(p.edges)) { errors.push(`presets[${i}].edges: a list of { from, to }`); continue; }
-    if (typeof p?.name !== 'string' || !p.name) errors.push(`presets[${i}].name: required`);
-    if (!Number.isInteger(p?.version)) errors.push(`presets[${i}].version: required (the current preset format is ${presets.VERSION})`);
-    else if (p.version > presets.VERSION) errors.push(`presets[${i}].version: ${p.version} is newer than this Koppler reads (${presets.VERSION}); update Koppler`);
-    for (const [id, n] of Object.entries(p.nodes ?? {})) {
-      if (!has(stack.apps, id)) errors.push(`presets[${i}].nodes.${id}: no such app`);
-      if (!isObject(n)) errors.push(`presets[${i}].nodes.${id}: an object ({} for the defaults)`);
-    }
-    for (const [n, e] of (p.edges ?? []).entries()) {
-      if (typeof e?.from !== 'string' || typeof e?.to !== 'string') errors.push(`presets[${i}].edges[${n}]: needs from and to`);
-      else if (!has(p.nodes, e.from) || !has(p.nodes, e.to)) errors.push(`presets[${i}].edges: ${e.from} -> ${e.to} needs both apps in the preset`);
-    }
-  }
-  return errors;
-}
-
 const readJson = file => { try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return null; } };
 const writeJson = (file, value) => { fs.mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 }); fs.writeFileSync(file, JSON.stringify(value, null, 2) + '\n'); };
 const git = (cwd, ...args) => execFileSync('git', args, { cwd, encoding: 'utf8' }).trim();
@@ -298,7 +202,6 @@ export function candidateRepos(index, stack, stackDir) {
     return [{ slug, name: nameFromRepo(repo), kind: detectKind(r.path), path: tilde(r.path), folder: tilde(path.dirname(r.path)), ...(inStack && { inStack }) }];
   }).sort((a, b) => a.folder.localeCompare(b.folder) || a.name.localeCompare(b.name));
 }
-const BUILT_IN_KINDS = Object.keys(kinds.KINDS);
 const NOT_SET_UP = 'Run facts not collected yet: read the repo (launchSettings/README/infra) and fill run, url, prereqs before using.';
 // Adds picked clones to stack.json as apps that are not set up yet. Only clones from the index can be added.
 export function addApps(picks, { config = loadConfig(), index = readJson(INDEX) } = {}) {

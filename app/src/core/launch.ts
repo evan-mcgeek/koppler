@@ -3,7 +3,10 @@
 import type { Device } from './addresses.ts';
 import { frameworkOf, type PackageJson } from './frameworks.ts';
 import { recipeOf, type RepoView } from './kinds.ts';
-import type { App } from './stack.ts';
+import type { App as StackApp } from './stack.ts';
+
+/** An app as far as starting it needs: any part may be missing, and each kind says what it needs. */
+export type App = Partial<StackApp>;
 
 /** One profile of a .NET launch settings file. */
 export interface LaunchProfile {

@@ -6,7 +6,8 @@ import path from 'node:path';
 const sandbox = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-switch-'));
 process.env.KOPPLER_TEMP = path.join(sandbox, 'temp'); process.env.KOPPLER_CONFIG_DIR = path.join(sandbox, 'config');
 fs.mkdirSync(process.env.KOPPLER_TEMP); fs.mkdirSync(process.env.KOPPLER_CONFIG_DIR);
-const { branchList, hostOwners, missingCalls, remoteKey, slugMatches, validateStack } = await import('../dist/sync.mjs');
+const { branchList, hostOwners, missingCalls, remoteKey, slugMatches } = await import('../dist/sync.mjs');
+const { validateStack } = await import('../dist/core/stack.js');
 
 assert.equal(remoteKey('git@github.com:acme/orders-api.git'), 'github.com/acme/orders-api');
 assert.equal(remoteKey('https://github.com/Acme/Orders-API/'), 'github.com/acme/orders-api');

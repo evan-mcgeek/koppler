@@ -28,7 +28,7 @@ import { needs as needsFor } from './needs.mjs';
 import { APPROVE, approved, missingTunnels, startsFromStack } from './checks.mjs';
 import { APP, BIN, LOGS, STATE, TEMP } from './paths.ts';
 import { readActions, updateActions } from './actions.mjs';
-import { appEnv } from './safe-env.mjs';
+import { appEnv } from './safe-env.ts';
 import { redact, scrub } from './scrub.mjs';
 import * as kp from './core/plan.ts';
 import { readData } from './data.ts';
