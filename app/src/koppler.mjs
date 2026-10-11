@@ -4,7 +4,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { execFileSync, spawnSync } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { init as initStack, removeApp, stacksCommand, sync, updateClones, useCommand } from './sync.mjs';
 import { discardChanges, linkStack, linkedStatus, proposeChanges, updateStack } from './linked.mjs';
@@ -15,6 +15,7 @@ import { down } from './engine/down.ts';
 import { secretTest } from './engine/app-start.ts';
 import { wire } from './engine/wire.ts';
 import { run } from './engine/run.ts';
+import { canvas, logs, status, stop } from './cli/running.ts';
 import { up } from './engine/up.ts';
 import { recipesCommand } from './engine/recipes.ts';
 import { queryCommand } from './query.mjs';
@@ -25,10 +26,9 @@ import { appliedCommand as applied, historyCommand, planCommand, runningNames } 
 import * as tunnelPlan from './core/ports.ts';
 import { needs as needsFor } from './needs.mjs';
 import { APPROVE, missingTunnels } from './engine/checks.ts';
-import { APP, BIN, LOGS, TEMP } from './paths.ts';
-import { confirm, envOf, fail, flagValue, positional, table } from './cli/output.ts';
-import { alive, listener, NAME, readRecord, records, sh, sleep, stopOne, uptime } from './engine/processes.ts';
-import { redact, scrub } from './scrub.ts';
+import { APP, BIN, TEMP } from './paths.ts';
+import { confirm, envOf, fail, flagValue, positional } from './cli/output.ts';
+import { sh } from './engine/processes.ts';
 import * as kp from './core/plan.ts';
 import { readData } from './data.ts';
 
@@ -56,39 +56,6 @@ const init = async args => {
   await canvas(['--pick']);
 };
 const here = path.dirname(fileURLToPath(import.meta.url));
-
-
-async function stop(args) {
-  // --apps: every app, API and tunnel Koppler runs, but not the canvas; code changes and branches stay as they are.
-  const all = args.includes('--all'), apps = args.includes('--apps');
-  const names = args.filter(a => !a.startsWith('-'));
-  if (!all && !apps && !names.length) fail('usage: koppler stop <name...> | --apps | --all [--yes]');
-  for (const n of names) if (!NAME.test(n)) fail(`${n} is not a name Koppler gives its processes`);
-  const targets = all ? records() : apps ? records().filter(r => r.name !== 'canvas') : names.map(n => readRecord(n) ?? fail(`${n} is not started by koppler`));
-  if (!targets.length) return console.log('nothing to stop');
-  if ((all || apps) && !await confirm(`Stop ${targets.map(r => r.name).join(', ')}?`, args)) fail('nothing stopped (in a script, add --yes)');
-  for (const line of await Promise.all(targets.map(stopOne))) console.log(line);
-}
-
-
-// What a bug report needs, ready to paste into a public issue: versions, then the tails of the canvas debug log, the
-// latest run log and each named log, all scrubbed of secrets and of everything that names the user or their stack.
-async function debugReport(names) {
-  const { stacksHere } = await import('./sync.mjs');
-  const registries = [readData('registry'), readData('state'), ...stacksHere().map(s => { try { return JSON.parse(fs.readFileSync(path.join(s.dir, 'stack.json'), 'utf8')); } catch { return null; } })];
-  const tailOf = (file, n) => { try { return fs.readFileSync(file, 'utf8').trimEnd().split('\n').slice(-n).join('\n'); } catch { return null; } };
-  const newest = dir => { try { return fs.readdirSync(dir).filter(f => /^up-.*\.log$/.test(f)).map(f => path.join(dir, f)).sort((a, b) => fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs)[0]; } catch { return null; } };
-  const commit = (() => { try { return execFileSync('git', ['-C', here, 'rev-parse', '--short', 'HEAD'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim(); } catch { return null; } })();
-  const parts = [`Koppler ${commit ?? 'installed copy'}, Node ${process.version}, ${os.type()} ${os.release()}`];
-  const add = (title, text) => text && parts.push(`## ${title}\n\n\`\`\`text\n${text}\n\`\`\``);
-  // A board's name says nothing about a bug and may name a project, even one no stack lists any more.
-  const unnamed = line => { try { const o = JSON.parse(line); if (o.board?.name) o.board.name = 'board'; return JSON.stringify(o); } catch { return line; } };
-  add('Canvas debug log', tailOf(path.join(TEMP, 'debug.jsonl'), 40)?.split('\n').map(unnamed).join('\n'));
-  const run = newest(TEMP);
-  add(`Latest run (${run ? path.basename(run) : ''})`, run && tailOf(run, 60));
-  for (const n of names) add(`${n} log`, NAME.test(n) ? tailOf(path.join(LOGS, `${n}.log`), 80) ?? 'no log' : 'not a log name');
-  console.log(scrub(parts.join('\n\n'), registries));
-}
 
 
 // The tunnels a set of apps needs, with shared, moved and loopback-aliased ones worked out (default: the apps on the canvas).
@@ -170,57 +137,6 @@ async function flowCheck(args) {
   if (args.includes('--json')) console.log(JSON.stringify(results.map(r => ({ connection: r.label, ok: r.result.ok, text: r.result.text, detail: r.result.detail })), null, 2));
   else for (const r of results) console.log(`${r.result.ok ? 'ok     ' : r.result.unsure ? 'unsure ' : 'FAILED '} ${r.label}: ${r.result.text}${r.result.ok ? '' : ` (${r.result.detail})`}`);
   if (results.some(r => !r.result.ok && !r.result.unsure)) process.exitCode = 1;
-}
-
-// The canvas: started when it is not running, then opened in the browser.
-async function canvas(args) {
-  if (args.includes('--stop')) return stop(['canvas']);
-  const rec = readRecord('canvas');
-  if (!rec || !alive(rec)) await run(['canvas', '--port', String(Number(process.env.KOPPLER_PORT) || 4747), '--', process.execPath, path.join(here, 'status-watch.mjs')]);
-  const urlFile = path.join(TEMP, 'canvas-url');
-  for (let i = 0; i < 40 && !fs.existsSync(urlFile); i++) await sleep(250);
-  if (!fs.existsSync(urlFile)) fail('the canvas did not start; see koppler logs canvas');
-  // The address carries the page's access token, so it goes to the browser and is not printed.
-  const url = fs.readFileSync(urlFile, 'utf8').trim() + (args.includes('--pick') ? '#pick' : '');
-  if (args.includes('--no-open') || process.platform !== 'darwin') return console.log(`The canvas runs on port ${new URL(url).port}; its address is in ${urlFile}`);
-  sh('open', [url]);
-  console.log('The canvas is open in your browser.');
-}
-
-// A log, with secrets masked as on the card; `-f` follows it.
-async function logs(args) {
-  const [want] = positional(args, ['-n']), lines = Number(flagValue(args, '-n')) || 50;
-  if (!want) fail('usage: koppler logs <name> [-f] [-n <lines>]');
-  if (!NAME.test(want)) fail(`${want} is not a name Koppler gives its processes`);
-  const file = path.join(LOGS, `${want}.log`);
-  if (!fs.existsSync(file)) fail(`no log for ${want}; koppler status lists what runs`);
-  process.stdout.write(redact(fs.readFileSync(file, 'utf8').trimEnd().split('\n').slice(-lines).join('\n')) + '\n');
-  if (!args.includes('-f') && !args.includes('--follow')) return;
-  let at = fs.statSync(file).size;
-  fs.watchFile(file, { interval: 500 }, cur => {
-    if (cur.size < at) at = 0;
-    if (cur.size === at) return;
-    const fd = fs.openSync(file, 'r'), buf = Buffer.alloc(cur.size - at);
-    fs.readSync(fd, buf, 0, buf.length, at); fs.closeSync(fd); at = cur.size;
-    process.stdout.write(redact(buf.toString('utf8')));
-  });
-}
-
-// What runs; --apps adds every app in the stack with its clone; --debug is for a bug report.
-function status(args = []) {
-  if (args.includes('--debug')) return debugReport(positional(args));
-  const json = args.includes('--json'), recs = records();
-  const procs = recs.map(r => { const up = alive(r); return { name: r.name, state: up ? 'running' : 'exited', pid: r.pid, up: up ? uptime(r.startedAt) : null, port: r.port ?? null, open: !!(r.port && up && listener(r.port, r.bind)), command: r.command }; });
-  const registry = args.includes('--apps') ? registryOrFail() : null, local = readData('local')?.apps ?? {};
-  const apps = registry && Object.entries(registry.apps).map(([id, app]) => ({ id, name: app.name, kind: app.kind, clone: local[id] ? { branch: local[id].branch ?? null, changed: local[id].dirty ?? 0 } : null, state: procs.find(p => p.name === id)?.state ?? null }));
-  if (json) return console.log(JSON.stringify({ processes: procs, ...(apps && { stack: registry.name ?? null, apps }) }, null, 2));
-  if (apps) {
-    console.log(`${registry.name ?? 'stack'}: ${registry.source ?? ''}`);
-    table([['APP', 'NAME', 'KIND', 'CLONE', 'KOPPLER'], ...apps.map(a => [a.id, a.name, a.kind, a.clone ? `${a.clone.branch ?? 'detached'}${a.clone.changed ? ` (${a.clone.changed} changed)` : ''}` : 'missing', a.state ?? '-'])]);
-    console.log('');
-  }
-  if (!procs.length) return console.log('nothing started by koppler');
-  table([['NAME', 'STATE', 'PID', 'UP', 'PORT', 'COMMAND'], ...procs.map(p => [p.name, p.state, p.pid, p.up ?? '-', p.port ? `${p.port} ${p.open ? 'open' : 'closed'}` : '-', p.command.length > 70 ? p.command.slice(0, 67) + '...' : p.command])]);
 }
 
 // Secrets, in the user's own terminal: the values never pass through Koppler's output.
