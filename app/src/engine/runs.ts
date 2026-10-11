@@ -422,7 +422,7 @@ export async function appliedCommand(args: string[]): Promise<void> {
   const changes = changesAfter(run, all);
   // How each remembered change did on this Mac, and when; private, never in the shared stack.
   try {
-    const { markRuns } = await import('../recipes.mjs');
+    const { markRuns } = await import('./recipes.ts');
     markRuns(actionsFile(), !failed);
   } catch {
     // Remembered changes are a convenience: a run still ends without them.
