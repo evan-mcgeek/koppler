@@ -70,3 +70,34 @@ console.log('branch tests ok');
   assert.match(switchTo({ app: 'api', repo: path.join(dir, 'gone'), to: 'feature/x', how: null, logFile }).error, /^api: /);
   console.log('switching back tests ok');
 }
+
+// A clone the user moved to a third branch stays there: Stop drops the switch instead of undoing it or asking again.
+{
+  const d = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-branch-moved-')), r = path.join(d, 'repo'), log = path.join(d, 'actions.json');
+  const g = (...a) => execFileSync('git', ['-C', r, ...a], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+  fs.mkdirSync(r); g('init', '-q', '-b', 'develop'); g('config', 'user.email', 't@t'); g('config', 'user.name', 't');
+  fs.writeFileSync(path.join(r, 'a.txt'), 'one\n'); g('add', '.'); g('commit', '-qm', 'one'); g('branch', 'feature/x'); g('branch', 'other');
+  const entries = () => JSON.parse(fs.readFileSync(log, 'utf8')).length;
+  // With new changes on the third branch.
+  switchTo({ app: 'api', repo: r, to: 'feature/x', how: null, logFile: log });
+  g('switch', '-q', 'other'); fs.writeFileSync(path.join(r, 'a.txt'), 'mine\n');
+  const dirty = switchBack({ app: 'api', logFile: log });
+  assert.match(dirty.message ?? dirty.error, /^api: left on other, where you moved it/);
+  assert.equal(g('rev-parse', '--abbrev-ref', 'HEAD'), 'other');
+  assert.equal(fs.readFileSync(path.join(r, 'a.txt'), 'utf8'), 'mine\n');
+  assert.equal(entries(), 0);
+  // Clean on the third branch: not pulled back either.
+  g('checkout', '-q', '--', '.'); g('switch', '-q', 'develop');
+  switchTo({ app: 'api', repo: r, to: 'feature/x', how: null, logFile: log });
+  g('switch', '-q', 'other');
+  assert.match(switchBack({ app: 'api', logFile: log }).message, /left on other/);
+  assert.equal(g('rev-parse', '--abbrev-ref', 'HEAD'), 'other');
+  assert.equal(entries(), 0);
+  // What was set aside is not lost: the message says where it waits.
+  g('switch', '-q', 'develop'); fs.writeFileSync(path.join(r, 'a.txt'), 'aside\n');
+  switchTo({ app: 'api', repo: r, to: 'feature/x', how: 'set-aside', logFile: log });
+  g('switch', '-q', 'other');
+  assert.match(switchBack({ app: 'api', logFile: log }).message, /your set-aside changes wait in the stash as "koppler: api on develop while it runs feature\/x"/);
+  assert.match(g('stash', 'list'), /koppler: api on develop/);
+  assert.equal(entries(), 0);
+}
