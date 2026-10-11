@@ -186,3 +186,14 @@ const [crashy, upA, upB, tunA, tunB, runA, runB, agentA, agentB, leftA, leftB] =
   assert.match(koppler('status'), /canvas\s+running/);
   koppler('stop', '--all', '--yes');
 }
+// An action that is not one of the secrets commands gets the usage line, also when it is named like a built-in property.
+{
+  const { spawnSync } = await import('node:child_process');
+  const path = await import('node:path'), { fileURLToPath } = await import('node:url');
+  const entry = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'dist', 'koppler.mjs');
+  for (const action of ['constructor', 'toString', 'bogus']) {
+    const r = spawnSync('node', [entry, 'secret', action], { encoding: 'utf8' });
+    assert.equal(r.status, 2, `${action}: ${r.stderr}`);
+    assert.match(r.stderr, /^koppler: usage: koppler secret /, action);
+  }
+}
