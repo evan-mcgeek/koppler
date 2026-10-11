@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url';
 import * as kinds from './core/kinds.ts';
 import { detectKind } from './investigate.mjs';
 import { packageOf, librariesFor } from './engine/libraries.ts';
-import { checkStack as checkLoadedStack } from './checks.mjs';
+import { checkStack as checkLoadedStack } from './engine/checks.ts';
 import { TEMP } from './paths.ts';
 import { validateStack } from './core/stack.ts';
 import { readData, writeData } from './data.ts';

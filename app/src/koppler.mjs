@@ -24,7 +24,7 @@ import { appliedCommand as applied, historyCommand, planCommand, runningNames, a
 import * as tunnelPlan from './core/ports.ts';
 import * as kinds from './core/kinds.ts';
 import { needs as needsFor } from './needs.mjs';
-import { APPROVE, approved, missingTunnels, startsFromStack } from './checks.mjs';
+import { APPROVE, approved, missingTunnels, startsFromStack } from './engine/checks.ts';
 import { APP, BIN, LOGS, TEMP } from './paths.ts';
 import { confirm, fail, flagValue, positional, table } from './cli/output.ts';
 import { alive, listener, NAME, parseRun, readRecord, records, sh, sleep, startProcess, stopOne, uptime } from './engine/processes.ts';
@@ -278,7 +278,7 @@ async function up(args) {
   for (const id of new Set(entries.map(e => e.app))) step(id, 'Tunnels', 'done', `${entries.filter(e => e.app === id).map(e => e.what ?? e.tunnel).join(', ')} open`);
   // Queues switched to local: the emulator, each queue in it, and every app on one started with its local address.
   if (board?.queues) {
-    const q = await import('./queues.mjs');
+    const q = await import('./engine/queues.ts');
     const lq = q.localQueues(registry, board.queues, ids.filter(id => !skip.has(id)), env), urls = {};
     left.push(...lq.left);
     if (lq.queues.some(one => one.type !== 'kafka') && !running('queues')) await run(['queues', '--port', String(q.PORT), '--', ...q.EMULATOR], { onStop: [q.STOP_EMULATOR] });
@@ -335,7 +335,7 @@ async function doctor(args) {
   if (args.includes('--flow')) return flowCheck(args);
   const json = args.includes('--json'), registry = registryOrFail(), env = envOf(registry, args);
   const ids = positional(args, ['--env', '--no-tunnels']);
-  const { checkTools, report } = await import('./checks.mjs');
+  const { checkTools, report } = await import('./engine/checks.ts');
   // Approving runs commands from a shared file on this Mac: only a person at the terminal can say yes, never --yes.
   const tools = await checkTools({ approve: args.includes('--approve'), confirm: question => confirm(question) });
   if (tools.error) fail(tools.error);
@@ -456,7 +456,7 @@ const link = async args => {
     const r = await linkStack(url); if (r.error) fail(r.error);
     console.log(`USING ${r.name}, linked from ${url}`); sync([]);
     // A linked stack is someone else's file: say so when it brings commands of its own.
-    const { stackCommands } = await import('./checks.mjs'), own = stackCommands(readData('registry'));
+    const { stackCommands } = await import('./engine/checks.ts'), own = stackCommands(readData('registry'));
     if (own.length) console.log(`\nThis stack carries ${own.length} ${own.length === 1 ? 'command or code change' : 'commands and code changes'} of its own. None runs until you have reviewed them: ${APPROVE}`);
     return;
   }

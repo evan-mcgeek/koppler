@@ -3,7 +3,7 @@
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { APPROVE, approved, startsFromStack } from '../checks.mjs';
+import { APPROVE, approved, startsFromStack } from './checks.ts';
 import { fail } from '../cli/output.ts';
 import { register } from '../core/kinds.ts';
 import { launchProfile, startCommand, type LaunchProfiles, type StartContext } from '../core/launch.ts';
