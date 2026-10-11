@@ -100,6 +100,27 @@ test('a cable is drawn through waypoints dropped on the empty board, and Escape 
   await expect(page.locator('.svelte-flow__edge')).toHaveCount(5);
 });
 
+test('a cable shows a mark to unplug it under the pointer, and a click unplugs it', async ({ page }) => {
+  const mark = cable(page, 'web>orders').locator('.cut');
+  await expect(mark).toBeHidden();
+  // This cable runs straight across: the middle of its box is on it.
+  const at = await cable(page, 'web>orders')
+    .locator('.wire')
+    .evaluate(el => {
+      const box = el.getBoundingClientRect();
+      return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+    });
+  await page.mouse.move(at.x, at.y);
+  await expect(mark).toBeVisible();
+  await expect(cable(page, 'web>orders').locator('title')).toHaveText(
+    'Web Shop calls local Orders API. Click to unplug.',
+  );
+  await page.screenshot({ path: 'test-results/next-cut.png' });
+  await page.mouse.click(at.x, at.y);
+  await expect(cable(page, 'web>orders')).toHaveCount(0);
+  await expect(page.locator('.svelte-flow__edge')).toHaveCount(3);
+});
+
 test('the keyboard moves a picked card and removes a picked cable', async ({ page }) => {
   const before = await middle(card(page, 'web'));
   await card(page, 'web').focus();
@@ -124,4 +145,55 @@ test('Arrange places every card, and zoomed out a card shows its short form', as
     await expect(card(page, 'orders').locator('.glance')).toBeVisible({ timeout: 300 });
   }).toPass();
   await expect(card(page, 'orders').locator('.body')).toHaveCount(0);
+});
+
+const view = (page: Page) => page.locator('.svelte-flow__viewport').evaluate(el => getComputedStyle(el).transform);
+const centre = (of: Locator) =>
+  of.evaluate(el => {
+    const box = el.getBoundingClientRect();
+    return [box.x + box.width / 2, box.y + box.height / 2];
+  });
+
+test('scrolling moves the board, and only a pinch or Ctrl with the wheel zooms it', async ({ page }) => {
+  const zoom = page.getByTitle('Reset to 100%');
+  const before = { view: await view(page), zoom: await zoom.innerText(), card: await middle(card(page, 'web')) };
+  await page.mouse.move(700, 700);
+  await page.mouse.wheel(60, 90);
+  await expect.poll(() => view(page)).not.toBe(before.view);
+  expect(await zoom.innerText()).toBe(before.zoom);
+  const moved = await middle(card(page, 'web'));
+  expect([Math.round(before.card.x - moved.x), Math.round(before.card.y - moved.y)]).toEqual([60, 90]);
+  await page.keyboard.down('Control');
+  await page.mouse.wheel(0, 200);
+  await page.keyboard.up('Control');
+  await expect(zoom).not.toHaveText(before.zoom);
+});
+
+test('the Select tool picks the cards in a dragged area, and the Hand tool moves the board', async ({ page }) => {
+  await expect(page.getByRole('radio', { name: /^Select/ })).toBeChecked();
+  const web = await middle(card(page, 'web'));
+  const orders = await middle(card(page, 'orders'));
+  await page.mouse.move(web.box.x - 30, web.box.y - 30);
+  await page.mouse.down();
+  await page.mouse.move(orders.box.x + 40, orders.box.y + 60, { steps: 6 });
+  await page.mouse.up();
+  await expect(page.locator('.svelte-flow__node.selected')).toHaveCount(2);
+
+  await page.keyboard.press('h');
+  await expect(page.getByRole('radio', { name: /^Hand/ })).toBeChecked();
+  const before = await view(page);
+  await page.mouse.move(web.box.x - 30, web.box.y - 30);
+  await page.mouse.down();
+  await page.mouse.move(web.box.x + 50, web.box.y + 20, { steps: 6 });
+  await page.mouse.up();
+  expect(await view(page)).not.toBe(before);
+  await page.keyboard.press('v');
+  await expect(page.getByRole('radio', { name: /^Select/ })).toBeChecked();
+});
+
+test("a lone cable's plug sits in the middle of its port's ring", async ({ page }) => {
+  const plug = await centre(page.locator('.ends .plug[data-cable="web>orders"]'));
+  const ring = await centre(card(page, 'web').locator('.port.right'));
+  expect(Math.abs((plug[0] ?? 0) - (ring[0] ?? 9))).toBeLessThan(0.6);
+  expect(Math.abs((plug[1] ?? 0) - (ring[1] ?? 9))).toBeLessThan(0.6);
 });
