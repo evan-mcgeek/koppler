@@ -38,7 +38,7 @@
   "scripts": {
     "test": "npm run build && vitest run && node --test --test-concurrency=1 test/*.test.mjs",
     "test:canvas": "npm run build && playwright test",
-    "start": "node src/koppler.mjs canvas",
+    "start": "node scripts/koppler-dev.mjs canvas",
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
