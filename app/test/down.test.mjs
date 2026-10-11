@@ -15,8 +15,8 @@ git('init', '-q', '-b', 'develop'); git('config', 'user.email', 't@t'); git('con
 fs.writeFileSync(path.join(repo, 'Startup.cs'), 'validate = true;\n');
 fs.writeFileSync(path.join(repo, 'Properties/launchSettings.json'), JSON.stringify({ profiles: { QA: { environmentVariables: { A: '1' } } } }, null, 2) + '\n');
 git('add', '.'); git('commit', '-qm', 'one'); git('branch', 'feature/x');
-fs.writeFileSync(path.join(dir, 'registry.js'), `window.REGISTRY = ${JSON.stringify({ envs: ['qa'], apps: { api: { name: 'API' } } })};`);
-fs.writeFileSync(path.join(dir, 'local.js'), `window.LOCAL = ${JSON.stringify({ apps: { api: { path: repo } } })};`);
+fs.writeFileSync(path.join(dir, 'registry.json'), JSON.stringify({ envs: ['qa'], apps: { api: { name: 'API' } } }));
+fs.writeFileSync(path.join(dir, 'local.json'), JSON.stringify({ apps: { api: { path: repo } } }));
 
 // The run: branch switched over a set-aside change, then an edit, a new launch profile and an env file, all logged.
 fs.writeFileSync(path.join(repo, 'mine.txt'), 'my work\n');
@@ -59,7 +59,7 @@ console.log('down tests ok');
   const e = { ...process.env, KOPPLER_STATE: d, KOPPLER_TEMP: d, KOPPLER_CONFIG_DIR: d };
   const before = "const re = /^a$/; const s = x.replace(re, '$&-$\\'');", after = 'const re = null;';
   fs.writeFileSync(file, `// top\n${after}\n// bottom\n`);
-  fs.writeFileSync(path.join(d, 'registry.js'), `window.REGISTRY = ${JSON.stringify({ envs: ['qa'], apps: { api: { name: 'API' } } })};`);
+  fs.writeFileSync(path.join(d, 'registry.json'), JSON.stringify({ envs: ['qa'], apps: { api: { name: 'API' } } }));
   fs.writeFileSync(path.join(d, 'actions.json'), JSON.stringify([{ kind: 'edit', app: 'api', file, before, after }]));
   const out = spawnSync('node', [path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'dist', 'koppler.mjs'), 'down'], { encoding: 'utf8', env: e });
   assert.equal(out.status, 0, out.stdout + out.stderr);
@@ -83,8 +83,8 @@ console.log('down tests ok');
   fs.writeFileSync(path.join(app, '.gitignore'), '.env.local\npubspec_overrides.yaml\n');
   fs.writeFileSync(path.join(app, 'package.json'), '{"name":"app"}\n');
   g('add', '.'); g('commit', '-qm', 'one'); g('branch', 'feature/x');
-  fs.writeFileSync(path.join(d, 'registry.js'), `window.REGISTRY = ${JSON.stringify({ envs: ['qa'], apps: { app: { name: 'App' } } })};`);
-  fs.writeFileSync(path.join(d, 'local.js'), `window.LOCAL = ${JSON.stringify({ apps: { app: { path: app } } })};`);
+  fs.writeFileSync(path.join(d, 'registry.json'), JSON.stringify({ envs: ['qa'], apps: { app: { name: 'App' } } }));
+  fs.writeFileSync(path.join(d, 'local.json'), JSON.stringify({ apps: { app: { path: app } } }));
   assert.equal(k('switch', 'app', 'feature/x').code, 0);
   const log = JSON.parse(fs.readFileSync(path.join(d, 'actions.json'), 'utf8'));
 

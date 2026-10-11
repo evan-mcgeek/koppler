@@ -28,7 +28,7 @@ assert.deepEqual(strays({ nodes: { api: {} } }, ['api', 'web', 'canvas', 'tunnel
 
 // The commands, end to end in a throwaway folder: plan, applied, a changed board, stop.
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-runs-'));
-fs.writeFileSync(path.join(dir, 'registry.js'), 'window.REGISTRY = { envs: ["qa"], apps: { api: { name: "Orders API" }, web: { name: "Web" }, docs: { name: "Docs", outside: "a library, nothing to run" } } };');
+fs.writeFileSync(path.join(dir, 'registry.json'), JSON.stringify({ envs: ['qa'], apps: { api: { name: 'Orders API' }, web: { name: 'Web' }, docs: { name: 'Docs', outside: 'a library, nothing to run' } } }));
 const env = { ...process.env, KOPPLER_TEMP: dir, KOPPLER_STATE: path.join(dir, 'state') };
 const koppler = (...args) => { const r = spawnSync('node', [path.join(here, '..', 'dist', 'koppler.mjs'), ...args], { encoding: 'utf8', env }); return (r.stdout + r.stderr).trim(); };
 const add = o => fs.appendFileSync(path.join(dir, 'history.jsonl'), JSON.stringify(o) + '\n');

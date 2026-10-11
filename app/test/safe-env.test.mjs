@@ -54,8 +54,8 @@ assert.deepEqual(['NODE_OPTIONS', 'DYLD_LIBRARY_PATH', 'LD_PRELOAD', 'JAVA_TOOL_
   fs.mkdirSync(path.join(dir, 'secrets'));
   fs.writeFileSync(path.join(dir, 'secrets', 'api.env'), 'export DB_URL=db-not-real\nexport API_KEY=key-not-real\n');
   const stack = { envs: ['qa'], apps: { api: { name: 'API', kind: 'other', start: `printf '%s' "\${NODE_OPTIONS:-none}" > ${seen}; printf '%s' "$KOPPLER_SECRET_NAMES" > ${seen}.names; exec sleep 30` } } };
-  fs.writeFileSync(path.join(dir, 'registry.js'), `window.REGISTRY = ${JSON.stringify(stack)};`);
-  fs.writeFileSync(path.join(dir, 'local.js'), `window.LOCAL = ${JSON.stringify({ apps: { api: { path: dir } } })};`);
+  fs.writeFileSync(path.join(dir, 'registry.json'), JSON.stringify(stack));
+  fs.writeFileSync(path.join(dir, 'local.json'), JSON.stringify({ apps: { api: { path: dir } } }));
   allowStack(dir, stack);
   const r = koppler('run', 'api');
   try {

@@ -6,6 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { updateActions } from './actions.mjs';
+import { readData } from "./data.js";
 const git = (repo, ...args) => execFileSync('git', ['-C', repo, ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
 const tryGit = (repo, ...args) => { try {
     return { ok: true, out: git(repo, ...args) };
@@ -96,13 +97,13 @@ export const switchBack = ({ app, logFile }) => safely(app, () => {
         log.splice(i, 1); });
     return { message: `${app}: back on ${was}${note}` };
 });
-export function switchCommand(args, { load, fail, temp }) {
+export function switchCommand(args, { fail, temp }) {
     const [app, to] = args.filter(a => !a.startsWith('--'));
     if (!app)
         fail('usage: koppler switch <app> <branch> [--set-aside | --take-along] | koppler switch <app> --back');
     const logFile = path.join(temp, 'actions.json');
     const r = args.includes('--back') ? switchBack({ app, logFile }) : (() => {
-        const repo = load('local.js', 'LOCAL')?.apps?.[app]?.path ?? fail(`${app} has no clone on this Mac (koppler sync)`);
+        const repo = readData('local')?.apps?.[app]?.path ?? fail(`${app} has no clone on this Mac (koppler sync)`);
         if (!to)
             fail('usage: koppler switch <app> <branch> [--set-aside | --take-along]');
         return switchTo({ app, repo, to, how: args.includes('--set-aside') ? 'set-aside' : args.includes('--take-along') ? 'take-along' : null, logFile });

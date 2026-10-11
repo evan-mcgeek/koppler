@@ -1,5 +1,5 @@
-// Finds your local repos (any git host) and the shared stack config, then copies the stack into temp/registry.js and
-// each app's clone into temp/local.js, for the canvas and scripts.
+// Finds your local repos (any git host) and the shared stack config, then copies the stack into the run folder as registry.json and
+// each app's clone into local.json, for the canvas and the commands.
 // Usage: koppler init [--root <dir>]... [--depth <n>] [--stack <dir>]   first-time scan of every repo, remembered
 //        koppler sync [--stack <dir>] [--rescan]                        before each run (also: node sync.mjs)
 import fs from 'node:fs';
@@ -18,6 +18,7 @@ import { packageOf, librariesFor } from './libraries.mjs';
 import { checkStack as checkLoadedStack } from './checks.mjs';
 import { TEMP } from './paths.ts';
 import { loadsCode } from './safe-env.mjs';
+import { readData, writeData } from './data.ts';
 
 
 const CONFIG_DIR = process.env.KOPPLER_CONFIG_DIR || path.join(os.homedir(), '.config', 'koppler');
@@ -334,7 +335,8 @@ export function removeApp(id, { config = loadConfig() } = {}) {
 }
 
 // Each stack keeps its own board, history, live state, action log and notes; switching puts them away and brings the other's back.
-const PER_STACK = ['state.js', 'history.jsonl', 'live.json', 'actions.json', 'status.json', 'NOTES.md', 'stack.suggestions.json', 'stack.deployed.json'];
+// The board in both its forms: one saved before boards were JSON moves along until it is saved again.
+const PER_STACK = ['state.json', 'state.js', 'history.jsonl', 'live.json', 'actions.json', 'status.json', 'NOTES.md', 'stack.suggestions.json', 'stack.deployed.json'];
 export const stackKey = dir => crypto.createHash('sha1').update(path.resolve(dir)).digest('hex').slice(0, 12);
 export function setStack(config, dir, save = c => writeJson(CONFIG, c)) {
   const from = config.stack;
@@ -390,9 +392,9 @@ export function useStack(dir, { config = loadConfig(), index = readJson(INDEX), 
 // With no stack yet, the canvas still opens: it asks for a name and environments, then for the apps.
 function writeSetup(index) {
   fs.mkdirSync(TEMP, { recursive: true });
-  fs.writeFileSync(path.join(TEMP, 'registry.js'), `window.REGISTRY = ${JSON.stringify({ name: '', envs: ['dev'], apps: {}, setup: true, stacks: knownStacks(index).map(({ dir, path, name, apps, envs, shared, linked }) => ({ dir, path, name, apps, envs, shared, ...(linked && { linked }) })) }, null, 2)};\n`);
-  fs.writeFileSync(path.join(TEMP, 'local.js'), `window.LOCAL = ${JSON.stringify({ roots: index.roots, at: new Date().toISOString(), apps: {} }, null, 2)};\n`);
-  fs.writeFileSync(path.join(TEMP, 'repos.js'), `window.REPOS = ${JSON.stringify({ roots: index.roots.map(tilde), stack: null, repos: candidateRepos(index, { apps: {} }, null) }, null, 2)};\n`);
+  writeData('registry', { name: '', envs: ['dev'], apps: {}, setup: true, stacks: knownStacks(index).map(({ dir, path, name, apps, envs, shared, linked }) => ({ dir, path, name, apps, envs, shared, ...(linked && { linked }) })) });
+  writeData('local', { roots: index.roots, at: new Date().toISOString(), apps: {} });
+  writeData('repos', { roots: index.roots.map(tilde), stack: null, repos: candidateRepos(index, { apps: {} }, null) });
 }
 
 // Copies the stack and resolves each app to a clone from the index; branch and changes are read fresh every time.
@@ -402,7 +404,8 @@ function syncStack(config, index) {
   const errors = validateStack(stack);
   if (errors.length) fail(`${source} is invalid:\n  ${errors.join('\n  ')}`);
   fs.mkdirSync(TEMP, { recursive: true });
-  fs.writeFileSync(path.join(TEMP, 'registry.js'), `// Copied from ${source} by koppler sync. Edit that file, not this one.\nwindow.REGISTRY = ${JSON.stringify({ ...stack, source }, null, 2)};\n`);
+  // A copy of the stack file; `source` says which, and that is the one to edit.
+  writeData('registry', { ...stack, source });
   console.log(`STACK ${stack.name ?? tilde(config.stack)}: ${Object.keys(stack.apps).length} apps from ${tilde(source)}`);
 
   const local = {};
@@ -424,8 +427,8 @@ function syncStack(config, index) {
     local[id] = { path: p, branch: git(p, 'branch', '--show-current') || null, dirty, branches: branchesOf(p), ...(libraries.length && { libraries }) };
     console.log(`OK ${id}: ${tilde(p)} [${local[id].branch ?? 'detached'}]${dirty ? ` dirty=${dirty}` : ''}${paths.length > 1 ? ` (also: ${paths.slice(1).map(tilde).join(', ')})` : ''}`);
   }
-  fs.writeFileSync(path.join(TEMP, 'repos.js'), `window.REPOS = ${JSON.stringify({ roots: index.roots.map(tilde), stack: tilde(config.stack), repos: candidateRepos(index, stack, config.stack) }, null, 2)};\n`);
-  fs.writeFileSync(path.join(TEMP, 'local.js'), `window.LOCAL = ${JSON.stringify({ roots: index.roots, at: new Date().toISOString(), apps: local }, null, 2)};\n`);
+  writeData('repos', { roots: index.roots.map(tilde), stack: tilde(config.stack), repos: candidateRepos(index, stack, config.stack) });
+  writeData('local', { roots: index.roots, at: new Date().toISOString(), apps: local });
 
   // An empty `consumes` means nobody has mapped that app yet, not that it calls nothing: look in every clone.
   const found = missingCalls(stack, (id, hosts) => local[id] ? grepClone(local[id].path, hosts) : []);
@@ -434,7 +437,7 @@ function syncStack(config, index) {
   const known = hostsByApp(stack), { shared } = hostOwners(stack);
   for (const id of Object.keys(stack.apps).filter(id => !stack.apps[id].outside && !known[id]?.size && kinds.of(stack.apps[id]).serves !== false)) console.log(`UNKNOWN ${id}: no deployed address in stack.json, so calls to it cannot be found`);
   for (const [host, ids] of shared) console.log(`SHARED ${host} is used by ${ids.join(' and ')}, so calls to it are not attributed`);
-  fs.writeFileSync(path.join(TEMP, 'registry.js'), `// Copied from ${source} by koppler sync. Edit that file, not this one.\nwindow.REGISTRY = ${JSON.stringify({ ...stack, source, found }, null, 2)};\n`);
+  writeData('registry', { ...stack, source, found });
 }
 
 // What to do with a clone after fetching: fast-forward only a clean branch that is simply behind its upstream.
@@ -448,8 +451,7 @@ export function updateAction({ upstream, dirty, ahead, behind }) {
 // Fetches every clone of the stack (all at once) and fast-forwards the checked-out branch where that loses nothing.
 // Never commits, stashes, discards or switches branches; uncommitted or diverged work is only reported.
 export async function updateClones() {
-  const file = path.join(TEMP, 'local.js');
-  const local = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8').replace(/^window\.LOCAL = /, '').replace(/;\s*$/, '')) : null;
+  const local = readData('local');
   const apps = Object.entries(local?.apps ?? {}).filter(([, a]) => a?.path);
   if (!apps.length) return;
   // No password prompts from a background fetch; a slow remote gives up after a minute.
@@ -470,7 +472,7 @@ export async function updateClones() {
     else if (action === 'diverged') console.log(`BEHIND ${id}: ${a.branch} is ${counts[1]} behind and ${counts[0]} ahead of ${upstream}; not updated (diverged)`);
     a.branches = branchesOf(a.path); a.dirty = dirty;
   }));
-  fs.writeFileSync(file, `window.LOCAL = ${JSON.stringify({ ...local, at: new Date().toISOString() }, null, 2)};\n`);
+  writeData('local', { ...local, at: new Date().toISOString() });
 }
 
 const checkStack = dir => { if (!fs.existsSync(path.join(dir, 'stack.json'))) fail(`no stack.json in ${tilde(dir)}`); };

@@ -2,7 +2,7 @@
 
 One file per stack, in the team's repo, reviewed through PRs.
 It holds facts about the apps, never secret values.
-`koppler sync` validates it (`envs`, and `name` / `kind` / `slug` per app, `consumes` pointing at known apps) and copies it to `<state>/registry.js`.
+`koppler sync` validates it (`envs`, and `name` / `kind` / `slug` per app, `consumes` pointing at known apps) and copies it to `<state>/registry.json`.
 
 ```json
 {

@@ -23,7 +23,7 @@ The log says how to undo things; which runs and Stops happened, and how they end
 
 `koppler history --done` copies the code changes in this log (`edit`, `profile`, `env-file`, `checkout`) into the run's history entry, with secrets masked, so the canvas History shows them as diffs even after a revert. Log each change before calling it.
 
-Also write `<state>/state.js` after every run from the canvas, so a fresh open restores the layout: `window.SAVED_STATE = <data.layout as JSON>;`
+Also write `<state>/state.json` after every run from the canvas, so a fresh open restores the layout: `data.layout`, as JSON
 
 ## Koppler does it
 

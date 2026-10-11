@@ -6,6 +6,7 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import tunnelPlan from './ports.cjs';
 import kp from './plan.cjs';
+import { readData } from "./data.js";
 // "Cache (Valkey)" -> "Valkey cache", "Database" -> "database": what an address leads to, in plain words.
 const friendly = host => { const k = tunnelPlan.tunnelKind({ tunnel: host }); const m = k.match(/^(\w+) \((.+)\)$/); return m ? `${m[2]} ${m[1].toLowerCase()}` : k === 'Tunnel' ? 'private' : k.toLowerCase(); };
 // A secret's condition: "always" or none means it is needed; anything else is only needed in that case.
@@ -68,9 +69,9 @@ export function isDone(check, env = {}) {
     }
     return null;
 }
-export function needs(args, { load, skill, fail, collect = false }) {
-    const registry = load('registry.js', 'REGISTRY') ?? fail('no stack loaded (koppler init)');
-    const local = load('local.js', 'LOCAL')?.apps ?? {};
+export function needs(args, { skill, fail, collect = false }) {
+    const registry = readData('registry') ?? fail('no stack loaded (koppler init)');
+    const local = readData('local')?.apps ?? {};
     const json = args.includes('--json'), envAt = args.indexOf('--env'), offAt = args.indexOf('--no-tunnels');
     // Apps run without their tunnels: no tunnel, and no hosts entry pointing at one.
     const noTunnels = new Set(offAt >= 0 ? (args[offAt + 1] ?? '').split(',').filter(Boolean) : []);
@@ -79,7 +80,7 @@ export function needs(args, { load, skill, fail, collect = false }) {
         fail(`unknown env ${env}; the stack has ${registry.envs.join(', ')}`);
     let ids = args.filter((a, i) => !a.startsWith('--') && (envAt < 0 || i !== envAt + 1) && (offAt < 0 || i !== offAt + 1));
     if (!ids.length)
-        ids = Object.keys(load('state.js', 'SAVED_STATE')?.nodes ?? {});
+        ids = Object.keys(readData('state')?.nodes ?? {});
     for (const id of ids)
         if (!registry.apps[id])
             fail(`${id} is not an app in the stack`);

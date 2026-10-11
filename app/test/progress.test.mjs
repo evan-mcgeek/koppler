@@ -17,9 +17,9 @@ const stack = { envs: ['qa'], apps: {
   web: { name: 'Web', kind: 'other', slug: 'x/web', url: 'http://localhost:5812', start: 'exit 1' },
   app: { name: 'App', kind: 'other', slug: 'x/app', start: 'true' },
 } };
-fs.writeFileSync(path.join(dir, 'registry.js'), `window.REGISTRY = ${JSON.stringify(stack)};`);
+fs.writeFileSync(path.join(dir, 'registry.json'), JSON.stringify(stack));
 allowStack(dir, stack);
-fs.writeFileSync(path.join(dir, 'local.js'), `window.LOCAL = ${JSON.stringify({ apps: { api: { path: path.join(dir, 'repo') }, web: { path: path.join(dir, 'repo') } } })};`);
+fs.writeFileSync(path.join(dir, 'local.json'), JSON.stringify({ apps: { api: { path: path.join(dir, 'repo') }, web: { path: path.join(dir, 'repo') } } }));
 fs.writeFileSync(path.join(dir, 'history.jsonl'), JSON.stringify({ id: 'prog0001', at: new Date().toISOString(), kind: 'run', env: 'qa', mode: 'auto', nodes: { api: { branch: '', run: 'cli' }, web: { branch: '', run: 'cli' }, app: { branch: '', run: 'ide' } }, edges: [], plan: {} }) + '\n');
 
 const r = koppler('up', '--run', 'prog0001');

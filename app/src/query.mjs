@@ -7,6 +7,7 @@ import path from 'node:path';
 import { parse } from './secret-check.mjs';
 import { BIN } from './paths.ts';
 import { clientEnv, findClient } from './safe-env.mjs';
+import { readData } from './data.ts';
 
 const MAX_LINES = 500;
 const reason = text => /password authentication failed|access denied|WRONGPASS/i.test(text) ? 'it refused the user name or password'
@@ -84,10 +85,10 @@ export function clientCall(c, sql) {
   return null;
 }
 
-export async function queryCommand(args, { load, fail }) {
+export async function queryCommand(args, { fail }) {
   const flag = n => { const i = args.indexOf(`--${n}`); return i >= 0 ? args[i + 1] : undefined; };
   const [app, sqlArg] = args.filter((a, i) => !a.startsWith('--') && !['--env', '--secret'].includes(args[i - 1]));
-  const registry = load('registry.js', 'REGISTRY') ?? fail('no stack loaded (koppler init)');
+  const registry = readData('registry') ?? fail('no stack loaded (koppler init)');
   const base = registry.apps[app] ?? fail('usage: koppler query <app> [--env <env>] [--secret <NAME>] "<sql>"');
   const env = flag('env') ?? registry.envs[0];
   if (!registry.envs.includes(env)) fail(`unknown env ${env}; the stack has ${registry.envs.join(', ')}`);

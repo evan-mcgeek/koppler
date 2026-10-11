@@ -62,7 +62,7 @@ While `status-watch.mjs` runs, it also listens on `127.0.0.1` (port 4747 or `KOP
 | Request | What it does |
 |---|---|
 | `GET /s/<token>/` and `/s/<token>/temp/{registry,local,state,status}.js` | serves the standalone canvas; the URL is in `<state>/canvas-url` |
-| `POST /state?token=…` | keeps only known layout fields and writes `<state>/state.js`, which the page loads on open |
+| `POST /state?token=…` | keeps only known layout fields and writes `<state>/state.json`, which the page loads on open |
 | `POST /preset?token=…` | body `{ "url" }`: reads a preset file from an https GitHub link (through the user's `gh` login, else as a public file, 300 KB at most) and returns its presets with only known fields; any other address is refused |
 | `POST /secret?token=…`, `/secret-remove`, `/secret-test` | body `{ app, env, name }` (+ `value` to set): store, remove or test one secret the stack declares for that app and environment; nothing returns a value, and the test answers only `{ ok, message }` |
 | `POST /apps?token=…` | body `{ apps: [{ slug, name?, kind? }] }`: adds clones the user picked to `stack.json` as apps not set up yet (only clones the scan found, never one already there), then reloads the stack |
@@ -70,7 +70,7 @@ While `status-watch.mjs` runs, it also listens on `127.0.0.1` (port 4747 or `KOP
 
 Everything else gets 404, 400 or 413.
 The page learns the address from `status.js` and saves 400 ms after each change. The sidebar says whether the layout is being saved.
-Without the watcher, the layout is saved only when the user sends it (the agent writes `<state>/state.js` from `data.layout`).
+Without the watcher, the layout is saved only when the user sends it (the agent writes `<state>/state.json` from `data.layout`).
 
 ## Mobile app detection
 

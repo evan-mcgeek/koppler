@@ -11,6 +11,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { runs } from './runs.mjs';
 import { readActions, updateActions } from './actions.mjs';
+import { readData } from "./data.js";
 const configDir = () => process.env.KOPPLER_CONFIG_DIR || path.join(os.homedir(), '.config', 'koppler');
 const privateFile = () => path.join(configDir(), 'recipes.json');
 const readJson = (f, fallback) => { try {
@@ -132,8 +133,8 @@ export function markRuns(logFile, ok) {
         (mine.runs ??= {})[id] = { at, ok };
     writeJson(privateFile(), mine);
 }
-export function recipesCommand(cmd, args, { load, fail, temp }) {
-    const registry = load('registry.js', 'REGISTRY') ?? fail('no stack loaded (koppler init)');
+export function recipesCommand(cmd, args, { fail, temp }) {
+    const registry = readData('registry') ?? fail('no stack loaded (koppler init)');
     const logFile = path.join(temp, 'actions.json'), flag = n => { const i = args.indexOf(`--${n}`); return i >= 0 ? args[i + 1] : undefined; };
     const ids = args.filter((a, i) => !a.startsWith('--') && !args[i - 1]?.startsWith('--'));
     const status = r => r.here ? `${r.here.ok ? 'works on my machine' : 'failed here'}, last run ${r.here.at.slice(0, 10)}` : 'not run here yet';
@@ -146,7 +147,7 @@ export function recipesCommand(cmd, args, { load, fail, temp }) {
     if (cmd === 'remember') {
         const app = ids[0] ?? fail('usage: koppler recipes --remember <app> --why "<reason>" [--when always|calls:<app>|env:<env>] [--private]');
         const edit = readJson(logFile, []).filter(a => a.kind === 'edit' && a.app === app && !a.recipe).at(-1);
-        const r = remember({ registry, app, edit: edit && { ...edit, repo: load('local.js', 'LOCAL')?.apps?.[app]?.path }, why: flag('why'), whenText: flag('when'), forcePrivate: args.includes('--private'), anyOs: args.includes('--any-os') });
+        const r = remember({ registry, app, edit: edit && { ...edit, repo: readData('local')?.apps?.[app]?.path }, why: flag('why'), whenText: flag('when'), forcePrivate: args.includes('--private'), anyOs: args.includes('--any-os') });
         if (r.error)
             fail(r.error);
         return console.log(`Remembered for ${app} (${r.scope === 'shared' ? 'in the stack, for the team: commit stack.json' : 'on this Mac only'}); id ${r.id}`);
@@ -155,7 +156,7 @@ export function recipesCommand(cmd, args, { load, fail, temp }) {
     // The board the user sent: its environment and which local apps each app calls.
     const run = [...runs()].reverse().find(r => r.kind === 'run'), env = flag('env') ?? run?.env ?? registry.envs[0];
     const calls = Object.fromEntries(ids.map(a => [a, (run?.edges ?? []).filter(e => e.from === a).map(e => e.to)]));
-    const local = load('local.js', 'LOCAL')?.apps ?? {};
+    const local = readData('local')?.apps ?? {};
     const res = prepare({ registry, apps: ids, env, calls, repoOf: a => local[a]?.path, logFile });
     if (!res.length)
         return console.log('No remembered changes for these apps.');

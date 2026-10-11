@@ -74,11 +74,11 @@ export const test = base.extend<{ stack: Stack; board: object | null; canvas: Ca
       temp = path.join(dir, 'state', 'run'),
       port = await freePort();
     fs.mkdirSync(temp, { recursive: true });
-    const write = (file: string, name: string, value: unknown) => {
-      fs.writeFileSync(path.join(temp, file), `window.${name} = ${JSON.stringify(value)};\n`);
+    const write = (name: string, value: unknown) => {
+      fs.writeFileSync(path.join(temp, `${name}.json`), JSON.stringify(value));
     };
-    write('registry.js', 'REGISTRY', { ...stack, source: path.join(dir, 'stack') });
-    write('local.js', 'LOCAL', {
+    write('registry', { ...stack, source: path.join(dir, 'stack') });
+    write('local', {
       roots: [dir],
       at: new Date().toISOString(),
       apps: Object.fromEntries(
@@ -88,8 +88,8 @@ export const test = base.extend<{ stack: Stack; board: object | null; canvas: Ca
         ]),
       ),
     });
-    write('repos.js', 'REPOS', { roots: [dir], stack: stack.name, repos: [] });
-    if (board) write('state.js', 'SAVED_STATE', board);
+    write('repos', { roots: [dir], stack: stack.name, repos: [] });
+    if (board) write('state', board);
     const env = {
       ...process.env,
       KOPPLER_STATE: path.join(dir, 'state'),

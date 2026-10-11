@@ -2,16 +2,12 @@
 // where each runs locally, its deployed address per environment (from Terraform), and which apps call which.
 // Nothing is written until the user picks what to keep.
 import fs from 'node:fs';
-import path from 'node:path';
-import vm from 'node:vm';
 import { localPorts } from './investigate.mjs';
 import { ENV_TOKEN, draftApp, readRepo, stackEnv } from './deployed.mjs';
 import { grepClone, hostsByApp, missingCalls, urlsInClone, validateStack } from './sync.mjs';
 import kinds from './kinds.cjs';
-import { TEMP } from './paths.ts';
+import { readData } from './data.ts';
 
-const temp = () => process.env.KOPPLER_TEMP || TEMP;
-const load = (file, key) => { try { const sb = { window: {} }; vm.runInNewContext(fs.readFileSync(path.join(temp(), file), 'utf8'), sb); return sb.window[key]; } catch { return null; } };
 const deployedOf = (app, env, first) => env === first ? app.deployedUrl : app.envs?.[env]?.deployedUrl;
 
 // An app whose Terraform cannot tell its address often still writes it in its own code (Swagger servers, pipelines):
@@ -113,7 +109,7 @@ export function applyFindings(stack, findings, ids) {
 
 // The stack in use and its clones, as the canvas and the command see them.
 export function current() {
-  const registry = load('registry.js', 'REGISTRY'), local = load('local.js', 'LOCAL')?.apps ?? {};
+  const registry = readData('registry'), local = readData('local')?.apps ?? {};
   if (!registry?.source) return null;
   const stack = JSON.parse(fs.readFileSync(registry.source, 'utf8'));
   return { source: registry.source, stack, clones: Object.fromEntries(Object.entries(local).filter(([, l]) => l?.path).map(([id, l]) => [id, l.path])) };

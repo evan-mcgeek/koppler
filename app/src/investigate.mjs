@@ -3,20 +3,16 @@
 // Usage: koppler discover
 import fs from 'node:fs';
 import path from 'node:path';
-import vm from 'node:vm';
 import { fileURLToPath } from 'node:url';
 import { hostsByApp } from './sync.mjs';
 import tunnelPlan from './ports.cjs';
 import kinds from './kinds.cjs';
 import { TEMP } from './paths.ts';
+import { readData } from './data.ts';
 
 
 const SKIP = new Set(['node_modules', '.git', 'bin', 'obj', 'build', 'dist', '.dart_tool', 'Pods', 'coverage', '.next', 'vendor', 'target']);
 
-const load = (file, key) => {
-  try { const sandbox = { window: {} }; vm.runInNewContext(fs.readFileSync(path.join(TEMP, file), 'utf8'), sandbox); return sandbox.window[key]; }
-  catch { return null; }
-};
 const read = file => { try { return fs.readFileSync(file, 'utf8'); } catch { return null; } };
 
 // Files up to a few levels deep whose name matches, skipping build output and dependencies.
@@ -100,7 +96,7 @@ export function conflicts(apps) {
 }
 
 export function investigate(_args = [], { afterSync = false } = {}) {
-  const registry = load('registry.js', 'REGISTRY'), local = load('local.js', 'LOCAL')?.apps ?? {};
+  const registry = readData('registry'), local = readData('local')?.apps ?? {};
   if (!registry) { console.error('koppler: no stack loaded (koppler init)'); process.exit(1); }
   kinds.register(registry.kinds);
   const found = registry.found ?? {}, known = hostsByApp(registry);

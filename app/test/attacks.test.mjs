@@ -20,8 +20,8 @@ fs.mkdirSync(bin);
 fs.writeFileSync(path.join(bin, 'cloudflared'), `#!/bin/sh\nprintf '%s\\n' "$@" > "${seen}"\nfor last; do :; done\nexec python3 -m http.server "\${last##*:}" --bind 127.0.0.1\n`, { mode: 0o755 });
 const host = `db.acme.example; touch ${marker} #`;
 const stack = { envs: ['qa'], apps: { api: { name: 'API', kind: 'other', start: `exec python3 -m http.server ${appPort} --bind 127.0.0.1`, url: `http://localhost:${appPort}`, prereqs: [{ tunnel: host, port: tunnelPort }] } } };
-fs.writeFileSync(path.join(dir, 'registry.js'), `window.REGISTRY = ${JSON.stringify(stack)};`);
-fs.writeFileSync(path.join(dir, 'local.js'), `window.LOCAL = ${JSON.stringify({ apps: { api: { path: dir } } })};`);
+fs.writeFileSync(path.join(dir, 'registry.json'), JSON.stringify(stack));
+fs.writeFileSync(path.join(dir, 'local.json'), JSON.stringify({ apps: { api: { path: dir } } }));
 allowStack(dir, stack);
 try {
   const r = koppler('up', 'api');

@@ -1,6 +1,6 @@
 # Preparing local nodes
 
-Facts come from `<state>/registry.js` (`window.REGISTRY`, a copy of the shared `stack.json`; read its `notes`) and `<state>/local.js` (`window.LOCAL.apps`, written by `koppler sync`: clone path, branch, dirty count).
+Facts come from `<state>/registry.json` (a copy of the shared `stack.json`; read its `notes`) and `<state>/local.json` (its `apps`, written by `koppler sync`: clone path, branch, dirty count).
 For an env other than the first, each field in `apps[id].envs.<env>` replaces the top-level one first (lists such as `prereqs` and `secrets` are replaced whole, never merged).
 Work in `LOCAL.apps[id].path`, the user's real clone, never a worktree.
 Every change below is proposed with the exact diff or command and applied only after the user confirms.
