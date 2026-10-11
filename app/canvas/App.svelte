@@ -3,6 +3,8 @@
   import { untrack } from 'svelte';
   import Board from './Board.svelte';
   import Help from './Help.svelte';
+  import Review from './Review.svelte';
+  import { runs } from './run.svelte.ts';
   import Side from './Side.svelte';
   import Toast from './Toast.svelte';
   import { board } from './board.svelte.ts';
@@ -60,6 +62,11 @@
     };
   });
 
+  const keys = (ev: KeyboardEvent) => {
+    if (!(ev.metaKey || ev.ctrlKey) || ev.key !== 'Enter' || !board.nodes.length || runs.review) return;
+    ev.preventDefault();
+    runs.start();
+  };
   const remembered = () => {
     try {
       return localStorage.getItem('koppler-side') !== 'hidden';
@@ -79,6 +86,7 @@
 </script>
 
 <svelte:window
+  onkeydown={keys}
   onpagehide={() => {
     keep(true);
   }}
@@ -105,7 +113,34 @@
   {/if}
   <span class="spacer"></span>
   <Help />
+  {#if board.stack}
+    <button
+      class="stop"
+      type="button"
+      title="Stop what the agent started and revert all temporary code changes"
+      onclick={() => {
+        runs.stop();
+      }}
+    >
+      <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"
+        ><rect x="3" y="3" width="10" height="10" rx="1.5" /></svg
+      >
+      Stop
+    </button>
+    <button
+      class="run"
+      type="button"
+      disabled={!board.nodes.length}
+      title={board.nodes.length
+        ? 'Review what will run, then send it (Cmd or Ctrl + Enter)'
+        : 'Add an app to the board first'}
+      onclick={() => {
+        runs.start();
+      }}>Run</button
+    >
+  {/if}
 </header>
+<Review />
 {#if board.protected}
   <div class="banner" role="alert">
     {board.env.toUpperCase()}: local code runs against real {board.env.toUpperCase()} data and secrets.
@@ -149,6 +184,44 @@
     background: color-mix(in oklab, var(--prod) 14%, var(--panel));
     color: var(--prod);
     font: 600 13px var(--sans);
+  }
+  .stop,
+  .run {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    font: 600 13px var(--sans);
+    cursor: pointer;
+  }
+  .stop {
+    border-color: color-mix(in oklab, var(--prod) 45%, transparent);
+    background: none;
+    color: var(--prod);
+  }
+  .stop:hover {
+    background: color-mix(in oklab, var(--prod) 12%, transparent);
+  }
+  .stop rect {
+    fill: currentColor;
+  }
+  .run {
+    background: var(--cable);
+    color: var(--on-accent);
+  }
+  .run:hover {
+    background: color-mix(in oklab, var(--cable) 85%, var(--ink));
+  }
+  .protected .run {
+    background: var(--prod);
+  }
+  .run:disabled {
+    border-color: var(--line);
+    background: color-mix(in oklab, var(--ink) 8%, transparent);
+    color: var(--muted);
+    cursor: not-allowed;
   }
   .title {
     font-weight: 700;

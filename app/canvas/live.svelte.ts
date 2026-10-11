@@ -1,5 +1,6 @@
 // What is running right now: the status the server puts together every second and a half, and what it says about
 // the cards of the board on screen.
+import type { BoardInput } from '../src/core/plan.ts';
 import { board } from './board.svelte.ts';
 
 export interface Step {
@@ -27,10 +28,19 @@ interface Status {
   apps?: Record<string, AppStatus | undefined>;
   /** Tunnel ports, and whether something listens on each. */
   ports?: Record<string, boolean | undefined>;
-  /** The board that was last run. */
-  live?: { env?: string; nodes?: Record<string, unknown> } | null;
+  /** The board that was last run. Absent when the server cannot tell. */
+  live?: (BoardInput & { env?: string; nodes?: Record<string, unknown> }) | null;
   /** The run Koppler is applying, or last applied. */
   progress?: { env?: string; apps?: string[] };
+  /** What Koppler started and still runs, by name, and the environment each app was started on. */
+  running?: string[];
+  runningEnvs?: Record<string, string | undefined>;
+  /** The last runs, oldest first. */
+  runs?: { state?: string; kind?: string; changes?: { app: string; title: string; file?: string }[] }[];
+  /** Whether an agent session takes what the canvas sends: listening, busy or none. */
+  agent?: { state?: string };
+  /** The credentials each app declares per environment, and whether each is stored. */
+  secrets?: Record<string, Record<string, { name: string; stored?: boolean; when?: string }[] | undefined> | undefined>;
 }
 
 class Live {

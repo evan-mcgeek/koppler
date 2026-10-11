@@ -98,6 +98,8 @@ export interface StackApp {
   outside?: string;
   /** The apps the stack says it calls, and the calls found in its code. */
   calls: string[];
+  /** Only the calls the stack itself records. */
+  known: string[];
   /** Whether anything can call it: it serves, or some app is known to call it. */
   answers: boolean;
   /** Who may start it and, for a mobile app, on what. */
@@ -233,6 +235,23 @@ class Board {
   });
   #leadOf(queue: { pubs: string[]; reads: string[] }): string | undefined {
     return [...queue.pubs, ...queue.reads].find(app => this.#onBoard.has(app));
+  }
+  queueName(id: string): string {
+    return this.#registry?.queues?.[id]?.name ?? id;
+  }
+  /**
+   * An app whose stack entry has no sign-in, tunnel or hosts entry of its own for this environment while the first
+   * environment has one: it would run on another environment's.
+   */
+  borrowsTunnels(id: string): boolean {
+    if (this.env === this.envs[0]) return false;
+    const app = this.#registry?.apps[id];
+    const own = app?.envs?.[this.env]?.prereqs ?? [];
+    const hidden = this.nodes.find(node => node.id === id)?.data.hideTunnels;
+    return (['sso', 'tunnel', 'hosts'] as const).some(
+      kind =>
+        (app?.prereqs ?? []).some(need => need[kind]) && !own.some(need => need[kind]) && !(kind !== 'sso' && hidden),
+    );
   }
   /** An app's queues that the stack describes. */
   queuesOf(id: string): string[] {
@@ -836,6 +855,7 @@ class Board {
       slug: app.slug ?? '',
       cloned: !!clones[id],
       calls: [...new Set([...Object.keys(app.consumes ?? {}), ...Object.keys(stack.found?.[id] ?? {})])],
+      known: Object.keys(app.consumes ?? {}),
       answers:
         kindOf(app).serves ||
         Object.entries(stack.apps).some(
