@@ -17,7 +17,8 @@ import { discardChanges, linkStack, linkedStatus, proposeChanges, updateStack } 
 import { applyFindings, current as currentFindingsStack, discover } from './discover.mjs';
 import { appendAnswer, clearMessages, readMessages } from './messages.mjs';
 import { githubFile, readFile } from './github.mjs';
-import kinds from './kinds.cjs';
+import * as kinds from './core/kinds.ts';
+import * as launch from './core/launch.ts';
 import { recipesFor } from './recipes.mjs';
 import { APP, BIN, LOGS, STATE as STATE_HOME, TEMP } from './paths.ts';
 import { redact } from './scrub.mjs';
@@ -218,7 +219,7 @@ export function sanitizeLayout(input) {
 
 let serving = false;
 const FONTS = fs.readdirSync(path.join(here, 'fonts')).filter(f => /\.(woff2|css)$/.test(f)).map(f => `fonts/${f}`);
-export const PAGE_FILES = { '': 'canvas.html', 'page/ports.js': 'page/ports.js', 'kinds.cjs': 'kinds.cjs', 'page/presets.js': 'page/presets.js', 'page/plan.js': 'page/plan.js', 'page/logfmt.js': 'page/logfmt.js', 'temp/status.js': 'temp/status.js', 'temp/debug.jsonl': 'temp/debug.jsonl', ...Object.fromEntries(FONTS.map(f => [f, f])) };
+export const PAGE_FILES = { '': 'canvas.html', 'page/ports.js': 'page/ports.js', 'page/kinds.js': 'page/kinds.js', 'page/presets.js': 'page/presets.js', 'page/plan.js': 'page/plan.js', 'page/logfmt.js': 'page/logfmt.js', 'temp/status.js': 'temp/status.js', 'temp/debug.jsonl': 'temp/debug.jsonl', ...Object.fromEntries(FONTS.map(f => [f, f])) };
 const PAGE_DATA = { 'temp/registry.js': { name: 'registry', global: 'REGISTRY' }, 'temp/local.js': { name: 'local', global: 'LOCAL' }, 'temp/repos.js': { name: 'repos', global: 'REPOS' }, 'temp/state.js': { name: 'state', global: 'SAVED_STATE' } };
 const CONTENT_TYPES = { html: 'text/html; charset=utf-8', css: 'text/css; charset=utf-8', woff2: 'font/woff2', jsonl: 'text/plain; charset=utf-8' };
 // The page loads and calls nothing but this server, and no other page can frame it or learn its address.
@@ -561,7 +562,7 @@ const leadsHere = name => dns.promises.lookup(name, { all: true }).then(list => 
 const localProfile = (registry, id, env) => {
   try {
     const app = registry.apps[id], file = path.join(readData('local').apps[id].path, app.launchSettings);
-    const profiles = JSON.parse(fs.readFileSync(file, 'utf8').replace(/^\uFEFF/, '')).profiles ?? {}, name = kinds.launchProfile(app, profiles, env).local, profile = profiles[name];
+    const profiles = JSON.parse(fs.readFileSync(file, 'utf8').replace(/^\uFEFF/, '')).profiles ?? {}, name = launch.launchProfile(app, profiles, env).local, profile = profiles[name];
     // When Koppler started the app, to tell a setting written after that. ponytail: the file's time, so any later edit of it asks for a restart
     let started = null; try { started = Date.parse(JSON.parse(fs.readFileSync(path.join(STATE_DIR, 'procs', `${id}.json`), 'utf8')).startedAt); } catch {}
     return profile ? { name, env: profile.environmentVariables ?? {}, changed: fs.statSync(file).mtimeMs, started } : { name, env: null };

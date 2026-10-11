@@ -8,7 +8,7 @@ import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { execFileSync } from 'node:child_process';
-import kinds from './kinds.cjs';
+import * as kinds from './core/kinds.ts';
 import { TEMP } from './paths.ts';
 import { readData } from './data.ts';
 

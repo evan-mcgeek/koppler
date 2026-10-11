@@ -1213,7 +1213,7 @@
 <span class="sr" id="health-live" role="status" aria-live="polite"></span>
 
 <script src="page/ports.js"></script>
-<script src="kinds.cjs"></script>
+<script src="page/kinds.js"></script>
 <script src="page/presets.js"></script>
 <script src="page/plan.js"></script>
 <script src="page/logfmt.js"></script>
@@ -1241,7 +1241,7 @@ const MIN_WORLD = { w: 3000, h: 2000 }, WORLD = { ...MIN_WORLD }, NODE_W = 260, 
 const ZOOM = { min: 0.25, max: 2, step: 1.2 };
 const SIDES = { top: [0, -1], right: [1, 0], bottom: [0, 1], left: [-1, 0] };
 const OPPOSITE = { top: 'bottom', bottom: 'top', left: 'right', right: 'left' };
-// What each kind of app offers on its card (kinds.cjs): where it runs, and a platform for mobile apps.
+// What each kind of app offers on its card (core/kinds): where it runs, and a platform for mobile apps.
 const kindOf = id => KopplerKinds.of(registry.apps[id]);
 const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), Math.max(lo, hi));
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));

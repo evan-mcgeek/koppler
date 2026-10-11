@@ -8,7 +8,7 @@ import os from 'node:os';
 import { execFile, execFileSync } from 'node:child_process';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import kinds from './kinds.cjs';
+import * as kinds from './core/kinds.ts';
 import * as presets from './core/presets.ts';
 import { TYPES as SECRET_TYPES } from './secret-check.mjs';
 import * as kp from './core/plan.ts';

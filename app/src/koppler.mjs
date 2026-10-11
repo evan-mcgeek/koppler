@@ -20,7 +20,10 @@ import { investigate, repoFiles } from './investigate.mjs';
 import { deployed } from './deployed.mjs';
 import { appliedCommand as applied, historyCommand, planCommand, runningNames, appendRun, runRecord, runs as runHistory } from './runs.mjs';
 import * as tunnelPlan from './core/ports.ts';
-import kinds from './kinds.cjs';
+import * as addresses from './core/addresses.ts';
+import * as frameworks from './core/frameworks.ts';
+import * as kinds from './core/kinds.ts';
+import * as launch from './core/launch.ts';
 import { needs as needsFor } from './needs.mjs';
 import { APPROVE, approved, missingTunnels, startsFromStack } from './checks.mjs';
 import { APP, BIN, LOGS, STATE, TEMP } from './paths.ts';
@@ -168,7 +171,7 @@ const profilesOf = (app, repo) => app.kind === 'dotnet' && app.launchSettings &&
 function httpUrlOf(app, repo, env) {
   if (app.kind !== 'dotnet' || !app.launchSettings) return null;
   const profiles = profilesOf(app, repo);
-  const profile = profiles[kinds.launchProfile(app, profiles, env).name] ?? {};
+  const profile = profiles[launch.launchProfile(app, profiles, env).name] ?? {};
   return String(profile.applicationUrl ?? '').split(';').find(u => u.startsWith('http://')) ?? null;
 }
 
@@ -178,7 +181,7 @@ function secretTest(store, secret) {
   catch (e) { return { code: e.status ?? 1, message: String(e.stdout ?? '').trim() || 'failed: the check did not finish' }; }
 }
 
-// How to start a stack app by id, for its kind (kinds.cjs), in the chosen environment.
+// How to start a stack app by id, for its kind (core/launch), in the chosen environment.
 function appCommand(id, opts) {
   const registry = readData('registry');
   const base = registry?.apps?.[id];
@@ -199,7 +202,7 @@ function appCommand(id, opts) {
   if (app.kind === 'flutter') ctx.device = resolveDevice(opts.device, app);
   else { ctx.files = repoFiles(repo); if (['ios', 'android'].includes(opts.device)) ctx.platform = opts.device; }
   if (opts.lan) { ctx.lan = true; ctx.httpPort = Number(new URL(httpUrlOf(app, repo, env) ?? 'http://x').port) || null; }
-  const start = kinds.startCommand(app, ctx);
+  const start = launch.startCommand(app, ctx);
   if (start.error) fail(`${id}: ${start.error}; or run any command: koppler run ${id} -- <command>`);
   // Each environment after the first has its own secret store, so a PROD value never replaces or leaks into another environment's.
   const store = env === registry.envs[0] ? id : `${id}@${env}`;
@@ -648,19 +651,19 @@ function wireInfo(registry, local, from, to, env, deviceFlag) {
   if (!call) return { error: `${from} does not call ${to} as far as the stack knows (koppler sync finds unrecorded calls)` };
   const device = kinds.of(caller).platforms ? resolveDevice(deviceFlag, caller) : null;
   const httpUrl = device?.physical && local[to] ? httpUrlOf(callee, local[to].path, env) : null;
-  const address = kinds.localAddress(callee, device, { lanIp: device?.physical ? lanIp() : null, httpUrl, like: call.deployed });
+  const address = addresses.localAddress(callee, device, { lanIp: device?.physical ? lanIp() : null, httpUrl, like: call.deployed });
   if (address.error) return { error: `${from} -> ${to}: ${address.error}` };
   // A stack may pin an address per simulator or emulator; a phone always gets the computed one.
   const pinned = call.value && typeof call.value === 'object' && !device?.physical ? call.value[device?.platform] : typeof call.value === 'string' ? call.value : null;
   const value = pinned ?? address.url;
   // A browser front end also needs the API to allow its origin (CORS), and no https page calling an http API.
-  const callerUrl = caller.url ?? (kinds.of(caller).browser && local[from] ? `http://localhost:${kinds.frameworkOf(readJsonFile(path.join(local[from].path, 'package.json')))?.port ?? 3000}` : null);
+  const callerUrl = caller.url ?? (kinds.of(caller).browser && local[from] ? `http://localhost:${frameworks.frameworkOf(readJsonFile(path.join(local[from].path, 'package.json')))?.port ?? 3000}` : null);
   const slot = Object.entries(registry.apps).filter(([, a]) => kinds.of(a).browser && a.consumes?.[to]).map(([id]) => id).sort().indexOf(from);
-  const browser = kinds.of(caller).browser ? kinds.browserChecks(caller, callee, callerUrl, Math.max(slot, 0)) : { settings: [], warnings: [] };
+  const browser = kinds.of(caller).browser ? addresses.browserChecks(callee, callerUrl, Math.max(slot, 0)) : { settings: [], warnings: [] };
   const result = { from, to, how: call.how, device: device ? `${device.name} (${device.physical ? 'phone' : device.platform === 'ios' ? 'iOS simulator' : 'Android emulator'})` : null,
-    ...(call.how === 'env' ? { env: call.env, profile: kinds.launchProfile(caller, profilesOf(caller, local[from]?.path), env).local } : {}), ...(call.file ? { file: call.file, key: call.key } : {}),
-    ...(call.how === 'env-file' ? kinds.envFileChange(call, value) : {}),
-    value, needsLan: address.needsLan, found: call.found, cors: browser.settings.map(c => ({ ...c, profile: kinds.launchProfile(callee, profilesOf(callee, local[to]?.path), env).local })), warnings: browser.warnings,
+    ...(call.how === 'env' ? { env: call.env, profile: launch.launchProfile(caller, profilesOf(caller, local[from]?.path), env).local } : {}), ...(call.file ? { file: call.file, key: call.key } : {}),
+    ...(call.how === 'env-file' ? addresses.envFileChange(call, value) : {}),
+    value, needsLan: address.needsLan, found: call.found, cors: browser.settings.map(c => ({ ...c, profile: launch.launchProfile(callee, profilesOf(callee, local[to]?.path), env).local })), warnings: browser.warnings,
     note: [address.note, call.note].filter(Boolean).join(' ') || undefined, call };
   return result;
 }

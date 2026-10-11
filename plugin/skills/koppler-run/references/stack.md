@@ -122,7 +122,7 @@ Callers post to `url` plus a route, as they post to API Gateway when deployed.
 A callee whose address lives inside that secret is repointed by writing `{ "set": { "<key>": "http://host.docker.internal:<port>/" } }` to `<state>/lambda-<app id>.json` before the start (the function runs in Docker, where `localhost` is not the Mac); log it as an `env-file` action.
 
 When a recipe cannot tell how the app starts (several Go commands, a Python repo with no known framework, plain Maven), `koppler run` says so and asks for `start`.
-The port in the app's `url` wins over the usual one. The recipes live in `kinds.cjs` (`RECIPES`); only .NET, Flutter, Node and the web frameworks have been run for real so far.
+The port in the app's `url` wins over the usual one. The recipes live in the app's `core/kinds`; only .NET, Flutter, Node and the web frameworks have been run for real so far.
 
 ## Adding apps
 
