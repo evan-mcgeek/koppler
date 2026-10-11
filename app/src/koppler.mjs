@@ -7,7 +7,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { init as initStack, removeApp, stacksCommand, sync, updateClones, useCommand } from './engine/sync.ts';
 import { discardChanges, linkStack, linkedStatus, proposeChanges, updateStack } from './engine/linked.ts';
-import { discoverCommand } from './discover.mjs';
+import { discoverCommand } from './engine/discover.ts';
 import { sayCommand } from './engine/messages.ts';
 import { switchCommand } from './engine/branch.ts';
 import { down } from './engine/down.ts';

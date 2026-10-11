@@ -14,7 +14,7 @@ import { execFile, spawn } from 'node:child_process';
 import { appendRun, live, runRecord, runningEnvs, runningNames, runs } from './engine/runs.ts';
 import { addApps, removeApp, createStack, currentStack, forgetStacks, stacksHere, useStack } from './engine/sync.ts';
 import { discardChanges, linkStack, linkedStatus, proposeChanges, updateStack } from './engine/linked.ts';
-import { applyFindings, current as currentFindingsStack, discover } from './discover.mjs';
+import { applyFindings, current as currentFindingsStack, discover } from './engine/discover.ts';
 import { appendAnswer, clearMessages, readMessages } from './engine/messages.ts';
 import { githubFile, readFile } from './github.ts';
 import * as kinds from './core/kinds.ts';
