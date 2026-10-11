@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { clientCall, readOnlySql } from '../dist/query.mjs';
+import { clientCall, readOnlySql } from '../dist/engine/query.js';
 
 const ok = (sql, type = 'postgres') => assert.equal(readOnlySql(sql, type).error, undefined, `${sql} should pass: ${readOnlySql(sql, type).error}`);
 const no = (sql, type, why) => assert.match(readOnlySql(sql, type).error ?? 'passed', why, sql);

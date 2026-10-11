@@ -25,9 +25,9 @@ export default tseslint.config(
       'no-unused-vars': ['error', { ignoreRestSiblings: true, caughtErrors: 'none', argsIgnorePattern: '^_' }],
     },
   },
-  ...tseslint.configs.strictTypeChecked.map(config => ({ ...config, files: ['**/*.ts'] })),
+  ...tseslint.configs.strictTypeChecked.map(config => ({ ...config, files: ['**/*.{ts,mts}'] })),
   {
-    files: ['**/*.ts'],
+    files: ['**/*.{ts,mts}'],
     languageOptions: { parserOptions: { projectService: true, tsconfigRootDir: import.meta.dirname } },
     // `({ dropped, ...kept }) => kept` is how a property is left out.
     rules: { '@typescript-eslint/no-unused-vars': ['error', { ignoreRestSiblings: true }] },
