@@ -20,7 +20,7 @@
   const viewport = useViewport();
   const FIT = { padding: 0.15, duration: 200 };
   // Not the library's zoomIn and zoomOut: taken here, before its board exists, they stay tied to an empty one.
-  const zoomBy = (factor: number) => void flow.setZoom(flow.getZoom() * factor, { duration: 150 });
+  const zoomBy = (factor: number) => () => void flow.setZoom(flow.getZoom() * factor, { duration: 150 });
 
   const draft = $derived.by(() => {
     const drawn = board.draft;
@@ -55,11 +55,11 @@
       <button title="Zoom to fit all apps" onclick={() => void flow.fitView(FIT)}>Fit</button>
       <span class="sep" aria-hidden="true"></span>
       <div class="zoom" role="group" aria-label="Zoom">
-        <button aria-label="Zoom out" onclick={() => zoomBy(1 / 1.2)}>−</button>
+        <button aria-label="Zoom out" onclick={zoomBy(1 / 1.2)}>−</button>
         <button title="Reset to 100%" onclick={() => void flow.setZoom(1, { duration: 200 })}>
           {Math.round(viewport.current.zoom * 100)}%
         </button>
-        <button aria-label="Zoom in" onclick={() => zoomBy(1.2)}>+</button>
+        <button aria-label="Zoom in" onclick={zoomBy(1.2)}>+</button>
       </div>
     </div>
   </Panel>
