@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { fromKoppler } from '../dist/status-watch.mjs';
+import { fromKoppler } from '../dist/server/mobile.js';
 import { cableTest } from '../dist/server/cable-test.js';
 import { declaredSecrets } from '../dist/server/secrets.js';
 import { githubFile } from '../dist/github.js';

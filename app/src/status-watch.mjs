@@ -4,21 +4,19 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import http from 'node:http';
-import net from 'node:net';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFile, spawn } from 'node:child_process';
-import { appendRun, live, runRecord, runningEnvs, runningNames, runs } from './engine/runs.ts';
-import { addApps, removeApp, createStack, currentStack, forgetStacks, stacksHere, useStack } from './engine/sync.ts';
-import { discardChanges, linkStack, linkedStatus, proposeChanges, updateStack } from './engine/linked.ts';
+import { appendRun, runRecord } from './engine/runs.ts';
+import { addApps, removeApp, createStack, currentStack, forgetStacks, useStack } from './engine/sync.ts';
+import { discardChanges, linkStack, proposeChanges, updateStack } from './engine/linked.ts';
 import { applyFindings, current as currentFindingsStack, discover } from './engine/discover.ts';
 import { appendAnswer, clearMessages, readMessages } from './engine/messages.ts';
 import { fetchPresets, sanitizeLayout, sanitizePrompt } from './server/sanitize.ts';
 import { appendDebugLog, clearDebugLog, tail } from './server/logs.ts';
 import { cableTest } from './server/cable-test.ts';
-import { secretRequest, secretsStatus } from './server/secrets.ts';
-import * as kinds from './core/kinds.ts';
-import { recipesFor } from './engine/recipes.ts';
+import { secretRequest } from './server/secrets.ts';
+import { publish, SOURCE } from './server/status.ts';
 import { LOGS, STATE as STATE_HOME, TEMP } from './paths.ts';
 import { redact } from './scrub.ts';
 import { listenerPid } from './engine/listen.ts';
@@ -26,94 +24,12 @@ import { readData, writeData } from './data.ts';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
-const SOURCE = path.join(TEMP, 'status.json');
-const OUT = path.join(TEMP, 'status.js');
 const PROMPTS = path.join(TEMP, 'prompts.jsonl');
 const MAX_STATE_BYTES = 256 * 1024;
 const STATE_DIR = STATE_HOME;
 export const LOG_DIR = LOGS;
 const PORT = Number(process.env.KOPPLER_PORT) || 4747;
-const codeVersion = () => { try { return Math.max(...fs.readdirSync(here).filter(f => /\.m?js$/.test(f) && !f.includes('.test.')).map(f => fs.statSync(path.join(here, f)).mtimeMs)); } catch { return 0; } };
-const STARTED_CODE = codeVersion();
-const STARTED_AT = new Date().toISOString();
-// Run from its source folder rather than an installed plugin: Koppler itself is being worked on, so the debug log stays on.
-const DEV = !fs.realpathSync(here).split(path.sep).join('/').includes('/plugins/cache/');
-const INTERVAL_MS = 1500, MOBILE_INTERVAL_MS = 5000;
-
-const portOpen = port => new Promise(resolve => {
-  const socket = net.connect({ host: '127.0.0.1', port, timeout: 400 });
-  const done = open => { socket.destroy(); resolve(open); };
-  socket.once('connect', () => done(true));
-  socket.once('timeout', () => done(false));
-  socket.once('error', () => done(false));
-});
-
-const run = (cmd, args) => new Promise(resolve =>
-  execFile(cmd, args, { timeout: 4000, maxBuffer: 4 * 1024 * 1024 }, (err, stdout) => resolve(err ? '' : stdout)));
-
-// The mobile app has no port: find its process on booted iOS simulators and connected Android devices.
-export async function findMobileApp({ iosBundleId, androidPackage }) {
-  const found = [];
-  if (iosBundleId) {
-    let booted = [];
-    try { booted = Object.values(JSON.parse(await run('xcrun', ['simctl', 'list', 'devices', 'booted', '-j'])).devices).flat(); } catch {}
-    for (const sim of booted) {
-      const line = (await run('xcrun', ['simctl', 'spawn', sim.udid, 'launchctl', 'list']))
-        .split('\n').find(l => l.includes(`UIKitApplication:${iosBundleId}[`));
-      const pid = Number(line?.split(/\s+/)[0]);
-      if (pid > 0) found.push({ platform: 'ios', device: sim.name, deviceId: sim.udid, pid });
-    }
-  }
-  if (androidPackage) {
-    const serials = (await run('adb', ['devices'])).split('\n').slice(1).map(l => l.split('\t')).filter(([, st]) => st?.trim() === 'device').map(([id]) => id);
-    for (const serial of serials) {
-      const pid = Number((await run('adb', ['-s', serial, 'shell', 'pidof', androidPackage])).trim().split(/\s+/)[0]);
-      if (pid > 0) found.push({ platform: 'android', device: (await run('adb', ['-s', serial, 'shell', 'getprop', 'ro.product.model'])).trim() || serial, deviceId: serial, pid });
-    }
-  }
-  const runs = (await run('ps', ['-Ao', 'command='])).split('\n').filter(l => l.includes('flutter_tools') && / run( |$)/.test(l));
-  for (const app of found) {
-    const r = runs.find(l => l.includes(app.deviceId)) || (runs.length === 1 ? runs[0] : null);
-    if (!r) continue;
-    app.flavor = r.match(/--flavor[= ](\S+)/)?.[1] ?? null;
-    app.source = r.includes('--machine') ? 'ide' : 'cli';
-  }
-  return found;
-}
-
-let mobileApps = {}, mobileCheckedAt = 0;
-function loadMobileConfig() {
-  return Object.fromEntries(Object.entries(readData('registry')?.apps ?? {}).filter(([, a]) => a.mobile).map(([id, a]) => [id, a.mobile]));
-}
-// An app Koppler launched keeps no `flutter run` attached, so its flavor and device come from Koppler's own record of the start.
-export function fromKoppler(id, found, record = (() => { try { return JSON.parse(fs.readFileSync(path.join(STATE_DIR, 'procs', `${id}.json`), 'utf8')); } catch { return null; } })()) {
-  const command = String(record?.command ?? '');
-  return found.map(app => app.flavor || !command.includes(app.deviceId) ? app : { ...app, flavor: command.match(/--flavor[= ](\S+)/)?.[1] ?? null, source: 'cli' });
-}
-let mobileState = {};
-async function refreshMobile(ids) {
-  if (Date.now() - mobileCheckedAt < MOBILE_INTERVAL_MS) return;
-  mobileCheckedAt = Date.now();
-  mobileApps = loadMobileConfig();
-  for (const id of ids) if (mobileApps[id]) mobileState[id] = fromKoppler(id, await findMobileApp(mobileApps[id]));
-  followIdeLogs();
-}
-// A mobile app on the applied board that runs from the IDE: Koppler follows its output with `flutter logs` on that device,
-// so its card shows the app's own log instead of an older run's. Started once per device; Stop and revert stops it too.
-const following = new Map();
-function followIdeLogs() {
-  const reg = loadRegistry(), board = live()?.nodes ?? {}, running = runningNames();
-  const local = readData('local')?.apps ?? {};
-  for (const [id, found] of Object.entries(mobileState)) {
-    const ide = found.find(a => a.source === 'ide'), repo = local[id]?.path;
-    if (!ide || !board[id] || !repo || running.includes(id) || following.get(id) === ide.deviceId) continue;
-    following.set(id, ide.deviceId);
-    const flutter = reg?.apps?.[id]?.flutter?.fvm ? ['fvm', 'flutter'] : ['flutter'];
-    execFile(process.execPath, [path.join(here, 'koppler.mjs'), 'run', id, '--cwd', repo, '--restart', '--', ...flutter, 'logs', '-d', ide.deviceId], { timeout: 30000 }, () => {});
-  }
-}
-
-const writeAtomic = (file, body) => { fs.writeFileSync(file + '.tmp', body, { mode: 0o600 }); fs.renameSync(file + '.tmp', file); };
+const INTERVAL_MS = 1500;
 
 let serving = false;
 const FONTS = fs.readdirSync(path.join(here, 'fonts')).filter(f => /\.(woff2|css)$/.test(f)).map(f => `fonts/${f}`);
@@ -373,100 +289,15 @@ const loadRegistry = () => readData('registry');
 // Tests of the same tunnel wait for each other.
 const tunnelLanes = new Map();
 
-// Every tunnel port in the stack, so cards can show whether their database or cache is reachable.
-function tunnelPorts() {
-  try {
-    const apps = Object.values(readData('registry').apps);
-    const declared = apps.flatMap(a => [...(a.prereqs ?? []), ...Object.values(a.envs ?? {}).flatMap(e => e.prereqs ?? [])]).filter(p => p.tunnel && Number.isInteger(p.port) && p.port > 0 && p.port < 65536).map(p => p.port);
-    // Tunnels koppler moved to another port are checked there too.
-    let running = [];
-    try { running = fs.readdirSync(path.join(STATE_DIR, 'procs')).map(f => { try { return JSON.parse(fs.readFileSync(path.join(STATE_DIR, 'procs', f), 'utf8')).port; } catch { return null; } }).filter(Boolean); } catch {}
-    return [...new Set([...declared, ...running])];
-  } catch { return []; }
-}
-
-async function snapshot() {
-  let status;
-  try { status = JSON.parse(fs.readFileSync(SOURCE, 'utf8')); } catch { status = { apps: {} }; }
-  // An app Koppler started itself (koppler up) has a card too, even when no agent wrote a status for it.
-  status.apps ||= {};
-  for (const name of runningNames()) {
-    if (status.apps[name] || name === 'canvas' || name.startsWith('tunnel-')) continue;
-    try { const rec = JSON.parse(fs.readFileSync(path.join(STATE_DIR, 'procs', `${name}.json`), 'utf8')); status.apps[name] = { ...(rec.port && { port: rec.port }), log: rec.log }; } catch {}
-  }
-  // The steps of the run Koppler applies itself (koppler up), for cards the agent wrote no checklist for.
-  try {
-    const progress = JSON.parse(fs.readFileSync(path.join(TEMP, 'progress.json'), 'utf8'));
-    if (/^[a-z0-9]{6,40}$/.test(progress.run ?? '')) status.progress = { run: progress.run, env: String(progress.env ?? '').slice(0, 16), apps: Object.keys(progress.apps ?? {}).filter(id => /^[a-z0-9-]{1,64}$/.test(id)) };
-    if (/^[a-z0-9]{6,40}$/.test(progress.run ?? '')) for (const [id, steps] of Object.entries(progress.apps ?? {})) {
-      if (!/^[a-z0-9-]{1,64}$/.test(id) || !Array.isArray(steps)) continue;
-      const app = status.apps[id] ||= {};
-      if (!app.steps?.length) app.steps = steps.slice(0, 12).map(x => ({ label: String(x.label).slice(0, 60), state: ['done', 'failed', 'user', 'todo'].includes(x.state) ? x.state : 'todo', ...(x.detail && { detail: String(x.detail).slice(0, 300) }) }));
-    }
-  } catch {}
-  // A mobile app on the applied board is looked for on the simulators and devices too, even when started from the IDE.
-  { const reg = loadRegistry(); for (const id of Object.keys(live()?.nodes ?? {})) if (!status.apps[id] && reg?.apps?.[id] && kinds.of(reg.apps[id]).platforms) status.apps[id] = {}; }
-  await refreshMobile(Object.keys(status.apps || {}));
-  for (const [id, app] of Object.entries(status.apps || {})) {
-    if (app.port) app.listening = await portOpen(app.port);
-    if (mobileState[id]) app.running = mobileState[id];
-    app.logTail = tail(app.log || path.join(LOG_DIR, `${id}.log`));
-    delete app.log;
-  }
-  status.ports = Object.fromEntries(await Promise.all(tunnelPorts().map(async port => [port, await portOpen(port)])));
-  status.secrets = await secretsStatus().catch(() => ({}));
-  // Remembered code changes per app, with how each did on this Mac; the review lists the ones a Send applies.
-  try {
-    const reg = loadRegistry();
-    status.recipes = Object.fromEntries(Object.keys(reg?.apps ?? {}).map(id => [id, recipesFor(reg, id).filter(r => !r.os || r.os === 'any' || r.os === process.platform)
-      .map(r => ({ id: r.id, why: String(r.why).slice(0, 200), file: String(r.file).slice(0, 200), when: r.when, scope: r.scope, ...(r.here && { here: { ok: !!r.here.ok, at: String(r.here.at).slice(0, 10) } }) }))]).filter(([, l]) => l.length));
-  } catch { status.recipes = {}; }
-  status.stack = currentStack();
-  // What the stack needs on this Mac, as `koppler doctor` last found it.
-  try { status.checks = JSON.parse(fs.readFileSync(path.join(TEMP, 'checks.json'), 'utf8')).results.slice(0, 80).map(r => ({ name: String(r.name).slice(0, 80), state: String(r.state).slice(0, 16), detail: redact(String(r.detail ?? '')).slice(0, 400), ...(Array.isArray(r.for) && { for: r.for.slice(0, 10).map(x => String(x).slice(0, 80)) }), ...(r.state === 'gap' && { app: String(r.app).slice(0, 64), env: String(r.env).slice(0, 16), kind: String(r.kind).slice(0, 16) }) })); } catch { status.checks = null; }
-  status.stacks = stacksHere();
-  status.linked = status.stack ? linkedStatus(status.stack) : null;
-  status.live = live();
-  status.messages = readMessages();
-  // Whether an agent session takes Sends: listening now, working on one it took (for up to two hours), or none.
-  status.agent = (() => {
-    let l; try { l = JSON.parse(fs.readFileSync(path.join(TEMP, 'listener.json'), 'utf8')); } catch { return { state: 'none' }; }
-    if (l.pid) return listenerPid(l) ? { state: 'listening', since: l.since } : { state: 'none' };
-    // Working on what it took, until it marks a run done or failed after that: then it has finished and is not listening.
-    const ended = Math.max(0, ...runs().map(r => Date.parse(r.endedAt ?? '') || 0));
-    return l.busy && Date.parse(l.busy) > ended && Date.now() - Date.parse(l.busy) < 2 * 3600 * 1000 ? { state: 'busy', since: l.since, busy: l.busy } : { state: 'none' };
-  })();
-  // Sends, Stops and answers no session has taken yet.
-  try { status.queued = fs.readFileSync(PROMPTS, 'utf8').split('\n').filter(Boolean).length; } catch { status.queued = 0; }
-  status.running = runningNames();
-  status.runningEnvs = runningEnvs();
-  status.runs = runs().slice(-20).map(({ nodes, edges, ...r }) => ({ ...r, nodes, edges }));
-  status.at = new Date().toISOString();
-  // The page works out the server's addresses from its own, so the token is in no file but its own.
-  if (serving) status.server = true;
-  try { status.pageVersion = fs.statSync(path.join(here, 'canvas.html')).mtimeMs; } catch {}
-  // The page reloads itself; the server's own code only takes effect after a restart.
-  status.startedAt = STARTED_AT;
-  if (DEV) status.dev = true;
-  status.start = 'koppler canvas';
-  if (codeVersion() > STARTED_CODE) status.restart = `koppler stop canvas && ${status.start}`;
-  return status;
-}
-
-async function publish() {
-  const body = `window.__kopplerStatus && window.__kopplerStatus(${JSON.stringify(await snapshot())});\n`;
-  writeAtomic(OUT, body);
-}
-
 if (process.argv[1] && fs.realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const once = process.argv.includes('--once');
   // On a machine where Koppler never ran, nothing has made its folder yet.
   fs.mkdirSync(TEMP, { recursive: true, mode: 0o700 });
   if (!once) startServer();
-  await publish();
+  await publish(serving);
   // A slow publish is not started again on top of itself.
   let publishing = false;
-  if (!once) setInterval(() => { if (publishing) return; publishing = true; publish().catch(e => console.error(`status-watch: ${e?.message ?? e}`)).finally(() => { publishing = false; }); }, INTERVAL_MS);
+  if (!once) setInterval(() => { if (publishing) return; publishing = true; publish(serving).catch(e => console.error(`status-watch: ${e?.message ?? e}`)).finally(() => { publishing = false; }); }, INTERVAL_MS);
   // Whatever still slips through (a callback of a finished request) is logged; the canvas stays up.
   if (!once) for (const event of ['uncaughtException', 'unhandledRejection']) process.on(event, e => console.error(`status-watch: ${e?.stack ?? e}`));
 }
