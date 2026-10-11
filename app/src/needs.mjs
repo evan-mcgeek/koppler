@@ -1,6 +1,6 @@
 // What the user has to do before a set of apps can start, in plain words with one command each, checked live.
 // Usage: koppler doctor [app...] [--env <env>] [--no-tunnels <app,app>] [--json]   (default: the apps on the canvas)
-import { APPROVE, approved, checksFor, envGaps, stackCommands, startsFromStack } from './checks.mjs';
+import { APPROVE, approved, checksFor, envGaps, stackCommands, startsFromStack } from './engine/checks.ts';
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
