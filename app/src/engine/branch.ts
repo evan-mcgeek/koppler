@@ -159,6 +159,14 @@ export const switchBack = ({ app, logFile }: { app: string; logFile: string }): 
     if (!fs.existsSync(repo))
       return { error: `${app}'s clone is no longer at ${repo}, so it could not be switched back to ${was}` };
     const there = detached ? head(repo) === 'HEAD' && git(repo, 'rev-parse', 'HEAD') === from : head(repo) === from;
+    const now = head(repo);
+    if (!there && now !== to) {
+      // The user moved the clone on since: it stays where they put it, and the switch is no longer Koppler's to undo.
+      forget(logFile, app, to);
+      const where = now === 'HEAD' ? 'the commit you checked out' : now;
+      const aside = stash ? `; your set-aside changes wait in the stash as "${stash}"` : '';
+      return { message: `${app}: left on ${where}, where you moved it; not switched back to ${was}${aside}` };
+    }
     if (!there) {
       const dirty = changed(repo);
       // Changes made while it ran stay the user's: switching over them is their call, unless they came along in the
