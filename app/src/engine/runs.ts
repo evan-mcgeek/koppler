@@ -370,7 +370,7 @@ function profileEnvNow(action: Loose): unknown {
     const { app, file, name } = action as { app: string; file: string; name: string };
     const repo = clones[app]?.path;
     const settings = JSON.parse(
-      fs.readFileSync(path.isAbsolute(file) ? file : path.join(repo as string, file), 'utf8').replace(/^﻿/, ''),
+      fs.readFileSync(path.isAbsolute(file) ? file : path.join(repo as string, file), 'utf8').replace(/^\uFEFF/, ''),
     ) as { profiles?: Record<string, { environmentVariables?: unknown } | undefined> };
     return settings.profiles?.[name]?.environmentVariables ?? null;
   } catch {
