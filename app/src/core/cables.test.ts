@@ -64,9 +64,32 @@ test('tunnels under a card leave the free part of its bottom edge to the cables'
   expect(onPort).not.toContainEqual({ id: 'web', side: 'bottom' });
 });
 
-test('cables between two facing cards run straight across', () => {
-  const twice: Cable[] = [down('web', 'orders'), { from: 'orders', to: 'web', fromSide: 'top', toSide: 'bottom' }];
-  const { offset } = endOffsets(twice, { cardOf });
-  expect(offset['0|from']).toBe(offset['0|to']);
-  expect(offset['1|from']).toBe(offset['1|to']);
+test('Arrange centres cables between two facing cards on the stretch they share, so they run straight across', () => {
+  // Payments API reaches from 100 to 300 here: it shares 100 to 200 with Web Shop above it.
+  const boxes: Record<string, Box> = { ...cards, payments: { x: 100, y: 300, w: 200, h: 100 } };
+  const twice: Cable[] = [down('web', 'payments'), { from: 'payments', to: 'web', fromSide: 'top', toSide: 'bottom' }];
+  orderSlots(twice, id => boxes[id] as Box);
+  const { offset } = endOffsets(twice, { cardOf: id => boxes[id] });
+  const at = (box: Box, by = 0) => box.x + box.w / 2 + by;
+  expect(at(boxes['web'] as Box, offset['0|from'])).toBe(at(boxes['payments'] as Box, offset['0|to']));
+  expect(at(boxes['web'] as Box, offset['1|to'])).toBe(at(boxes['payments'] as Box, offset['1|from']));
+  expect(((offset['0|from'] ?? 0) + (offset['1|to'] ?? 0)) / 2).toBe(50);
+});
+
+test('a card that moves leaves every end where it is on its side', () => {
+  const boxes: Record<string, Box> = { ...cards, payments: { x: 100, y: 300, w: 200, h: 100 } };
+  const cables = [down('web', 'payments')];
+  const drawn = () => endOffsets(cables, { cardOf: id => boxes[id] }).offset;
+  // A cable just drawn sits on the middle of each side.
+  expect(drawn()).toEqual({ '0|from': 0, '0|to': 0 });
+  orderSlots(cables, id => boxes[id] as Box);
+  const arranged = drawn();
+  expect(arranged).toEqual({ '0|from': 50, '0|to': -50 });
+  boxes['payments'] = { x: 400, y: 500, w: 200, h: 100 };
+  expect(drawn()).toEqual(arranged);
+});
+
+test('ends that Arrange moved off the middle stay on a side that has become too short for it', () => {
+  const cables: Cable[] = [{ ...down('web', 'orders'), fromShift: 500 }];
+  expect(endOffsets(cables, { cardOf }).offset['0|from']).toBe(84);
 });

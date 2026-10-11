@@ -11,6 +11,9 @@ export interface Cable {
   toSide: Side;
   fromSlot?: number;
   toSlot?: number;
+  /** How far from the middle of its side Arrange centred the cables this end sits among. */
+  fromShift?: number;
+  toShift?: number;
 }
 type End = 'from' | 'to';
 
@@ -85,19 +88,42 @@ function bySide<T extends Cable>(cables: T[]) {
   return sides;
 }
 
+const spread = (length: number, count: number) => (count > 1 ? Math.min(26, (length - 48) / (count - 1)) : 0);
+type Ends = { cable: Cable; end: End; side: Side; other: string }[];
+/** The one card every cable on this side goes to, when they all meet it on the side facing this one. */
+const facingCard = (list: Ends): string | undefined =>
+  list.every(one => one.other === list[0]?.other) &&
+  list.every(({ cable, end, side }) => (end === 'from' ? cable.toSide : cable.fromSide) === OPPOSITE[side])
+    ? list[0]?.other
+    : undefined;
+
 /**
- * Arrange's order of the cables along each side of a card: by where their other end sits. Sets each cable's slots.
+ * Arrange's order of the cables along each side of a card, by where their other end sits, and where it centres them.
+ * Cables that all go to one card, onto the side facing this one, are centred on the stretch both cards share, so they
+ * run straight across. Sets each cable's slots and shifts: they stay as set, whatever moves, until the next Arrange.
  */
 export function orderSlots(cables: Cable[], boxOf: (id: string) => Box): void {
   for (const list of bySide(cables).values()) {
-    const place = (other: string, side: Side) => {
-      const box = boxOf(other);
-      return across(side) ? box.y + box.h / 2 : box.x + box.w / 2;
-    };
+    const [{ id, side } = { id: '', side: 'top' as Side }] = list;
+    const along = across(side) ? 'y' : 'x';
+    const lengthOf = (box: Box) => (along === 'x' ? box.w : box.h);
+    const middle = (box: Box) => box[along] + lengthOf(box) / 2;
+    const card = boxOf(id);
+    const other = facingCard(list);
+    let shift: number | undefined;
+    if (other) {
+      const low = Math.max(card[along], boxOf(other)[along]);
+      const high = Math.min(card[along] + lengthOf(card), boxOf(other)[along] + lengthOf(boxOf(other)));
+      const step = Math.min(spread(lengthOf(card), list.length), spread(lengthOf(boxOf(other)), list.length));
+      if (high - low >= step * (list.length - 1) + 32) shift = Math.round((low + high) / 2 - middle(card));
+    }
     list
-      .sort((a, b) => place(a.other, a.side) - place(b.other, b.side))
+      .sort((a, b) => middle(boxOf(a.other)) - middle(boxOf(b.other)))
       .forEach(({ cable, end }, slot) => {
         cable[`${end}Slot`] = slot;
+        if (shift) cable[`${end}Shift`] = shift;
+        else if (end === 'from') delete cable.fromShift;
+        else delete cable.toShift;
       });
   }
 }
@@ -109,11 +135,10 @@ export interface Sides {
   /** How much of a card's bottom edge its tunnels cover from the left, and whether they sit at its right end instead. */
   coveredBelow?: (id: string) => { covered: number; atRight: boolean };
 }
-const spread = (length: number, count: number) => (count > 1 ? Math.min(26, (length - 48) / (count - 1)) : 0);
-
 /**
  * Several cables on one side of a card spread along it, in the order Arrange gave them (cables drawn since go after,
- * in the order they were drawn), so they fan out instead of leaving from one point. Gives each end's distance from the
+ * in the order they were drawn), so they fan out instead of leaving from one point. Nothing here follows the cards as
+ * they move: where a fan is centred is Arrange's to set. Gives each end's distance from the
  * middle of its side, keyed `<cable index>|<from or to>`, and the sides whose one cable sits right on the port.
  */
 export function endOffsets(cables: Cable[], { cardOf, coveredBelow }: Sides) {
@@ -136,18 +161,14 @@ export function endOffsets(cables: Cable[], { cardOf, coveredBelow }: Sides) {
     const shift = !free ? 0 : atRight ? free / 2 - room / 2 : covered + free / 2 - room / 2;
     let step = count > 1 ? Math.min(26, ((free || room) - (free ? 20 : 48)) / (count - 1)) : 0;
     let centre = shift;
-    // Cables that all go to one card, onto the side facing this one, spread around the middle of the stretch both
-    // cards share, with the same spacing on both, so they run straight across instead of slanting into each other.
-    const other = list.every(one => one.other === list[0]?.other) ? cardOf(list[0]?.other ?? '') : undefined;
-    const facing = list.every(({ cable, end }) => (end === 'from' ? cable.toSide : cable.fromSide) === OPPOSITE[side]);
-    if (other && facing && !shift) {
-      const low = Math.max(card[along], other[along]);
-      const high = Math.min(card[along] + room, other[along] + lengthOf(other));
-      const both = Math.min(step, spread(lengthOf(other), count));
-      if (high - low >= both * (count - 1) + 32) {
-        step = both;
-        centre = (low + high) / 2 - (card[along] + room / 2);
-      }
+    if (!shift) {
+      // Cables that all go to one card, onto the side facing this one, keep the same spacing on both cards.
+      const other = cardOf(facingCard(list) ?? '');
+      if (other) step = Math.min(step, spread(lengthOf(other), count));
+      // Where Arrange centred them, as far as the side still has room for it.
+      const placed = list.map(({ cable, end }) => cable[`${end}Shift`]).find(at => at !== undefined) ?? 0;
+      const reach = Math.max(0, room / 2 - 16 - ((count - 1) / 2) * step);
+      centre = clamp(placed, -reach, reach);
     }
     list.forEach(({ index, end }, place) => {
       offset[`${String(index)}|${end}`] = centre + (place - (count - 1) / 2) * step;

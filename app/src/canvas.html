@@ -1817,7 +1817,7 @@ function loadPreset(given) {
 const boardLayout = () => ({
   nodes: Object.fromEntries(Object.entries(state.nodes).map(([id, n]) => [id, { x: Math.round(n.x), y: Math.round(n.y) }])),
   infra: Object.fromEntries(Object.entries(state.infra ?? {}).map(([k, v]) => [k, { x: Math.round(v.x), y: Math.round(v.y) }])),
-  sides: Object.fromEntries(state.edges.map(e => [`${e.from}>${e.to}`, [e.fromSide, e.toSide, null, null, e.fromSlot ?? null, e.toSlot ?? null, e.points ?? null]])),
+  sides: Object.fromEntries(state.edges.map(e => [`${e.from}>${e.to}`, [e.fromSide, e.toSide, null, null, e.fromSlot ?? null, e.toSlot ?? null, e.points ?? null, e.fromShift ?? null, e.toShift ?? null]])),
   ...(state.tidy && { tidy: state.tidy }),
 });
 // Puts the board on screen back as a stored layout has it. False when the layout does not cover every card.
@@ -1830,7 +1830,7 @@ function applyLayout(layout, edges) {
   for (const id of ids) Object.assign(state.nodes[id], at(layout.nodes[id]) ?? {});
   state.tidy = ['down', 'right'].includes(layout.tidy) ? layout.tidy : state.tidy;
   state.infra = { ...(state.infra ?? {}), ...Object.fromEntries(Object.entries(layout.infra ?? {}).map(([k, p]) => [k, at(p) && { ...at(p), ...(p.away === true && { away: true }) }]).filter(([k, p]) => p && /^[\w:.@-]{1,300}$/.test(k))) };
-  state.edges = edges.map(e => { const [fromSide, toSide, , , fromSlot, toSlot, points] = layout.sides?.[`${e.from}>${e.to}`] ?? []; return { from: e.from, to: e.to, ...(SIDES[fromSide] && SIDES[toSide] ? { fromSide, toSide } : sidesFor(state.nodes, e, state.tidy)), ...(Number.isInteger(fromSlot) && { fromSlot }), ...(Number.isInteger(toSlot) && { toSlot }), ...(Array.isArray(points) && points.every(q => Number.isFinite(q?.x) && Number.isFinite(q?.y)) && { points: points.slice(0, 20).map(q => ({ x: q.x, y: q.y })) }) }; });
+  state.edges = edges.map(e => { const [fromSide, toSide, , , fromSlot, toSlot, points, fromShift, toShift] = layout.sides?.[`${e.from}>${e.to}`] ?? []; return { from: e.from, to: e.to, ...(SIDES[fromSide] && SIDES[toSide] ? { fromSide, toSide } : sidesFor(state.nodes, e, state.tidy)), ...(Number.isInteger(fromSlot) && { fromSlot }), ...(Number.isInteger(toSlot) && { toSlot }), ...(Number.isFinite(fromShift) && { fromShift }), ...(Number.isFinite(toShift) && { toShift }), ...(Array.isArray(points) && points.every(q => Number.isFinite(q?.x) && Number.isFinite(q?.y)) && { points: points.slice(0, 20).map(q => ({ x: q.x, y: q.y })) }) }; });
   return true;
 }
 const boardAsPreset = name => ({ name, version: KopplerPresets.VERSION, nodes: Object.fromEntries(Object.entries(state.nodes).map(([id, n]) => [id, { run: n.run, ...(n.platform && { platform: n.platform }), ...(n.branch && { branch: n.branch }), ...(n.note && { note: n.note }), ...(n.hideTunnels && { tunnels: false }), ...(queuesHidden(id).all && { queues: false }) }])),
@@ -3041,7 +3041,7 @@ function setCable(g, a, aSide, b, bSide, route) {
   for (const c of g.querySelectorAll('.socket, .socket-light')) { c.setAttribute('cx', b.x); c.setAttribute('cy', b.y); c.setAttribute('visibility', bSide ? 'visible' : 'hidden'); }
 }
 
-// Arrange sets the order of the cables along each side of a card, by where their other end sits, and clears any
+// Arrange sets the order of the cables along each side of a card, by where their other end sits, centres them, and clears any
 // waypoints: every cable is a plain curve after it, the same as one the user draws.
 function styleCables() {
   const boxes = Object.fromEntries([...Object.keys(state.nodes).map(id => [id, { ...state.nodes[id], ...size(id) }]), ...Object.entries(state.infra ?? {}).map(([id, p]) => [id, { ...p, ...size(id) }])]);
