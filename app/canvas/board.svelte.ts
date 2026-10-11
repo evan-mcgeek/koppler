@@ -4,6 +4,8 @@ import type { Edge, Node } from '@xyflow/svelte';
 import { arrange, sidesFor, type Point, type Side } from '../src/core/arrange.ts';
 import { endOffsets, orderSlots, sidePoint, SIDES, type Box, type Cable } from '../src/core/cables.ts';
 import { of as kindOf } from '../src/core/kinds.ts';
+import { planTunnels, tunnelKind, type Tunnel } from '../src/core/ports.ts';
+import type { Registry } from '../src/data.ts';
 import type { Loaded, SavedBoard } from './data.ts';
 
 export interface CableData extends Record<string, unknown> {
@@ -30,8 +32,26 @@ export interface CardData extends Record<string, unknown> {
   platform?: string;
   /** The user's own instruction for the agent. */
   note: string;
+  /** Runs without its tunnels, when only its API is needed. */
+  hideTunnels?: boolean;
 }
 export type CardNode = Node<CardData, 'app'>;
+/** A tunnel to a database or cache: a read-only card beside the first app on the board that uses it. */
+export interface TunnelData extends Record<string, unknown> {
+  what: string;
+  /** The local address and port it listens on, and whether the plan moved it off the port the stack asked for. */
+  local: string;
+  moved: boolean;
+  host: string;
+  /** What is worth knowing about it, one line each. */
+  about: string[];
+  apps: string[];
+}
+export type TunnelNode = Node<TunnelData, 'tunnel'>;
+const tunnelKey = (tunnel: Tunnel) => `tunnel:${tunnel.host}:${String(tunnel.original)}`;
+/** The room a tunnel card is given before it has been measured, and the gap that keeps it beside its app. */
+const TUNNEL = { w: 230, h: 58, gap: 40 };
+const TUNNEL_SIDES: Side[] = ['bottom', 'right', 'left', 'top'];
 export type End = 'from' | 'to';
 export interface StackApp {
   id: string;
@@ -103,7 +123,160 @@ class Board {
       ),
     ),
   );
-  ends = $derived(endOffsets(this.cables, { cardOf: id => this.boxes.get(id) }));
+  /** Tunnel cards, kept apart from the app cards: the flow shows both. */
+  infra = $state.raw<TunnelNode[]>([]);
+  infraBoxes = $derived(
+    new Map<string, Box>(
+      this.infra.map(({ id, position, measured }) => [
+        id,
+        { ...position, w: measured?.width ?? TUNNEL.w, h: measured?.height ?? TUNNEL.h },
+      ]),
+    ),
+  );
+  #registry: Registry | undefined;
+  /** The apps whose new tunnel cards still wait for their real place. */
+  unplaced = $state.raw<string[]>([]);
+
+  /** The databases and caches an app reaches through tunnels in the board's environment. */
+  tunnelsOf(id: string) {
+    const app = this.#registry?.apps[id];
+    const own = this.env !== this.envs[0] ? app?.envs?.[this.env]?.prereqs : undefined;
+    // A port that is not a number (a broken or hostile stack file) never reaches the page.
+    return (own ?? app?.prereqs ?? []).flatMap(need => {
+      const { tunnel, port } = need;
+      return tunnel && port && Number.isInteger(port) && port < 65536 ? [{ ...need, tunnel, port }] : [];
+    });
+  }
+  /** The tunnels for everything on the board, planned together so none clash: shared, moved, or on an address of its own. */
+  plan = $derived.by(() => {
+    const shown = this.nodes.filter(node => !node.data.hideTunnels);
+    const needs = shown.flatMap(({ id }) =>
+      this.tunnelsOf(id).map(need => ({
+        app: id,
+        tunnel: need.tunnel,
+        port: need.port,
+        env: need.env,
+        what: tunnelKind(need),
+        connectsAs: need.connectsAs,
+      })),
+    );
+    const taken = this.nodes.flatMap(({ id }) => {
+      const port = Number(new URL(this.#registry?.apps[id]?.url ?? 'http://none').port);
+      return port ? [port] : [];
+    });
+    return planTunnels(needs, taken);
+  });
+  /** The tunnel cards an app leads: those it is the first app on the board to use. They stay beside it. */
+  ledBy(id: string): string[] {
+    return this.plan.filter(tunnel => tunnel.apps[0] === id).map(tunnelKey);
+  }
+  /** Which apps each tunnel card is linked to. */
+  links = $derived(this.plan.flatMap(tunnel => tunnel.apps.map(app => ({ from: app, to: tunnelKey(tunnel) }))));
+
+  /** How much of a card's bottom edge the tunnel cards under it cover, and whether they sit at its right end. */
+  #coveredBelow(id: string) {
+    const card = this.boxes.get(id);
+    const under = this.ledBy(id)
+      .flatMap(key => this.infraBoxes.get(key) ?? [])
+      .filter(box => card && box.y > card.y && box.x < card.x + card.w && box.x + box.w > card.x);
+    return {
+      covered: under.length ? Math.max(...under.map(box => box.w + 12)) : 0,
+      atRight: !!card && !!under.length && under.every(box => Math.abs(box.x + box.w - card.x - card.w) < 2),
+    };
+  }
+  ends = $derived(
+    endOffsets(this.cables, { cardOf: id => this.boxes.get(id), coveredBelow: id => this.#coveredBelow(id) }),
+  );
+
+  /**
+   * Tunnel cards go on the first side of their app its cables do not use (below, else right, left, above), so they
+   * are never in front of cables, stacked there as one block with the app.
+   */
+  #beside(id: string, cards: TunnelNode[]): TunnelNode[] {
+    const app = this.nodes.find(node => node.id === id);
+    const led = new Set(this.ledBy(id));
+    if (!app || !led.size) return cards;
+    const box = { ...app.position, ...(this.boxes.get(id) ?? { w: 260, h: 200 }) };
+    const used = new Set(this.cables.flatMap(one => [one.from === id && one.fromSide, one.to === id && one.toSide]));
+    const side = TUNNEL_SIDES.find(one => !used.has(one)) ?? 'bottom';
+    let y = side === 'bottom' ? box.y + box.h + TUNNEL.gap / 2 : side === 'top' ? box.y - TUNNEL.gap / 2 : box.y;
+    return cards.map(card => {
+      if (!led.has(card.id)) return card;
+      const size = this.infraBoxes.get(card.id) ?? TUNNEL;
+      if (side === 'top') y -= size.h;
+      const x = side === 'right' ? box.x + box.w + TUNNEL.gap : side === 'left' ? box.x - TUNNEL.gap - size.w : box.x;
+      const placed = { ...card, position: { x, y } };
+      y += side === 'top' ? -TUNNEL.gap / 2 : size.h + TUNNEL.gap / 2;
+      return placed;
+    });
+  }
+
+  /** Brings the tunnel cards in line with the plan: a card for each tunnel, new ones beside the app that leads them. */
+  syncInfra(at: Record<string, Point | undefined> = {}): void {
+    const before = new Map(this.infra.map(card => [card.id, card]));
+    const fresh: string[] = [];
+    let cards = this.plan.map((tunnel): TunnelNode => {
+      const id = tunnelKey(tunnel);
+      const kept = before.get(id);
+      if (!kept && !at[id]) fresh.push(tunnel.apps[0] ?? '');
+      const need = tunnel.apps.flatMap(app => this.tunnelsOf(app)).find(one => one.tunnel === tunnel.host);
+      const note = (need as { note?: unknown } | undefined)?.note;
+      return {
+        ...kept,
+        id,
+        type: 'tunnel',
+        deletable: false,
+        position: kept?.position ?? at[id] ?? { x: 0, y: 0 },
+        data: {
+          what: tunnel.what,
+          local: `${tunnel.bind}:${String(tunnel.port)}`,
+          moved: !!tunnel.settings || !!tunnel.needsAlias,
+          host: tunnel.host,
+          about: [
+            tunnel.settings
+              ? `Moved from port ${String(tunnel.original)} so it does not clash with another tunnel on the board.`
+              : '',
+            tunnel.needsAlias
+              ? `Keeps port ${String(tunnel.port)} on its own loopback address, ${tunnel.bind}, so it does not clash (needs sudo once).`
+              : '',
+            typeof note === 'string' ? note : '',
+          ].filter(Boolean),
+          apps: tunnel.apps,
+        },
+      };
+    });
+    for (const lead of fresh) cards = this.#beside(lead, cards);
+    this.infra = cards;
+    this.unplaced = [...new Set([...this.unplaced, ...fresh])];
+  }
+
+  /** New tunnel cards were placed by guess: put right once their app and they have their real sizes. */
+  settle(): void {
+    const sized = (cards: { measured?: { width?: number } }[]) => cards.every(card => card.measured?.width);
+    if (!this.unplaced.length || !sized(this.nodes) || !sized(this.infra)) return;
+    let cards = this.infra;
+    for (const lead of this.unplaced) cards = this.#beside(lead, cards);
+    this.unplaced = [];
+    this.infra = cards;
+  }
+
+  /** An app that moves takes the tunnel cards it leads along. */
+  followed(id: string, by: Point, cards: TunnelNode[]): TunnelNode[] {
+    const led = new Set(this.ledBy(id));
+    return cards.map(card =>
+      led.has(card.id) && !card.selected && !card.dragging
+        ? { ...card, position: { x: card.position.x + by.x, y: card.position.y + by.y } }
+        : card,
+    );
+  }
+
+  /** Turns off the tunnels of every app that uses this one. ponytail: per tunnel, once apps have several. */
+  hideTunnel(key: string): void {
+    const apps = new Set(this.infra.find(card => card.id === key)?.data.apps);
+    this.nodes = this.nodes.map(node =>
+      apps.has(node.id) ? { ...node, data: { ...node.data, hideTunnels: true } } : node,
+    );
+  }
 
   /** Where a cable's end is drawn: its place among the others on that side of the card. */
   endPoint(index: number, end: End): Point | undefined {
@@ -301,6 +474,7 @@ class Board {
   content(): string {
     return JSON.stringify({
       nodes: this.nodes.map(({ id, type, position, data }) => ({ id, type, position, data })),
+      infra: this.infra.map(({ id, position }) => ({ id, position })),
       edges: this.edges.map(({ id, source, target, type, data }) => ({ id, source, target, type, data })),
     });
   }
@@ -324,9 +498,18 @@ class Board {
     this.#now = back;
     // The next change is a step of its own.
     this.#at = 0;
-    const { nodes, edges } = JSON.parse(back) as { nodes: CardNode[]; edges: CableEdge[] };
+    const { nodes, edges, infra } = JSON.parse(back) as {
+      nodes: CardNode[];
+      edges: CableEdge[];
+      infra: { id: string; position: Point }[];
+    };
     this.nodes = nodes;
     this.edges = edges;
+    this.syncInfra(Object.fromEntries(infra.map(({ id, position }) => [id, position])));
+    this.infra = this.infra.map(card => ({
+      ...card,
+      position: infra.find(one => one.id === card.id)?.position ?? card.position,
+    }));
     this.canUndo = this.#past.length > 0;
     this.canRedo = this.#future.length > 0;
   }
@@ -363,6 +546,7 @@ class Board {
         name,
         kind,
         kindLabel,
+        ...(chosen.hideTunnels === true && { hideTunnels: true }),
         branch: chosen.branch ?? '',
         run: run ?? 'cli',
         ...(platform && { platform }),
@@ -373,6 +557,7 @@ class Board {
 
   /** Puts the board the server kept on screen: the stack's apps where they were left, and their cables. */
   open({ stack, clones, roots, saved }: Loaded): void {
+    this.#registry = stack;
     this.stack = stack.name ?? '';
     this.envs = stack.envs;
     this.env = saved?.env ?? stack.envs[0] ?? '';
@@ -408,6 +593,8 @@ class Board {
         cable(from, to, { fromSide: fromSide ?? 'right', toSide: toSide ?? 'left', ...kept }),
       );
     this.#kept = saved ?? {};
+    this.infra = [];
+    this.syncInfra((saved?.infra ?? {}) as Record<string, Point | undefined>);
     const { zoom, pan } = saved ?? {};
     this.view = zoom && pan ? { x: pan.x, y: pan.y, zoom } : undefined;
   }
@@ -421,7 +608,7 @@ class Board {
       env: this.env,
       ...(this.view && { zoom: this.view.zoom, pan: { x: this.view.x, y: this.view.y } }),
       nodes: Object.fromEntries(
-        this.nodes.map(({ id, position, data: { branch, run, platform, note } }) => [
+        this.nodes.map(({ id, position, data: { branch, run, platform, note, hideTunnels } }) => [
           id,
           {
             ...before[id],
@@ -431,10 +618,14 @@ class Board {
             run,
             ...(platform && { platform }),
             note,
+            hideTunnels: hideTunnels ? true : undefined,
           },
         ]),
       ),
       edges: this.edges.map(({ source, target, data }) => ({ from: source, to: target, ...data })),
+      infra: Object.fromEntries(
+        this.infra.map(({ id, position }) => [id, { x: Math.round(position.x), y: Math.round(position.y) }]),
+      ),
     };
   }
 
@@ -501,8 +692,18 @@ class Board {
 
   /** Arrange: places the cards, picks each cable's sides and its order along them, and drops the waypoints. */
   arrange(): void {
-    const size = (id: string) => this.boxes.get(id) ?? { w: 260, h: 160 };
     const links = this.cables.map(({ from, to }) => ({ from, to }));
+    const card = (id: string) => this.boxes.get(id) ?? { w: 260, h: 160 };
+    // An app is given the room of its tunnel cards too: beside it when it calls others, else under it.
+    const size = (id: string) => {
+      const led = this.ledBy(id).map(key => this.infraBoxes.get(key) ?? TUNNEL);
+      const { w, h } = card(id);
+      if (!led.length) return { w, h };
+      const tall = led.reduce((sum, box) => sum + box.h + TUNNEL.gap / 2, 0);
+      return links.some(link => link.from === id)
+        ? { w: w + TUNNEL.gap + Math.max(...led.map(box => box.w)), h: Math.max(h, tall) }
+        : { w, h: h + tall };
+    };
     const placed = arrange(
       this.nodes.map(node => node.id),
       links,
@@ -511,10 +712,13 @@ class Board {
       false,
       { pad: PAD },
     );
-    const cables: Cable[] = links.map(link => ({ ...link, ...sidesFor(placed, link, 'down', size) }));
-    orderSlots(cables, id => ({ ...(placed[id] ?? { x: 0, y: 0 }), ...size(id) }));
+    const cables: Cable[] = links.map(link => ({ ...link, ...sidesFor(placed, link, 'down', card) }));
+    orderSlots(cables, id => ({ ...(placed[id] ?? { x: 0, y: 0 }), ...card(id) }));
     this.nodes = this.nodes.map(node => ({ ...node, position: placed[node.id] ?? node.position }));
     this.edges = cables.map(({ from, to, ...data }) => cable(from, to, data));
+    let cards = this.infra;
+    for (const node of this.nodes) cards = this.#beside(node.id, cards);
+    this.infra = cards;
   }
 }
 

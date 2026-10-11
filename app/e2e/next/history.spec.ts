@@ -3,7 +3,7 @@ import type { Page } from '@playwright/test';
 import { test, expect, nextEdit } from '../canvas.ts';
 
 const card = (page: Page, id: string) => page.locator(`.svelte-flow__node[data-id="${id}"]`);
-const cards = (page: Page) => page.locator('.svelte-flow__node');
+const cards = (page: Page) => page.locator('.svelte-flow__node-app');
 const cables = (page: Page) => page.locator('.svelte-flow__edge');
 const at = (x: number, y: number) => ({ x, y, run: 'cli', branch: 'main' });
 test.use({
