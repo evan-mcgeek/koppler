@@ -22,7 +22,7 @@ import { recipesFor } from './recipes.mjs';
 import { APP, BIN, LOGS, STATE as STATE_HOME, TEMP } from './paths.ts';
 import { redact } from './scrub.mjs';
 import { listenerPid } from './listen.mjs';
-import kp from './plan.cjs';
+import * as kp from './core/plan.ts';
 import { readData, writeData } from './data.ts';
 export { githubFile };
 
@@ -218,7 +218,7 @@ export function sanitizeLayout(input) {
 
 let serving = false;
 const FONTS = fs.readdirSync(path.join(here, 'fonts')).filter(f => /\.(woff2|css)$/.test(f)).map(f => `fonts/${f}`);
-export const PAGE_FILES = { '': 'canvas.html', 'ports.cjs': 'ports.cjs', 'kinds.cjs': 'kinds.cjs', 'presets.cjs': 'presets.cjs', 'plan.cjs': 'plan.cjs', 'logfmt.cjs': 'logfmt.cjs', 'temp/status.js': 'temp/status.js', 'temp/debug.jsonl': 'temp/debug.jsonl', ...Object.fromEntries(FONTS.map(f => [f, f])) };
+export const PAGE_FILES = { '': 'canvas.html', 'page/ports.js': 'page/ports.js', 'kinds.cjs': 'kinds.cjs', 'page/presets.js': 'page/presets.js', 'page/plan.js': 'page/plan.js', 'page/logfmt.js': 'page/logfmt.js', 'temp/status.js': 'temp/status.js', 'temp/debug.jsonl': 'temp/debug.jsonl', ...Object.fromEntries(FONTS.map(f => [f, f])) };
 const PAGE_DATA = { 'temp/registry.js': { name: 'registry', global: 'REGISTRY' }, 'temp/local.js': { name: 'local', global: 'LOCAL' }, 'temp/repos.js': { name: 'repos', global: 'REPOS' }, 'temp/state.js': { name: 'state', global: 'SAVED_STATE' } };
 const CONTENT_TYPES = { html: 'text/html; charset=utf-8', css: 'text/css; charset=utf-8', woff2: 'font/woff2', jsonl: 'text/plain; charset=utf-8' };
 // The page loads and calls nothing but this server, and no other page can frame it or learn its address.

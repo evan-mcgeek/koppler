@@ -5,7 +5,7 @@
 //        koppler history                            recent runs and how they ended
 import fs from 'node:fs';
 import path from 'node:path';
-import kp from './plan.cjs';
+import * as kp from './core/plan.ts';
 import { STATE, TEMP } from './paths.ts';
 import { redact } from './scrub.mjs';
 import { readData } from './data.ts';

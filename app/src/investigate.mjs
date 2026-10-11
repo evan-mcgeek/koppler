@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { hostsByApp } from './sync.mjs';
-import tunnelPlan from './ports.cjs';
+import * as tunnelPlan from './core/ports.ts';
 import kinds from './kinds.cjs';
 import { TEMP } from './paths.ts';
 import { readData } from './data.ts';
@@ -91,7 +91,7 @@ export function conflicts(apps) {
     if (own) claim(own, `app:${a.id}`, a.id);
     for (const t of a.tunnels) claim(t.port, `tunnel:${t.tunnel}`, `tunnel to ${t.tunnel} (for ${a.id})`);
   }
-  // Two tunnels on one port are planned by ports.cjs (share, move or loopback); only clashes involving an app are reported here.
+  // Two tunnels on one port are planned by core/ports (share, move or loopback); only clashes involving an app are reported here.
   return [...owners].filter(([, m]) => m.size > 1 && [...m.keys()].some(k => k.startsWith('app:'))).map(([port, m]) => ({ port, who: [...m.values()].map(labels => labels.join(', ')) }));
 }
 

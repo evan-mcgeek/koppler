@@ -68,7 +68,7 @@ Local libraries need nothing in `stack.json`: `koppler sync` matches each app's 
 Top-level `presets` are the team boards: `[{ "name": "Mobile App + Mobile API", "version": 1, "nodes": { "<app>": { "run": "cli", "platform"?, "branch"?, "note"? } }, "edges": [{ "from", "to" }] }]`. The canvas lays them out by who calls whom; `koppler sync` checks every app and cable exists. Every board a user builds is kept as their own, saved as they change it; Share copies it as JSON to add here.
 A single preset in its own `.json` file (the JSON that Share copies), a list of them, or a whole `stack.json` can be opened from the canvas's board selector, as a file or as a GitHub link.
 
-Every preset carries the `version` of the preset format it was saved in (`presets.cjs`: `VERSION`, currently 1); `koppler sync` requires it on shared presets.
+Every preset carries the `version` of the preset format it was saved in (`VERSION` in `core/presets`, currently 1); `koppler sync` requires it on shared presets.
 Before any preset opens, its version is compared with the one this Koppler reads:
 - older: it is brought up to date one step at a time (`MIGRATIONS[n]` turns version n into n + 1; a file without a version is read as version 0);
 - newer: it is refused, with a message to update Koppler.
