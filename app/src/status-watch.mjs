@@ -16,8 +16,7 @@ import { addApps, removeApp, createStack, currentStack, forgetStacks, stacksHere
 import { discardChanges, linkStack, linkedStatus, proposeChanges, updateStack } from './engine/linked.ts';
 import { applyFindings, current as currentFindingsStack, discover } from './engine/discover.ts';
 import { appendAnswer, clearMessages, readMessages } from './engine/messages.ts';
-import { githubFile } from './github.ts';
-import { fetchPresets, presetsIn, sanitizeLayout, sanitizePrompt } from './server/sanitize.ts';
+import { fetchPresets, sanitizeLayout, sanitizePrompt } from './server/sanitize.ts';
 import { appendDebugLog, clearDebugLog, tail } from './server/logs.ts';
 import * as kinds from './core/kinds.ts';
 import * as launch from './core/launch.ts';
