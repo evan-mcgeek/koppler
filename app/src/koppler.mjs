@@ -18,7 +18,7 @@ import { doctor, ports, secret } from './cli/doctor.ts';
 import { up } from './engine/up.ts';
 import { recipesCommand } from './engine/recipes.ts';
 import { queryCommand } from './query.mjs';
-import { findCommand } from './research.mjs';
+import { findCommand } from './engine/research.ts';
 import { investigate } from './investigate.mjs';
 import { deployed } from './deployed.mjs';
 import { appliedCommand as applied, historyCommand, planCommand, runningNames } from './engine/runs.ts';
@@ -142,7 +142,7 @@ const remove = args => { const r = removeApp(positional(args)[0] ?? fail('usage:
 const say = args => sayCommand(args);
 const switchBranch = args => switchCommand(args, { temp: TEMP });
 const query = args => queryCommand(args, { fail });
-const listen = async args => (await import('./listen.mjs')).listen(args);
+const listen = async args => (await import('./engine/listen.ts')).listen(args);
 
 // Koppler's version: the package's, or the commit when it runs from a clone.
 function version() {

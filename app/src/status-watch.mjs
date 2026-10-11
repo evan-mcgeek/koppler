@@ -22,7 +22,7 @@ import * as launch from './core/launch.ts';
 import { recipesFor } from './engine/recipes.ts';
 import { APP, BIN, LOGS, STATE as STATE_HOME, TEMP } from './paths.ts';
 import { redact } from './scrub.ts';
-import { listenerPid } from './listen.mjs';
+import { listenerPid } from './engine/listen.ts';
 import * as kp from './core/plan.ts';
 import { readData, writeData } from './data.ts';
 export { githubFile };
