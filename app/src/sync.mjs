@@ -10,7 +10,7 @@ import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import * as kinds from './core/kinds.ts';
 import { detectKind } from './investigate.mjs';
-import { packageOf, librariesFor } from './libraries.mjs';
+import { packageOf, librariesFor } from './engine/libraries.ts';
 import { checkStack as checkLoadedStack } from './checks.mjs';
 import { TEMP } from './paths.ts';
 import { validateStack } from './core/stack.ts';

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { packageOf, dependenciesOf, librariesFor, link, unlink } from '../dist/libraries.mjs';
+import { packageOf, dependenciesOf, librariesFor, link, unlink } from '../dist/engine/libraries.js';
 
 // An app that depends on a package you have cloned can use the clone; Stop puts everything back as it was.
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-libs-')), app = path.join(dir, 'app'), lib = path.join(dir, 'design'), other = path.join(dir, 'other');

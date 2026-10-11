@@ -10,7 +10,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { runs } from './runs.mjs';
-import { readActions, updateActions } from './actions.mjs';
+import { readActions, updateActions } from './engine/actions.ts';
 import { readData } from './data.ts';
 
 const configDir = () => process.env.KOPPLER_CONFIG_DIR || path.join(os.homedir(), '.config', 'koppler');

@@ -97,7 +97,7 @@ console.log('down tests ok');
   log.push({ kind: 'env-file', app: 'app', file: envFile, lines: ['API_URL=http://localhost:5001'] });
   fs.writeFileSync(path.join(d, 'actions.json'), JSON.stringify(log));
   // A local library, after which the user adds an override of their own.
-  const { link } = await import('../dist/libraries.mjs');
+  const { link } = await import('../dist/engine/libraries.js');
   process.env.PATH = e.PATH;
   const overrides = path.join(app, 'pubspec_overrides.yaml');
   link('app', app, [{ name: 'ui_kit', ecosystem: 'dart', path: '/libs/ui_kit' }, { name: 'left-pad', ecosystem: 'npm', path: '/libs/left-pad' }], path.join(d, 'actions.json'));

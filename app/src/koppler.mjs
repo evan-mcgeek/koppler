@@ -6,12 +6,13 @@ import os from 'node:os';
 import path from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { isDeepStrictEqual } from 'node:util';
 import { init as initStack, removeApp, stacksCommand, sync, updateClones, useCommand } from './sync.mjs';
 import { discardChanges, linkStack, linkedStatus, proposeChanges, updateStack } from './linked.mjs';
 import { discoverCommand } from './discover.mjs';
 import { sayCommand } from './messages.mjs';
-import { switchCommand } from './branch.mjs';
+import { switchCommand } from './engine/branch.ts';
+import { down } from './engine/down.ts';
+import { readActions } from './engine/actions.ts';
 import { recipesCommand } from './recipes.mjs';
 import { queryCommand } from './query.mjs';
 import { findCommand } from './research.mjs';
@@ -26,7 +27,6 @@ import * as launch from './core/launch.ts';
 import { needs as needsFor } from './needs.mjs';
 import { APPROVE, approved, missingTunnels, startsFromStack } from './checks.mjs';
 import { APP, BIN, LOGS, TEMP } from './paths.ts';
-import { readActions, updateActions } from './actions.mjs';
 import { confirm, fail, flagValue, positional, table } from './cli/output.ts';
 import { alive, listener, NAME, parseRun, readRecord, records, sh, sleep, startProcess, stopOne, uptime } from './engine/processes.ts';
 import { redact, scrub } from './scrub.ts';
@@ -325,7 +325,7 @@ async function up(args) {
       if ((board.plan?.stops ?? []).some(x => x.id === id) && actions.some(a => a.app === id && a.kind !== 'process')) left.push(`revert ${registry.apps[id]?.name ?? id}'s changes (it left the board)`);
     }
     // Branches as the board asks, uncommitted changes as chosen on the card.
-    const { switchTo } = await import('./branch.mjs');
+    const { switchTo } = await import('./engine/branch.ts');
     for (const id of ids) {
       const want = node(id).branch, repo = local[id]?.path;
       if (!want || !repo) continue;
@@ -333,7 +333,7 @@ async function up(args) {
       if (r.error) { left.push(r.error); skip.add(id); step(id, 'Branch', 'failed', r.error); step(id, 'Start', 'failed', 'Not started: its branch could not be switched.'); } else { console.log(r.message); step(id, 'Branch', 'done', r.message); }
     }
     // Local libraries the board asks for, linked before the app starts.
-    const libs = await import('./libraries.mjs');
+    const libs = await import('./engine/libraries.ts');
     for (const id of ids.filter(id => !skip.has(id) && node(id).libraries?.length)) {
       const wanted = (local[id]?.libraries ?? []).filter(l => node(id).libraries.includes(l.name));
       try { libs.link(id, local[id].path, wanted, logFile); console.log(`${id}: local ${wanted.map(l => l.name).join(', ')}`); step(id, 'Libraries', 'done', `Local ${wanted.map(l => l.name).join(', ')}`); }
@@ -416,86 +416,6 @@ async function up(args) {
   if (left.length) { console.log(`\nLeft for the agent:\n${left.map(l => `  - ${l}`).join('\n')}`); process.exit(3); }
   console.log(`Up on ${env.toUpperCase()}.`);
   if (board) await applied([board.id]);
-}
-
-// A changed JSON file as text, written the way the file was: its indent, line ends and byte order mark. When the result
-// holds what git has, it is git's own text, so the file is clean again.
-// ponytail: with the user's own uncommitted changes in the file, lists kept on one line are spread out; a text-level edit would keep those
-function jsonTextLike(file, raw, json) {
-  try {
-    const committed = execFileSync('git', ['-C', path.dirname(file), 'show', `HEAD:./${path.basename(file)}`], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
-    if (isDeepStrictEqual(JSON.parse(committed.replace(/^\uFEFF/, '')), json)) return committed;
-  } catch { /* not in git, or not committed yet */ }
-  const indent = raw.match(/\n([ \t]+)"/)?.[1] ?? '  ', eol = raw.includes('\r\n') ? '\r\n' : '\n';
-  return (raw.startsWith('﻿') ? '﻿' : '') + JSON.stringify(json, null, indent).replace(/\n/g, eol) + (raw.endsWith('\n') ? eol : '');
-}
-
-// Stop and revert, done by Koppler: stop what it runs, undo the action log in reverse (code edits, env-file lines, launch
-// profiles, then branches back with set-aside changes), and look for unlogged temporary edits. What it cannot undo
-// safely stays in the log and is listed for the agent (exit 3); otherwise, with --run, the Stop is marked done.
-async function down(args) {
-  const flag = n => { const i = args.indexOf(`--${n}`); return i >= 0 ? args[i + 1] : undefined; };
-  const logFile = path.join(TEMP, 'actions.json');
-  for (const rec of records().filter(r => r.name !== 'canvas')) console.log(await stopOne(rec));
-  fs.rmSync(path.join(TEMP, 'progress.json'), { force: true });
-  let log; try { log = readActions(logFile); } catch (e) { fail(e.message); }
-  const left = [], keep = [], { unlink } = await import('./libraries.mjs');
-  const name = a => readData('registry')?.apps?.[a.app]?.name ?? a.app ?? a.repo ?? '';
-  for (const a of [...log].reverse()) {
-    try {
-      if (a.kind === 'edit') {
-        const body = fs.readFileSync(a.file, 'utf8'), n = body.split(a.after).length - 1;
-        if (n === 1) { fs.writeFileSync(a.file, body.replace(a.after, () => a.before)); console.log(`${name(a)}: reverted ${path.basename(a.file)}`); continue; }
-        if (body.includes(a.before) && !n) { console.log(`${name(a)}: ${path.basename(a.file)} already as before`); continue; }
-        left.push(`${name(a)}: ${a.file} changed since Koppler edited it; put back by hand: ${JSON.stringify(a.before).slice(0, 200)}`);
-      } else if (a.kind === 'file') {
-        try { console.log(`${name(a)}: ${unlink(a)}`); continue; } catch (e) { left.push(`${name(a)}: ${e.message}`); }
-      } else if (a.kind === 'npm-local') {
-        // Installed again further down, once the branch its lockfile belongs to is back.
-      } else if (a.kind === 'env-file') {
-        // One line out per line added, the last one: a line of the user's own that reads the same stays.
-        const rest = fs.readFileSync(a.file, 'utf8').split('\n');
-        for (const line of [].concat(a.lines ?? [])) { const at = rest.lastIndexOf(line); if (at >= 0) rest.splice(at, 1); }
-        if (a.created && !rest.join('').trim()) fs.rmSync(a.file); else fs.writeFileSync(a.file, rest.join('\n'));
-        console.log(`${name(a)}: removed Koppler's lines from ${path.basename(a.file)}`); continue;
-      } else if (a.kind === 'profile') {
-        const raw = fs.readFileSync(a.file, 'utf8'), json = JSON.parse(raw.replace(/^\uFEFF/, ''));
-        if (a.created) delete json.profiles?.[a.name];
-        else if (json.profiles?.[a.name] && a.previous) json.profiles[a.name].environmentVariables = a.previous;
-        fs.writeFileSync(a.file, jsonTextLike(a.file, raw, json));
-        console.log(`${name(a)}: ${a.created ? 'removed' : 'restored'} launch profile ${a.name}`); continue;
-      } else if (a.kind === 'process' && a.pid) {
-        try { process.kill(a.pid, 0); left.push(`${a.label ?? a.command}: still running as pid ${a.pid}; not started through koppler, so check it before stopping`); } catch { continue; }
-      } else if (a.kind === 'checkout' || a.kind === 'secret' || a.kind === 'process') { if (a.kind === 'checkout') keep.push(a); continue; }
-      else left.push(`${name(a)}: unknown change "${a.kind}" in the log`);
-    } catch (e) { left.push(`${name(a)}: could not undo ${a.kind} (${e.message})`); }
-    keep.push(a);
-  }
-  // Branches go back last, once the edits on them are undone; switchBack takes each one off the log as it succeeds.
-  // What could not be undone stays; entries added meanwhile (another command, the agent) are kept too.
-  const handled = new Set(log.map(a => JSON.stringify(a))), kept = keep.reverse();
-  updateActions(logFile, list => { const added = list.filter(a => !handled.has(JSON.stringify(a))); list.splice(0, list.length, ...kept, ...added); });
-  const { switchBack } = await import('./branch.mjs'), stuck = new Set();
-  for (const a of keep.filter(a => a.kind === 'checkout').reverse()) {
-    const r = switchBack({ app: a.app, logFile });
-    if (r.error) { left.push(r.error); stuck.add(a.app); } else console.log(r.message);
-  }
-  for (const a of keep.filter(a => a.kind === 'npm-local')) {
-    if (stuck.has(a.app)) { left.push(`${name(a)}: run npm install once its branch is back, to get the published ${a.packages.join(', ')} again`); continue; }
-    try {
-      console.log(`${name(a)}: ${unlink(a)}`);
-      updateActions(logFile, list => { const at = list.findIndex(x => JSON.stringify(x) === JSON.stringify(a)); if (at >= 0) list.splice(at, 1); });
-    } catch (e) { left.push(`${name(a)}: ${e.message}`); }
-  }
-  // Temporary edits nobody logged still carry their marker.
-  const local = readData('local')?.apps ?? {}, marker = ['koppler:.*do not', 'commit'].join(' ');
-  for (const [id, l] of Object.entries(local)) {
-    if (!l?.path) continue;
-    try { const hits = execFileSync('git', ['-C', l.path, 'grep', '-nE', marker], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim(); if (hits) left.push(`${id}: unlogged temporary edits:\n    ${hits.split('\n').slice(0, 10).join('\n    ')}`); } catch {}
-  }
-  if (left.length) { console.log(`\nLeft for the agent:\n${left.map(l => `  - ${l}`).join('\n')}`); process.exit(3); }
-  console.log('Stopped and reverted.');
-  if (flag('run')) await applied([flag('run')]);
 }
 
 // What to change so `from` calls the local `to`: the setting or the file and key, and the value for the device it runs on.
@@ -754,7 +674,7 @@ const add = async args => {
 
 const remove = args => { const r = removeApp(positional(args)[0] ?? fail('usage: koppler remove <app>')); if (r.error) fail(r.error); console.log(`Removed ${r.name} from the stack (its clone stays).`); sync([]); };
 const say = args => sayCommand(args);
-const switchBranch = args => switchCommand(args, { fail, temp: TEMP });
+const switchBranch = args => switchCommand(args, { temp: TEMP });
 const query = args => queryCommand(args, { fail });
 const listen = async args => (await import('./listen.mjs')).listen(args);
 
