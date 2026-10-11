@@ -5,7 +5,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { fileUrl, githubFile, proposeFile, readFile } from './github.mjs';
-import { setStack, validateStack } from './sync.mjs';
+import { validateStack } from './core/stack.ts';
+import { setStack } from './sync.mjs';
 
 const configDir = () => process.env.KOPPLER_CONFIG_DIR || path.join(os.homedir(), '.config', 'koppler');
 const SOURCE = '.source.json';

@@ -1,7 +1,6 @@
 import { expect, test } from 'vitest';
 import { register } from './kinds.ts';
-import { launchProfile, startCommand, type Start, type StartContext } from './launch.ts';
-import type { App } from './stack.ts';
+import { launchProfile, startCommand, type App, type Start, type StartContext } from './launch.ts';
 import { CLONES, repoOf } from './testing/repo.ts';
 
 const api: App = {

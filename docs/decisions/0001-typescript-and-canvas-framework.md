@@ -31,7 +31,7 @@ How the canvas is wired matters for the options:
 Two things found on the way:
 
 - Opening the canvas inside Lavish no longer works: the page loads `temp/registry.js` next to itself, and state moved to `~/.local/state/koppler`.
-- The project has no runtime dependencies today.
+- The project had no runtime dependencies when this was written; the schema library (Zod) is now its one.
 
 ## Decision 1: TypeScript
 

@@ -2,7 +2,6 @@
 // Kinds with a program of their own to start them are listed first; the rest are recipes, which say how a repo is
 // recognised and how it is usually started. A stack can add kinds of its own.
 import { frameworkOf, type PackageJson } from './frameworks.ts';
-import type { App } from './stack.ts';
 
 /** A choice shown to the user: its id and its words. */
 type Choice = readonly [id: string, label: string];
@@ -205,6 +204,9 @@ for (const [id, recipe] of Object.entries(BUILT_IN_RECIPES))
     ...(recipe.color && { color: recipe.color }),
   };
 
+/** The kinds Koppler has itself: a stack cannot define one under the same id. */
+export const BUILT_IN_KINDS: readonly string[] = Object.keys(KINDS);
+
 // The stack in use adds its own kinds to these two tables; another stack's are taken out first.
 const recipes: Record<string, Recipe> = { ...BUILT_IN_RECIPES };
 const custom = new Set<string>();
@@ -266,7 +268,7 @@ export function detect(repo: RepoView): string | null {
 export const defaultPort = (kind: string, repo: RepoView): number | null => recipeOf(kind)?.port?.(repo) ?? null;
 
 /** What is known about an app's kind; a kind nobody defined still gets a label and the usual choices. */
-export function of(app: Pick<App, 'kind'> | null | undefined): Kind {
+export function of(app: { kind?: string | undefined } | null | undefined): Kind {
   const kind = app?.kind;
   if (kind !== undefined && Object.hasOwn(KINDS, kind))
     return KINDS[kind] ?? { label: kind, runIn: RUN_IN, serves: true };
