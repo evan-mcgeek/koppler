@@ -1221,6 +1221,8 @@
 <script src="page/presets.js"></script>
 <script src="page/plan.js"></script>
 <script src="page/logfmt.js"></script>
+<script src="page/arrange.js"></script>
+<script src="page/cables.js"></script>
 <script src="temp/registry.js"></script>
 <script src="temp/local.js"></script>
 <script src="temp/repos.js"></script>
@@ -1674,117 +1676,11 @@ searchBox.onkeydown = e => {
   if (first) { placeNode(first.dataset.id); searchBox.value = ''; renderApps(); summarize(); }
 };
 
-// Rows by call depth: apps nothing on the board calls go on top, each callee one row below its deepest caller.
-const GAP_X = 80, GAP_Y = 90;
-// Row heights and column widths come from the cards themselves, so taller cards never overlap.
-// Layers by call depth: apps nothing on the board calls come first, each callee one layer after its deepest caller.
-// Layers run down the board (rows) or across it (columns); Tidy up takes whichever fits the visible board better.
-// Cables crossing each other between neighbouring layers. A cable that skips layers passes a waypoint in each one it crosses,
-// so it is counted where it really runs (the usual layered-graph method).
-function withWaypoints(layers, edges, depth) {
-  // Rows are the layers as laid out (empty depths already dropped), so a card's row is its index here.
-  const rows = layers.map(l => [...l]), links = [], d = {};
-  rows.forEach((l, k) => l.forEach(id => { d[id] = k; }));
-  edges.forEach(e => {
-    let [a, b] = d[e.from] <= d[e.to] ? [e.from, e.to] : [e.to, e.from];
-    if (d[a] === d[b]) return;
-    for (let k = d[a] + 1; k < d[b]; k++) { const w = `~${e.from}>${e.to}:${k}`; d[w] = k; rows[k].push(w); links.push([a, w]); a = w; }
-    links.push([a, b]);
-  });
-  return { rows, links, d };
-}
-function crossingsOf(rows, links, d) {
-  const at = {};
-  rows.forEach(l => l.forEach((id, i) => { at[id] = i; }));
-  let n = 0;
-  for (let i = 0; i < links.length; i++) for (let j = i + 1; j < links.length; j++) {
-    const [a1, a2] = links[i], [b1, b2] = links[j];
-    if (d[a1] !== d[b1]) continue;
-    if ((at[a1] - at[b1]) * (at[a2] - at[b2]) < 0) n++;
-  }
-  return n;
-}
-// Orders each layer so cables cross as little as possible: each card (and waypoint) moves to the average place of its
-// neighbours in the layer before it, sweeping down then up; the order with the fewest crossings wins.
-function orderLayers(layers, edges, depth) {
-  const { rows, links, d } = withWaypoints(layers, edges, depth);
-  const near = {};
-  for (const [a, b] of links) { (near[a] ||= []).push(b); (near[b] ||= []).push(a); }
-  let best = rows.map(l => [...l]), fewest = crossingsOf(rows, links, d);
-  for (let sweep = 0; sweep < 12 && fewest; sweep++) {
-    const down = sweep % 2 === 0, order = down ? rows.map((_, i) => i).slice(1) : rows.map((_, i) => rows.length - 2 - i).filter(i => i >= 0);
-    for (const k of order) {
-      const at = {};
-      rows.forEach(l => l.forEach((id, i) => { at[id] = i; }));
-      const mean = id => { const ns = (near[id] ?? []).filter(o => d[o] === k + (down ? -1 : 1)); return ns.length ? ns.reduce((t, o) => t + at[o], 0) / ns.length : at[id]; };
-      rows[k].sort((a, b) => mean(a) - mean(b));
-    }
-    const n = crossingsOf(rows, links, d);
-    if (n < fewest) { fewest = n; best = rows.map(l => [...l]); }
-  }
-  layers.forEach((l, i) => { l.splice(0, l.length, ...best[i].filter(id => !id.startsWith('~'))); });
-  return fewest;
-}
-// Which layer each card sits in: callers above callees. Apps that call each other in a loop (directly or through others)
-// share a layer, so a loop cannot push everything after it into one long line.
-function layerDepths(ids, edges) {
-  const out = Object.fromEntries(ids.map(id => [id, []]));
-  for (const e of edges) if (e.from in out && e.to in out && e.from !== e.to) out[e.from].push(e.to);
-  // Tarjan: groups of cards that can all reach each other.
-  const index = {}, low = {}, group = {}, stack = [], on = new Set();
-  let next = 0, groups = 0;
-  const visit = v => {
-    index[v] = low[v] = next++; stack.push(v); on.add(v);
-    for (const w of out[v]) {
-      if (!(w in index)) { visit(w); low[v] = Math.min(low[v], low[w]); }
-      else if (on.has(w)) low[v] = Math.min(low[v], index[w]);
-    }
-    if (low[v] === index[v]) { let w; do { w = stack.pop(); on.delete(w); group[w] = groups; } while (w !== v); groups++; }
-  };
-  for (const id of ids) if (!(id in index)) visit(id);
-  // Longest path between groups; the groups form no loops, so this settles.
-  const depthOf = Array(groups).fill(0);
-  for (let pass = 0; pass < groups; pass++)
-    for (const v of ids) for (const w of out[v]) if (group[v] !== group[w] && depthOf[group[w]] < depthOf[group[v]] + 1) depthOf[group[w]] = depthOf[group[v]] + 1;
-  return Object.fromEntries(ids.map(id => [id, depthOf[group[id]]]));
-}
-function arrange(ids, edges, sizeOf, dir = 'down', mirror = false) {
-  const depth = layerDepths(ids, edges);
-  const layers = [];
-  for (const id of ids) (layers[depth[id]] ||= []).push(id);
-  const filled = layers.filter(Boolean);
-  orderLayers(filled, edges.filter(e => e.from in depth && e.to in depth && e.from !== e.to), depth);
-  // The mirrored version keeps the same crossings, read the other way round.
-  if (mirror) filled.forEach(l => l.reverse());
-  const sz = Object.fromEntries(ids.map(id => [id, sizeOf(id)]));
-  // Along a layer cards sit side by side (rows) or stacked (columns); across layers the gap leaves room for cables.
-  // Run view packs tighter: its cards are for reading, not for wiring.
-  const k = state.view === 'run' ? 0.6 : 1;
-  const [along, across, gapAlong, gapAcross] = dir === 'down' ? ['w', 'h', GAP_X * k, GAP_Y * k] : ['h', 'w', GAP_Y * 0.6 * k, GAP_X * 1.6 * k];
-  const length = layer => layer.reduce((t, id) => t + sz[id][along], 0) + gapAlong * (layer.length - 1);
-  const longest = Math.max(...filled.map(length));
-  const pos = {};
-  let c = PAD + 40;
-  for (const layer of filled) {
-    let a = PAD + 40 + (longest - length(layer)) / 2;
-    for (const id of layer) { pos[id] = dir === 'down' ? { x: a, y: c } : { x: c, y: a }; a += sz[id][along] + gapAlong; }
-    c += Math.max(...layer.map(id => sz[id][across])) + gapAcross;
-  }
-  return pos;
-}
-const layoutBox = (pos, sizeOf) => { const ids = Object.keys(pos); return { w: Math.max(...ids.map(id => pos[id].x + sizeOf(id).w)) - Math.min(...ids.map(id => pos[id].x)), h: Math.max(...ids.map(id => pos[id].y + sizeOf(id).h)) - Math.min(...ids.map(id => pos[id].y)) }; };
-// The sides of two cards that face each other, from their boxes (not their corners): a card clearly above or below
-// the other, with more room between them that way, gets a vertical cable; otherwise it runs sideways, towards the
-// other card. A side kept for a card's tunnels and queues is used only when no other side faces.
-const sidesFor = (pos, e, dir = 'down', sizeOf = size, keep = {}) => {
-  const box = id => { const s = sizeOf(id); return { x: pos[id].x, y: pos[id].y, w: s.w, h: s.h, cx: pos[id].x + s.w / 2, cy: pos[id].y + s.h / 2 }; };
-  const a = box(e.from), b = box(e.to);
-  const gapX = Math.max(b.x - (a.x + a.w), a.x - (b.x + b.w)), gapY = Math.max(b.y - (a.y + a.h), a.y - (b.y + b.h));
-  const vertical = b.cy > a.cy ? { fromSide: 'bottom', toSide: 'top' } : { fromSide: 'top', toSide: 'bottom' };
-  const sideways = b.cx >= a.cx ? { fromSide: 'right', toSide: 'left' } : { fromSide: 'left', toSide: 'right' };
-  const pick = gapY > gapX || (gapY === gapX && dir === 'down') ? [vertical, sideways] : [sideways, vertical];
-  return pick.find(s => keep[e.from] !== s.fromSide && keep[e.to] !== s.toSide) ?? pick[0];
-};
+// Arrange's own geometry (layers by call depth, the order with the fewest crossings, facing sides) is core/arrange.
+// Run view packs tighter: its cards are for reading, not for wiring.
+const arrange = (ids, edges, sizeOf, dir = 'down', mirror = false) => KopplerArrange.arrange(ids, edges, sizeOf, dir, mirror, { pad: PAD, tight: state.view === 'run' });
+const layoutBox = KopplerArrange.layoutBox;
+const sidesFor = (pos, e, dir = 'down', sizeOf = size, keep = {}) => KopplerArrange.sidesFor(pos, e, dir, sizeOf, keep);
 
 // Lays the board out. Several versions are possible (down or across, and each mirrored); they are ranked by how large the
 // whole board shows, and `version` picks one (0 = the best). Cards are measured at full size whatever the zoom, so the
@@ -3095,7 +2991,7 @@ function size(id) {
 
 function portPoint(id, side) {
   const n = state.nodes[id] ?? state.infra[id], { w, h } = size(id);
-  const p = { top: { x: n.x + w / 2, y: n.y }, right: { x: n.x + w, y: n.y + h / 2 }, bottom: { x: n.x + w / 2, y: n.y + h }, left: { x: n.x, y: n.y + h / 2 } }[side];
+  const p = KopplerCables.sidePoint({ x: n.x, y: n.y, w, h }, side);
   // A card's port ring is snapped to whole pixels: the cable ends on the ring as drawn, so the plug sits in its middle.
   const r = state.nodes[id] && world.querySelector(`.node[data-id="${CSS.escape(id)}"] .port[data-side="${side}"]`)?.getBoundingClientRect();
   if (!r?.width) return p;
@@ -3110,30 +3006,8 @@ function nearestSide(id, p) {
   }, { side: 'left', d: Infinity }).side;
 }
 
-// Cable leaves and enters along each socket's side; a null side means a free end.
-function cableCurve(a, aSide, b, bSide) {
-  const lead = clamp(Math.hypot(b.x - a.x, b.y - a.y) * 0.4, 30, 140);
-  const [ax, ay] = SIDES[aSide], [bx, by] = bSide ? SIDES[bSide] : [0, 0];
-  return [a, { x: a.x + ax * lead, y: a.y + ay * lead }, { x: b.x + bx * lead, y: b.y + by * lead }, b];
-}
-// Every cable is a curve, through the waypoints the user placed if any.
-function cablePath(a, aSide, b, bSide) {
-  const [, c1, c2] = cableCurve(a, aSide, b, bSide);
-  return `M${a.x},${a.y} C${c1.x},${c1.y} ${c2.x},${c2.y} ${b.x},${b.y}`;
-}
-// A cable through the waypoints the user placed: it leaves and enters along the sockets' sides and bends smoothly at
-// each point (Catmull-Rom, as Béziers).
-function throughPath(a, aSide, b, bSide, points) {
-  const lead = 40, A = { x: a.x + SIDES[aSide][0] * lead, y: a.y + SIDES[aSide][1] * lead }, B = bSide ? { x: b.x + SIDES[bSide][0] * lead, y: b.y + SIDES[bSide][1] * lead } : b;
-  const pts = [A, ...points, B];
-  let d = `M${a.x},${a.y} L${A.x},${A.y}`;
-  for (let i = 0; i < pts.length - 1; i++) {
-    const p0 = pts[i - 1] ?? a, p1 = pts[i], p2 = pts[i + 1], p3 = pts[i + 2] ?? b;
-    d += ` C${p1.x + (p2.x - p0.x) / 6},${p1.y + (p2.y - p0.y) / 6} ${p2.x - (p3.x - p1.x) / 6},${p2.y - (p3.y - p1.y) / 6} ${p2.x},${p2.y}`;
-  }
-  return `${d} L${b.x},${b.y}`;
-}
-
+// The curve a cable is drawn as, plain or through the waypoints the user placed, is core/cables.
+const { cablePath, throughPath } = KopplerCables;
 
 function cableEl(a, aSide, b, bSide, cls, route) {
   const g = document.createElementNS(SVG, 'g');
@@ -3169,15 +3043,9 @@ function setCable(g, a, aSide, b, bSide, route) {
 
 // Arrange sets the order of the cables along each side of a card, by where their other end sits, and clears any
 // waypoints: every cable is a plain curve after it, the same as one the user draws.
-const across = side => side === 'left' || side === 'right';
 function styleCables() {
-  const boxes = [...Object.keys(state.nodes).map(id => ({ id, ...state.nodes[id], ...size(id) })), ...Object.entries(state.infra ?? {}).map(([id, p]) => ({ id, ...p, ...size(id) }))];
-  const slots = new Map();
-  for (const e of state.edges) for (const [end, id, side, other] of [['from', e.from, e.fromSide, e.to], ['to', e.to, e.toSide, e.from]]) { const k = `${id}|${side}`; if (!slots.has(k)) slots.set(k, []); slots.get(k).push({ e, end, side, other }); }
-  for (const list of slots.values()) {
-    const at = x => { const o = boxes.find(b => b.id === x.other); return across(x.side) ? o.y + o.h / 2 : o.x + o.w / 2; };
-    list.sort((p, q) => at(p) - at(q)).forEach((x, n) => { x.e[`${x.end}Slot`] = n; });
-  }
+  const boxes = Object.fromEntries([...Object.keys(state.nodes).map(id => [id, { ...state.nodes[id], ...size(id) }]), ...Object.entries(state.infra ?? {}).map(([id, p]) => [id, { ...p, ...size(id) }])]);
+  KopplerCables.orderSlots(state.edges, id => boxes[id]);
   for (const e of state.edges) { delete e.style; delete e.via; delete e.points; }
 }
 
@@ -3392,32 +3260,14 @@ function drawWires() {
   }
   drawFlowLinks();
   // Several cables on one side of a card spread along it, ordered by where they go, so they fan out instead of leaving from one point.
-  const ends = new Map(), offset = {};
-  state.edges.forEach((e, i) => { for (const [end, id, side, other, slot] of [['from', e.from, e.fromSide, e.to, e.fromSlot], ['to', e.to, e.toSide, e.from, e.toSlot]]) { const k = `${id}|${side}`; if (!ends.has(k)) ends.set(k, []); ends.get(k).push({ key: `${i}|${end}`, other, slot: slot ?? Infinity, i }); } });
-  for (const [k, list] of ends) {
-    const [id, side] = k.split('|'), along = SIDES[side][0] === 0 ? 'x' : 'y', room = along === 'x' ? size(id).w : size(id).h;
-    // The order Arrange gave them; cables drawn since go after, in the order they were drawn. Moving a card never reorders them.
-    list.sort((a, b) => a.slot - b.slot || a.i - b.i);
-    // Tunnels stacked under a card cover the left of its bottom edge: cables leave from what is still free.
-    const under = side === 'bottom' ? tunnelsLedBy(id).filter(t => t.pos.y > state.nodes[id].y && t.pos.x < state.nodes[id].x + room && t.pos.x + t.el.offsetWidth > state.nodes[id].x) : [];
-    const atRight = under.length && under.every(t => Math.abs(t.pos.x + t.el.offsetWidth - state.nodes[id].x - room) < 2);
-    const covered = under.length ? Math.max(...under.map(t => t.el.offsetWidth + 12)) : 0;
-    const free = covered && room - covered >= 56 ? room - covered : 0, shift = !free ? 0 : atRight ? free / 2 - room / 2 : covered + free / 2 - room / 2;
-    const spread = (len, n) => n > 1 ? Math.min(26, (len - 48) / (n - 1)) : 0;
-    let step = list.length > 1 ? Math.min(26, ((free || room) - (free ? 20 : 48)) / (list.length - 1)) : 0, centre = shift;
-    // Cables that all go to one card, onto the side facing this one, spread around the middle of the stretch both cards
-    // share, with the same spacing on both, so they run straight across instead of slanting into each other.
-    const other = list.every(x => x.other === list[0].other) && state.nodes[list[0].other] ? list[0].other : null;
-    const facing = other && list.every(x => { const e = state.edges[x.i]; return (x.key.endsWith('|from') ? e.toSide : e.fromSide) === OPPOSITE[side]; });
-    if (facing && !shift) {
-      const start = n => state.nodes[n][along], length = n => along === 'x' ? size(n).w : size(n).h;
-      const lo = Math.max(start(id), start(other)), hi = Math.min(start(id) + room, start(other) + length(other));
-      const both = Math.min(step, spread(length(other), list.length));
-      if (hi - lo >= both * (list.length - 1) + 32) { step = both; centre = (lo + hi) / 2 - (start(id) + room / 2); }
-    }
-    list.forEach((x, j) => { offset[x.key] = centre + (j - (list.length - 1) / 2) * step; });
-    if (list.length === 1 && !centre) world.querySelector(`.node[data-id="${id}"] .port[data-side="${side}"]`)?.classList.add('on');
-  }
+  // Tunnels stacked under a card cover part of its bottom edge: cables leave from what is still free.
+  const coveredBelow = id => {
+    const node = state.nodes[id], room = size(id).w;
+    const under = tunnelsLedBy(id).filter(t => t.pos.y > node.y && t.pos.x < node.x + room && t.pos.x + t.el.offsetWidth > node.x);
+    return { covered: under.length ? Math.max(...under.map(t => t.el.offsetWidth + 12)) : 0, atRight: !!under.length && under.every(t => Math.abs(t.pos.x + t.el.offsetWidth - node.x - room) < 2) };
+  };
+  const { offset, onPort } = KopplerCables.endOffsets(state.edges, { cardOf: id => state.nodes[id] && { ...state.nodes[id], ...size(id) }, coveredBelow });
+  for (const { id, side } of onPort) world.querySelector(`.node[data-id="${id}"] .port[data-side="${side}"]`)?.classList.add('on');
   const endPoint = (id, side, key) => { const p = portPoint(id, side), d = offset[key] ?? 0; return SIDES[side][0] === 0 ? { ...p, x: p.x + d } : { ...p, y: p.y + d }; };
   state.edges.forEach((edge, i) => {
     const tip = endPoint(edge.to, edge.toSide, `${i}|to`);

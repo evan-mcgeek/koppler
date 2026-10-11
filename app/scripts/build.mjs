@@ -13,6 +13,8 @@ const app = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'),
 // Shared modules the page still loads as plain scripts, each under the global name the page calls it by. Gone once the
 // page is built from the same modules.
 const forPage = {
+  arrange: 'KopplerArrange',
+  cables: 'KopplerCables',
   kinds: 'KopplerKinds',
   plan: 'KopplerPlan',
   ports: 'KopplerPorts',
