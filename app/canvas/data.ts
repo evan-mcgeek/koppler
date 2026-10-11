@@ -5,7 +5,10 @@ import type { Clone, Registry } from '../src/data.ts';
 
 export interface SavedBoard {
   env?: string;
-  nodes?: Record<string, { x: number; y: number; branch?: string } | undefined>;
+  nodes?: Record<
+    string,
+    { x: number; y: number; branch?: string; run?: string; platform?: string; note?: string } | undefined
+  >;
   edges?: { from: string; to: string; fromSide?: Side; toSide?: Side }[];
 }
 export interface Loaded {

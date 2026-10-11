@@ -37,8 +37,7 @@ test('the page shows the stack, its environment and the board the server kept', 
   await expect(page.getByRole('banner')).toContainText('QA');
   await expect(card(page, 'orders')).toContainText('Orders API');
   await expect(card(page, 'orders')).toContainText('.NET');
-  await expect(card(page, 'orders')).toContainText('localhost:5001');
-  await expect(card(page, 'orders')).toContainText('main');
+  await expect(card(page, 'orders').getByLabel('Branch').locator('option:checked')).toHaveText('main');
   await expect(page.locator('.svelte-flow__edge')).toHaveCount(4);
 });
 
@@ -118,11 +117,11 @@ test('Arrange places every card, and zoomed out a card shows its short form', as
   const before = await middle(card(page, 'orders'));
   await page.getByRole('button', { name: 'Arrange' }).click();
   await expect.poll(async () => (await middle(card(page, 'orders'))).y).not.toBe(before.y);
-  await expect(card(page, 'orders').locator('dl')).toBeVisible();
+  await expect(card(page, 'orders').locator('.body')).toBeVisible();
   // Arrange is still moving the view when the first click lands: zoom out until the short form shows.
   await expect(async () => {
     await page.getByRole('button', { name: 'Zoom out' }).click({ timeout: 500 });
     await expect(card(page, 'orders').locator('.glance')).toBeVisible({ timeout: 300 });
   }).toPass();
-  await expect(card(page, 'orders').locator('dl')).toHaveCount(0);
+  await expect(card(page, 'orders').locator('.body')).toHaveCount(0);
 });
