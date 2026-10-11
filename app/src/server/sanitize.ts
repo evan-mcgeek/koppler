@@ -53,6 +53,17 @@ const TUNNEL = /^tunnel:[\w.-]{1,253}:\d{1,5}$/;
 const WHEN = /^\d{4}-\d\d-\d\dT[\d:.]+Z$/;
 const TIDY = ['down', 'right'];
 const SIDES = ['top', 'right', 'bottom', 'left'];
+const slot = (value: unknown) =>
+  Number.isInteger(value) && (value as number) >= 0 && (value as number) < 1000 ? value : null;
+const shift = (value: unknown) => (typeof value === 'number' && Math.abs(value) <= 10000 ? value : null);
+/** The waypoints a cable runs through. */
+const waypoints = (value: unknown): Point[] | null => {
+  const points = listOf(value)
+    .filter(point => isObject(point) && Number.isFinite(point['x']) && Number.isFinite(point['y']))
+    .slice(0, 20)
+    .map(xy);
+  return points.length ? points : null;
+};
 const cables = (value: unknown) =>
   listOf(value)
     .map(fieldsOf)
@@ -74,11 +85,17 @@ function boardLayout(given: unknown): BoardLayout | null {
       .slice(0, 100)
       .map(([key, at]) => [key, xy(at)]),
   );
-  const isSides = (value: unknown) =>
-    Array.isArray(value) && value.length === 2 && value.every(side => SIDES.includes(side as string));
+  // Per cable: its two sides, two unused places, its slot on each side, its waypoints, and where Arrange centred
+  // each end. Older boards hold only the sides.
   const sides = Object.fromEntries(
     Object.entries(fieldsOf(given['sides']))
-      .filter(([key, value]) => key.split('>').length === 2 && key.split('>').every(isId) && isSides(value))
+      .filter(([key]) => key.split('>').length === 2 && key.split('>').every(isId))
+      .flatMap(([key, value]): [string, unknown[]][] => {
+        const [fromSide, toSide, , , fromSlot, toSlot, points, fromShift, toShift] = listOf(value);
+        if (!SIDES.includes(fromSide as string) || !SIDES.includes(toSide as string)) return [];
+        const more = [null, null, slot(fromSlot), slot(toSlot), waypoints(points), shift(fromShift), shift(toShift)];
+        return [[key, [fromSide, toSide, ...(more.some(one => one !== null) ? more : [])]]];
+      })
       .slice(0, 500),
   );
   const tidy = given['tidy'];
@@ -172,6 +189,11 @@ export function sanitizeLayout(input: unknown): Loose | null {
     to: edge['to'],
     fromSide: text(edge['fromSide'], 8),
     toSide: text(edge['toSide'], 8),
+    ...(slot(edge['fromSlot']) !== null && { fromSlot: edge['fromSlot'] }),
+    ...(slot(edge['toSlot']) !== null && { toSlot: edge['toSlot'] }),
+    ...(shift(edge['fromShift']) !== null && { fromShift: edge['fromShift'] }),
+    ...(shift(edge['toShift']) !== null && { toShift: edge['toShift'] }),
+    ...(waypoints(edge['points']) && { points: waypoints(edge['points']) }),
   }));
   // Where tunnel cards sit, keyed by tunnel:<host>:<port>.
   const infra = Object.fromEntries(

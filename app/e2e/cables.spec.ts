@@ -57,3 +57,44 @@ test.describe('a card joined to one below it that sits off to the side', () => {
     expect(await ends(page)).toEqual(before);
   });
 });
+
+test.describe('two cards with no cable yet', () => {
+  test.use({
+    board: {
+      env: 'qa',
+      mode: 'auto',
+      zoom: 1,
+      pan: { x: 0, y: 0 },
+      nodes: {
+        web: { x: 120, y: 80, run: 'cli', branch: 'main' },
+        orders: { x: 700, y: 420, run: 'cli', branch: 'main' },
+      },
+      edges: [],
+    },
+  });
+
+  test('a cable drawn through a waypoint comes back from the copy the server keeps', async ({ page }) => {
+    const web = await card(page, 'Web Shop').boundingBox();
+    const orders = await card(page, 'Orders API').boundingBox();
+    if (!web || !orders) throw new Error('no cards');
+    await page.mouse.move(web.x + 50, web.y + 20);
+    const port = await card(page, 'Web Shop').locator('.port[data-side="top"]').boundingBox();
+    if (!port) throw new Error('no port');
+    await page.mouse.move(port.x + 8, port.y + 8);
+    await page.mouse.down();
+    await page.mouse.move(orders.x + 100, web.y - 20, { steps: 6 });
+    await page.mouse.up();
+    const saved = page.waitForResponse(r => r.url().includes('/state?') && r.request().method() === 'POST' && r.ok());
+    await page.mouse.move(orders.x + 100, orders.y + 60, { steps: 6 });
+    await page.mouse.down();
+    await page.mouse.up();
+    await saved;
+    const drawn = () => page.locator('#wires .cable .wire').getAttribute('d');
+    const before = await drawn();
+    // Another browser, or this one after its site data is cleared: only what the server kept.
+    await page.evaluate('localStorage.clear(); window.name = ""');
+    await page.reload();
+    await expect(page.locator('#ends .plug')).toBeVisible();
+    expect(await drawn()).toBe(before);
+  });
+});
