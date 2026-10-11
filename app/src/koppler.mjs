@@ -19,7 +19,7 @@ import { up } from './engine/up.ts';
 import { recipesCommand } from './engine/recipes.ts';
 import { queryCommand } from './query.mjs';
 import { findCommand } from './engine/research.ts';
-import { investigate } from './investigate.mjs';
+import { investigate } from './engine/investigate.ts';
 import { deployed } from './deployed.mjs';
 import { appliedCommand as applied, historyCommand, planCommand, runningNames } from './engine/runs.ts';
 import { APPROVE } from './engine/checks.ts';
@@ -44,7 +44,7 @@ const init = async args => {
   const offline = args.includes('--no-fetch');
   initStack(args.filter(a => a !== '--pick' && a !== '--no-fetch')); console.log('');
   if (!offline) { await updateClones(); console.log(''); }
-  investigate([], { afterSync: true });
+  investigate({ afterSync: true });
   const registry = readData('registry');
   if (!registry || !(pick || (!Object.keys(registry.apps).length && process.stdout.isTTY))) return;
   if (registry.setup && !pick && !process.stdout.isTTY) return;
@@ -96,7 +96,7 @@ const discover = async args => {
   const names = flagValue(args, '--find');
   if (names !== undefined) return findCommand([...names.split(/[,\s]+/).filter(Boolean), ...args.filter(a => a === '--no-github')]);
   if (!args.includes('--no-fetch')) { await updateClones(); console.log(''); }
-  investigate([]);
+  investigate();
   console.log('');
   discoverCommand(args.filter(a => a === '--apply'));
   if (args.includes('--deployed')) { console.log(''); await deployed(positional(args, ['--find'])); }
