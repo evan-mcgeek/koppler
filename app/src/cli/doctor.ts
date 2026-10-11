@@ -10,6 +10,7 @@ import { checkTools, missingTunnels, report } from '../engine/checks.ts';
 import { needs } from '../engine/needs.ts';
 import { live } from '../engine/runs.ts';
 import { tunnelsOf } from '../engine/up.ts';
+import { cableTest, type Tested } from '../server/cable-test.ts';
 import { APP, BIN } from '../paths.ts';
 import { confirm, envOf, positional } from './output.ts';
 import { fail } from '../failure.ts';
@@ -75,15 +76,6 @@ function secretTests(stack: Registry, ids: string[], env: string) {
   });
 }
 
-/** One connection's test, as the canvas's Flow check runs it. */
-interface Tested {
-  ok: boolean;
-  unsure?: boolean;
-  text: string;
-  detail?: string;
-}
-type CableTest = (stack: Registry, body: Record<string, unknown>) => Promise<Tested>;
-
 /**
  * Every connection of what runs now, tested the way the canvas's Flow check does: each app answers, each cable reaches
  * its local app, each tunnel reaches its database or cache.
@@ -111,7 +103,6 @@ async function flowCheck(args: string[]): Promise<void> {
       })),
     ),
   ];
-  const { cableTest } = (await import('../status-watch.mjs')) as { cableTest: CableTest };
   const results: { label: string; result: Tested }[] = [];
   for (const { label, body } of jobs) results.push({ label, result: await cableTest(stack, body) });
   if (args.includes('--json')) {
@@ -125,7 +116,7 @@ async function flowCheck(args: string[]): Promise<void> {
   } else
     for (const { label, result } of results) {
       const state = result.ok ? 'ok     ' : result.unsure ? 'unsure ' : 'FAILED ';
-      console.log(`${state} ${label}: ${result.text}${result.ok ? '' : ` (${String(result.detail)})`}`);
+      console.log(`${state} ${label}: ${result.text}${result.ok ? '' : ` (${result.detail})`}`);
     }
   if (results.some(({ result }) => !result.ok && !result.unsure)) process.exitCode = 1;
 }

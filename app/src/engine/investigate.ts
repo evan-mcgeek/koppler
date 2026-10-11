@@ -85,7 +85,7 @@ export const portsIn = (text: string): number[] => [
 export function dotnetPorts(launchSettingsText: string): FoundPort[] {
   let profiles: Record<string, { applicationUrl?: string } | null>;
   try {
-    const settings = JSON.parse(launchSettingsText.replace(/^﻿/, '')) as { profiles?: typeof profiles };
+    const settings = JSON.parse(launchSettingsText.replace(/^\uFEFF/, '')) as { profiles?: typeof profiles };
     profiles = settings.profiles ?? {};
   } catch {
     return portsIn(launchSettingsText).map(port => ({ port, where: 'launchSettings.json' }));

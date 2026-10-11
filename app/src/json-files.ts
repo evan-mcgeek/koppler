@@ -5,7 +5,7 @@ import path from 'node:path';
 /** The file's content, or null when it is missing or not JSON. A byte order mark, as editors on Windows add, is fine. */
 export function readJson(file: string): unknown {
   try {
-    return JSON.parse(fs.readFileSync(file, 'utf8').replace(/^﻿/, ''));
+    return JSON.parse(fs.readFileSync(file, 'utf8').replace(/^\uFEFF/, ''));
   } catch {
     return null;
   }

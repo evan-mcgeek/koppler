@@ -4,10 +4,7 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import http from 'node:http';
-import https from 'node:https';
-import dns from 'node:dns';
 import net from 'node:net';
-import tls from 'node:tls';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFile, spawn } from 'node:child_process';
@@ -18,13 +15,13 @@ import { applyFindings, current as currentFindingsStack, discover } from './engi
 import { appendAnswer, clearMessages, readMessages } from './engine/messages.ts';
 import { fetchPresets, sanitizeLayout, sanitizePrompt } from './server/sanitize.ts';
 import { appendDebugLog, clearDebugLog, tail } from './server/logs.ts';
+import { cableTest } from './server/cable-test.ts';
+import { secretRequest, secretsStatus } from './server/secrets.ts';
 import * as kinds from './core/kinds.ts';
-import * as launch from './core/launch.ts';
 import { recipesFor } from './engine/recipes.ts';
-import { APP, BIN, LOGS, STATE as STATE_HOME, TEMP } from './paths.ts';
+import { LOGS, STATE as STATE_HOME, TEMP } from './paths.ts';
 import { redact } from './scrub.ts';
 import { listenerPid } from './engine/listen.ts';
-import * as kp from './core/plan.ts';
 import { readData, writeData } from './data.ts';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -372,157 +369,9 @@ function startServer() {
   });
 }
 
-// Credentials: the secrets each app declares per environment, and whether each is stored. Names and fetch steps only, never values.
 const loadRegistry = () => readData('registry');
-const storeOf = (registry, app, env) => env === registry.envs[0] ? app : `${app}@${env}`;
-export function declaredSecrets(registry) {
-  const out = {};
-  for (const [id, base] of Object.entries(registry?.apps ?? {})) for (const env of registry.envs) {
-    const app = env === registry.envs[0] ? base : { ...base, ...(base.envs?.[env] ?? {}) };
-    const list = (app.secrets ?? []).filter(x => x && typeof x.env === 'string' && /^[A-Za-z_][A-Za-z0-9_]*$/.test(x.env));
-    // Fetch steps written for the first environment are not offered for another one.
-    const own = env === registry.envs[0] || !!base.envs?.[env]?.secrets;
-    if (list.length) (out[id] ||= {})[env] = list.map(x => ({ name: x.env, ...(typeof x.type === 'string' && /^[a-z]{1,20}$/.test(x.type) && { type: x.type }), ...(own && x.when && { when: String(x.when) }),
-      ...(own && x.fetch?.cli && { fetchCli: String(x.fetch.cli).replaceAll('<skill>', APP) }), // The panel stores the value itself, so the closing "then run secret-set" step is left out.
-      ...(own && x.fetch?.ui && { fetchUi: String(x.fetch.ui).replace(/[,;.]?\s*(and\s+|then\s+)*run:?\s+(<skill>\/bin\/secret-set|koppler secret set)\b.*$/is, '').trim() }) }));
-  }
-  return out;
-}
-const runScript = (name, args, input, env) => new Promise(resolve => {
-  const child = execFile(path.join(BIN, name), args, { timeout: 60000, maxBuffer: 64 * 1024, ...(env && { env: { ...process.env, ...env } }) }, (err, stdout) => resolve({ code: err ? (err.code ?? 1) : 0, out: String(stdout).trim() }));
-  if (input !== undefined) child.stdin.end(input); else child.stdin.end();
-});
-let storedNames = {}, storedAt = 0;
-async function refreshStored(force) {
-  if (!force && Date.now() - storedAt < 5000) return;
-  storedAt = Date.now();
-  const { code, out } = await runScript('secret-store', ['names']);
-  if (code === 0) storedNames = Object.fromEntries(out.split('\n').filter(Boolean).map(l => { const [store, names = ''] = l.split(/:\s*/); return [store, names.split(/\s+/).filter(Boolean)]; }));
-}
-async function secretsStatus() {
-  const registry = loadRegistry();
-  if (!registry) return {};
-  await refreshStored();
-  const declared = declaredSecrets(registry);
-  for (const [id, envs] of Object.entries(declared)) for (const [env, list] of Object.entries(envs)) for (const x of list) x.stored = (storedNames[storeOf(registry, id, env)] ?? []).includes(x.name);
-  return declared;
-}
-// A request from the Credentials panel: only for a secret the stack declares for that app and environment.
-async function secretRequest(action, body) {
-  const registry = loadRegistry(), { app, env, name } = body ?? {};
-  const declared = registry && typeof app === 'string' && typeof env === 'string' ? declaredSecrets(registry)[app]?.[env]?.find(x => x.name === name) : null, known = !!declared;
-  if (!known) return { status: 400, body: { error: 'The stack does not declare that credential.' } };
-  const store = storeOf(registry, app, env);
-  if (action === 'set') {
-    if (typeof body.value !== 'string' || !body.value.trim() || body.value.length > 16384) return { status: 400, body: { error: 'Paste the value first.' } };
-    // A protected environment's value is stored so that every read asks the user.
-    const { code } = await runScript('secret-store', ['set', store, name], body.value.replace(/\r?\n$/, ''), { KOPPLER_SECRET_PROTECTED: kp.isProtected(registry, env) ? '1' : '0' });
-    await refreshStored(true);
-    return code === 0 ? { status: 200, body: { ok: true } } : { status: 500, body: { error: 'Could not store it.' } };
-  }
-  if (action === 'remove') { await runScript('secret-store', ['remove', store, name]); await refreshStored(true); return { status: 200, body: { ok: true } }; }
-  const { code, out } = await runScript('secret-test', [store, name, ...(declared.type ? ['--type', declared.type] : [])]);
-  return { status: 200, body: { ok: code === 0, message: out || 'failed: the check did not finish' } };
-}
-
-// The Test button on a cable. An app cable asks the callee's local address for any answer; a tunnel link opens its port and,
-// when the app has one stored credential of that kind, logs in with it. Only this Mac's own addresses are ever tried.
-const LOOPBACK = /^(localhost|127(\.\d{1,3}){3})$/;
-const KIND_BY_PORT = { 5432: 'postgres', 3306: 'mysql', 6379: 'redis' };
-const answers = url => new Promise(resolve => {
-  const started = Date.now(), done = value => { clearTimeout(timer); resolve(value); };
-  const req = (url.protocol === 'https:' ? https : http).get(url, { rejectUnauthorized: !LOOPBACK.test(url.hostname) }, res => {
-    let body = ''; res.on('data', c => { if (body.length < 2048) body += c; }); res.on('end', () => done({ status: res.statusCode, ms: Date.now() - started, body }));
-  });
-  const timer = setTimeout(() => { req.destroy(); done(null); }, 4000);
-  req.once('error', () => done(null));
-});
-const opens = (host, port) => new Promise(resolve => {
-  const socket = net.connect({ host, port, timeout: 1500 }), done = open => { socket.destroy(); resolve(open); };
-  socket.once('connect', () => done(true)); socket.once('timeout', () => done(false)); socket.once('error', () => done(false));
-});
+// Tests of the same tunnel wait for each other.
 const tunnelLanes = new Map();
-// Whether a real server of that kind answers through a tunnel: the tunnel program listens even when nothing is behind it.
-// Postgres answers an SSL request with one byte, MySQL greets first, Redis and Valkey answer PING (in plain text or over TLS).
-const speaks = (kind, host, port) => {
-  const talk = (open, hello, good) => new Promise(resolve => {
-    const socket = open(), done = value => { clearTimeout(timer); socket.destroy(); resolve(value); }, timer = setTimeout(() => done(false), 6000);
-    socket.once(open === secure ? 'secureConnect' : 'connect', () => { if (hello) socket.write(hello); });
-    socket.once('data', data => done(good(data))); socket.once('error', () => done(false)); socket.once('close', () => done(false));
-  });
-  const plain = () => net.connect({ host, port }), secure = () => tls.connect({ host, port, rejectUnauthorized: false });
-  if (kind === 'postgres') return talk(plain, Buffer.from([0, 0, 0, 8, 4, 210, 22, 47]), d => d[0] === 83 || d[0] === 78);
-  if (kind === 'mysql') return talk(plain, null, d => d.length > 4 && (d[4] === 10 || d[4] === 255));
-  const pong = d => /^[+-]/.test(String(d));
-  // Plain and TLS are tried at once: a TLS-only cache never answers a plain PING, and waiting for that first would eat the time.
-  return Promise.all([talk(plain, 'PING\r\n', pong), talk(secure, 'PING\r\n', pong)]).then(r => r.some(Boolean));
-};
-const leadsHere = name => dns.promises.lookup(name, { all: true }).then(list => list.some(r => r.address === '::1' || LOOPBACK.test(r.address)), () => false);
-// The -LOCAL launch profile's settings of a .NET caller for an environment, to see where it is pointed.
-const localProfile = (registry, id, env) => {
-  try {
-    const app = registry.apps[id], file = path.join(readData('local').apps[id].path, app.launchSettings);
-    const profiles = JSON.parse(fs.readFileSync(file, 'utf8').replace(/^\uFEFF/, '')).profiles ?? {}, name = launch.launchProfile(app, profiles, env).local, profile = profiles[name];
-    // When Koppler started the app, to tell a setting written after that. ponytail: the file's time, so any later edit of it asks for a restart
-    let started = null; try { started = Date.parse(JSON.parse(fs.readFileSync(path.join(STATE_DIR, 'procs', `${id}.json`), 'utf8')).startedAt); } catch {}
-    return profile ? { name, env: profile.environmentVariables ?? {}, changed: fs.statSync(file).mtimeMs, started } : { name, env: null };
-  } catch { return null; }
-};
-const KIND_NAME = { postgres: 'Postgres', mysql: 'MySQL', redis: 'Redis or Valkey' };
-// `auto` is a check the canvas runs by itself: it never reads a production credential, which would open a Keychain prompt.
-export async function cableTest(registry, body, probe = { answers, opens, speaks, leadsHere, profile: (id, env) => localProfile(registry, id, env), login: (app, env, name) => secretRequest('test', { app, env, name }).then(r => r.body) }) {
-  const env = registry?.envs?.includes(body?.env) ? body.env : registry?.envs?.[0], appOf = id => { const base = Object.hasOwn(registry?.apps ?? {}, id) ? registry.apps[id] : null; return base && (env === registry.envs[0] ? base : { ...base, ...(base.envs?.[env] ?? {}) }); };
-  if (typeof body?.node === 'string') {
-    // An app by itself: it answers on its local address; a Lambda also has its function deployed and its queue trigger on.
-    const app = appOf(body.node);
-    let url; try { url = new URL(app.url); } catch { return { ok: false, unsure: true, text: 'Cannot test', detail: app ? `${app.name} has no local address in the stack yet.` : 'That app is not in the stack.' }; }
-    if (!/^https?:$/.test(url.protocol) || !LOOPBACK.test(url.hostname)) return { ok: false, unsure: true, text: 'Cannot test', detail: `${app.name}'s address is not on this Mac.` };
-    if (app.kind !== 'lambda') { const r = await probe.answers(url); return r ? { ok: true, text: `Answers, ${r.ms} ms`, detail: `${app.name} answers on ${url.host} (HTTP ${r.status}).` } : { ok: false, text: 'No answer', detail: `Nothing answers on ${url.host}. ${app.name} is not running.` }; }
-    const r = await probe.answers(new URL('/health', url));
-    if (!r) return { ok: false, text: 'No answer', detail: `Nothing answers on ${url.host}. ${app.name} is not running.` };
-    let health = null; try { health = JSON.parse(r.body); } catch {}
-    if (health?.koppler !== 'lambda') return { ok: true, text: 'Answers', detail: `${app.name} answers on ${url.host}. It was started before the deeper check existed; restart it to have its function and queue checked too.` };
-    return health.ok ? { ok: true, text: 'Function ready', detail: `${app.name}: the emulator is up, the function is deployed and its queue trigger is on.` }
-      : { ok: false, text: 'Function not ready', detail: `${app.name} answers on ${url.host}, but ${health.error ?? `its function is ${health.function ?? 'missing'} and its queue trigger ${health.trigger ?? 'missing'}`}.` };
-  }
-  if (typeof body?.to === 'string') {
-    // An app cable: the callee answers, and the caller is set to call it.
-    const app = appOf(body.to), caller = appOf(body.from);
-    let url; try { url = new URL(app.url); } catch { return { ok: false, unsure: true, text: 'Cannot test', detail: app ? `${app.name} has no local address in the stack yet.` : 'That app is not in the stack.' }; }
-    if (!/^https?:$/.test(url.protocol) || !LOOPBACK.test(url.hostname)) return { ok: false, unsure: true, text: 'Cannot test', detail: `${app.name}'s address is not on this Mac.` };
-    const r = await probe.answers(url);
-    if (!r) return { ok: false, text: 'No answer', detail: `Nothing answers on ${url.host}. Start ${app.name} first.` };
-    const up = `${app.name} answers on ${url.host} (HTTP ${r.status})`, call = caller?.consumes?.[body.to], settings = call?.how === 'env' && caller.kind === 'dotnet' ? [].concat(call.env ?? []) : [];
-    const profile = settings.length ? probe.profile(body.from, env) : null;
-    if (!profile) return { ok: true, text: `Answers, ${r.ms} ms`, detail: `${up}.${caller ? ` Whether ${caller.name} is set to call it could not be checked here.` : ''}` };
-    const portOf = value => { try { return new URL(value).port; } catch { return null; } };
-    const wrong = !profile.env ? `it has no ${profile.name} profile yet` : settings.map(name => !profile.env[name] ? `${name} is missing from ${profile.name}` : portOf(profile.env[name]) !== url.port ? `${name} in ${profile.name} points elsewhere` : null).find(Boolean);
-    if (!wrong && profile.started && profile.changed > profile.started) return { ok: false, text: 'Restart needed', detail: `${up}, and ${caller.name}'s ${profile.name} profile points at it, but ${caller.name} was started before that profile was last changed. Restart ${caller.name} to pick it up.` };
-    return wrong ? { ok: false, text: 'Not pointed at it', detail: `${up}, but ${caller.name} is not set to call it: ${wrong}.` }
-      : { ok: true, text: `Answers, ${r.ms} ms`, detail: `${up}, and ${caller.name}'s ${profile.name} profile points at it.` };
-  }
-  // A tunnel link: the port is open, a real server answers behind it, the name the app dials leads to it, and its credential logs in.
-  const app = appOf(body?.app), host = String(body?.host ?? ''), port = Number(body?.port);
-  if (!app || !LOOPBACK.test(host) || !Number.isInteger(port) || port < 1 || port > 65535) return { ok: false, unsure: true, text: 'Cannot test', detail: 'That tunnel is not on this Mac.' };
-  const where = `${host}:${port}`;
-  if (!await probe.opens(host, port)) return { ok: false, text: 'Port closed', detail: `Nothing listens on ${where}. The tunnel is not running.` };
-  const kind = KIND_BY_PORT[Number(body.original) || port];
-  if (!kind) return { ok: true, unsure: true, text: 'Port open', detail: `The tunnel on ${where} is open. Koppler cannot tell what kind of server is behind it, so only the port was checked.` };
-  // A tunnel sometimes drops one connection while it serves others, so silence is only believed the third time.
-  let spoke = false; for (let i = 0; i < 3 && !spoke; i++) { if (i) await new Promise(r => setTimeout(r, 400)); spoke = await probe.speaks(kind, host, port); }
-  if (!spoke) return { ok: false, text: 'Nothing behind it', detail: `The tunnel listens on ${where}, but no ${KIND_NAME[kind]} server answers through it. It may have lost its connection: restart the tunnel.` };
-  for (const name of (app.prereqs ?? []).map(p => p?.hosts).filter(n => typeof n === 'string' && /^[a-z0-9.-]{1,253}$/i.test(n)))
-    if (!await probe.leadsHere(name)) return { ok: false, text: 'Name not redirected', detail: `A ${KIND_NAME[kind]} server answers on ${where}, but ${name}, the name ${app.name} dials, does not lead to this Mac. Add its hosts entry (koppler doctor).` };
-  const reached = `A ${KIND_NAME[kind]} server answers through the tunnel on ${where}`, mine = (declaredSecrets(registry)[body.app]?.[env] ?? []).filter(x => x.type === kind);
-  const production = kp.isProtected(registry, env);
-  if (mine.length !== 1 || (body.auto && production)) return { ok: true, text: 'Reachable', detail: `${reached}. ${mine.length === 1 ? `${mine[0].name} was not tried: a production credential is only read when you press the test yourself.` : `${app.name} logs in with its own settings, which Koppler does not hold, so the login itself was not tried.`}` };
-  const r = await probe.login(body.app, env, mine[0].name);
-  if (r?.ok) return { ok: true, text: 'Logged in', detail: `${reached}, and ${app.name}'s ${mine[0].name} logs in.` };
-  const why = String(r?.message ?? r?.error ?? 'the check did not finish');
-  if (/not stored/.test(why)) return { ok: false, text: 'Not stored', detail: `${reached}, but ${mine[0].name} is not stored yet. Store it under Credentials.` };
-  return /^cannot test/.test(why) ? { ok: true, text: 'Reachable', detail: `${reached}. ${mine[0].name} ${why.replace(/^cannot test: /, 'could not be tried: ')}` }
-    : { ok: false, text: 'Login failed', detail: `${reached}, but ${mine[0].name} is rejected: ${why.replace(/^failed: /, '')}` };
-}
 
 // Every tunnel port in the stack, so cards can show whether their database or cache is reachable.
 function tunnelPorts() {

@@ -33,7 +33,7 @@ type Undone =
   /** Handled after the others (a branch, an npm install): the entry stays for now. */
   | { state: 'later' };
 
-const BOM = '﻿';
+const BOM = '\uFEFF';
 const reason = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
 /**

@@ -59,7 +59,7 @@ test('JSON files: a byte order mark is fine, a missing folder is made, and nothi
   writeJson(file, { a: 1 });
   expect(readJson(file)).toEqual({ a: 1 });
   expect(fs.readdirSync(path.dirname(file))).toEqual(['settings.json']);
-  fs.writeFileSync(file, '﻿{"b":2}');
+  fs.writeFileSync(file, '\uFEFF{"b":2}');
   expect(readJson(file)).toEqual({ b: 2 });
   expect(readJson(path.join(dir, 'missing.json'))).toBeNull();
 });
