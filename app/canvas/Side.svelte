@@ -2,6 +2,7 @@
   import KindIcon from './KindIcon.svelte';
   import Settings from './Settings.svelte';
   import { board, type StackApp } from './board.svelte.ts';
+  import { live } from './live.svelte.ts';
 
   type Sort = 'name' | 'added';
   const remembered = (): Sort => {
@@ -99,6 +100,12 @@
             >
               <span class="name">{app.name}</span>
             </button>
+            {@const up = live.up(app.id)}
+            {#if up !== null}
+              <span class="live" data-on={up} role="img" aria-label={up ? 'Running' : 'Not answering'}
+                >{up ? '' : '!'}</span
+              >
+            {/if}
             <button
               class="act remove"
               type="button"
@@ -364,6 +371,28 @@
   }
   .act.add {
     color: var(--cable);
+  }
+  .live {
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1;
+  }
+  .live[data-on='true']::before {
+    content: '';
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--ok);
+  }
+  .live[data-on='false'] {
+    background: var(--bad);
+    color: var(--on-accent);
   }
   .empty,
   .note {

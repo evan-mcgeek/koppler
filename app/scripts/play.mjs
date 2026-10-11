@@ -27,18 +27,28 @@ const apps = {
   gateway: one('Gateway', 'node', 4000, ['orders', 'catalog', 'accounts']),
   orders: one('Orders API', 'dotnet', 5001, ['payments', 'catalog'], {
     prereqs: [{ tunnel: 'db.qa.acme.example', port: 5432, what: 'Database (Postgres)' }],
+    publishes: { 'order-events': {} },
   }),
-  payments: one('Payments API', 'dotnet', 5002),
+  payments: one('Payments API', 'dotnet', 5002, ['billing'], { reads: { 'order-events': {} } }),
+  billing: { name: 'Billing', kind: 'other', outside: 'a hosted service', deployedUrl: 'https://api.billing.example' },
   catalog: one('Catalog API', 'node', 5003),
   accounts: one('Accounts API', 'dotnet', 5004),
   receipts: one('Receipts', 'lambda', 5005, ['orders']),
 };
 // Accounts API is left out of the clones, to show an app that is not cloned.
-const cloned = Object.keys(apps).filter(id => id !== 'accounts');
+const cloned = Object.keys(apps).filter(id => id !== 'accounts' && id !== 'billing');
 const write = (name, value) => {
   fs.writeFileSync(path.join(temp, `${name}.json`), JSON.stringify(value));
 };
-write('registry', { name: 'Acme Shop', envs: ['qa', 'prod'], apps, source: path.join(dir, 'stack') });
+const queues = { 'order-events': { name: 'Order events', type: 'sqs', queue: 'order-events-qa' } };
+write('registry', {
+  name: 'Acme Shop',
+  envs: ['qa', 'prod'],
+  protected: ['prod'],
+  apps,
+  queues,
+  source: path.join(dir, 'stack'),
+});
 write('local', {
   roots: [path.join(dir, 'clones')],
   at: new Date().toISOString(),

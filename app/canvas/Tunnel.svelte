@@ -1,12 +1,18 @@
 <script lang="ts">
   import type { NodeProps } from '@xyflow/svelte';
   import { board, type TunnelNode } from './board.svelte.ts';
+  import { live } from './live.svelte.ts';
 
   const { id, data, selected }: NodeProps<TunnelNode> = $props();
+  const on = $derived(live.tunnel(data.local.split(':').at(-1) ?? '', data.apps));
 </script>
 
 <div class="tunnel" class:selected title={[data.host, ...data.about].join('\n')}>
-  <span class="live" aria-hidden="true"></span>
+  <span
+    class="live"
+    data-on={on}
+    title={on ? 'Tunnel is up' : on === false ? 'Nothing is listening on this port' : 'Not running'}
+  ></span>
   <span class="what">{data.what}</span>
   <span class="local" class:moved={data.moved}>{data.local}</span>
   <button
@@ -51,6 +57,12 @@
     height: 8px;
     border-radius: 50%;
     background: var(--line);
+  }
+  .live[data-on='true'] {
+    background: var(--ok);
+  }
+  .live[data-on='false'] {
+    background: var(--bad);
   }
   .what {
     font-weight: 600;
