@@ -4,7 +4,6 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import vm from 'node:vm';
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { isDeepStrictEqual } from 'node:util';
@@ -29,6 +28,7 @@ import { readActions, updateActions } from './actions.mjs';
 import { appEnv } from './safe-env.mjs';
 import { redact, scrub } from './scrub.mjs';
 import kp from './plan.cjs';
+import { readData } from "./data.js";
 // A first-time setup ends with the full picture: ports, conflicts and calls of every app.
 // With --pick, or on a stack that has no apps yet, init ends on the canvas, where the user ticks the clones that belong to the stack.
 const init = async (args) => {
@@ -51,7 +51,7 @@ const init = async (args) => {
         console.log('');
     }
     investigate([], { afterSync: true });
-    const registry = load('registry.js', 'REGISTRY');
+    const registry = readData('registry');
     if (!registry || !(pick || (!Object.keys(registry.apps).length && process.stdout.isTTY)))
         return;
     if (registry.setup && !pick && !process.stdout.isTTY)
@@ -82,16 +82,6 @@ catch {
     return '';
 } };
 const sleep = ms => new Promise(r => setTimeout(r, ms));
-const load = (file, key) => {
-    try {
-        const sandbox = { window: {} };
-        vm.runInNewContext(fs.readFileSync(path.join(TEMP, file), 'utf8'), sandbox);
-        return sandbox.window[key];
-    }
-    catch {
-        return null;
-    }
-};
 // A restart wrapper keeps flaky tunnels up; stop kills the whole process group, wrapper included.
 export function commandFor(argv, restart) {
     return restart ? ['sh', '-c', 'while :; do "$@"; echo "koppler: exited with $?, restarting in 2s"; sleep 2; done', 'sh', ...argv] : argv;
@@ -238,7 +228,7 @@ function secretTest(store, secret) {
 }
 // How to start a stack app by id, for its kind (kinds.cjs), in the chosen environment.
 function appCommand(id, opts) {
-    const registry = load('registry.js', 'REGISTRY');
+    const registry = readData('registry');
     const base = registry?.apps?.[id];
     if (!base)
         return null;
@@ -253,7 +243,7 @@ function appCommand(id, opts) {
     // A start command written in the shared stack runs only once the user has seen and allowed it, and again after it changes.
     if (startsFromStack(registry, id, env) && !approved(registry.source ?? '', registry))
         fail(`${base.name ?? id} is started by a command from the stack that you have not allowed yet, or that changed since. Review it in your own terminal: ${APPROVE}`);
-    const repo = load('local.js', 'LOCAL')?.apps?.[id]?.path ?? fail(`${id} is not cloned (koppler sync --rescan after cloning)`);
+    const repo = readData('local')?.apps?.[id]?.path ?? fail(`${id} is not cloned (koppler sync --rescan after cloning)`);
     // Settings given for this start (a cable's local address) come from the environment and must win over the launch profile.
     const ctx = { repo, env, id, engine: here, override: Object.keys(opts.setEnv ?? START_ENV ?? {}), envNames: [env, ...(registry.envAliases?.[env] ?? [])] };
     if (app.kind === 'dotnet' && app.launchSettings)
@@ -440,7 +430,7 @@ const table = rows => {
 // latest run log and each named log, all scrubbed of secrets and of everything that names the user or their stack.
 async function debugReport(names) {
     const { stacksHere } = await import('./sync.mjs');
-    const registries = [load('registry.js', 'REGISTRY'), load('state.js', 'SAVED_STATE'), ...stacksHere().map(s => { try {
+    const registries = [readData('registry'), readData('state'), ...stacksHere().map(s => { try {
             return JSON.parse(fs.readFileSync(path.join(s.dir, 'stack.json'), 'utf8'));
         }
         catch {
@@ -485,14 +475,14 @@ async function debugReport(names) {
 }
 // The tunnels a set of apps needs, with shared, moved and loopback-aliased ones worked out (default: the apps on the canvas).
 function ports(args) {
-    const registry = load('registry.js', 'REGISTRY') ?? fail('no stack loaded (koppler init)');
+    const registry = readData('registry') ?? fail('no stack loaded (koppler init)');
     const json = args.includes('--json'), envAt = args.indexOf('--env');
     const env = envAt >= 0 ? args[envAt + 1] : registry.envs[0];
     if (!registry.envs.includes(env))
         fail(`unknown env ${env}; the stack has ${registry.envs.join(', ')}`);
     let ids = args.filter((a, i) => !a.startsWith('--') && (envAt < 0 || i !== envAt + 1));
     if (!ids.length)
-        ids = Object.keys(load('state.js', 'SAVED_STATE')?.nodes ?? {});
+        ids = Object.keys(readData('state')?.nodes ?? {});
     for (const id of ids)
         if (!registry.apps[id])
             fail(`${id} is not an app in the stack`);
@@ -545,12 +535,12 @@ async function recordRun(registry, board, label) {
     return id;
 }
 async function up(args) {
-    const registry = load('registry.js', 'REGISTRY') ?? fail('no stack loaded (koppler init)');
+    const registry = readData('registry') ?? fail('no stack loaded (koppler init)');
     // Every run is recorded like a Run from the canvas, so the canvas, the history and Stop all know it: a saved board
     // (--board), or apps from the terminal or chat, added to what already runs on that environment.
     if (args.includes('--board')) {
         const want = flagValue(args, '--board') ?? fail('usage: koppler up --board "<board or preset name>" [--env <env>]');
-        const boards = [...(load('state.js', 'SAVED_STATE')?.presets ?? []), ...(registry.presets ?? [])];
+        const boards = [...(readData('state')?.presets ?? []), ...(registry.presets ?? [])];
         const b = boards.find(p => p.name === want) ?? boards.find(p => p.name?.toLowerCase() === want.toLowerCase()) ?? fail(`no board called ${want}; koppler use --boards lists them`);
         return up(['--run', await recordRun(registry, { env: envOf(registry, args), nodes: b.nodes ?? {}, edges: b.edges ?? [], queues: b.queues ?? {} }, b.name)]);
     }
@@ -578,7 +568,7 @@ async function up(args) {
         const edges = [...(kept.edges ?? []), ...cables].filter((e, i, all) => all.findIndex(x => x.from === e.from && x.to === e.to) === i);
         return up(['--run', await recordRun(registry, { env, nodes, edges, queues: kept.queues ?? {} }, ids.map(id => registry.apps[id].name).join(', '))]);
     }
-    const local = load('local.js', 'LOCAL')?.apps ?? {};
+    const local = readData('local')?.apps ?? {};
     const flag = n => { const i = args.indexOf(`--${n}`); return i >= 0 ? args[i + 1] : undefined; };
     const runId = flag('run'), all = [...runHistory()];
     const board = runId ? all.find(r => r.id === runId) ?? fail(`no run ${runId} in the history`) : null;
@@ -845,7 +835,7 @@ async function down(args) {
         fail(e.message);
     }
     const left = [], keep = [], { unlink } = await import('./libraries.mjs');
-    const name = a => load('registry.js', 'REGISTRY')?.apps?.[a.app]?.name ?? a.app ?? a.repo ?? '';
+    const name = a => readData('registry')?.apps?.[a.app]?.name ?? a.app ?? a.repo ?? '';
     for (const a of [...log].reverse()) {
         try {
             if (a.kind === 'edit') {
@@ -949,7 +939,7 @@ async function down(args) {
         }
     }
     // Temporary edits nobody logged still carry their marker.
-    const local = load('local.js', 'LOCAL')?.apps ?? {}, marker = ['koppler:.*do not', 'commit'].join(' ');
+    const local = readData('local')?.apps ?? {}, marker = ['koppler:.*do not', 'commit'].join(' ');
     for (const [id, l] of Object.entries(local)) {
         if (!l?.path)
             continue;
@@ -970,8 +960,8 @@ async function down(args) {
 }
 // What to change so `from` calls the local `to`: the setting or the file and key, and the value for the device it runs on.
 function wire(args) {
-    const registry = load('registry.js', 'REGISTRY') ?? fail('no stack loaded (koppler init)');
-    const local = load('local.js', 'LOCAL')?.apps ?? {};
+    const registry = readData('registry') ?? fail('no stack loaded (koppler init)');
+    const local = readData('local')?.apps ?? {};
     const flag = name => { const i = args.indexOf(`--${name}`); return i >= 0 ? args[i + 1] : undefined; };
     const [from, to] = args.filter((a, i) => !a.startsWith('--') && !['--device', '--env'].includes(args[i - 1]));
     if (!registry.apps[from])
@@ -1033,7 +1023,7 @@ function wirePrint(caller, callee, call, value, address, result) {
 }
 const positional = (args, valued = []) => args.filter((a, i) => !a.startsWith('-') && !valued.includes(args[i - 1]));
 const flagValue = (args, name) => { const i = args.indexOf(name); return i >= 0 ? args[i + 1] : undefined; };
-const registryOrFail = () => load('registry.js', 'REGISTRY') ?? fail('no stack loaded (koppler init)');
+const registryOrFail = () => readData('registry') ?? fail('no stack loaded (koppler init)');
 const envOf = (registry, args) => {
     const env = flagValue(args, '--env') ?? registry.envs[0];
     if (!registry.envs.includes(env))
@@ -1060,7 +1050,7 @@ async function doctor(args) {
     const tools = await checkTools({ approve: args.includes('--approve'), confirm: question => confirm(question) });
     if (tools.error)
         fail(tools.error);
-    const todo = ids.length ? needsFor(args.filter(a => a !== '--secrets' && a !== '--approve'), { load, skill: APP, fail, collect: json }) : null;
+    const todo = ids.length ? needsFor(args.filter(a => a !== '--secrets' && a !== '--approve'), { skill: APP, fail, collect: json }) : null;
     const secrets = args.includes('--secrets') ? secretTests(registry, ids.length ? ids : Object.keys(registry.apps), env) : [];
     if (json)
         return console.log(JSON.stringify({ tools: tools.results, ...(todo ?? {}), ...(args.includes('--secrets') && { secrets }) }, null, 2));
@@ -1149,7 +1139,7 @@ function status(args = []) {
         return debugReport(positional(args));
     const json = args.includes('--json'), recs = records();
     const procs = recs.map(r => { const up = alive(r); return { name: r.name, state: up ? 'running' : 'exited', pid: r.pid, up: up ? uptime(r.startedAt) : null, port: r.port ?? null, open: !!(r.port && up && listener(r.port, r.bind)), command: r.command }; });
-    const registry = args.includes('--apps') ? registryOrFail() : null, local = load('local.js', 'LOCAL')?.apps ?? {};
+    const registry = args.includes('--apps') ? registryOrFail() : null, local = readData('local')?.apps ?? {};
     const apps = registry && Object.entries(registry.apps).map(([id, app]) => ({ id, name: app.name, kind: app.kind, clone: local[id] ? { branch: local[id].branch ?? null, changed: local[id].dirty ?? 0 } : null, state: procs.find(p => p.name === id)?.state ?? null }));
     if (json)
         return console.log(JSON.stringify({ processes: procs, ...(apps && { stack: registry.name ?? null, apps }) }, null, 2));
@@ -1174,14 +1164,14 @@ function secret(args) {
     if (!script)
         fail('usage: koppler secret set|list|remove|psql <app>[@<env>] [<NAME>]');
     // A protected environment's value is stored so that every read asks the user (the stack says which; else all but the first).
-    const registry = load('registry.js', 'REGISTRY'), env = String(rest[0] ?? '').split('@')[1] ?? registry?.envs?.[0];
+    const registry = readData('registry'), env = String(rest[0] ?? '').split('@')[1] ?? registry?.envs?.[0];
     const mark = registry ? { KOPPLER_SECRET_PROTECTED: kp.isProtected(registry, env) ? '1' : '0' } : {};
     process.exit(spawnSync(path.join(BIN, script), rest, { stdio: 'inherit', env: { ...process.env, ...mark } }).status ?? 1);
 }
 // Stacks on this Mac, or switch to one; --boards lists the boards of the stack in use (the team's presets and your own).
 const use = args => {
     if (args.includes('--boards')) {
-        const registry = registryOrFail(), own = load('state.js', 'SAVED_STATE')?.presets ?? [];
+        const registry = registryOrFail(), own = readData('state')?.presets ?? [];
         const boards = [...(registry.presets ?? []).map(p => ({ name: p.name, from: 'team' })), ...own.map(p => ({ name: p.name, from: 'yours' }))];
         if (args.includes('--json'))
             return console.log(JSON.stringify(boards, null, 2));
@@ -1205,12 +1195,12 @@ const link = async (args) => {
         console.log(`USING ${r.name}, linked from ${url}`);
         sync([]);
         // A linked stack is someone else's file: say so when it brings commands of its own.
-        const { stackCommands } = await import('./checks.mjs'), own = stackCommands(load('registry.js', 'REGISTRY'));
+        const { stackCommands } = await import('./checks.mjs'), own = stackCommands(readData('registry'));
         if (own.length)
             console.log(`\nThis stack carries ${own.length} ${own.length === 1 ? 'command or code change' : 'commands and code changes'} of its own. None runs until you have reviewed them: ${APPROVE}`);
         return;
     }
-    const dir = load('registry.js', 'REGISTRY')?.source?.replace(/\/stack\.json$/, '') ?? fail('no stack in use');
+    const dir = readData('registry')?.source?.replace(/\/stack\.json$/, '') ?? fail('no stack in use');
     const st = linkedStatus(dir) ?? fail('the stack in use is not linked to GitHub; link one with: koppler link <GitHub link to a stack.json>');
     if (args.includes('--update')) {
         const r = await updateStack(dir);
@@ -1238,7 +1228,7 @@ const link = async (args) => {
 const discover = async (args) => {
     const names = flagValue(args, '--find');
     if (names !== undefined)
-        return findCommand([...names.split(/[,\s]+/).filter(Boolean), ...args.filter(a => a === '--no-github')], { load });
+        return findCommand([...names.split(/[,\s]+/).filter(Boolean), ...args.filter(a => a === '--no-github')]);
     if (!args.includes('--no-fetch')) {
         await updateClones();
         console.log('');
@@ -1267,10 +1257,10 @@ const history = args => {
 // Remembered code changes: list them, keep the last edit, or apply the ones that match the latest Send.
 const recipes = args => {
     if (args.includes('--remember'))
-        return recipesCommand('remember', args.filter(a => a !== '--remember'), { load, fail, temp: TEMP });
+        return recipesCommand('remember', args.filter(a => a !== '--remember'), { fail, temp: TEMP });
     if (args.includes('--apply'))
-        return recipesCommand('prepare', args.filter(a => a !== '--apply'), { load, fail, temp: TEMP });
-    return recipesCommand('recipes', args, { load, fail, temp: TEMP });
+        return recipesCommand('prepare', args.filter(a => a !== '--apply'), { fail, temp: TEMP });
+    return recipesCommand('recipes', args, { fail, temp: TEMP });
 };
 // Apps join the stack from their clones: a repo name or slug from `koppler sync`, or a folder.
 const add = async (args) => {
@@ -1279,7 +1269,7 @@ const add = async (args) => {
         fail('usage: koppler add <repo or folder>...  (koppler add --list shows the repos you can add)');
     const { addApps, candidateRepos } = await import('./sync.mjs');
     const config = JSON.parse(fs.readFileSync(path.join(process.env.KOPPLER_CONFIG_DIR || path.join(os.homedir(), '.config', 'koppler'), 'config.json'), 'utf8'));
-    const index = load('repos.js', 'REPOS') ?? fail('no repos found yet: koppler init');
+    const index = readData('repos') ?? fail('no repos found yet: koppler init');
     const stack = JSON.parse(fs.readFileSync(path.join(config.stack, 'stack.json'), 'utf8'));
     const known = candidateRepos(index, stack, config.stack);
     const picks = wanted.map(w => known.find(c => c.slug === w || c.slug.split('/').pop() === w || c.path === path.resolve(w.replace(/^~(?=\/|$)/, os.homedir()))) ?? fail(`${w} is not one of your clones that is outside the stack; koppler sync --rescan finds new clones`));
@@ -1292,8 +1282,8 @@ const add = async (args) => {
 const remove = args => { const r = removeApp(positional(args)[0] ?? fail('usage: koppler remove <app>')); if (r.error)
     fail(r.error); console.log(`Removed ${r.name} from the stack (its clone stays).`); sync([]); };
 const say = args => sayCommand(args);
-const switchBranch = args => switchCommand(args, { load, fail, temp: TEMP });
-const query = args => queryCommand(args, { load, fail, here });
+const switchBranch = args => switchCommand(args, { fail, temp: TEMP });
+const query = args => queryCommand(args, { fail });
 const listen = async (args) => (await import('./listen.mjs')).listen(args);
 // Koppler's version: the package's, or the commit when it runs from a clone.
 function version() {

@@ -5,10 +5,10 @@
 //        koppler history                            recent runs and how they ended
 import fs from 'node:fs';
 import path from 'node:path';
-import vm from 'node:vm';
 import kp from './plan.cjs';
 import { STATE, TEMP } from "./paths.js";
 import { redact } from './scrub.mjs';
+import { readData } from "./data.js";
 const temp = () => process.env.KOPPLER_TEMP || TEMP;
 const stateDir = () => process.env.KOPPLER_STATE || STATE;
 const historyFile = () => path.join(temp(), 'history.jsonl'), liveFile = () => path.join(temp(), 'live.json');
@@ -131,14 +131,7 @@ export function runningPart(board, names = runningNames()) {
 }
 // Apps Koppler runs that the applied board does not explain.
 export const strays = (liveBoard, names, appIds) => names.filter(n => appIds.includes(n) && !liveBoard?.nodes?.[n]);
-const registry = () => { try {
-    const sandbox = { window: {} };
-    vm.runInNewContext(fs.readFileSync(path.join(temp(), 'registry.js'), 'utf8'), sandbox);
-    return sandbox.window.REGISTRY;
-}
-catch {
-    return null;
-} };
+const registry = () => readData('registry');
 const fail = message => { console.error(`koppler: ${message}`); process.exit(1); };
 // The plan for the newest Send that has not been applied, worked out again now, and whether it is still what the user confirmed.
 // What running a board would start, restart, stop and keep, against what runs now.
@@ -177,14 +170,7 @@ function profileEnvIn(local) {
         }
     };
 }
-const localClones = () => { try {
-    const sandbox = { window: {} };
-    vm.runInNewContext(fs.readFileSync(path.join(temp(), 'local.js'), 'utf8'), sandbox);
-    return sandbox.window.LOCAL;
-}
-catch {
-    return null;
-} };
+const localClones = () => readData('local');
 export async function appliedCommand(args) {
     const failAt = args.indexOf('--failed'), reason = failAt >= 0 ? args[failAt + 1] : null, given = args.find((a, i) => !a.startsWith('--') && (failAt < 0 || i !== failAt + 1));
     const all = runs(), run = given ? all.find(r => r.id === given) : [...all].reverse().find(r => r.state === 'waiting' || r.state === 'applying');

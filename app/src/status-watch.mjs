@@ -1,5 +1,5 @@
 // Publishes temp/status.json plus live port state and log tails as temp/status.js, which the canvas re-loads on a timer.
-// Also runs a loopback-only, token-protected server: the standalone canvas page, layout autosaves (temp/state.js) and Send/Stop prompts (temp/prompts.jsonl).
+// Also runs a loopback-only, token-protected server: the standalone canvas page, layout autosaves (the board, state.json) and Send/Stop prompts (temp/prompts.jsonl).
 // Usage: node status-watch.mjs [--once]   (port 4747 or KOPPLER_PORT, token kept across restarts so the page URL in temp/canvas-url stays the same)
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -11,7 +11,6 @@ import tls from 'node:tls';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFile, spawn } from 'node:child_process';
-import vm from 'node:vm';
 import { appendRun, live, runRecord, runningEnvs, runningNames, runs } from './runs.mjs';
 import { addApps, removeApp, createStack, currentStack, forgetStacks, stacksHere, useStack } from './sync.mjs';
 import { discardChanges, linkStack, linkedStatus, proposeChanges, updateStack } from './linked.mjs';
@@ -24,13 +23,13 @@ import { APP, BIN, LOGS, STATE as STATE_HOME, TEMP } from './paths.ts';
 import { redact } from './scrub.mjs';
 import { listenerPid } from './listen.mjs';
 import kp from './plan.cjs';
+import { readData, writeData } from './data.ts';
 export { githubFile };
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
 const SOURCE = path.join(TEMP, 'status.json');
 const OUT = path.join(TEMP, 'status.js');
-const STATE = path.join(TEMP, 'state.js');
 const PROMPTS = path.join(TEMP, 'prompts.jsonl');
 const MAX_STATE_BYTES = 256 * 1024;
 const MAX_NOTE = 4000;
@@ -120,11 +119,7 @@ export async function findMobileApp({ iosBundleId, androidPackage }) {
 
 let mobileApps = {}, mobileCheckedAt = 0;
 function loadMobileConfig() {
-  try {
-    const sandbox = { window: {} };
-    vm.runInNewContext(fs.readFileSync(path.join(TEMP, 'registry.js'), 'utf8'), sandbox);
-    return Object.fromEntries(Object.entries(sandbox.window.REGISTRY.apps).filter(([, a]) => a.mobile).map(([id, a]) => [id, a.mobile]));
-  } catch { return {}; }
+  return Object.fromEntries(Object.entries(readData('registry')?.apps ?? {}).filter(([, a]) => a.mobile).map(([id, a]) => [id, a.mobile]));
 }
 // An app Koppler launched keeps no `flutter run` attached, so its flavor and device come from Koppler's own record of the start.
 export function fromKoppler(id, found, record = (() => { try { return JSON.parse(fs.readFileSync(path.join(STATE_DIR, 'procs', `${id}.json`), 'utf8')); } catch { return null; } })()) {
@@ -144,7 +139,7 @@ async function refreshMobile(ids) {
 const following = new Map();
 function followIdeLogs() {
   const reg = loadRegistry(), board = live()?.nodes ?? {}, running = runningNames();
-  let local = {}; try { const sandbox = { window: {} }; vm.runInNewContext(fs.readFileSync(path.join(TEMP, 'local.js'), 'utf8'), sandbox); local = sandbox.window.LOCAL?.apps ?? {}; } catch {}
+  const local = readData('local')?.apps ?? {};
   for (const [id, found] of Object.entries(mobileState)) {
     const ide = found.find(a => a.source === 'ide'), repo = local[id]?.path;
     if (!ide || !board[id] || !repo || running.includes(id) || following.get(id) === ide.deviceId) continue;
@@ -223,7 +218,8 @@ export function sanitizeLayout(input) {
 
 let serving = false;
 const FONTS = fs.readdirSync(path.join(here, 'fonts')).filter(f => /\.(woff2|css)$/.test(f)).map(f => `fonts/${f}`);
-export const PAGE_FILES = { '': 'canvas.html', 'ports.cjs': 'ports.cjs', 'kinds.cjs': 'kinds.cjs', 'presets.cjs': 'presets.cjs', 'plan.cjs': 'plan.cjs', 'logfmt.cjs': 'logfmt.cjs', 'temp/registry.js': 'temp/registry.js', 'temp/local.js': 'temp/local.js', 'temp/repos.js': 'temp/repos.js', 'temp/state.js': 'temp/state.js', 'temp/status.js': 'temp/status.js', 'temp/debug.jsonl': 'temp/debug.jsonl', ...Object.fromEntries(FONTS.map(f => [f, f])) };
+export const PAGE_FILES = { '': 'canvas.html', 'ports.cjs': 'ports.cjs', 'kinds.cjs': 'kinds.cjs', 'presets.cjs': 'presets.cjs', 'plan.cjs': 'plan.cjs', 'logfmt.cjs': 'logfmt.cjs', 'temp/status.js': 'temp/status.js', 'temp/debug.jsonl': 'temp/debug.jsonl', ...Object.fromEntries(FONTS.map(f => [f, f])) };
+const PAGE_DATA = { 'temp/registry.js': { name: 'registry', global: 'REGISTRY' }, 'temp/local.js': { name: 'local', global: 'LOCAL' }, 'temp/repos.js': { name: 'repos', global: 'REPOS' }, 'temp/state.js': { name: 'state', global: 'SAVED_STATE' } };
 const CONTENT_TYPES = { html: 'text/html; charset=utf-8', css: 'text/css; charset=utf-8', woff2: 'font/woff2', jsonl: 'text/plain; charset=utf-8' };
 // The page loads and calls nothing but this server, and no other page can frame it or learn its address.
 const SECURITY_HEADERS = {
@@ -301,6 +297,13 @@ function startServer() {
         try { const own = JSON.parse(fs.readFileSync(SOURCE, 'utf8')).apps?.[id]?.log; if (own) file = own; } catch {}
         const text = tail(file, 2 * 1024 * 1024, 2000);
         res.writeHead(text === null ? 404 : 200, { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' }).end(text ?? '');
+        return;
+      }
+      // The page still takes its data as scripts; each is made from the JSON run file when asked for.
+      const data = PAGE_DATA[url.pathname.slice(prefix.length)];
+      if (data) {
+        const value = readData(data.name);
+        res.writeHead(value ? 200 : 404, { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'no-store' }).end(value ? `window.${data.global} = ${JSON.stringify(value)};\n` : '');
         return;
       }
       const file = PAGE_FILES[url.pathname.slice(prefix.length)];
@@ -431,7 +434,7 @@ function startServer() {
       if (url.pathname === '/state') {
         const layout = sanitizeLayout(body);
         if (!layout) { res.writeHead(400).end(); return; }
-        writeAtomic(STATE, `window.SAVED_STATE = ${JSON.stringify(layout, null, 2)};\n`);
+        writeData('state', layout);
       } else {
         const prompt = sanitizePrompt(body);
         if (!prompt) { res.writeHead(400).end(); return; }
@@ -469,7 +472,7 @@ function startServer() {
 }
 
 // Credentials: the secrets each app declares per environment, and whether each is stored. Names and fetch steps only, never values.
-const loadRegistry = () => { try { const sandbox = { window: {} }; vm.runInNewContext(fs.readFileSync(path.join(TEMP, 'registry.js'), 'utf8'), sandbox); return sandbox.window.REGISTRY; } catch { return null; } };
+const loadRegistry = () => readData('registry');
 const storeOf = (registry, app, env) => env === registry.envs[0] ? app : `${app}@${env}`;
 export function declaredSecrets(registry) {
   const out = {};
@@ -557,8 +560,7 @@ const leadsHere = name => dns.promises.lookup(name, { all: true }).then(list => 
 // The -LOCAL launch profile's settings of a .NET caller for an environment, to see where it is pointed.
 const localProfile = (registry, id, env) => {
   try {
-    const sandbox = { window: {} }; vm.runInNewContext(fs.readFileSync(path.join(TEMP, 'local.js'), 'utf8'), sandbox);
-    const app = registry.apps[id], file = path.join(sandbox.window.LOCAL.apps[id].path, app.launchSettings);
+    const app = registry.apps[id], file = path.join(readData('local').apps[id].path, app.launchSettings);
     const profiles = JSON.parse(fs.readFileSync(file, 'utf8').replace(/^\uFEFF/, '')).profiles ?? {}, name = kinds.launchProfile(app, profiles, env).local, profile = profiles[name];
     // When Koppler started the app, to tell a setting written after that. ponytail: the file's time, so any later edit of it asks for a restart
     let started = null; try { started = Date.parse(JSON.parse(fs.readFileSync(path.join(STATE_DIR, 'procs', `${id}.json`), 'utf8')).startedAt); } catch {}
@@ -624,9 +626,7 @@ export async function cableTest(registry, body, probe = { answers, opens, speaks
 // Every tunnel port in the stack, so cards can show whether their database or cache is reachable.
 function tunnelPorts() {
   try {
-    const sandbox = { window: {} };
-    vm.runInNewContext(fs.readFileSync(path.join(TEMP, 'registry.js'), 'utf8'), sandbox);
-    const apps = Object.values(sandbox.window.REGISTRY.apps);
+    const apps = Object.values(readData('registry').apps);
     const declared = apps.flatMap(a => [...(a.prereqs ?? []), ...Object.values(a.envs ?? {}).flatMap(e => e.prereqs ?? [])]).filter(p => p.tunnel && Number.isInteger(p.port) && p.port > 0 && p.port < 65536).map(p => p.port);
     // Tunnels koppler moved to another port are checked there too.
     let running = [];

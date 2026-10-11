@@ -6,6 +6,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { gh } from './github.mjs';
+import { readData } from "./data.js";
 const CONFIG_DIR = process.env.KOPPLER_CONFIG_DIR || path.join(os.homedir(), '.config', 'koppler');
 const readJson = f => { try {
     return JSON.parse(fs.readFileSync(f, 'utf8'));
@@ -63,13 +64,13 @@ export async function find(names, { registry, index = readJson(path.join(CONFIG_
     }
     return out;
 }
-export async function findCommand(args, { load }) {
+export async function findCommand(args) {
     const names = args.filter(a => !a.startsWith('--'));
     if (!names.length) {
         console.error('usage: koppler discover --find "<name> [<name>...]" [--json] [--no-github]');
         process.exit(1);
     }
-    const res = await find(names, { registry: load('registry.js', 'REGISTRY'), github: !args.includes('--no-github') });
+    const res = await find(names, { registry: readData('registry'), github: !args.includes('--no-github') });
     if (args.includes('--json'))
         return console.log(JSON.stringify(res, null, 2));
     for (const r of res) {

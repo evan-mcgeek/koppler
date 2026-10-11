@@ -3,23 +3,13 @@
 // Usage: koppler discover
 import fs from 'node:fs';
 import path from 'node:path';
-import vm from 'node:vm';
 import { fileURLToPath } from 'node:url';
 import { hostsByApp } from './sync.mjs';
 import tunnelPlan from './ports.cjs';
 import kinds from './kinds.cjs';
 import { TEMP } from "./paths.js";
+import { readData } from "./data.js";
 const SKIP = new Set(['node_modules', '.git', 'bin', 'obj', 'build', 'dist', '.dart_tool', 'Pods', 'coverage', '.next', 'vendor', 'target']);
-const load = (file, key) => {
-    try {
-        const sandbox = { window: {} };
-        vm.runInNewContext(fs.readFileSync(path.join(TEMP, file), 'utf8'), sandbox);
-        return sandbox.window[key];
-    }
-    catch {
-        return null;
-    }
-};
 const read = file => { try {
     return fs.readFileSync(file, 'utf8');
 }
@@ -143,7 +133,7 @@ export function conflicts(apps) {
     return [...owners].filter(([, m]) => m.size > 1 && [...m.keys()].some(k => k.startsWith('app:'))).map(([port, m]) => ({ port, who: [...m.values()].map(labels => labels.join(', ')) }));
 }
 export function investigate(_args = [], { afterSync = false } = {}) {
-    const registry = load('registry.js', 'REGISTRY'), local = load('local.js', 'LOCAL')?.apps ?? {};
+    const registry = readData('registry'), local = readData('local')?.apps ?? {};
     if (!registry) {
         console.error('koppler: no stack loaded (koppler init)');
         process.exit(1);

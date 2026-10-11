@@ -4,6 +4,10 @@ import os from 'node:os';
 import path from 'node:path';
 import { stepsFor, isDone } from '../dist/needs.mjs';
 
+// The stack a command reads is the one in the run folder.
+process.env.KOPPLER_TEMP = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-needs-'));
+const useStack = stack => fs.writeFileSync(path.join(process.env.KOPPLER_TEMP, 'registry.json'), JSON.stringify(stack));
+
 const steps = stepsFor('Orders API', [{ sso: 'acme-qa' }, { hosts: 'db.cluster.acme.dev' }, { devCerts: true }, { tunnel: 'x', port: 1 }],
   { appId: 'orders-api', skill: '/skill', repo: '/repo', secrets: [{ env: 'ConnectionStrings__DB', when: 'always', fetch: { cli: 'aws ... | <skill>/bin/secret-set orders-api ConnectionStrings__DB --stdin', ui: 'console' } }, { file: 'src/app.secrets.json' }] });
 assert.deepEqual(steps.map(s => s.title), ['Sign in to AWS (acme-qa)', 'Point the database address at your Mac', 'Trust the local HTTPS certificate', 'Store ConnectionStrings__DB for Orders API', 'Put app.secrets.json in place for Orders API']);
@@ -28,7 +32,7 @@ assert.deepEqual(prodStep.check, { secret: ['orders-api@prod', 'ConnectionString
 const { needs } = await import('../dist/needs.mjs');
 const registry = { envs: ['qa', 'prod'], apps: { o: { name: 'Orders', secrets: [{ env: 'KEY', fetch: { cli: 'aws --profile qa-ops', ui: 'QA console' } }] } } };
 const out = []; const log = console.log; console.log = s => out.push(s);
-needs(['o', '--env', 'prod', '--json'], { load: f => f === 'registry.js' ? registry : null, skill: '/skill', fail: e => { throw new Error(e); } });
+useStack(registry); needs(['o', '--env', 'prod', '--json'], { skill: '/skill', fail: e => { throw new Error(e); } });
 console.log = log;
 const store = JSON.parse(out[0]).steps.find(s => s.id.startsWith('secret:'));
 assert.equal(store.command, 'koppler secret set o@prod KEY');
@@ -37,7 +41,7 @@ assert.equal(store.alt, undefined);
 {
   const reg = { envs: ['qa', 'prod'], apps: { o: { name: 'Orders', prereqs: [{ sso: 'qa-ops' }, { hosts: 'db.acme.dev' }, { tunnel: 'db.acme.dev', port: 5432 }], envs: { prod: { prereqs: [{ sso: 'prod-ops' }, { hosts: 'db.prod' }, { tunnel: 'db.prod', port: 5432 }] } } } } };
   const out = []; const log = console.log; console.log = s => out.push(s);
-  needs(['o', '--env', 'prod', '--no-tunnels', 'o', '--json'], { load: f => f === 'registry.js' ? reg : null, skill: '/skill', fail: e => { throw new Error(e); } });
+  useStack(reg); needs(['o', '--env', 'prod', '--no-tunnels', 'o', '--json'], { skill: '/skill', fail: e => { throw new Error(e); } });
   console.log = log;
   assert.deepEqual(JSON.parse(out[0]).steps.map(s => s.id), ['sso:prod-ops']);
 }
@@ -45,7 +49,7 @@ assert.equal(store.alt, undefined);
 {
   const reg = { envs: ['qa', 'prod'], apps: { w: { name: 'Wallet', prereqs: [{ sso: 'qa-ops' }, { tunnel: 'qa-db', port: 5432 }], envs: { prod: { prereqs: [{ tunnel: 'prod-db', port: 5432 }] } } } } };
   const out = []; const log = console.log; console.log = s => out.push(s);
-  needs(['w', '--env', 'prod', '--json'], { load: f => f === 'registry.js' ? reg : null, skill: '/skill', fail: e => { throw new Error(e); } });
+  useStack(reg); needs(['w', '--env', 'prod', '--json'], { skill: '/skill', fail: e => { throw new Error(e); } });
   console.log = log;
   const r = JSON.parse(out[0]);
   assert.deepEqual(r.steps.map(s => s.gap ? 'gap' : s.id), ['gap']);
@@ -58,7 +62,7 @@ assert.equal(store.alt, undefined);
   const port = srv.address().port;
   const reg = { envs: ['qa'], apps: { w: { name: 'Wallet', prereqs: [{ tunnel: 'db.acme', port }] } } };
   const out = []; const log = console.log; console.log = s => out.push(s);
-  needs(['w', '--json'], { load: f => f === 'registry.js' ? reg : null, skill: '/skill', fail: e => { throw new Error(e); } });
+  useStack(reg); needs(['w', '--json'], { skill: '/skill', fail: e => { throw new Error(e); } });
   console.log = log; srv.close();
   assert.deepEqual(JSON.parse(out[0]).koppler, [`tunnel to db on localhost:${port} (already open)`, 'start Wallet']);
 }

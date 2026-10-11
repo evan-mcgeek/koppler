@@ -7,6 +7,7 @@ import path from 'node:path';
 import { parse } from './secret-check.mjs';
 import { BIN } from "./paths.js";
 import { clientEnv, findClient } from './safe-env.mjs';
+import { readData } from "./data.js";
 const MAX_LINES = 500;
 const reason = text => /password authentication failed|access denied|WRONGPASS/i.test(text) ? 'it refused the user name or password'
     : /connection refused|could not connect|can't connect|timeout|timed out|could not translate|unknown (mysql )?server host|ENOTFOUND/i.test(text) ? 'nothing answers at its address (is the tunnel up?)'
@@ -127,10 +128,10 @@ export function clientCall(c, sql) {
             args: ['--connect-timeout=10', '-h', c.host, '-P', String(c.port), '-u', c.user, ...(c.database ? ['-D', c.database] : []), '--table', '-e', `SET SESSION TRANSACTION READ ONLY; START TRANSACTION READ ONLY; ${sql}\n; ROLLBACK;`] };
     return null;
 }
-export async function queryCommand(args, { load, fail }) {
+export async function queryCommand(args, { fail }) {
     const flag = n => { const i = args.indexOf(`--${n}`); return i >= 0 ? args[i + 1] : undefined; };
     const [app, sqlArg] = args.filter((a, i) => !a.startsWith('--') && !['--env', '--secret'].includes(args[i - 1]));
-    const registry = load('registry.js', 'REGISTRY') ?? fail('no stack loaded (koppler init)');
+    const registry = readData('registry') ?? fail('no stack loaded (koppler init)');
     const base = registry.apps[app] ?? fail('usage: koppler query <app> [--env <env>] [--secret <NAME>] "<sql>"');
     const env = flag('env') ?? registry.envs[0];
     if (!registry.envs.includes(env))

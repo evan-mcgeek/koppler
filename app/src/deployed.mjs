@@ -4,17 +4,13 @@
 // Usage: koppler discover --deployed [app...]
 import fs from 'node:fs';
 import path from 'node:path';
-import vm from 'node:vm';
 import { fileURLToPath } from 'node:url';
 import { hostsByApp } from './sync.mjs';
 import { findFiles } from './investigate.mjs';
 import { TEMP } from './paths.ts';
+import { readData } from './data.ts';
 
 
-const load = (file, key) => {
-  try { const sandbox = { window: {} }; vm.runInNewContext(fs.readFileSync(path.join(TEMP, file), 'utf8'), sandbox); return sandbox.window[key]; }
-  catch { return null; }
-};
 
 export const ENV_TOKEN = /(?:^|[-_./])(dev|development|qa|test|uat|staging|stage|prod|production|prd|live)(?=[-_./]|$)/i;
 const SYNONYMS = { prod: ['production', 'prd', 'live'], staging: ['stage'], dev: ['development'] };
@@ -322,7 +318,7 @@ export function outsideCalls(repo, drafts, stack) {
 }
 
 export function deployed(args = []) {
-  const stack = load('registry.js', 'REGISTRY'), local = load('local.js', 'LOCAL')?.apps ?? {};
+  const stack = readData('registry'), local = readData('local')?.apps ?? {};
   if (!stack) { console.error('koppler: no stack loaded (koppler init)'); process.exit(1); }
   const ids = args.filter(a => !a.startsWith('--'));
   for (const id of ids) if (!stack.apps[id]) { console.error(`koppler: ${id} is not an app in the stack`); process.exit(1); }

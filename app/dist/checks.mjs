@@ -6,11 +6,11 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import vm from 'node:vm';
 import crypto from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import kinds from './kinds.cjs';
 import { TEMP } from "./paths.js";
+import { readData } from "./data.js";
 const temp = () => process.env.KOPPLER_TEMP || TEMP;
 const approvalsFile = () => path.join(process.env.KOPPLER_CONFIG_DIR || path.join(os.homedir(), '.config', 'koppler'), 'approved-checks.json');
 const TOOL = /^[A-Za-z0-9._+-]{1,64}$/;
@@ -136,14 +136,7 @@ export function runChecks(registry, { source = registry?.source ?? '', exists = 
             return shell(c.run) ? { ...base, state: 'ok', detail: c.ok || 'ok' } : { ...base, state: 'missing', detail: c.fix };
         }), ...gaps];
 }
-const registryNow = () => { try {
-    const sandbox = { window: {} };
-    vm.runInNewContext(fs.readFileSync(path.join(temp(), 'registry.js'), 'utf8'), sandbox);
-    return sandbox.window.REGISTRY;
-}
-catch {
-    return null;
-} };
+const registryNow = () => readData('registry');
 const report = results => { for (const r of results)
     console.log(`${{ ok: 'ok', missing: 'MISSING', pending: 'PENDING', gap: 'GAP' }[r.state].padEnd(8)} ${r.name.padEnd(14)} ${r.detail}${r.for?.length && r.state !== 'ok' ? ` (needed by ${r.for.join(', ')})` : ''}`); };
 // Runs the loaded stack's checks, prints them, and leaves the result for the canvas. Returns false when something is missing.

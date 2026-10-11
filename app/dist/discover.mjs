@@ -2,22 +2,11 @@
 // where each runs locally, its deployed address per environment (from Terraform), and which apps call which.
 // Nothing is written until the user picks what to keep.
 import fs from 'node:fs';
-import path from 'node:path';
-import vm from 'node:vm';
 import { localPorts } from './investigate.mjs';
 import { ENV_TOKEN, draftApp, readRepo, stackEnv } from './deployed.mjs';
 import { grepClone, hostsByApp, missingCalls, urlsInClone, validateStack } from './sync.mjs';
 import kinds from './kinds.cjs';
-import { TEMP } from "./paths.js";
-const temp = () => process.env.KOPPLER_TEMP || TEMP;
-const load = (file, key) => { try {
-    const sb = { window: {} };
-    vm.runInNewContext(fs.readFileSync(path.join(temp(), file), 'utf8'), sb);
-    return sb.window[key];
-}
-catch {
-    return null;
-} };
+import { readData } from "./data.js";
 const deployedOf = (app, env, first) => env === first ? app.deployedUrl : app.envs?.[env]?.deployedUrl;
 // An app whose Terraform cannot tell its address often still writes it in its own code (Swagger servers, pipelines):
 // a host carrying the repo's name and an environment's name. Returns { id: { env: { host, token, where } } }.
@@ -145,7 +134,7 @@ export function applyFindings(stack, findings, ids) {
 }
 // The stack in use and its clones, as the canvas and the command see them.
 export function current() {
-    const registry = load('registry.js', 'REGISTRY'), local = load('local.js', 'LOCAL')?.apps ?? {};
+    const registry = readData('registry'), local = readData('local')?.apps ?? {};
     if (!registry?.source)
         return null;
     const stack = JSON.parse(fs.readFileSync(registry.source, 'utf8'));

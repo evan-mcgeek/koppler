@@ -158,17 +158,17 @@ console.log('ok');
   const temp = process.env.KOPPLER_TEMP;
   if (temp && temp.includes('koppler-switch-')) {
     const config = { stack: '/stacks/a' };
-    fsx.writeFileSync(px.join(temp, 'state.js'), 'board A'); fsx.writeFileSync(px.join(temp, 'history.jsonl'), 'history A'); fsx.writeFileSync(px.join(temp, 'registry.js'), 'shared');
+    fsx.writeFileSync(px.join(temp, 'state.json'), 'board A'); fsx.writeFileSync(px.join(temp, 'history.jsonl'), 'history A'); fsx.writeFileSync(px.join(temp, 'registry.json'), 'shared');
     setStack(config, '/stacks/b', () => {});
     assert.equal(config.stack, '/stacks/b');
-    assert.equal(fsx.existsSync(px.join(temp, 'state.js')), false);
-    assert.equal(fsx.readFileSync(px.join(temp, 'stacks', stackKey('/stacks/a'), 'state.js'), 'utf8'), 'board A');
-    assert.equal(fsx.readFileSync(px.join(temp, 'registry.js'), 'utf8'), 'shared');
-    fsx.writeFileSync(px.join(temp, 'state.js'), 'board B');
+    assert.equal(fsx.existsSync(px.join(temp, 'state.json')), false);
+    assert.equal(fsx.readFileSync(px.join(temp, 'stacks', stackKey('/stacks/a'), 'state.json'), 'utf8'), 'board A');
+    assert.equal(fsx.readFileSync(px.join(temp, 'registry.json'), 'utf8'), 'shared');
+    fsx.writeFileSync(px.join(temp, 'state.json'), 'board B');
     setStack(config, '/stacks/a', () => {});
-    assert.deepEqual([fsx.readFileSync(px.join(temp, 'state.js'), 'utf8'), fsx.readFileSync(px.join(temp, 'history.jsonl'), 'utf8')], ['board A', 'history A']);
+    assert.deepEqual([fsx.readFileSync(px.join(temp, 'state.json'), 'utf8'), fsx.readFileSync(px.join(temp, 'history.jsonl'), 'utf8')], ['board A', 'history A']);
     setStack(config, '/stacks/a', () => {});
-    assert.equal(fsx.readFileSync(px.join(temp, 'state.js'), 'utf8'), 'board A');
+    assert.equal(fsx.readFileSync(px.join(temp, 'state.json'), 'utf8'), 'board A');
     // A remembered change must name a file inside the app's clone.
 {
   const base = { envs: ['qa'], apps: { a: { name: 'A', kind: 'node', slug: 'acme/a' } } };
@@ -230,7 +230,7 @@ console.log('switch stacks ok');
   git(dir, 'clone', '-q', origin, clean); git(dir, 'clone', '-q', origin, dirty);
   fs.writeFileSync(path.join(origin, 'a.txt'), '2'); git(origin, 'commit', '-qam', 'two');
   fs.writeFileSync(path.join(dirty, 'mine.txt'), 'work in progress');
-  fs.writeFileSync(path.join(process.env.KOPPLER_TEMP, 'local.js'), `window.LOCAL = ${JSON.stringify({ apps: { clean: { path: clean, branch: 'main' }, dirty: { path: dirty, branch: 'main' }, gone: null } })};\n`);
+  fs.writeFileSync(path.join(process.env.KOPPLER_TEMP, 'local.json'), JSON.stringify({ apps: { clean: { path: clean, branch: 'main' }, dirty: { path: dirty, branch: 'main' }, gone: null } }));
   const lines = []; const log = console.log; console.log = l => lines.push(l);
   try { await updateClones(); } finally { console.log = log; }
   assert.equal(fs.readFileSync(path.join(clean, 'a.txt'), 'utf8'), '2', 'a clean clone that is behind is fast-forwarded');
