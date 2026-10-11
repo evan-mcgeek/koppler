@@ -64,7 +64,7 @@ test('the list is filtered by a name or a kind, and an app that is not cloned of
   await expect(page.getByText('No app matches.')).toBeVisible();
   await search.fill('pay');
   await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
-  await page.getByRole('button', { name: 'Payments API' }).click();
+  await page.getByRole('complementary').getByRole('button', { name: 'Payments API' }).click();
   await expect(page.getByRole('complementary').getByRole('status')).toHaveText(
     'Clone command for Payments API copied.',
   );

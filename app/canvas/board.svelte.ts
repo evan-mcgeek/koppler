@@ -4,6 +4,7 @@ import type { Edge, Node } from '@xyflow/svelte';
 import { arrange, sidesFor, type Point, type Side } from '../src/core/arrange.ts';
 import { endOffsets, orderSlots, sidePoint, SIDES, type Box, type Cable } from '../src/core/cables.ts';
 import { of as kindOf } from '../src/core/kinds.ts';
+import { LOCAL_QUEUE_TYPES, queuesOf } from '../src/core/plan.ts';
 import { planTunnels, tunnelKind, type Tunnel } from '../src/core/ports.ts';
 import type { Registry } from '../src/data.ts';
 import type { Loaded, SavedBoard } from './data.ts';
@@ -48,6 +49,37 @@ export interface TunnelData extends Record<string, unknown> {
   apps: string[];
 }
 export type TunnelNode = Node<TunnelData, 'tunnel'>;
+/** A queue between apps: a card with a switch between the deployed queue and a local copy. */
+export interface QueueData extends Record<string, unknown> {
+  queue: string;
+  name: string;
+  /** Its type, as the card shows it: SQS, KAFKA. */
+  kind: string;
+  /** Whether Koppler can run this type locally, and whether the board asks for that. */
+  can: boolean;
+  local: boolean;
+  /** Set when a local app reads the deployed queue: it takes messages the deployed reader would get. */
+  shares: string;
+  about: string[];
+}
+export type QueueNode = Node<QueueData, 'queue'>;
+/** An outside system, such as a payment provider: it never runs here. */
+export interface OutsideData extends Record<string, unknown> {
+  name: string;
+  /** Which one the board's environment uses, or that it never runs. */
+  where: string;
+  about: string[];
+}
+export type OutsideNode = Node<OutsideData, 'outside'>;
+/** Every card that is not an app. */
+export type InfraNode = TunnelNode | QueueNode | OutsideNode;
+/** A line between cards that is not a cable: a message to or from a queue, or a call to an outside system. */
+export interface Flow {
+  from: string;
+  to: string;
+  /** The queue a message link belongs to. */
+  queue?: string;
+}
 const tunnelKey = (tunnel: Tunnel) => `tunnel:${tunnel.host}:${String(tunnel.original)}`;
 /** The room a tunnel card is given before it has been measured, and the gap that keeps it beside its app. */
 const TUNNEL = { w: 230, h: 58, gap: 40 };
@@ -124,7 +156,10 @@ class Board {
     ),
   );
   /** Tunnel cards, kept apart from the app cards: the flow shows both. */
-  infra = $state.raw<TunnelNode[]>([]);
+  infra = $state.raw<InfraNode[]>([]);
+  /** The queues run locally instead of the deployed ones, and the queues taken off the board. */
+  queues = $state.raw<Record<string, 'local'>>({});
+  hiddenQueues = $state.raw<Record<string, true>>({});
   infraBoxes = $derived(
     new Map<string, Box>(
       this.infra.map(({ id, position, measured }) => [
@@ -168,7 +203,77 @@ class Board {
   });
   /** The tunnel cards an app leads: those it is the first app on the board to use. They stay beside it. */
   ledBy(id: string): string[] {
-    return this.plan.filter(tunnel => tunnel.apps[0] === id).map(tunnelKey);
+    return [
+      ...this.plan.filter(tunnel => tunnel.apps[0] === id).map(tunnelKey),
+      ...this.boardQueues.filter(queue => this.#leadOf(queue) === id).map(queue => `queue:${queue.id}`),
+    ];
+  }
+  #onBoard = $derived(new Set(this.nodes.map(node => node.id)));
+  #outside(id: string): boolean {
+    return !!this.#registry?.apps[id]?.outside;
+  }
+  /** The queues of the stack that an app on the board publishes to or reads, with who uses each. */
+  boardQueues = $derived.by(() => {
+    const apps = this.#registry?.apps ?? {};
+    return Object.entries(this.#registry?.queues ?? {}).flatMap(([id, queue]) => {
+      const users = (how: 'publishes' | 'reads') =>
+        Object.keys(apps).filter(
+          app => Object.hasOwn(apps[app]?.[how] ?? {}, id) && (this.#onBoard.has(app) || this.#outside(app)),
+        );
+      const [pubs, reads] = [users('publishes'), users('reads')];
+      const shown = !this.hiddenQueues[id] && [...pubs, ...reads].some(app => this.#onBoard.has(app));
+      return shown ? [{ id, queue, pubs, reads }] : [];
+    });
+  });
+  #leadOf(queue: { pubs: string[]; reads: string[] }): string | undefined {
+    return [...queue.pubs, ...queue.reads].find(app => this.#onBoard.has(app));
+  }
+  /** An app's queues that the stack describes. */
+  queuesOf(id: string): string[] {
+    return queuesOf(this.#registry, id).filter(queue => this.#registry?.queues?.[queue]);
+  }
+  /** The message links and the calls to outside systems, between the cards they join. */
+  flows = $derived.by((): Flow[] => {
+    const card = (app: string) => (this.#outside(app) ? `outside:${app}` : app);
+    return [
+      ...this.boardQueues.flatMap(({ id, pubs, reads }) => [
+        ...pubs.map(app => ({ from: card(app), to: `queue:${id}`, queue: id })),
+        ...reads.map(app => ({ from: `queue:${id}`, to: card(app), queue: id })),
+      ]),
+      ...this.nodes.flatMap(({ id }) =>
+        Object.keys(this.#registry?.apps[id]?.consumes ?? {})
+          .filter(app => this.#outside(app))
+          .map(app => ({ from: id, to: `outside:${app}` })),
+      ),
+    ];
+  });
+  /** The side of an app its tunnel and queue cards stack on: the first one its cables do not use. */
+  infraSide(id: string): Side {
+    const used = new Set(this.cables.flatMap(one => [one.from === id && one.fromSide, one.to === id && one.toSide]));
+    return TUNNEL_SIDES.find(one => !used.has(one)) ?? 'bottom';
+  }
+  /** The apps this one still calls in the deployed environment: the calls the stack knows that have no cable. */
+  deployedCalls(id: string): StackApp[] {
+    const called = this.apps.find(app => app.id === id)?.calls ?? [];
+    return called.flatMap(to => {
+      const app = this.apps.find(one => one.id === to);
+      return app && !app.outside && !this.edges.some(edge => edge.id === `${id}>${to}`) ? [app] : [];
+    });
+  }
+  /** Runs an app this one calls locally too: on the board if it is not, and cabled. */
+  callLocally(from: string, to: string): void {
+    this.add(to);
+    if (this.nodes.some(node => node.id === to)) this.connect(from, to);
+  }
+  setQueue(id: string, local: boolean): void {
+    const { [id]: _was, ...others } = this.queues;
+    this.queues = local ? { ...others, [id]: 'local' } : others;
+    this.syncInfra();
+  }
+  /** Takes queues off the board, or brings them back: their apps then use the deployed ones. */
+  showQueues(ids: string[], show: boolean): void {
+    const kept = Object.entries(this.hiddenQueues).filter(([id]) => !ids.includes(id));
+    this.hiddenQueues = Object.fromEntries(show ? kept : [...kept, ...ids.map(id => [id, true] as const)]);
   }
   /** Which apps each tunnel card is linked to. */
   links = $derived(this.plan.flatMap(tunnel => tunnel.apps.map(app => ({ from: app, to: tunnelKey(tunnel) }))));
@@ -192,13 +297,12 @@ class Board {
    * Tunnel cards go on the first side of their app its cables do not use (below, else right, left, above), so they
    * are never in front of cables, stacked there as one block with the app.
    */
-  #beside(id: string, cards: TunnelNode[]): TunnelNode[] {
+  #beside(id: string, cards: InfraNode[]): InfraNode[] {
     const app = this.nodes.find(node => node.id === id);
     const led = new Set(this.ledBy(id));
     if (!app || !led.size) return cards;
     const box = { ...app.position, ...(this.boxes.get(id) ?? { w: 260, h: 200 }) };
-    const used = new Set(this.cables.flatMap(one => [one.from === id && one.fromSide, one.to === id && one.toSide]));
-    const side = TUNNEL_SIDES.find(one => !used.has(one)) ?? 'bottom';
+    const side = this.infraSide(id);
     let y = side === 'bottom' ? box.y + box.h + TUNNEL.gap / 2 : side === 'top' ? box.y - TUNNEL.gap / 2 : box.y;
     return cards.map(card => {
       if (!led.has(card.id)) return card;
@@ -215,7 +319,7 @@ class Board {
   syncInfra(at: Record<string, Point | undefined> = {}): void {
     const before = new Map(this.infra.map(card => [card.id, card]));
     const fresh: string[] = [];
-    let cards = this.plan.map((tunnel): TunnelNode => {
+    const tunnels = this.plan.map((tunnel): TunnelNode => {
       const id = tunnelKey(tunnel);
       const kept = before.get(id);
       if (!kept && !at[id]) fresh.push(tunnel.apps[0] ?? '');
@@ -245,9 +349,117 @@ class Board {
         },
       };
     });
+    const env = this.env.toUpperCase();
+    const name = (app: string) => this.#registry?.apps[app]?.name ?? app;
+    const queues = this.boardQueues.map((one): QueueNode => {
+      const id = `queue:${one.id}`;
+      const kept = before.get(id);
+      const lead = this.#leadOf(one);
+      if (!kept && !at[id] && lead) fresh.push(lead);
+      const can = (LOCAL_QUEUE_TYPES as readonly string[]).includes(one.queue.type);
+      const local = can && this.queues[one.id] === 'local';
+      const readers = one.reads.filter(app => this.#onBoard.has(app)).map(name);
+      const shares = !local && readers.length ? readers.join(' and ') : '';
+      return {
+        ...(kept as QueueNode | undefined),
+        id,
+        type: 'queue',
+        deletable: false,
+        position: kept?.position ?? at[id] ?? { x: 0, y: 0 },
+        data: {
+          queue: one.id,
+          name: one.queue.name,
+          kind: one.queue.type.toUpperCase(),
+          can,
+          local,
+          shares: shares ? `Shared with ${env}'s reader` : '',
+          about: [
+            one.queue.envs?.[this.env]?.queue ?? one.queue.queue ?? one.id,
+            shares
+              ? `Your local ${shares} reads the ${env} queue, so it takes messages the deployed reader would get.`
+              : '',
+          ].filter(Boolean),
+        },
+      };
+    });
+    const linked = [...new Set(this.flows.flatMap(flow => [flow.from, flow.to]))].filter(key =>
+      key.startsWith('outside:'),
+    );
+    const outside = linked.map((id): OutsideNode => {
+      const app = this.#registry?.apps[id.slice(8)];
+      const kept = before.get(id);
+      const own = this.env === this.envs[0] ? undefined : app?.envs?.[this.env]?.deployedUrl;
+      const address = typeof own === 'string' ? own : (app?.deployedUrl ?? '');
+      const host = URL.canParse(address) ? new URL(address).hostname : '';
+      const why = typeof app?.outside === 'string' ? `: ${app.outside}` : '';
+      return {
+        ...(kept as OutsideNode | undefined),
+        id,
+        type: 'outside',
+        deletable: false,
+        position: kept?.position ?? at[id] ?? { x: 0, y: 0 },
+        data: {
+          name: app?.name ?? id.slice(8),
+          where: host ? `${env}: ${host}` : 'Outside, never runs',
+          about: [
+            `${app?.name ?? id.slice(8)} does not run on this Mac${why}. Koppler cannot check calls to it.`,
+            host ? `The ${env} board uses ${address}.` : '',
+          ].filter(Boolean),
+        },
+      };
+    });
+    let cards: InfraNode[] = [...tunnels, ...queues, ...outside];
     for (const lead of fresh) cards = this.#beside(lead, cards);
+    // An outside system goes beside the card it is linked to, on the first spot that is free.
+    for (const card of outside.filter(one => !before.has(one.id) && !at[one.id])) {
+      const spot = this.#nextTo(card.id, cards);
+      cards = cards.map(one => (one.id === card.id ? { ...one, position: spot } : one));
+    }
     this.infra = cards;
     this.unplaced = [...new Set([...this.unplaced, ...fresh])];
+  }
+
+  /** A free spot for a new card beside what it is linked to: right of what calls it, left of what it feeds. */
+  #nextTo(id: string, cards: InfraNode[]): Point {
+    const size = TUNNEL;
+    const box = (key: string): Box | undefined => {
+      const card = cards.find(one => one.id === key && (one.id === id || one.position.x || one.position.y));
+      const app = this.nodes.find(node => node.id === key);
+      return card
+        ? { ...card.position, ...(this.infraBoxes.get(key) ?? size) }
+        : app && { ...app.position, ...(this.boxes.get(key) ?? { w: 260, h: 200 }) };
+    };
+    const near = this.flows.flatMap(flow => {
+      const other = flow.from === id ? flow.to : flow.to === id ? flow.from : undefined;
+      const at = other === undefined ? undefined : box(other);
+      return at ? [{ at, before: flow.to === id }] : [];
+    });
+    const taken = [
+      ...this.nodes.map(node => box(node.id)),
+      ...cards.filter(one => one.id !== id).map(one => box(one.id)),
+    ];
+    const free = (spot: Point) =>
+      taken.every(
+        one =>
+          !one ||
+          spot.x + size.w + 16 <= one.x ||
+          one.x + one.w + 16 <= spot.x ||
+          spot.y + size.h + 16 <= one.y ||
+          one.y + one.h + 16 <= spot.y,
+      );
+    const [first] = near;
+    if (!first) return { x: 40, y: 40 };
+    const { at, before } = first;
+    const sides = before ? [at.x + at.w + 80, at.x - size.w - 80] : [at.x - size.w - 80, at.x + at.w + 80];
+    const spots = [
+      { x: sides[0] ?? 0, y: at.y },
+      { x: sides[1] ?? 0, y: at.y },
+      { x: at.x, y: at.y + at.h + 40 },
+      { x: at.x, y: at.y - size.h - 40 },
+      // Still nothing free: down the first choice.
+      ...Array.from({ length: 9 }, (_, step) => ({ x: sides[0] ?? 0, y: at.y + (step + 1) * (size.h + 24) })),
+    ];
+    return spots.find(free) ?? spots[0] ?? { x: 40, y: 40 };
   }
 
   /** New tunnel cards were placed by guess: put right once their app and they have their real sizes. */
@@ -261,7 +473,7 @@ class Board {
   }
 
   /** An app that moves takes the tunnel cards it leads along. */
-  followed(id: string, by: Point, cards: TunnelNode[]): TunnelNode[] {
+  followed(id: string, by: Point, cards: InfraNode[]): InfraNode[] {
     const led = new Set(this.ledBy(id));
     return cards.map(card =>
       led.has(card.id) && !card.selected && !card.dragging
@@ -272,7 +484,8 @@ class Board {
 
   /** Turns off the tunnels of every app that uses this one. ponytail: per tunnel, once apps have several. */
   hideTunnel(key: string): void {
-    const apps = new Set(this.infra.find(card => card.id === key)?.data.apps);
+    const card = this.infra.find(one => one.id === key);
+    const apps = new Set(card?.type === 'tunnel' ? card.data.apps : []);
     this.nodes = this.nodes.map(node =>
       apps.has(node.id) ? { ...node, data: { ...node.data, hideTunnels: true } } : node,
     );
@@ -475,6 +688,8 @@ class Board {
     return JSON.stringify({
       nodes: this.nodes.map(({ id, type, position, data }) => ({ id, type, position, data })),
       infra: this.infra.map(({ id, position }) => ({ id, position })),
+      queues: this.queues,
+      hiddenQueues: this.hiddenQueues,
       edges: this.edges.map(({ id, source, target, type, data }) => ({ id, source, target, type, data })),
     });
   }
@@ -498,13 +713,17 @@ class Board {
     this.#now = back;
     // The next change is a step of its own.
     this.#at = 0;
-    const { nodes, edges, infra } = JSON.parse(back) as {
+    const { nodes, edges, infra, queues, hiddenQueues } = JSON.parse(back) as {
       nodes: CardNode[];
       edges: CableEdge[];
       infra: { id: string; position: Point }[];
+      queues: Record<string, 'local'>;
+      hiddenQueues: Record<string, true>;
     };
     this.nodes = nodes;
     this.edges = edges;
+    this.queues = queues;
+    this.hiddenQueues = hiddenQueues;
     this.syncInfra(Object.fromEntries(infra.map(({ id, position }) => [id, position])));
     this.infra = this.infra.map(card => ({
       ...card,
@@ -594,6 +813,8 @@ class Board {
       );
     this.#kept = saved ?? {};
     this.infra = [];
+    this.queues = (saved?.['queues'] ?? {}) as Record<string, 'local'>;
+    this.hiddenQueues = (saved?.['hiddenQueues'] ?? {}) as Record<string, true>;
     this.syncInfra((saved?.infra ?? {}) as Record<string, Point | undefined>);
     const { zoom, pan } = saved ?? {};
     this.view = zoom && pan ? { x: pan.x, y: pan.y, zoom } : undefined;
@@ -623,6 +844,8 @@ class Board {
         ]),
       ),
       edges: this.edges.map(({ source, target, data }) => ({ from: source, to: target, ...data })),
+      queues: this.queues,
+      hiddenQueues: this.hiddenQueues,
       infra: Object.fromEntries(
         this.infra.map(({ id, position }) => [id, { x: Math.round(position.x), y: Math.round(position.y) }]),
       ),

@@ -11,11 +11,13 @@
     ViewportPortal,
   } from '@xyflow/svelte';
   import type { Side } from '../src/core/arrange.ts';
-  import { cablePath, sidePoint, throughPath, type Box } from '../src/core/cables.ts';
+  import { cablePath, sidePoint, SIDES, throughPath, type Box } from '../src/core/cables.ts';
   import AppCard from './AppCard.svelte';
   import Cable from './Cable.svelte';
+  import Outside from './Outside.svelte';
+  import Queue from './Queue.svelte';
   import Tunnel from './Tunnel.svelte';
-  import { board, type CardNode, type TunnelNode } from './board.svelte.ts';
+  import { board, type CardNode, type InfraNode } from './board.svelte.ts';
 
   const flow = useSvelteFlow();
   board.toFlow = at => flow.screenToFlowPosition(at, { snapToGrid: false });
@@ -107,6 +109,39 @@
       return app && card ? [{ key: `${from}>${to}`, d: linkPath(app, card) }] : [];
     }),
   );
+  /** A message link or a call to an outside system, between the sides of its two cards that face each other. */
+  const flows = $derived(
+    board.flows.flatMap(({ from, to, queue }) => {
+      const box = (key: string) => board.boxes.get(key) ?? board.infraBoxes.get(key);
+      const [a, b] = [box(from), box(to)];
+      if (!a || !b) return [];
+      const dx = b.x + b.w / 2 - (a.x + a.w / 2);
+      const dy = b.y + b.h / 2 - (a.y + a.h / 2);
+      const level: [Side, Side] = dx > 0 ? ['right', 'left'] : ['left', 'right'];
+      let sides: [Side, Side] =
+        Math.abs(dx) * 0.6 > Math.abs(dy) ? level : dy > 0 ? ['bottom', 'top'] : ['top', 'bottom'];
+      // An app's side with its tunnel cards is left to them: the link leaves sideways instead.
+      const taken = (key: string, side: Side) =>
+        board.boxes.has(key) && !!board.ledBy(key).length && board.infraSide(key) === side;
+      if (taken(from, sides[0]) || taken(to, sides[1])) sides = level;
+      // A card stacked with its own app is joined to it down their shared left edge, in a shallow bracket.
+      const own = board.ledBy(from).includes(to) || board.ledBy(to).includes(from);
+      if (own) sides = ['left', 'left'];
+      const [start, end] = [sidePoint(a, sides[0]), sidePoint(b, sides[1])];
+      const [x, y] = SIDES[sides[1]];
+      return [
+        {
+          key: `${from}>${to}`,
+          d: own
+            ? `M${String(start.x)},${String(start.y)} C${String(start.x - 36)},${String(start.y)} ${String(end.x - 36)},${String(end.y)} ${String(end.x)},${String(end.y)}`
+            : cablePath(start, sides[0], end, sides[1]),
+          start,
+          head: `translate(${String(end.x + x * 10)} ${String(end.y + y * 10)}) rotate(${String((Math.atan2(-y, -x) * 180) / Math.PI)})`,
+          kind: queue ? (board.queues[queue] === 'local' ? 'msg local' : 'msg') : 'ext',
+        },
+      ];
+    }),
+  );
   const arrange = () => {
     board.arrange();
     // The cards move first; the view follows once they are placed.
@@ -131,10 +166,10 @@
   <SvelteFlow
     bind:nodes={
       () => [...board.nodes, ...board.infra],
-      (all: (CardNode | TunnelNode)[]) => {
+      (all: (CardNode | InfraNode)[]) => {
         // An app the library moved (a drag, the arrow keys) takes its tunnel cards along, in the same step.
         const was = new Map(board.nodes.map(node => [node.id, node.position]));
-        let infra = all.filter(node => node.type === 'tunnel');
+        let infra = all.filter(node => node.type !== 'app');
         const apps = all.filter(node => node.type === 'app');
         for (const { id, position } of apps) {
           const from = was.get(id);
@@ -146,7 +181,7 @@
       }
     }
     bind:edges={board.edges}
-    nodeTypes={{ app: AppCard, tunnel: Tunnel }}
+    nodeTypes={{ app: AppCard, tunnel: Tunnel, queue: Queue, outside: Outside }}
     edgeTypes={{ cable: Cable }}
     connectionMode={ConnectionMode.Loose}
     deleteKey={['Backspace', 'Delete']}
@@ -254,6 +289,14 @@
         {#each links as link (link.key)}
           <path class="link" d={link.d} />
         {/each}
+        {#each flows as flow (flow.key)}
+          <g class="flow {flow.kind}">
+            <path class="under" d={flow.d} />
+            <path class="wire" d={flow.d} />
+            <path class="head" d="M-8,-5.5 L0,0 L-8,5.5" transform={flow.head} />
+            <circle class="plug" cx={flow.start.x} cy={flow.start.y} r="5" />
+          </g>
+        {/each}
       </svg>
     </ViewportPortal>
     <!-- Above every card, a picked one too: each cable's two ends, which the pointer can grab, and the cable being drawn. -->
@@ -323,6 +366,42 @@
     stroke-linecap: butt;
     marker-start: url(#link-end);
     marker-end: url(#link-end);
+  }
+  /* Message links are teal, dashed while the queue is the deployed one; calls to an outside system are dotted grey. */
+  .flow .under {
+    stroke: var(--desk);
+    stroke-width: 7;
+    opacity: 0.75;
+  }
+  .flow .wire,
+  .flow .head {
+    stroke-width: 2;
+  }
+  .flow.msg :is(.wire, .head) {
+    stroke: var(--msg);
+  }
+  .flow.msg .wire {
+    stroke-dasharray: 7 5;
+    stroke-linecap: butt;
+  }
+  .flow.msg.local .wire {
+    stroke-dasharray: none;
+    stroke-linecap: round;
+  }
+  .flow.msg .plug {
+    fill: var(--msg);
+    stroke: var(--surface);
+    stroke-width: 2;
+  }
+  .flow.ext :is(.wire, .head) {
+    stroke: var(--socket-rim);
+    stroke-width: 1.5;
+  }
+  .flow.ext .wire {
+    stroke-dasharray: 2 5;
+  }
+  .flow.ext .plug {
+    display: none;
   }
   .ends {
     position: absolute;
