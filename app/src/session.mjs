@@ -3,7 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { redact } from './scrub.mjs';
+import { redact } from './scrub.ts';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 export const isDev = () => !fs.realpathSync(here).split(path.sep).join('/').includes('/plugins/cache/');

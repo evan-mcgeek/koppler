@@ -4,7 +4,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { execFileSync, spawn, spawnSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { isDeepStrictEqual } from 'node:util';
 import { init as initStack, removeApp, stacksCommand, sync, updateClones, useCommand } from './sync.mjs';
@@ -13,7 +13,6 @@ import { discoverCommand } from './discover.mjs';
 import { sayCommand } from './messages.mjs';
 import { switchCommand } from './branch.mjs';
 import { recipesCommand } from './recipes.mjs';
-import { keepPreviousLog } from './session.mjs';
 import { queryCommand } from './query.mjs';
 import { findCommand } from './research.mjs';
 import { investigate, repoFiles } from './investigate.mjs';
@@ -26,10 +25,11 @@ import * as kinds from './core/kinds.ts';
 import * as launch from './core/launch.ts';
 import { needs as needsFor } from './needs.mjs';
 import { APPROVE, approved, missingTunnels, startsFromStack } from './checks.mjs';
-import { APP, BIN, LOGS, STATE, TEMP } from './paths.ts';
+import { APP, BIN, LOGS, TEMP } from './paths.ts';
 import { readActions, updateActions } from './actions.mjs';
-import { appEnv } from './safe-env.ts';
-import { redact, scrub } from './scrub.mjs';
+import { confirm, fail, flagValue, positional, table } from './cli/output.ts';
+import { alive, listener, NAME, parseRun, readRecord, records, sh, sleep, startProcess, stopOne, uptime } from './engine/processes.ts';
+import { redact, scrub } from './scrub.ts';
 import * as kp from './core/plan.ts';
 import { readData } from './data.ts';
 
@@ -58,75 +58,6 @@ const init = async args => {
 };
 const here = path.dirname(fileURLToPath(import.meta.url));
 
-const PROCS = path.join(STATE, 'procs');
-const NAME = /^[a-z0-9-]{1,64}$/;
-
-// A usage mistake exits 2, a failure 1, as most command line tools do.
-const fail = message => { console.error(`koppler: ${message}`); process.exit(/^usage:/.test(message) ? 2 : 1); };
-// A y/N question in a terminal; without one (a script, an agent), only --yes says yes.
-async function confirm(question, args = []) {
-  if (args.includes('--yes') || args.includes('-y')) return true;
-  if (!process.stdin.isTTY) return false;
-  const rl = (await import('node:readline/promises')).createInterface({ input: process.stdin, output: process.stderr });
-  const answer = (await rl.question(`${question} [y/N] `)).trim().toLowerCase();
-  rl.close();
-  return answer === 'y' || answer === 'yes';
-}
-const sh = (cmd, args) => { try { return execFileSync(cmd, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim(); } catch { return ''; } };
-const sleep = ms => new Promise(r => setTimeout(r, ms));
-
-// A restart wrapper keeps flaky tunnels up; stop kills the whole process group, wrapper included.
-export function commandFor(argv, restart) {
-  return restart ? ['sh', '-c', 'while :; do "$@"; echo "koppler: exited with $?, restarting in 2s"; sleep 2; done', 'sh', ...argv] : argv;
-}
-
-export function parseRun(args) {
-  const dash = args.indexOf('--');
-  const head = dash < 0 ? args : args.slice(0, dash), command = dash < 0 ? [] : args.slice(dash + 1);
-  const opts = { name: head[0], command, restart: false };
-  for (let i = 1; i < head.length; i++) {
-    if (head[i] === '--restart') opts.restart = true;
-    else if (head[i] === '--cwd') opts.cwd = head[++i];
-    else if (head[i] === '--port') opts.port = Number(head[++i]);
-    else if (head[i] === '--bind') opts.bind = head[++i];
-    else if (head[i] === '--env') opts.env = head[++i];
-    else if (head[i] === '--device') opts.device = head[++i];
-    else if (head[i] === '--dry-run') opts.dryRun = true;
-    else if (head[i] === '--lan') opts.lan = true;
-    else if (head[i] === '--test') opts.test = true;
-    else if (head[i] === '--no-test') opts.test = false;
-    else throw new Error(`unknown option ${head[i]}`);
-  }
-  if (!NAME.test(opts.name ?? '')) throw new Error('name must be lowercase letters, digits and dashes');
-  if (dash >= 0 && !command.length) throw new Error('nothing to run after --');
-  if (opts.port !== undefined && !(opts.port > 0 && opts.port < 65536)) throw new Error('--port must be a TCP port');
-  if (opts.bind !== undefined && !/^(localhost|127\.\d{1,3}\.\d{1,3}\.\d{1,3})$/.test(opts.bind)) throw new Error('--bind must be an address of this machine (localhost or 127.x.x.x)');
-  return opts;
-}
-
-const recordPath = name => path.join(PROCS, `${name}.json`);
-const readRecord = name => { try { return JSON.parse(fs.readFileSync(recordPath(name), 'utf8')); } catch { return null; } };
-const records = () => { try { return fs.readdirSync(PROCS).filter(f => f.endsWith('.json')).map(f => readRecord(f.slice(0, -5))).filter(Boolean); } catch { return []; } };
-const psCommand = pid => sh('ps', ['-p', String(pid), '-o', 'command=']);
-
-const psStart = pid => sh('ps', ['-p', String(pid), '-o', 'lstart=']);
-// A pid alone can be reused by an unrelated process, so it must be the one started then. Its start time says so;
-// its command cannot, because it changes when the wrapper hands over to the app.
-function alive(rec) {
-  try { process.kill(rec.pid, 0); } catch { return false; }
-  return rec.psStart ? psStart(rec.pid) === rec.psStart : psCommand(rec.pid) === rec.psCommand;
-}
-
-// What listens on a port. With an address of its own (a tunnel on 127.0.0.2), only what listens there or on every address counts.
-function listener(port, bind) {
-  const out = sh('lsof', ['-nP', `-iTCP:${port}`, '-sTCP:LISTEN', '-Fpcn']);
-  const own = bind && !['localhost', '127.0.0.1'].includes(bind) ? [`${bind}:${port}`, `*:${port}`] : null;
-  for (const block of out.split(/^(?=p\d)/m)) {
-    const pid = block.match(/^p(\d+)/m)?.[1], at = [...block.matchAll(/^n(.+)/gm)].map(m => m[1]);
-    if (pid && (!own || at.some(a => own.includes(a)))) return { pid: Number(pid), command: block.match(/^c(.+)/m)?.[1] };
-  }
-  return null;
-}
 
 const readJsonFile = file => { try { return JSON.parse(fs.readFileSync(file, 'utf8').replace(/^\uFEFF/, '')); } catch { return null; } };
 
@@ -240,64 +171,10 @@ async function run(args, extra = {}) {
     for (const c of opts.onStop ?? []) console.log(`on stop: ${c.join(' ')}`);
     return;
   }
-  const existing = readRecord(opts.name);
-  if (existing && alive(existing)) fail(`${opts.name} is already running (pid ${existing.pid}); koppler stop ${opts.name} first`);
-  if (opts.port) {
-    const held = listener(opts.port, opts.bind);
-    if (held) fail(`port ${opts.port} is already held by pid ${held.pid} (${held.command}); stop it or reuse it`);
-  }
-
-  fs.mkdirSync(LOGS, { recursive: true, mode: 0o700 });
-  fs.mkdirSync(PROCS, { recursive: true, mode: 0o700 });
-  const log = path.join(LOGS, `${opts.name}.log`);
-  const display = [path.isAbsolute(opts.command[0]) ? path.basename(opts.command[0]) : opts.command[0], ...opts.command.slice(1)].join(' ');
-  keepPreviousLog(log);
-  const fd = fs.openSync(log, 'w', 0o600);
-  fs.writeSync(fd, `${new Date().toLocaleString('sv-SE')} $ ${display}\n`);
-  const argv = commandFor(opts.command, opts.restart);
-  const cwd = path.resolve(opts.cwd ?? process.cwd());
-  // An app started with its secrets does not inherit variables that would make its runtime load the caller's code.
-  const safe = opts.holdsSecrets ? appEnv() : null;
-  if (safe?.dropped.length) console.log(`left out of ${opts.name}'s environment, since they load extra code: ${safe.dropped.join(', ')}`);
-  const child = spawn(argv[0], argv.slice(1), { cwd, detached: true, stdio: ['ignore', fd, fd], ...(safe && { env: safe.env }) });
-  let spawnError = null;
-  child.on('error', e => { spawnError = e; });
-  child.unref();
-  fs.closeSync(fd);
-  await sleep(300);
-  if (spawnError || !child.pid) fail(`could not start ${opts.name}: ${spawnError?.message ?? 'no pid'}`);
-
-  const rec = { name: opts.name, pid: child.pid, command: display, cwd, restart: opts.restart, port: opts.port ?? null, ...(opts.bind && { bind: opts.bind }), ...(opts.env && { env: opts.env }), onStop: opts.onStop ?? [], log, startedAt: new Date().toISOString(), psCommand: psCommand(child.pid), psStart: psStart(child.pid) };
-  fs.writeFileSync(recordPath(opts.name), JSON.stringify(rec, null, 2) + '\n', { mode: 0o600 });
-  await sleep(700);
-  if (!alive(rec)) fail(`${opts.name} exited right away; last lines of ${log}:\n${tailOf(log, 15)}`);
-  // An app with a port is started once that port answers; a build can take minutes, and a crash during it is reported, not "started".
-  if (rec.port) {
-    console.log(`waiting for ${opts.name} on port ${rec.port}…`);
-    for (const until = Date.now() + START_WAIT; Date.now() < until && alive(rec) && !listener(rec.port, rec.bind);) await sleep(1000);
-    if (!alive(rec)) fail(`${opts.name} exited before answering on port ${rec.port}; last lines of ${log}:\n${tailOf(log, 15)}`);
-    if (!listener(rec.port, rec.bind)) { console.error(`koppler: ${opts.name} is running (pid ${rec.pid}) but nothing answers on port ${rec.port} after ${START_WAIT / 1000}s; see ${log}`); process.exit(2); }
-  }
-  console.log(`started ${opts.name} (pid ${rec.pid})${rec.port ? `, answering on port ${rec.port}` : ''}, log ${log}`);
+  await startProcess(opts);
 }
-const START_WAIT = Number(process.env.KOPPLER_START_WAIT) * 1000 || 300000;
 
-const tailOf = (file, n) => { try { return redact(fs.readFileSync(file, 'utf8').trimEnd().split('\n').slice(-n).join('\n')); } catch { return ''; } };
 
-async function stopOne(rec) {
-  if (!alive(rec)) { for (const [cmd, ...cmdArgs] of rec.onStop ?? []) sh(cmd, cmdArgs); fs.rmSync(recordPath(rec.name), { force: true }); return `${rec.name}: was not running`; }
-  const kill = signal => { try { process.kill(-rec.pid, signal); } catch {} };
-  // Every process of the app counts, not only the one Koppler started: a worker that outlives it keeps holding its port.
-  const running = () => { try { process.kill(-rec.pid, 0); return true; } catch { return false; } };
-  kill('SIGTERM');
-  for (let i = 0; i < 80 && running(); i++) await sleep(100);
-  const forced = running();
-  if (forced) { kill('SIGKILL'); for (let i = 0; i < 20 && running(); i++) await sleep(100); }
-  // Some apps outlive their process, e.g. a mobile app on a simulator: close them too.
-  for (const [cmd, ...cmdArgs] of rec.onStop ?? []) sh(cmd, cmdArgs);
-  fs.rmSync(recordPath(rec.name), { force: true });
-  return `${rec.name}: stopped${forced ? ' (killed after 8s)' : ''}`;
-}
 
 async function stop(args) {
   // --apps: every app, API and tunnel Koppler runs, but not the canvas; code changes and branches stay as they are.
@@ -311,14 +188,6 @@ async function stop(args) {
   for (const line of await Promise.all(targets.map(stopOne))) console.log(line);
 }
 
-const uptime = since => {
-  const s = Math.floor((Date.now() - Date.parse(since)) / 1000);
-  return s < 3600 ? `${Math.floor(s / 60)}m` : `${Math.floor(s / 3600)}h${String(Math.floor(s % 3600 / 60)).padStart(2, '0')}m`;
-};
-const table = rows => {
-  const widths = rows[0].map((_, i) => Math.max(...rows.map(r => String(r[i]).length)));
-  for (const r of rows) console.log(r.map((c, i) => String(c).padEnd(widths[i])).join('  ').trimEnd());
-};
 
 
 // What a bug report needs, ready to paste into a public issue: versions, then the tails of the canvas debug log, the
@@ -679,8 +548,6 @@ function wirePrint(caller, callee, call, value, address, result) {
   if (result.note) console.log(`  note: ${result.note}`);
 }
 
-const positional = (args, valued = []) => args.filter((a, i) => !a.startsWith('-') && !valued.includes(args[i - 1]));
-const flagValue = (args, name) => { const i = args.indexOf(name); return i >= 0 ? args[i + 1] : undefined; };
 const registryOrFail = () => readData('registry') ?? fail('no stack loaded (koppler init)');
 const envOf = (registry, args) => {
   const env = flagValue(args, '--env') ?? registry.envs[0];

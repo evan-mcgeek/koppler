@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { redact, scrub } from '../dist/scrub.mjs';
+import { redact, scrub } from '../dist/scrub.js';
 
 // Secrets are masked; what is around them stays readable.
 for (const [raw, masked] of [

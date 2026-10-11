@@ -7,7 +7,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import * as kp from './core/plan.ts';
 import { STATE, TEMP } from './paths.ts';
-import { redact } from './scrub.mjs';
+import { redact } from './scrub.ts';
 import { readData } from './data.ts';
 
 const temp = () => process.env.KOPPLER_TEMP || TEMP;
