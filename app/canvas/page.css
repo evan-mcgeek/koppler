@@ -4,6 +4,10 @@ body,
   height: 100%;
   margin: 0;
 }
+#app {
+  display: flex;
+  flex-direction: column;
+}
 body {
   background: var(--paper);
   font-family: var(--sans);
@@ -16,4 +20,14 @@ body {
 }
 .kind-node {
   --kind: var(--node);
+}
+.kind-web {
+  --kind: var(--web);
+}
+.kind-lambda,
+.kind-sam {
+  --kind: var(--lambda);
+}
+.kind-other {
+  --kind: var(--other);
 }

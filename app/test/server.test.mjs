@@ -35,6 +35,16 @@ try {
   assert.equal((await call('GET', `${page.pathname}fonts/JetBrainsMono-OFL.txt`)).status, 404);
   assert.equal((await call('GET', `/s/${'0'.repeat(48)}/`)).status, 404);
 
+  // The new canvas: its page and the files that page names, and nothing else from its folder.
+  const next = await call('GET', `${page.pathname}next/`);
+  assert.equal(next.status, 200);
+  assert.equal(next.headers['content-type'], 'text/html; charset=utf-8');
+  assert.doesNotMatch(next.body.toString(), /(href|src)="https?:\/\//);
+  const script = /assets\/[\w.-]+\.js/.exec(next.body.toString())[0];
+  assert.equal((await call('GET', `${page.pathname}next/${script}`)).headers['content-type'], 'text/javascript; charset=utf-8');
+  for (const not of ['next', 'next/index.html', 'next/assets/', 'next/assets/..%2Findex.html', 'next/assets/%2e%2e/index.html', 'data/secrets.json', 'data/state.json'])
+    assert.equal((await call('GET', page.pathname + not)).status, 404, not);
+
   // Another site's name pointed at this machine, or a request another site makes, is refused.
   assert.equal((await call('GET', page.pathname, { host: `evil.example:${PORT}` })).status, 403);
   assert.equal((await call('GET', page.pathname, { host: `localhost:${PORT}` })).status, 200);
@@ -56,6 +66,10 @@ try {
   // A request that fails is answered, and the server keeps running: a save while its folder cannot be written, a body too large.
   const save = `/state?token=${token}`, board = JSON.stringify({ nodes: {}, edges: [], env: 'qa', mode: 'auto' });
   assert.equal((await call('POST', save, json, board)).status, 204);
+  // The board comes back as JSON, for the new canvas.
+  const kept = await call('GET', `${page.pathname}data/state.json`);
+  assert.equal(kept.headers['content-type'], 'application/json; charset=utf-8');
+  assert.equal(JSON.parse(kept.body.toString()).env, 'qa');
   if (process.getuid?.() !== 0) {
     fs.chmodSync(temp, 0o500);
     try {

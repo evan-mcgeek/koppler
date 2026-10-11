@@ -9,10 +9,4 @@ export default defineConfig({
   retries: 0,
   reporter: process.env.CI ? [['github'], ['list']] : 'list',
   use: { viewport: { width: 1440, height: 900 }, trace: 'retain-on-failure' },
-  // The new canvas has no server of ours yet: its tests (e2e/next) open it from Vite.
-  webServer: {
-    command: 'npx vite canvas --port 4799 --strictPort',
-    url: 'http://localhost:4799/',
-    reuseExistingServer: !process.env.CI,
-  },
 });

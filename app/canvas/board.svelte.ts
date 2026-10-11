@@ -3,6 +3,8 @@
 import type { Edge, Node } from '@xyflow/svelte';
 import { arrange, sidesFor, type Point, type Side } from '../src/core/arrange.ts';
 import { endOffsets, orderSlots, sidePoint, SIDES, type Box, type Cable } from '../src/core/cables.ts';
+import { of as kindOf } from '../src/core/kinds.ts';
+import type { Loaded } from './data.ts';
 
 export interface CableData extends Record<string, unknown> {
   fromSide: Side;
@@ -12,7 +14,7 @@ export interface CableData extends Record<string, unknown> {
   points?: Point[];
 }
 export type CableEdge = Edge<CableData, 'cable'> & { data: CableData };
-export type CardNode = Node<{ name: string; kind: string; branch: string; port: number }, 'app'>;
+export type CardNode = Node<{ name: string; kind: string; kindLabel: string; branch: string; address: string }, 'app'>;
 export type End = 'from' | 'to';
 interface Draft {
   a: Point;
@@ -37,6 +39,9 @@ export const cable = (from: string, to: string, data: CableData): CableEdge => (
 });
 
 class Board {
+  /** The stack's name and the environment the board runs against; empty until the board is opened. */
+  stack = $state('');
+  env = $state('');
   nodes = $state.raw<CardNode[]>([]);
   edges = $state.raw<CableEdge[]>([]);
   /** The cable being drawn. */
@@ -235,6 +240,34 @@ class Board {
     };
     addEventListener('pointermove', move);
     addEventListener('pointerup', stop);
+  }
+
+  /** Puts the board the server kept on screen: the stack's apps where they were left, and their cables. */
+  open({ stack, clones, saved }: Loaded): void {
+    this.stack = stack.name ?? '';
+    this.env = saved?.env ?? stack.envs[0] ?? '';
+    const placed = Object.entries(saved?.nodes ?? {}).flatMap(([id, at]) => {
+      const app = stack.apps[id];
+      return app && at ? [{ id, app, at }] : [];
+    });
+    this.nodes = placed.map(({ id, app, at }) => ({
+      id,
+      type: 'app',
+      position: { x: at.x, y: at.y },
+      data: {
+        name: app.name,
+        kind: app.kind,
+        kindLabel: kindOf(app).label,
+        branch: at.branch || clones[id]?.branch || '',
+        address: (app.url ?? '').replace(/^https?:\/\//, ''),
+      },
+    }));
+    const onBoard = new Set(placed.map(({ id }) => id));
+    this.edges = (saved?.edges ?? [])
+      .filter(({ from, to }) => onBoard.has(from) && onBoard.has(to))
+      .map(({ from, to, fromSide, toSide }) =>
+        cable(from, to, { fromSide: fromSide ?? 'right', toSide: toSide ?? 'left' }),
+      );
   }
 
   /** Arrange: places the cards, picks each cable's sides and its order along them, and drops the waypoints. */

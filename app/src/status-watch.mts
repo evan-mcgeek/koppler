@@ -105,7 +105,12 @@ function readBody(req: Request, res: Response, onBody: (body: unknown) => void):
   });
 }
 
-/** What the page loads: its own files, its data as scripts, and an app's log. */
+const DATA_FILE = /^data\/(registry|local|repos|state)\.json$/;
+/** The new canvas, built into its own folder: its page and the files that page names. */
+const nextFile = (what: string) =>
+  what === 'next/' ? 'next/index.html' : /^next\/assets\/[\w-][\w.-]*$/.test(what) ? what : undefined;
+
+/** What the page loads: its own files, its data as scripts or as JSON, and an app's log. */
 function servePage(what: string, url: URL, res: Response): void {
   // The open log tab reads its app's log here, much longer than the short tail every status carries.
   if (what === 'log') {
@@ -133,7 +138,13 @@ function servePage(what: string, url: URL, res: Response): void {
     res.writeHead(value ? 200 : 404, headers).end(value ? `window.${data.global} = ${JSON.stringify(value)};\n` : '');
     return;
   }
-  const file = Object.hasOwn(PAGE_FILES, what) ? PAGE_FILES[what] : undefined;
+  const asked = DATA_FILE.exec(what)?.[1] as DataName | undefined;
+  if (asked) {
+    const value = readData(asked);
+    res.writeHead(value ? 200 : 404, JSON_HEADERS).end(JSON.stringify(value));
+    return;
+  }
+  const file = Object.hasOwn(PAGE_FILES, what) ? PAGE_FILES[what] : nextFile(what);
   if (!file) {
     res.writeHead(404).end();
     return;

@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { build } from 'esbuild';
+import { build as buildPage } from 'vite';
 import { fileURLToPath } from 'node:url';
 
 const app = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'),
@@ -51,6 +52,14 @@ for (const [name, globalName] of Object.entries(forPage)) {
     logLevel: 'warning',
   });
 }
+// The new canvas, served beside today's until it replaces it.
+await buildPage({
+  root: path.join(app, 'canvas'),
+  configFile: path.join(app, 'canvas', 'vite.config.ts'),
+  base: './',
+  logLevel: 'warn',
+  build: { outDir: path.join(next, 'next'), emptyOutDir: true },
+});
 fs.chmodSync(path.join(next, 'koppler.mjs'), 0o755);
 // Read by the development launcher to tell whether the build is older than the source.
 fs.writeFileSync(path.join(next, '.built'), `${new Date().toISOString()}\n`);
