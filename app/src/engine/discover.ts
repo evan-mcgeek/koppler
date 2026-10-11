@@ -2,7 +2,7 @@
 // where each runs locally, its deployed address per environment (from Terraform), and which apps call which.
 // Nothing is written until the user picks what to keep.
 import fs from 'node:fs';
-import { fail } from '../cli/output.ts';
+import { fail } from '../failure.ts';
 import { of as kindOf, register } from '../core/kinds.ts';
 import { validateStack } from '../core/stack.ts';
 import { readClones, readStack } from '../data.ts';

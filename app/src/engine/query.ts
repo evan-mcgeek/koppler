@@ -4,7 +4,8 @@
 // Usage: koppler query <app> [--env <env>] [--secret <NAME>] "<sql>"
 import { execFile, execFileSync } from 'node:child_process';
 import path from 'node:path';
-import { fail, flagValue } from '../cli/output.ts';
+import { flagValue } from '../cli/output.ts';
+import { fail } from '../failure.ts';
 import { readStack } from '../data.ts';
 import { BIN } from '../paths.ts';
 import { clientEnv, findClient } from '../safe-env.ts';

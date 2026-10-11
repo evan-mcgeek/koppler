@@ -6,7 +6,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { doctor, ports, secret } from './cli/doctor.ts';
-import { fail, flagValue, positional } from './cli/output.ts';
+import { flagValue, positional } from './cli/output.ts';
+import { fail, Failure } from './failure.ts';
 import { canvas, logs, status, stop } from './cli/running.ts';
 import { readData, readStack } from './data.ts';
 import { switchCommand } from './engine/branch.ts';
@@ -495,37 +496,40 @@ function closest(word: string): string | null {
   return COMMANDS.find(command => command.name.startsWith(word))?.name ?? null;
 }
 
-if (process.argv[1] && fs.realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const [name, ...args] = process.argv.slice(2);
+/** Runs what was asked for. The help, the version and a finished command return; anything else is thrown. */
+async function main([name, ...args]: string[]): Promise<void> {
   const own = args.includes('--') ? args.slice(0, args.indexOf('--')) : args;
   if (!name || name === 'help' || name === '--help' || name === '-h') {
     if (name === 'help' && args[0] && !named(args[0]))
       fail(`usage: no command "${args[0]}"; koppler --help lists them`);
     help(named(args[0]));
-    process.exit(0);
+    return;
   }
   if (name === '--version' || name === '-V' || name === 'version') {
     console.log(`koppler ${version()}`);
-    process.exit(0);
+    return;
   }
   const command = named(name);
   if (!command) {
     const near = closest(name);
-    console.error(
-      `koppler: unknown command "${name}".${near ? ` Did you mean ${near}?` : ''}\nkoppler --help lists the commands.`,
+    throw new Failure(
+      `unknown command "${name}".${near ? ` Did you mean ${near}?` : ''}\nkoppler --help lists the commands.`,
+      2,
     );
-    process.exit(2);
   }
-  if (own.includes('--help') || own.includes('-h')) {
-    help(command);
-    process.exit(0);
-  }
+  if (own.includes('--help') || own.includes('-h')) help(command);
+  else await command.run(args);
+}
+
+if (process.argv[1] && fs.realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)) {
   // A failure says what went wrong in one line; KOPPLER_DEBUG=1 adds where, for a bug report.
   try {
-    await command.run(args);
+    await main(process.argv.slice(2));
   } catch (error) {
     const { message, stack } = error as Partial<Error>;
-    console.error(`koppler: ${message ?? String(error)}`);
+    // A failure the command raised itself has said everything when its message is empty.
+    if (!(error instanceof Failure) || message) console.error(`koppler: ${message ?? String(error)}`);
+    if (error instanceof Failure) process.exit(error.code);
     if (process.env['KOPPLER_DEBUG']) console.error(stack);
     process.exit(1);
   }

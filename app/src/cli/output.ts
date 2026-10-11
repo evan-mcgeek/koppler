@@ -1,10 +1,6 @@
-// What every command shares when it talks to the person at the terminal: ending with a reason, asking, and tables.
+// What every command shares when it talks to the person at the terminal: asking, tables, and reading its arguments.
 
-/** Ends the command with one line saying why. A usage mistake exits 2, a failure 1, as most command line tools do. */
-export function fail(message: string): never {
-  console.error(`koppler: ${message}`);
-  process.exit(message.startsWith('usage:') ? 2 : 1);
-}
+import { fail } from '../failure.ts';
 
 /** A y/N question in a terminal; without one (a script, an agent), only --yes says yes. */
 export async function confirm(question: string, args: string[] = []): Promise<boolean> {

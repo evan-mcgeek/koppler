@@ -8,7 +8,8 @@ import { alive, listener, NAME, readRecord, records, sh, sleep, stopOne, uptime 
 import { run } from '../engine/run.ts';
 import { CODE, LOGS, TEMP } from '../paths.ts';
 import { redact, scrub } from '../scrub.ts';
-import { confirm, fail, flagValue, positional, table } from './output.ts';
+import { confirm, flagValue, positional, table } from './output.ts';
+import { fail } from '../failure.ts';
 
 const notAName = (name: string) => `${name} is not a name Koppler gives its processes`;
 

@@ -5,7 +5,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { isDeepStrictEqual } from 'node:util';
-import { fail, flagValue } from '../cli/output.ts';
+import { flagValue } from '../cli/output.ts';
+import { fail, Failure } from '../failure.ts';
 import { readData } from '../data.ts';
 import { TEMP } from '../paths.ts';
 import { appliedCommand } from './runs.ts';
@@ -228,7 +229,7 @@ export async function down(args: string[]): Promise<void> {
   left.push(...unloggedEdits());
   if (left.length > 0) {
     console.log(`\nLeft for the agent:\n${left.map(line => `  - ${line}`).join('\n')}`);
-    process.exit(3);
+    throw new Failure('', 3);
   }
   console.log('Stopped and reverted.');
   const run = flagValue(args, '--run');

@@ -5,7 +5,7 @@
 //        koppler history                            recent runs and how they ended
 import fs from 'node:fs';
 import path from 'node:path';
-import { fail } from '../cli/output.ts';
+import { fail } from '../failure.ts';
 import * as kp from '../core/plan.ts';
 import { readData, readStack } from '../data.ts';
 import { STATE, TEMP } from '../paths.ts';

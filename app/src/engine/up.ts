@@ -5,7 +5,8 @@
 // agent (exit 3).
 import fs from 'node:fs';
 import path from 'node:path';
-import { envOf, fail, flagValue, positional } from '../cli/output.ts';
+import { envOf, flagValue, positional } from '../cli/output.ts';
+import { fail, Failure } from '../failure.ts';
 import { of as kindOf } from '../core/kinds.ts';
 import type { BoardNode, Edge } from '../core/plan.ts';
 import { aliasReady, planSteps, planTunnels, type TunnelNeed } from '../core/ports.ts';
@@ -495,7 +496,7 @@ async function carryOut(stack: Registry, args: string[]): Promise<void> {
   }
   if (up.left.length) {
     console.log(`\nLeft for the agent:\n${up.left.map(line => `  - ${line}`).join('\n')}`);
-    process.exit(3);
+    throw new Failure('', 3);
   }
   console.log(`Up on ${env.toUpperCase()}.`);
   if (board) await appliedCommand([board.id]);

@@ -3,7 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync, spawn } from 'node:child_process';
-import { fail } from '../cli/output.ts';
+import { fail, Failure } from '../failure.ts';
 import { LOGS, STATE } from '../paths.ts';
 import { appEnv } from '../safe-env.ts';
 import { redact } from '../scrub.ts';
@@ -195,10 +195,10 @@ async function waitForPort(record: ProcessRecord, port: number): Promise<void> {
     );
   if (listener(port, record.bind)) return;
   const waited = `${String(START_WAIT / 1000)}s`;
-  console.error(
-    `koppler: ${record.name} is running (pid ${String(record.pid)}) but nothing answers on port ${String(port)} after ${waited}; see ${record.log}`,
+  throw new Failure(
+    `${record.name} is running (pid ${String(record.pid)}) but nothing answers on port ${String(port)} after ${waited}; see ${record.log}`,
+    2,
   );
-  process.exit(2);
 }
 
 /** Starts a command detached, with its log and its record, and returns once it runs (and answers, when it has a port). */

@@ -10,6 +10,7 @@ import path from 'node:path';
 import { KINDS, of as kindOf, register } from '../core/kinds.ts';
 import { validateStack } from '../core/stack.ts';
 import { readData, writeData, type Clone } from '../data.ts';
+import { Failure } from '../failure.ts';
 import { TEMP } from '../paths.ts';
 import { checkStack as checkLoadedStack } from './checks.ts';
 import { detectKind } from './investigate.ts';
@@ -110,9 +111,9 @@ const DEFAULT_ROOTS = [
 const DEFAULT_DEPTH = 4;
 const expand = (given: string) => path.resolve(given.replace(/^~/, os.homedir()));
 const tilde = (full: string) => (full.startsWith(os.homedir()) ? '~' + full.slice(os.homedir().length) : full);
+// Every failure here exits 1, a usage line too.
 function fail(message: string): never {
-  console.error(`koppler: ${message}`);
-  process.exit(1);
+  throw new Failure(message, 1);
 }
 
 /** One key per remote, `host/path`, for any git host: git@github.com:a/b.git and https://github.com/a/b give the same key. */
