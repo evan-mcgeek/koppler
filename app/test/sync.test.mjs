@@ -2,11 +2,11 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-// Its own folders, set before sync.mjs loads: these tests switch stacks, which moves the run files of the stack in use.
+// Its own folders, set before the sync module loads: these tests switch stacks, which moves the run files of the stack in use.
 const sandbox = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-switch-'));
 process.env.KOPPLER_TEMP = path.join(sandbox, 'temp'); process.env.KOPPLER_CONFIG_DIR = path.join(sandbox, 'config');
 fs.mkdirSync(process.env.KOPPLER_TEMP); fs.mkdirSync(process.env.KOPPLER_CONFIG_DIR);
-const { branchList, hostOwners, missingCalls, remoteKey, slugMatches } = await import('../dist/sync.mjs');
+const { branchList, hostOwners, missingCalls, remoteKey, slugMatches } = await import('../dist/engine/sync.js');
 const { validateStack } = await import('../dist/core/stack.js');
 
 assert.equal(remoteKey('git@github.com:acme/orders-api.git'), 'github.com/acme/orders-api');
@@ -92,7 +92,7 @@ console.log('ok');
 
 // The picker's candidates and adding the picked ones: only clones from the index, never one already in the stack.
 {
-  const { addApps, candidateRepos, nameFromRepo } = await import('../dist/sync.mjs');
+  const { addApps, candidateRepos, nameFromRepo } = await import('../dist/engine/sync.js');
   const fsx = await import('node:fs'), osx = await import('node:os'), px = await import('node:path');
   assert.equal(nameFromRepo('acme-wallet-api'), 'Acme Wallet API');
   const dir = fsx.mkdtempSync(px.join(osx.tmpdir(), 'koppler-pick-'));
@@ -120,7 +120,7 @@ console.log('ok');
 
 // A new stack: a name and environments, created empty in the user's private config and made the stack in use.
 {
-  const { createStack } = await import('../dist/sync.mjs');
+  const { createStack } = await import('../dist/engine/sync.js');
   const fsx = await import('node:fs'), osx = await import('node:os'), px = await import('node:path');
   const dir = fsx.mkdtempSync(px.join(osx.tmpdir(), 'koppler-new-')), config = {};
   for (const [bad, why] of [[{ name: ' ', envs: 'qa' }, /Give the stack a name/], [{ name: 'X', envs: '' }, /at least one environment/], [{ name: 'X', envs: 'QA!, prod' }, /lowercase letters/]]) assert.match(createStack(bad, { config: {}, dir, save() {} }).error, why);
@@ -136,7 +136,7 @@ console.log('ok');
 
 // Stacks already on the Mac can be used from the empty state; a folder Koppler did not find cannot.
 {
-  const { knownStacks, useStack } = await import('../dist/sync.mjs');
+  const { knownStacks, useStack } = await import('../dist/engine/sync.js');
   const fsx = await import('node:fs'), osx = await import('node:os'), px = await import('node:path');
   const dir = fsx.mkdtempSync(px.join(osx.tmpdir(), 'koppler-use-')), repo = px.join(dir, 'team-repo'), shared = px.join(repo, 'stacks', 'shop');
   fsx.mkdirSync(shared, { recursive: true });
@@ -154,7 +154,7 @@ console.log('ok');
 
 // Switching stacks puts one stack's board, history and log away and brings the other's back.
 {
-  const { setStack, stackKey } = await import('../dist/sync.mjs');
+  const { setStack, stackKey } = await import('../dist/engine/sync.js');
   const fsx = await import('node:fs'), px = await import('node:path');
   const temp = process.env.KOPPLER_TEMP;
   if (temp && temp.includes('koppler-switch-')) {
@@ -216,7 +216,7 @@ console.log('switch stacks ok');
 
 // Updating clones: fetch, then fast-forward only a clean branch that is simply behind.
 {
-  const { updateAction, updateClones } = await import('../dist/sync.mjs');
+  const { updateAction, updateClones } = await import('../dist/engine/sync.js');
   assert.equal(updateAction({ upstream: null, dirty: 0, ahead: 0, behind: 3 }), 'no-upstream');
   assert.equal(updateAction({ upstream: 'origin/main', dirty: 0, ahead: 0, behind: 0 }), 'current');
   assert.equal(updateAction({ upstream: 'origin/main', dirty: 0, ahead: 0, behind: 2 }), 'fast-forward');
@@ -244,7 +244,7 @@ console.log('switch stacks ok');
 
 // Removing an app: its entry and other apps' calls to it go; nothing else changes.
 {
-  const { removeApp } = await import('../dist/sync.mjs');
+  const { removeApp } = await import('../dist/engine/sync.js');
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-remove-'));
   fs.writeFileSync(path.join(dir, 'stack.json'), JSON.stringify({ name: 'S', envs: ['qa'], apps: { a: { name: 'A', kind: 'node', slug: 'x/a', consumes: { b: { how: 'env' }, c: { how: 'env' } } }, b: { name: 'B', kind: 'node', slug: 'x/b' }, c: { name: 'C', kind: 'node', slug: 'x/c' } }, presets: [{ name: 'P', nodes: { a: {}, b: {} }, edges: [] }] }));
   assert.deepEqual(removeApp('b', { config: { stack: dir } }), { removed: 'b', name: 'B' });
