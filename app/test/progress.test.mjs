@@ -9,7 +9,7 @@ import { allowStack } from './allow.mjs';
 // koppler up writes each app's steps for its card as it goes; the step a failed run stopped on is marked failed.
 const here = path.dirname(fileURLToPath(import.meta.url)), dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-progress-'));
 const env = { ...process.env, KOPPLER_STATE: dir, KOPPLER_TEMP: dir, KOPPLER_CONFIG_DIR: dir };
-const koppler = (...args) => { const r = spawnSync('node', [path.join(here, '..', 'src', 'koppler.mjs'), ...args], { encoding: 'utf8', env, timeout: 60000 }); return { out: (r.stdout + r.stderr).trim(), code: r.status }; };
+const koppler = (...args) => { const r = spawnSync('node', [path.join(here, '..', 'dist', 'koppler.mjs'), ...args], { encoding: 'utf8', env, timeout: 60000 }); return { out: (r.stdout + r.stderr).trim(), code: r.status }; };
 fs.mkdirSync(path.join(dir, 'repo'));
 const serve = port => `node -e "require('http').createServer((q,s)=>s.end('ok')).listen(${port})"`;
 const stack = { envs: ['qa'], apps: {

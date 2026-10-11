@@ -16,7 +16,7 @@ const QUEUE_TYPES = kp.QUEUE_TYPES;
 import { detectKind } from './investigate.mjs';
 import { packageOf, librariesFor } from './libraries.mjs';
 import { checkStack as checkLoadedStack } from './checks.mjs';
-import { TEMP } from './paths.mjs';
+import { TEMP } from './paths.ts';
 import { loadsCode } from './safe-env.mjs';
 
 

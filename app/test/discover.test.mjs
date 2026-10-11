@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { applyFindings, discover } from '../src/discover.mjs';
+import { applyFindings, discover } from '../dist/discover.mjs';
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-discover-'));
 const mk = (name, files) => { const d = path.join(dir, name); for (const [f, t] of Object.entries(files)) { fs.mkdirSync(path.dirname(path.join(d, f)), { recursive: true }); fs.writeFileSync(path.join(d, f), t); } return d; };

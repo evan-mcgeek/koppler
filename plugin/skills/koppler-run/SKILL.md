@@ -26,7 +26,7 @@ When invoked with `disconnect`: `koppler listen --stop`, and say runs keep worki
 
 Compose a local run from a graph: nodes run locally, an edge points a caller at a local callee, every unwired dependency calls the deployed app of the chosen environment (the stack's `envs`).
 Koppler is a separate app that works without an agent; this skill drives it. It needs the `koppler` command on the PATH (`npm i -g koppler`, or `npm link` in `app/` of a Koppler clone): when `koppler --version` fails, tell the user how to install it and stop.
-`<app>` below means the Koppler app's folder, `"$(dirname "$(realpath "$(command -v koppler)")")/.."` (with `src/` and `bin/`), and `<state>` Koppler's state folder, `~/.local/state/koppler/run` (the canvas, the agent and `koppler` share it).
+`<app>` below means the Koppler app's folder, `"$(dirname "$(realpath "$(command -v koppler)")")/.."` (with `dist/` and `bin/`), and `<state>` Koppler's state folder, `~/.local/state/koppler/run` (the canvas, the agent and `koppler` share it).
 
 ## Operating principles
 
@@ -82,7 +82,7 @@ On that prompt:
 Two ways to open it; ask which the user wants the first time, default Lavish:
 
 - **Lavish** (has a Conversation panel for annotations and replies):
-  `npx -y lavish-axi <app>/src/canvas.html`, then `npx -y lavish-axi poll <app>/src/canvas.html` (run_in_background; wait for the notification).
+  `npx -y lavish-axi <app>/dist/canvas.html`, then `npx -y lavish-axi poll <app>/dist/canvas.html` (run_in_background; wait for the notification).
 - **Standalone** (canvas only, full window): `koppler canvas` (starts it when needed and opens it; the address stays the same across restarts), then `koppler listen --as <id>` (run_in_background; it exits with the prompts as JSON lines; start it again after each).
   Replies go to the chat only.
 
@@ -104,7 +104,7 @@ A `koppler-fix` prompt comes from the canvas's Flow check: `data.failures` lists
 `run` is `cli` or `ide`; a mobile app node with `run: cli` also carries `platform`: `ios` (simulator), `android` (emulator) or `phone` (a connected phone on the same Wi-Fi; its callees run with `--lan`). With `ide` the device is picked in the IDE, so ask which one before wiring the mobile app.
 Apps not cloned are greyed out; `koppler sync` prints the clone command. Ask before cloning.
 Boards: the canvas always shows one board, saved as the user changes it; the selector switches between the user's boards and the team boards (the stack's `presets`). A team board the user changes becomes their own copy. When the user asks for a usual setup, suggest the matching board.
-In Lavish, mirror replies there: `npx -y lavish-axi poll <app>/src/canvas.html --agent-reply-file <reply.md>` (background), so the user can answer in the page.
+In Lavish, mirror replies there: `npx -y lavish-axi poll <app>/dist/canvas.html --agent-reply-file <reply.md>` (background), so the user can answer in the page.
 
 ## 4. Run or checklist
 
@@ -119,7 +119,7 @@ Shared prerequisites first: AWS logins, then tunnels, then apps in order.
 Plan tunnels with `koppler plan <every local app> --env <env>` and follow it: one tunnel per host and port (apps share it); a moved tunnel runs on its new port, and `koppler up` starts its apps with the new address (for an app started from the IDE, its `env` setting goes into the app's `-LOCAL` profile; log it as a profile change); a tunnel on a loopback alias needs the user to run the printed `sudo` commands first.
 
 - `auto`: start tunnels and apps with `koppler`. Its processes are detached: they outlive agent background-job limits and Claude Code restarts, log where the canvas reads, and stop by name.
-  - Stack apps of any kind: `koppler run <app> [--env <env>] [--device ios|android|<id>]` (rules per kind in `<app>/src/kinds.cjs`): .NET runs its `-LOCAL` profile; Flutter builds and launches on the device, keeps its log on the card and closes the app on stop; Node and web front ends run `npm run` of their `script` (else `dev` or `start`), with the framework's default port and, with `--lan`, its own host flag. It loads the app's stored secrets (the only way the agent may start an app with them; never `with-secrets`, which stays denied), first tests each one against its own address (so open tunnels before apps; on a production env add `--test` only when the user agreed to the extra Keychain prompt), and refuses a port that is already held. `--dry-run` prints the command without starting it, e.g. for a manual-mode checklist.
+  - Stack apps of any kind: `koppler run <app> [--env <env>] [--device ios|android|<id>]` (rules per kind in `<app>/dist/kinds.cjs`): .NET runs its `-LOCAL` profile; Flutter builds and launches on the device, keeps its log on the card and closes the app on stop; Node and web front ends run `npm run` of their `script` (else `dev` or `start`), with the framework's default port and, with `--lan`, its own host flag. It loads the app's stored secrets (the only way the agent may start an app with them; never `with-secrets`, which stays denied), first tests each one against its own address (so open tunnels before apps; on a production env add `--test` only when the user agreed to the extra Keychain prompt), and refuses a port that is already held. `--dry-run` prints the command without starting it, e.g. for a manual-mode checklist.
   - Anything else: `koppler run <app or tunnel name> [--cwd <repo>] [--port <p>] [--bind <address>] [--restart] -- <command>`; an arbitrary command never gets secrets. Use `--restart` for tunnels, and `--bind` for one that keeps its port on its own address (`koppler plan` prints it).
   Wait for each app's `url` to answer (or a startup error in its log) before the next. An `ide` node still runs from the CLI unless the user said they start it in the IDE.
   A Flutter app the user starts from the IDE still gets its log on the card: `koppler run <app> --cwd <repo> --restart -- fvm flutter logs -d <device id>` (`references/status.md`).

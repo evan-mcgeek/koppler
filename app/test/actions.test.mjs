@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { readActions, updateActions } from '../src/actions.mjs';
+import { readActions, updateActions } from '../dist/actions.mjs';
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-actions-')), file = path.join(dir, 'actions.json');
 
@@ -37,7 +37,7 @@ fs.writeFileSync(path.join(repo, 'f'), 'a'); git('add', '.'); git('commit', '-qm
 fs.writeFileSync(path.join(dir, 'registry.js'), `window.REGISTRY = ${JSON.stringify({ envs: ['qa'], apps: { api: { name: 'API' } } })};`);
 fs.writeFileSync(path.join(dir, 'local.js'), `window.LOCAL = ${JSON.stringify({ apps: { api: { path: repo } } })};`);
 fs.writeFileSync(file, damaged);
-const r = spawnSync('node', [path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'src', 'koppler.mjs'), 'switch', 'api', 'feature'], { encoding: 'utf8', env: { ...process.env, KOPPLER_STATE: dir, KOPPLER_TEMP: dir, KOPPLER_CONFIG_DIR: dir } });
+const r = spawnSync('node', [path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'dist', 'koppler.mjs'), 'switch', 'api', 'feature'], { encoding: 'utf8', env: { ...process.env, KOPPLER_STATE: dir, KOPPLER_TEMP: dir, KOPPLER_CONFIG_DIR: dir } });
 assert.equal(r.status, 1);
 assert.match(r.stderr, /^koppler: the action log .* is damaged/);
 assert.equal(fs.readFileSync(file, 'utf8'), damaged);

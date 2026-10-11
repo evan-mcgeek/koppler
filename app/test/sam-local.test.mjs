@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
-import { declared, functions, overrides } from '../src/sam-local.mjs';
-import kinds from '../src/kinds.cjs';
+import { declared, functions, overrides } from '../dist/sam-local.mjs';
+import kinds from '../dist/kinds.cjs';
 
 // What a SAM template declares: the settings its functions read, and which functions run here (API ones).
 const template = `Transform: AWS::Serverless-2016-10-31
@@ -66,7 +66,7 @@ console.log('sam tests ok');
   fs.writeFileSync(path.join(dir, 'app', 'template.yaml'), 'Resources: {}\n');
   // A stand-in for sam that is stopped in the middle of its first build.
   fs.writeFileSync(path.join(dir, 'bin', 'sam'), `#!/bin/sh\necho "$1 $2 $*" >> "${calls}"\ncase " $* " in *" --cached "*) kill -TERM $$ ;; esac\n`, { mode: 0o755 });
-  const r = spawnSync('node', [path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'src', 'sam-local.mjs'), '3999', '{}'], { cwd: path.join(dir, 'app'), encoding: 'utf8', env: { ...process.env, PATH: `${path.join(dir, 'bin')}:${process.env.PATH}`, HOME: dir, KOPPLER_STATE: path.join(dir, 'state'), DOCKER_HOST: 'unix:///nowhere' } });
+  const r = spawnSync('node', [path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'dist', 'sam-local.mjs'), '3999', '{}'], { cwd: path.join(dir, 'app'), encoding: 'utf8', env: { ...process.env, PATH: `${path.join(dir, 'bin')}:${process.env.PATH}`, HOME: dir, KOPPLER_STATE: path.join(dir, 'state'), DOCKER_HOST: 'unix:///nowhere' } });
   assert.equal(r.status, 0, r.stdout + r.stderr);
   const ran = fs.readFileSync(calls, 'utf8').trim().split('\n');
   assert.equal(ran.length, 1, ran.join('\n'));

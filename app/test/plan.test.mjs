@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import kp from '../src/plan.cjs';
+import kp from '../dist/plan.cjs';
 
 const ids = p => Object.fromEntries(['starts', 'restarts', 'stops', 'keeps'].map(k => [k, p[k].map(x => x.id)]));
 const want = { env: 'qa', nodes: [{ id: 'app', run: 'ide', branch: null }, { id: 'api', run: 'cli', branch: null }, { id: 'db-api', run: 'cli', branch: 'main' }], edges: [{ from: 'app', to: 'api' }, { from: 'api', to: 'db-api' }] };

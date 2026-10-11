@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { localQueues, queueEnv, ENDPOINT, KAFKA, EMULATOR, BROKER, STOP_EMULATOR, STOP_BROKER } from '../src/queues.mjs';
+import { localQueues, queueEnv, ENDPOINT, KAFKA, EMULATOR, BROKER, STOP_EMULATOR, STOP_BROKER } from '../dist/queues.mjs';
 
 const registry = {
   queues: { thumbs: { name: 'Thumbnails', type: 'sqs', queue: 'thumbs-qa', envs: { prod: { queue: 'thumbs-prod' } } }, feed: { name: 'Feed', type: 'kafka' }, alerts: { name: 'Alerts', type: 'sns' } },

@@ -33,7 +33,7 @@ The page is sandboxed and cannot call the agent, so the agent publishes files th
 
 ```bash
 koppler canvas   # while the canvas is open
-node <app>/src/status-watch.mjs --once                                # publish a single snapshot
+node <app>/dist/status-watch.mjs --once                                # publish a single snapshot
 ```
 
 Every 1.5 seconds it writes `<state>/status.js` from `<state>/status.json`, adding `listening` (a TCP connect to the port) and `logTail` (last 80 lines).

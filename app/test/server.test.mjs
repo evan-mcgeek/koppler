@@ -9,9 +9,9 @@ import { freePorts, until } from './helpers.mjs';
 
 // The canvas server answers its own page only, and keeps its token to itself.
 const [PORT] = await freePorts(1), dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-server-')), temp = path.join(dir, 'state', 'run');
-fs.mkdirSync(temp, { recursive: true });
+// The state folder does not exist yet, as on a machine where Koppler never ran: the server makes it.
 const env = { ...process.env, KOPPLER_STATE: path.join(dir, 'state'), KOPPLER_TEMP: temp, KOPPLER_LOGS: path.join(dir, 'state', 'logs'), KOPPLER_CONFIG_DIR: path.join(dir, 'cfg'), KOPPLER_PORT: String(PORT) };
-const server = spawn(process.execPath, [path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'src', 'status-watch.mjs')], { env, stdio: 'ignore' });
+const server = spawn(process.execPath, [path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'dist', 'status-watch.mjs')], { env, stdio: 'ignore' });
 const call = (method, pathname, headers = {}, body) => new Promise((resolve, reject) => {
   const req = http.request({ host: '127.0.0.1', port: PORT, method, path: pathname, headers }, res => { const chunks = []; res.on('data', c => chunks.push(c)); res.on('end', () => resolve({ status: res.statusCode, headers: res.headers, body: Buffer.concat(chunks) })); });
   req.on('error', reject); req.end(body);

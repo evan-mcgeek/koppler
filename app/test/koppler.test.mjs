@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 // Whatever a test started is stopped when the file ends, even after a failed assertion, so no port stays held.
 const cleanups = [];
 process.on('exit', () => cleanups.forEach(stopAll => stopAll()));
-import { commandFor, parseRun } from '../src/koppler.mjs';
+import { commandFor, parseRun } from '../dist/koppler.mjs';
 import { allowStack } from './allow.mjs';
 import { freePorts, until } from './helpers.mjs';
 
@@ -31,8 +31,8 @@ console.log('ok');
   const fs = await import('node:fs'), os = await import('node:os'), path = await import('node:path'), { fileURLToPath } = await import('node:url');
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-alive-'));
   const env = { ...process.env, KOPPLER_STATE: dir, KOPPLER_TEMP: dir, KOPPLER_CONFIG_DIR: dir };
-  cleanups.push(() => spawnSync('node', [path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'src', 'koppler.mjs'), 'stop', '--all', '--yes'], { env }));
-  const koppler = (...args) => { const r = spawnSync('node', [path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'src', 'koppler.mjs'), ...args], { encoding: 'utf8', env }); return (r.stdout + r.stderr).trim(); };
+  cleanups.push(() => spawnSync('node', [path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'dist', 'koppler.mjs'), 'stop', '--all', '--yes'], { env }));
+  const koppler = (...args) => { const r = spawnSync('node', [path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'dist', 'koppler.mjs'), ...args], { encoding: 'utf8', env }); return (r.stdout + r.stderr).trim(); };
   assert.match(koppler('run', 'handover', '--', 'sh', '-c', 'sleep 0.4; exec sleep 30'), /started handover/);
   // With a port, "started" means it answers: a crash during startup is reported with its log, not as started.
   assert.match(koppler('run', 'crashy', '--port', String(crashy), '--', 'sh', '-c', 'sleep 2; echo boom; exit 1'), new RegExp(`crashy exited before answering on port ${crashy}[\\s\\S]*boom`));
@@ -52,8 +52,8 @@ console.log('ok');
   const fs = await import('node:fs'), os = await import('node:os'), path = await import('node:path'), { fileURLToPath } = await import('node:url');
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-up-'));
   const env = { ...process.env, KOPPLER_STATE: dir, KOPPLER_TEMP: dir, KOPPLER_CONFIG_DIR: dir };
-  cleanups.push(() => spawnSync('node', [path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'src', 'koppler.mjs'), 'stop', '--all', '--yes'], { env }));
-  const koppler = (...args) => { const r = spawnSync('node', [path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'src', 'koppler.mjs'), ...args], { encoding: 'utf8', env }); return (r.stdout + r.stderr).trim(); };
+  cleanups.push(() => spawnSync('node', [path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'dist', 'koppler.mjs'), 'stop', '--all', '--yes'], { env }));
+  const koppler = (...args) => { const r = spawnSync('node', [path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'dist', 'koppler.mjs'), ...args], { encoding: 'utf8', env }); return (r.stdout + r.stderr).trim(); };
   const app = port => ({ name: `App ${port}`, kind: 'other', start: `python3 -m http.server ${port} --bind 127.0.0.1`, url: `http://localhost:${port}` });
   { const stack = { envs: ['qa'], apps: { a: { ...app(upA), consumes: { b: { how: 'env', env: 'B_URL' } } }, b: app(upB) } }; fs.writeFileSync(path.join(dir, 'registry.js'), `window.REGISTRY = ${JSON.stringify(stack)};`); allowStack(dir, stack); }
   fs.writeFileSync(path.join(dir, 'local.js'), `window.LOCAL = ${JSON.stringify({ apps: { a: { path: dir }, b: { path: dir } } })};`);
@@ -69,8 +69,8 @@ console.log('ok');
   const fs = await import('node:fs'), os = await import('node:os'), path = await import('node:path'), { fileURLToPath } = await import('node:url');
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-uptunnel-')), bin = path.join(dir, 'bin');
   const env = { ...process.env, KOPPLER_STATE: dir, KOPPLER_TEMP: dir, KOPPLER_CONFIG_DIR: dir, PATH: `${bin}:${process.env.PATH}` };
-  cleanups.push(() => spawnSync('node', [path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'src', 'koppler.mjs'), 'stop', '--all', '--yes'], { env }));
-  const koppler = (...args) => { const r = spawnSync('node', [path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'src', 'koppler.mjs'), ...args], { encoding: 'utf8', env }); return { out: (r.stdout + r.stderr).trim(), code: r.status }; };
+  cleanups.push(() => spawnSync('node', [path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'dist', 'koppler.mjs'), 'stop', '--all', '--yes'], { env }));
+  const koppler = (...args) => { const r = spawnSync('node', [path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'dist', 'koppler.mjs'), ...args], { encoding: 'utf8', env }); return { out: (r.stdout + r.stderr).trim(), code: r.status }; };
   // A stand-in for the tunnel program: it listens where it is told to.
   fs.mkdirSync(bin);
   fs.writeFileSync(path.join(bin, 'cloudflared'), '#!/bin/sh\nfor last; do :; done\nexec python3 -m http.server "${last##*:}" --bind 127.0.0.1\n', { mode: 0o755 });
@@ -94,8 +94,8 @@ console.log('ok');
   const fs = await import('node:fs'), os = await import('node:os'), path = await import('node:path'), { fileURLToPath } = await import('node:url');
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-uprun-'));
   const env = { ...process.env, KOPPLER_STATE: dir, KOPPLER_TEMP: dir, KOPPLER_CONFIG_DIR: dir };
-  cleanups.push(() => spawnSync('node', [path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'src', 'koppler.mjs'), 'stop', '--all', '--yes'], { env }));
-  const koppler = (...args) => { const r = spawnSync('node', [path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'src', 'koppler.mjs'), ...args], { encoding: 'utf8', env }); return { out: (r.stdout + r.stderr).trim(), code: r.status }; };
+  cleanups.push(() => spawnSync('node', [path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'dist', 'koppler.mjs'), 'stop', '--all', '--yes'], { env }));
+  const koppler = (...args) => { const r = spawnSync('node', [path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'dist', 'koppler.mjs'), ...args], { encoding: 'utf8', env }); return { out: (r.stdout + r.stderr).trim(), code: r.status }; };
   const apps = {
     a: { name: 'A', kind: 'other', start: `echo "B_URL=$B_URL"; exec python3 -m http.server ${runA} --bind 127.0.0.1`, url: `http://localhost:${runA}`, consumes: { b: { how: 'env', env: 'B_URL' } } },
     b: { name: 'B', kind: 'other', start: `exec python3 -m http.server ${runB} --bind 127.0.0.1`, url: `http://localhost:${runB}` },
@@ -117,8 +117,8 @@ console.log('ok');
   const fs = await import('node:fs'), os = await import('node:os'), path = await import('node:path'), { fileURLToPath } = await import('node:url');
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-upchat-'));
   const env = { ...process.env, KOPPLER_STATE: dir, KOPPLER_TEMP: dir, KOPPLER_CONFIG_DIR: dir };
-  cleanups.push(() => spawnSync('node', [path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'src', 'koppler.mjs'), 'stop', '--all', '--yes'], { env }));
-  const koppler = (...args) => { const r = spawnSync('node', [path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'src', 'koppler.mjs'), ...args], { encoding: 'utf8', env }); return { out: (r.stdout + r.stderr).trim(), code: r.status }; };
+  cleanups.push(() => spawnSync('node', [path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'dist', 'koppler.mjs'), 'stop', '--all', '--yes'], { env }));
+  const koppler = (...args) => { const r = spawnSync('node', [path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'dist', 'koppler.mjs'), ...args], { encoding: 'utf8', env }); return { out: (r.stdout + r.stderr).trim(), code: r.status }; };
   const apps = {
     a: { name: 'A', kind: 'other', start: `echo "B_URL=$B_URL"; exec python3 -m http.server ${agentA} --bind 127.0.0.1`, url: `http://localhost:${agentA}`, consumes: { b: { how: 'env', env: 'B_URL' } } },
     b: { name: 'B', kind: 'other', start: `exec python3 -m http.server ${agentB} --bind 127.0.0.1`, url: `http://localhost:${agentB}` },
@@ -142,8 +142,8 @@ console.log('ok');
   const fs = await import('node:fs'), os = await import('node:os'), path = await import('node:path'), { fileURLToPath } = await import('node:url');
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-approve-')), marker = path.join(dir, 'ran');
   const env = { ...process.env, KOPPLER_STATE: dir, KOPPLER_TEMP: dir, KOPPLER_CONFIG_DIR: dir };
-  cleanups.push(() => spawnSync('node', [path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'src', 'koppler.mjs'), 'stop', '--all', '--yes'], { env }));
-  const koppler = (...args) => { const r = spawnSync('node', [path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'src', 'koppler.mjs'), ...args], { encoding: 'utf8', env, input: '' }); return { out: (r.stdout + r.stderr).trim(), code: r.status }; };
+  cleanups.push(() => spawnSync('node', [path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'dist', 'koppler.mjs'), 'stop', '--all', '--yes'], { env }));
+  const koppler = (...args) => { const r = spawnSync('node', [path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'dist', 'koppler.mjs'), ...args], { encoding: 'utf8', env, input: '' }); return { out: (r.stdout + r.stderr).trim(), code: r.status }; };
   const stackWith = start => ({ envs: ['qa'], apps: { api: { name: 'API', kind: 'other', start } } });
   const write = stack => fs.writeFileSync(path.join(dir, 'registry.js'), `window.REGISTRY = ${JSON.stringify(stack)};`);
   const first = stackWith(`touch ${marker}; exec sleep 30`);
@@ -173,8 +173,8 @@ console.log('ok');
   const fs = await import('node:fs'), os = await import('node:os'), path = await import('node:path'), { fileURLToPath } = await import('node:url');
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-upleft-'));
   const env = { ...process.env, KOPPLER_STATE: dir, KOPPLER_TEMP: dir, KOPPLER_CONFIG_DIR: dir };
-  cleanups.push(() => spawnSync('node', [path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'src', 'koppler.mjs'), 'stop', '--all', '--yes'], { env }));
-  const koppler = (...args) => { const r = spawnSync('node', [path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'src', 'koppler.mjs'), ...args], { encoding: 'utf8', env }); return { out: (r.stdout + r.stderr).trim(), code: r.status }; };
+  cleanups.push(() => spawnSync('node', [path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'dist', 'koppler.mjs'), 'stop', '--all', '--yes'], { env }));
+  const koppler = (...args) => { const r = spawnSync('node', [path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'dist', 'koppler.mjs'), ...args], { encoding: 'utf8', env }); return { out: (r.stdout + r.stderr).trim(), code: r.status }; };
   const apps = {
     a: { name: 'A', kind: 'other', start: `exec python3 -m http.server ${leftA} --bind 127.0.0.1`, url: `http://localhost:${leftA}`, consumes: { b: { how: 'unknown' } } },
     b: { name: 'B', kind: 'other', start: `exec python3 -m http.server ${leftB} --bind 127.0.0.1`, url: `http://localhost:${leftB}` },
@@ -195,8 +195,8 @@ console.log('ok');
   const fs = await import('node:fs'), os = await import('node:os'), path = await import('node:path'), { fileURLToPath } = await import('node:url');
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-stopapps-'));
   const env = { ...process.env, KOPPLER_STATE: dir, KOPPLER_TEMP: dir, KOPPLER_CONFIG_DIR: dir };
-  cleanups.push(() => spawnSync('node', [path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'src', 'koppler.mjs'), 'stop', '--all', '--yes'], { env }));
-  const koppler = (...args) => { const r = spawnSync('node', [path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'src', 'koppler.mjs'), ...args], { encoding: 'utf8', env }); return (r.stdout + r.stderr).trim(); };
+  cleanups.push(() => spawnSync('node', [path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'dist', 'koppler.mjs'), 'stop', '--all', '--yes'], { env }));
+  const koppler = (...args) => { const r = spawnSync('node', [path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'dist', 'koppler.mjs'), ...args], { encoding: 'utf8', env }); return (r.stdout + r.stderr).trim(); };
   koppler('run', 'canvas', '--', 'sleep', '30'); koppler('run', 'api', '--', 'sleep', '30'); koppler('run', 'tunnel-db-5432', '--', 'sleep', '30');
   const out = koppler('stop', '--apps', '--yes');
   assert.match(out, /api: stopped/); assert.match(out, /tunnel-db-5432: stopped/); assert.doesNotMatch(out, /canvas/);

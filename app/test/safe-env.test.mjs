@@ -4,8 +4,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { appEnv, clientEnv, findClient, loadsCode, takeSecrets } from '../src/safe-env.mjs';
-import { validateStack } from '../src/sync.mjs';
+import { appEnv, clientEnv, findClient, loadsCode, takeSecrets } from '../dist/safe-env.mjs';
+import { validateStack } from '../dist/sync.mjs';
 import { allowStack } from './allow.mjs';
 
 // An app started with its secrets keeps the caller's environment, minus what makes its runtime load other code.
@@ -50,7 +50,7 @@ assert.deepEqual(['NODE_OPTIONS', 'DYLD_LIBRARY_PATH', 'LD_PRELOAD', 'JAVA_TOOL_
 {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-safeenv-')), seen = path.join(dir, 'seen.txt');
   const env = { ...process.env, KOPPLER_STATE: dir, KOPPLER_TEMP: dir, KOPPLER_CONFIG_DIR: dir, KOPPLER_SECRETS: path.join(dir, 'secrets'), NODE_OPTIONS: '--max-old-space-size=256' };
-  const koppler = (...args) => spawnSync('node', [path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'src', 'koppler.mjs'), ...args], { encoding: 'utf8', env });
+  const koppler = (...args) => spawnSync('node', [path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'dist', 'koppler.mjs'), ...args], { encoding: 'utf8', env });
   fs.mkdirSync(path.join(dir, 'secrets'));
   fs.writeFileSync(path.join(dir, 'secrets', 'api.env'), 'export DB_URL=db-not-real\nexport API_KEY=key-not-real\n');
   const stack = { envs: ['qa'], apps: { api: { name: 'API', kind: 'other', start: `printf '%s' "\${NODE_OPTIONS:-none}" > ${seen}; printf '%s' "$KOPPLER_SECRET_NAMES" > ${seen}.names; exec sleep 30` } } };

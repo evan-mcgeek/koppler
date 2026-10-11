@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { stepsFor, isDone } from '../src/needs.mjs';
+import { stepsFor, isDone } from '../dist/needs.mjs';
 
 const steps = stepsFor('Orders API', [{ sso: 'acme-qa' }, { hosts: 'db.cluster.acme.dev' }, { devCerts: true }, { tunnel: 'x', port: 1 }],
   { appId: 'orders-api', skill: '/skill', repo: '/repo', secrets: [{ env: 'ConnectionStrings__DB', when: 'always', fetch: { cli: 'aws ... | <skill>/bin/secret-set orders-api ConnectionStrings__DB --stdin', ui: 'console' } }, { file: 'src/app.secrets.json' }] });
@@ -25,7 +25,7 @@ const prodStep = stepsFor('Orders API', [], { appId: 'orders-api', store: 'order
 assert.equal(prodStep.command, 'koppler secret set orders-api@prod ConnectionStrings__DB');
 assert.deepEqual(prodStep.check, { secret: ['orders-api@prod', 'ConnectionStrings__DB'] });
 // On PROD a secret whose fetch steps are only QA's asks for the value by hand, never with QA's command.
-const { needs } = await import('../src/needs.mjs');
+const { needs } = await import('../dist/needs.mjs');
 const registry = { envs: ['qa', 'prod'], apps: { o: { name: 'Orders', secrets: [{ env: 'KEY', fetch: { cli: 'aws --profile qa-ops', ui: 'QA console' } }] } } };
 const out = []; const log = console.log; console.log = s => out.push(s);
 needs(['o', '--env', 'prod', '--json'], { load: f => f === 'registry.js' ? registry : null, skill: '/skill', fail: e => { throw new Error(e); } });

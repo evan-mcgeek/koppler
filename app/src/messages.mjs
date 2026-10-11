@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { runs } from './runs.mjs';
-import { TEMP } from './paths.mjs';
+import { TEMP } from './paths.ts';
 
 const file = () => path.join(process.env.KOPPLER_TEMP || TEMP, 'messages.jsonl');
 const text = (v, max) => typeof v === 'string' ? v.trim().slice(0, max) : '';

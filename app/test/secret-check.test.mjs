@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import net from 'node:net';
-import { check, keyValues, parse } from '../src/secret-check.mjs';
+import { check, keyValues, parse } from '../dist/secret-check.mjs';
 
 assert.deepEqual(keyValues('Host=db.acme.test; Port=5433;Password="a;b""c";User Id=app'), { host: 'db.acme.test', port: '5433', password: 'a;b"c', 'user id': 'app' });
 

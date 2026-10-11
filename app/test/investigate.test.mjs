@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { conflicts, dotnetPorts, nodePorts, portsIn } from '../src/investigate.mjs';
+import { conflicts, dotnetPorts, nodePorts, portsIn } from '../dist/investigate.mjs';
 
 assert.deepEqual(portsIn('https://localhost:7089;http://localhost:5089'), [7089, 5089]);
 assert.deepEqual(portsIn('http://*:8080 and http://+:9090'), [8080, 9090]);
