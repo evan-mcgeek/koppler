@@ -6,6 +6,7 @@ import path from 'node:path';
 import { readClones, readData, readStack } from '../data.ts';
 import { alive, listener, NAME, readRecord, records, sh, sleep, stopOne, uptime } from '../engine/processes.ts';
 import { run } from '../engine/run.ts';
+import { appendNote } from '../engine/runs.ts';
 import { CODE, LOGS, TEMP } from '../paths.ts';
 import { redact, scrub } from '../scrub.ts';
 import { confirm, flagValue, positional, table } from './output.ts';
@@ -32,6 +33,10 @@ export async function stop(args: string[]): Promise<void> {
   const asked = `Stop ${targets.map(record => record.name).join(', ')}?`;
   if ((all || apps) && !(await confirm(asked, args))) fail('nothing stopped (in a script, add --yes)');
   for (const line of await Promise.all(targets.map(stopOne))) console.log(line);
+  // Stopping in bulk is not a run, so the history gets a note of it: later it says why nothing runs any more.
+  const stopped = targets.map(record => record.name);
+  if (all) appendNote('stop-all', stopped);
+  else if (apps) appendNote('stop-apps', stopped);
 }
 
 /** The canvas: started when it is not running, then opened in the browser. */

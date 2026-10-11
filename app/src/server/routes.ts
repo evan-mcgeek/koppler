@@ -8,7 +8,7 @@ import { applyFindings, current as currentFindingsStack, discover } from '../eng
 import { discardChanges, linkStack, proposeChanges, updateStack } from '../engine/linked.ts';
 import { listenerPid } from '../engine/listen.ts';
 import { appendAnswer, clearMessages, readMessages } from '../engine/messages.ts';
-import { appendRun, runRecord, type RunRecord } from '../engine/runs.ts';
+import { appendNote, appendRun, runRecord, type RunRecord } from '../engine/runs.ts';
 import { addApps, createStack, currentStack, forgetStacks, removeApp, useStack } from '../engine/sync.ts';
 import { CODE, TEMP } from '../paths.ts';
 import { redact } from '../scrub.ts';
@@ -260,6 +260,7 @@ export const ROUTES: Record<string, Route> = {
   '/shutdown': () => ({
     status: 204,
     after: () => {
+      appendNote('canvas-closed');
       const listener = path.join(TEMP, 'listener.json');
       try {
         const pid = listenerPid(JSON.parse(fs.readFileSync(listener, 'utf8')) as Parameters<typeof listenerPid>[0]);

@@ -407,6 +407,7 @@
   .run { padding: 9px 10px; border-radius: 7px; }
   .run + .run { border-top: 1px solid var(--line); border-radius: 0; }
   .run-head { display: flex; align-items: baseline; gap: 10px; width: 100%; padding: 0; border: 0; background: none; color: var(--ink); text-align: left; font-size: 13px; cursor: pointer; }
+  .run-head.note { cursor: default; }
   .run-head .what { flex: 1; min-width: 0; font-weight: 600; }
   .run-head .what small { display: block; margin-top: 2px; font-size: 12px; font-weight: 400; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .run-head time { flex: none; font-size: 12px; color: var(--muted); }
@@ -4501,6 +4502,7 @@ function followStack() {
 
 // History: every Send and Stop, how it ended, and the board it asked for.
 const historyOpen = document.getElementById('history-open'), historyPop = document.getElementById('history-pop'), historyList = document.getElementById('history-list');
+const NOTE_WORDS = { 'stop-apps': 'Apps stopped, changes kept', 'stop-all': 'Everything stopped, changes kept', 'canvas-closed': 'Canvas closed' };
 const RUN_STATES = { waiting: 'Waiting for the agent', applying: 'Being applied', done: 'Done', failed: 'Failed', replaced: 'Replaced by a newer run' };
 let openRun = null;
 const runTime = at => { const d = new Date(at), today = d.toDateString() === new Date().toDateString(); return d.toLocaleString([], today ? { hour: '2-digit', minute: '2-digit' } : { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }); };
@@ -4526,8 +4528,13 @@ function renderHistory() {
   historyOpen.classList.toggle('waiting', waitingRun());
   historyOpen.title = waitingRun() ? 'A run is waiting for the agent' : 'Every run and Stop, and how it ended';
   if (historyPop.hidden) return;
-  const runs = [...(status?.runs ?? [])].reverse();
+  // What stopped outside a run (apps stopped from the menu, the canvas closed) is told among the runs, newest first.
+  const runs = [...(status?.runs ?? []), ...(status?.notes ?? [])].sort((a, b) => String(b.at).localeCompare(String(a.at)));
   historyList.innerHTML = runs.length ? withEarlier('history', runs, r => sinceStart(r) || r.state === 'waiting' || r.state === 'applying', r => {
+    if (r.note) {
+      const stopped = (r.stopped ?? []).map(id => registry.apps[id]?.name ?? id);
+      return `<div class="run"><div class="run-head note"><span class="what">${esc(NOTE_WORDS[r.note] ?? 'Stopped')}${stopped.length ? `<small title="${esc(stopped.join(', '))}">${esc(stopped.join(', '))}</small>` : ''}</span><time>${esc(runTime(r.at))}</time></div></div>`;
+    }
     const apps = Object.keys(r.nodes ?? {}).map(id => registry.apps[id]?.name ?? id);
     return `<div class="run" data-id="${esc(r.id)}"><button class="run-head" type="button" aria-expanded="${openRun === r.id}">
         <span class="what">${r.kind === 'stop' ? 'Stop and revert' : `${esc(String(r.env).toUpperCase())}, ${esc(r.mode)}`}${apps.length ? `<small title="${esc(apps.join(', '))}">${esc(apps.join(', '))}</small>` : ''}</span>

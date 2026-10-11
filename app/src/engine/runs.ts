@@ -141,6 +141,44 @@ export function runRecord(prompt: Prompt | null | undefined): RunRecord | null {
     },
   };
 }
+/** Something that stopped outside a run, kept so the history says why things are no longer running. */
+export interface Note {
+  note: 'stop-apps' | 'stop-all' | 'canvas-closed';
+  at: string;
+  /** What was stopped, by the name Koppler ran it under. */
+  stopped: string[];
+}
+const NOTES: readonly string[] = ['stop-apps', 'stop-all', 'canvas-closed'];
+export const appendNote = (note: Note['note'], stopped: string[] = []): void => {
+  fs.mkdirSync(temp(), { recursive: true });
+  append({ note, at: stamp(), stopped: stopped.filter(name => ID.test(name)).slice(0, 100) });
+};
+/** The notes in the history, oldest first. They are not runs: no plan or live state looks at them. */
+export function readNotes(raw: string | null | undefined): Note[] {
+  return (raw ?? '').split('\n').flatMap(line => {
+    try {
+      const { note, at, stopped } = JSON.parse(line) as Partial<Note>;
+      if (!NOTES.includes(note ?? '') || typeof at !== 'string') return [];
+      const names = (Array.isArray(stopped) ? stopped : []).filter(name => typeof name === 'string' && ID.test(name));
+      return [{ note, at: at.slice(0, 40), stopped: names.slice(0, 100) } as Note];
+    } catch {
+      return [];
+    }
+  });
+}
+export const notes = (): Note[] => {
+  try {
+    return readNotes(fs.readFileSync(historyFile(), 'utf8')).slice(-MAX_RUNS);
+  } catch {
+    return [];
+  }
+};
+const NOTE_WORDS = {
+  'stop-apps': 'apps stopped, changes kept',
+  'stop-all': 'everything stopped, changes kept',
+  'canvas-closed': 'canvas closed',
+};
+
 export const appendRun = (record: RunRecord): void => {
   append(record);
 };
@@ -461,14 +499,22 @@ export async function appliedCommand(args: string[]): Promise<void> {
 /** `koppler history [--json]`: recent runs and how they ended. */
 export function historyCommand(args: string[] = []): void {
   const all = runs().slice(-15);
-  if (args.includes('--json')) console.log(JSON.stringify(all, null, 2));
-  else if (!all.length) console.log('No runs yet.');
-  else
-    for (const run of all) {
-      const what =
-        run.kind === 'stop'
-          ? 'stop and revert'
-          : `${String(run.env).toUpperCase()} ${String(run.mode)}: ${Object.keys(run.nodes).join(', ')}`;
-      console.log(`${run.at}  ${run.id}  ${what}  [${run.state}${run.reason ? `: ${run.reason}` : ''}]`);
-    }
+  if (args.includes('--json')) {
+    console.log(JSON.stringify(all, null, 2));
+    return;
+  }
+  const lines = all.map((run): [string, string] => {
+    const what =
+      run.kind === 'stop'
+        ? 'stop and revert'
+        : `${String(run.env).toUpperCase()} ${String(run.mode)}: ${Object.keys(run.nodes).join(', ')}`;
+    return [run.at, `${run.at}  ${run.id}  ${what}  [${run.state}${run.reason ? `: ${run.reason}` : ''}]`];
+  });
+  // What stopped outside a run is told among the runs, in the order it happened.
+  const [oldest] = lines;
+  for (const { note, at, stopped } of notes())
+    if (!oldest || at >= oldest[0])
+      lines.push([at, `${at}  ${NOTE_WORDS[note]}${stopped.length ? `: ${stopped.join(', ')}` : ''}`]);
+  if (!lines.length) console.log('No runs yet.');
+  for (const [, line] of lines.sort((a, b) => a[0].localeCompare(b[0]))) console.log(line);
 }
