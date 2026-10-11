@@ -263,10 +263,11 @@ const failRequest = (res, e) => {
 };
 const guarded = handle => (req, res) => { try { handle(req, res); } catch (e) { failRequest(res, e); } };
 const readBody = (req, res, onError, onBody) => {
-  let size = 0, done = false; const chunks = [];
-  // Too large a body is answered once, and what still arrives is dropped.
-  req.on('data', chunk => { if (done) return; size += chunk.length; if (size > MAX_STATE_BYTES) { done = true; res.writeHead(413, { connection: 'close' }).end(); req.resume(); } else chunks.push(chunk); });
-  req.on('end', () => { if (done) return; done = true; let body = null; try { body = JSON.parse(Buffer.concat(chunks).toString('utf8')); } catch {} try { onBody(body); } catch (e) { onError(e); } });
+  let size = 0; const chunks = [];
+  // Too large a body is dropped as it arrives and answered once it has all been sent: closing earlier would reach the
+  // sender as a broken connection instead of an answer. One that goes on far beyond the limit is cut off.
+  req.on('data', chunk => { size += chunk.length; if (size > MAX_STATE_BYTES * 256) req.destroy(); else if (size <= MAX_STATE_BYTES) chunks.push(chunk); });
+  req.on('end', () => { if (size > MAX_STATE_BYTES) return void res.writeHead(413).end(); let body = null; try { body = JSON.parse(Buffer.concat(chunks).toString('utf8')); } catch {} try { onBody(body); } catch (e) { onError(e); } });
 };
 
 // Loopback only, token-protected. Serves the canvas standalone (no Lavish), takes layout autosaves and Send/Stop prompts.
@@ -287,8 +288,8 @@ function startServer() {
     for (const [name, value] of Object.entries(SECURITY_HEADERS)) res.setHeader(name, value);
     // Only this machine's own page is answered: not another site's name pointed here, nor a request another site makes.
     const own = ['127.0.0.1', 'localhost'].map(h => `${h}:${server.address().port}`), origin = req.headers.origin;
-    // The answer is sent whole before the connection closes, whatever is still on its way in.
-    const refuse = code => { res.writeHead(code, { connection: 'close' }).end(); req.resume(); };
+    // Answered once the request has been read to its end, so the sender gets the answer and not a broken connection.
+    const refuse = code => { const answer = () => res.writeHead(code).end(); req.resume(); if (req.complete) answer(); else req.once('end', answer); };
     if (!own.includes(req.headers.host) || (origin !== undefined && !own.includes(origin.replace(/^http:\/\//, '')))) return refuse(403);
     if (req.method === 'GET' && url.pathname.startsWith(prefix)) {
       // The open log tab reads its app's log here, much longer than the short tail every status carries.
