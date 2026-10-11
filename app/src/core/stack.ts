@@ -58,6 +58,8 @@ const Call = z.looseObject(
     env: z.union([z.string(), z.array(z.string())], { error: 'a setting name, or a list of them' }).optional(),
     file: z.string().optional(),
     key: z.string().optional(),
+    /** An address to use instead of the worked-out one: one for all, or one per platform (ios, android). */
+    value: z.union([z.string(), z.record(z.string(), z.string())]).optional(),
     deployed: z.string().optional(),
     found: z.string().optional(),
     note: z.string().optional(),

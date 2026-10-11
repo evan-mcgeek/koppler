@@ -216,8 +216,8 @@ export function queuesOf(stack: { apps?: Record<string, AppQueues> } | null | un
 }
 
 interface Environments {
-  envs?: string[];
-  protected?: string[];
+  envs?: string[] | undefined;
+  protected?: string[] | undefined;
 }
 /**
  * The environments where a mistake costs something (production, usually). The stack names them in `protected`;

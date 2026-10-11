@@ -52,6 +52,8 @@ export interface RunOptions {
   onStop?: string[][];
   /** Started with stored secrets: the caller's code-loading variables are kept out of its environment. */
   holdsSecrets?: boolean;
+  /** Settings for this start only, such as the address of a local app it calls. */
+  setEnv?: Record<string, string>;
 }
 
 /** A program's output, or nothing when it fails or is not there. */
@@ -214,14 +216,15 @@ export async function startProcess(options: RunOptions): Promise<ProcessRecord> 
   const argv = commandFor(command, options.restart);
   const cwd = path.resolve(options.cwd ?? process.cwd());
   // An app started with its secrets does not inherit variables that would make its runtime load the caller's code.
-  const safe = options.holdsSecrets ? appEnv() : null;
+  const given = { ...process.env, ...options.setEnv };
+  const safe = options.holdsSecrets ? appEnv(given) : null;
   if (safe && safe.dropped.length > 0)
     console.log(`left out of ${name}'s environment, since they load extra code: ${safe.dropped.join(', ')}`);
   const child = spawn(argv[0] ?? '', argv.slice(1), {
     cwd,
     detached: true,
     stdio: ['ignore', fd, fd],
-    ...(safe && { env: safe.env }),
+    env: safe?.env ?? given,
   });
   let spawnError: Error | null = null as Error | null;
   child.on('error', error => {
