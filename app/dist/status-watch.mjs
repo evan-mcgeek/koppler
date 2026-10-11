@@ -998,6 +998,8 @@ async function publish() {
 }
 if (process.argv[1] && fs.realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)) {
     const once = process.argv.includes('--once');
+    // On a machine where Koppler never ran, nothing has made its folder yet.
+    fs.mkdirSync(TEMP, { recursive: true, mode: 0o700 });
     if (!once)
         startServer();
     await publish();

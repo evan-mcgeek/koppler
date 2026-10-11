@@ -6,7 +6,7 @@ import path from 'node:path';
 // A linked stack in a throwaway config: added, changed here, updated from GitHub, shared as a pull request.
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-linked-'));
 process.env.KOPPLER_CONFIG_DIR = dir; process.env.KOPPLER_TEMP = path.join(dir, 'temp'); fs.mkdirSync(process.env.KOPPLER_TEMP);
-const { changes, discardChanges, linkStack, linkedStatus, proposeChanges, updateStack } = await import('../src/linked.mjs');
+const { changes, discardChanges, linkStack, linkedStatus, proposeChanges, updateStack } = await import('../dist/linked.mjs');
 const link = 'https://github.com/acme/team-config/blob/main/stacks/shop/stack.json';
 let remote = { name: 'Shop', envs: ['qa'], apps: { api: { name: 'API', kind: 'node', slug: 'acme/api' } } };
 const read = async f => (assert.deepEqual(f, { owner: 'acme', repo: 'team-config', ref: 'main', path: 'stacks/shop/stack.json' }), JSON.stringify(remote));

@@ -5,7 +5,7 @@
 import { execFile, execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { parse } from './secret-check.mjs';
-import { BIN } from './paths.mjs';
+import { BIN } from './paths.ts';
 import { clientEnv, findClient } from './safe-env.mjs';
 
 const MAX_LINES = 500;

@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { pickPrompts } from './runs.mjs';
-import { TEMP } from './paths.mjs';
+import { TEMP } from './paths.ts';
 
 // When a process started: a pid alone can belong to an unrelated process by now.
 const startOf = pid => { try { return execFileSync('ps', ['-p', String(pid), '-o', 'lstart='], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim() || null; } catch { return null; } };

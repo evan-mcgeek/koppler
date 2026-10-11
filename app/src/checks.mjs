@@ -10,7 +10,7 @@ import vm from 'node:vm';
 import crypto from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import kinds from './kinds.cjs';
-import { TEMP } from './paths.mjs';
+import { TEMP } from './paths.ts';
 
 const temp = () => process.env.KOPPLER_TEMP || TEMP;
 const approvalsFile = () => path.join(process.env.KOPPLER_CONFIG_DIR || path.join(os.homedir(), '.config', 'koppler'), 'approved-checks.json');

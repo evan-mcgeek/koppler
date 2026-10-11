@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { collectSession, keepPreviousLog } from '../src/session.mjs';
+import { collectSession, keepPreviousLog } from '../dist/session.mjs';
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-session-')), logs = path.join(dir, 'logs');
 fs.mkdirSync(logs);

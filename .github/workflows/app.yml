@@ -27,6 +27,9 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: 22
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - run: npm ci
       - name: Tests
         run: npm test
 
@@ -74,24 +77,28 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: 22
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - run: npm ci
+      - run: npm run build
       - name: Script syntax
         run: |
-          for f in src/*.mjs src/*.cjs; do node --check "$f"; done
+          for f in dist/*.mjs dist/*.js dist/*.cjs; do node --check "$f"; done
           for f in bin/*; do if head -1 "$f" | grep -q bash; then bash -n "$f"; fi; done
       - name: The command starts
         run: |
-          node src/koppler.mjs --help > /dev/null
-          node src/koppler.mjs --version
+          node dist/koppler.mjs --help > /dev/null
+          node dist/koppler.mjs --version
       - name: Package holds the app and nothing else
         shell: python
         run: |
           import json, subprocess, sys
           files = {f["path"] for f in json.loads(subprocess.check_output(["npm", "pack", "--dry-run", "--json"], text=True))[0]["files"]}
           failed = False
-          for need in ("package.json", "src/koppler.mjs", "src/canvas.html", "src/status-watch.mjs"):
+          for need in ("package.json", "dist/koppler.mjs", "dist/canvas.html", "dist/status-watch.mjs", "dist/paths.js", "dist/fonts/fonts.css"):
               if need not in files: print(f"::error::{need} is missing from the package"); failed = True
           for f in sorted(files):
-              if f.startswith("test/") or ".test." in f or f.startswith("."):
+              if f.startswith(("test/", "src/", "e2e/", "scripts/", "node_modules/")) or ".test." in f or f.startswith("."):
                   print(f"::error::{f} should not be in the package"); failed = True
           print(f"{len(files)} files in the package")
           sys.exit(failed)

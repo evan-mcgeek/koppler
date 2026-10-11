@@ -98,7 +98,7 @@ export const test = base.extend<{ stack: Stack; board: object | null; canvas: Ca
       KOPPLER_CONFIG_DIR: path.join(dir, 'config'),
       KOPPLER_PORT: String(port),
     };
-    const server = spawn(process.execPath, [path.join(here, '..', 'src', 'status-watch.mjs')], {
+    const server = spawn(process.execPath, [path.join(here, '..', 'dist', 'status-watch.mjs')], {
       env,
       stdio: 'ignore',
     });

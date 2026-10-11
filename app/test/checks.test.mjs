@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 // Approvals go to a throwaway folder, never the real config.
 process.env.KOPPLER_CONFIG_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-checks-'));
-const { approve, approved, checksFor, fingerprint, runChecks, stackCommands, startsFromStack } = await import('../src/checks.mjs');
+const { approve, approved, checksFor, fingerprint, runChecks, stackCommands, startsFromStack } = await import('../dist/checks.mjs');
 
 const stack = {
   source: '/team/stack.json', install: { cloudflared: 'brew install cloudflared' },
@@ -63,7 +63,7 @@ assert.equal(approved('/other', { apps: {} }), true);
 
 // Gaps per environment: a tunnel or a secret's steps the first environment has and another does not.
 {
-  const { envGaps, missingTunnels } = await import('../src/checks.mjs');
+  const { envGaps, missingTunnels } = await import('../dist/checks.mjs');
   const reg = { envs: ['qa', 'prod'], apps: {
     w: { name: 'Wallet', prereqs: [{ tunnel: 'db-dev', port: 5432, what: 'Database' }, { sso: 'dev-ops' }], secrets: [{ env: 'DB', fetch: { cli: 'x' } }] },
     m: { name: 'Mobile', prereqs: [{ tunnel: 'cache-dev', port: 6379 }], envs: { prod: { prereqs: [{ tunnel: 'cache-prod', port: 6379 }] } } },

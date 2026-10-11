@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { until } from './helpers.mjs';
 
 // One session listens at a time; one the user moved away from cannot take the connection back by listening again.
-const koppler = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'src', 'koppler.mjs');
+const koppler = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'dist', 'koppler.mjs');
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-listen-')), env = { ...process.env, KOPPLER_TEMP: dir };
 const listener = () => { try { return JSON.parse(fs.readFileSync(path.join(dir, 'listener.json'), 'utf8')); } catch { return {}; } };
 const gone = child => new Promise(resolve => child.exitCode !== null || child.signalCode ? resolve() : child.once('exit', resolve));

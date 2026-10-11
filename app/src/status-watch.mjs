@@ -20,7 +20,7 @@ import { appendAnswer, clearMessages, readMessages } from './messages.mjs';
 import { githubFile, readFile } from './github.mjs';
 import kinds from './kinds.cjs';
 import { recipesFor } from './recipes.mjs';
-import { APP, BIN, LOGS, STATE as STATE_HOME, TEMP } from './paths.mjs';
+import { APP, BIN, LOGS, STATE as STATE_HOME, TEMP } from './paths.ts';
 import { redact } from './scrub.mjs';
 import { listenerPid } from './listen.mjs';
 import kp from './plan.cjs';

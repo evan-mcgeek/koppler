@@ -13,7 +13,7 @@ import { allowStack } from './allow.mjs';
 const freePort = () => new Promise(resolve => { const s = net.createServer(); s.listen(0, '127.0.0.1', () => { const { port } = s.address(); s.close(() => resolve(port)); }); });
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-attack-')), bin = path.join(dir, 'bin'), marker = path.join(dir, 'ran'), seen = path.join(dir, 'seen');
 const env = { ...process.env, KOPPLER_STATE: dir, KOPPLER_TEMP: dir, KOPPLER_CONFIG_DIR: dir, PATH: `${bin}:${process.env.PATH}` };
-const koppler = (...args) => { const r = spawnSync('node', [path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'src', 'koppler.mjs'), ...args], { encoding: 'utf8', env, timeout: 60000 }); return { out: (r.stdout + r.stderr).trim(), code: r.status }; };
+const koppler = (...args) => { const r = spawnSync('node', [path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'dist', 'koppler.mjs'), ...args], { encoding: 'utf8', env, timeout: 60000 }); return { out: (r.stdout + r.stderr).trim(), code: r.status }; };
 const [appPort, tunnelPort] = [await freePort(), await freePort()];
 // A stand-in for the tunnel program: it notes each argument on a line of its own and listens where it is told to.
 fs.mkdirSync(bin);

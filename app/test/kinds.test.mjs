@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import kinds from '../src/kinds.cjs';
+import kinds from '../dist/kinds.cjs';
 const { startCommand, of } = kinds;
 
 // .NET: the -LOCAL profile wins when it exists; stored secrets apply.

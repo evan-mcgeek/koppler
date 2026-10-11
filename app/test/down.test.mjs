@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 // koppler down: stops what Koppler runs and undoes every logged change, branch last, set-aside changes back.
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-down-')), repo = path.join(dir, 'repo');
 const env = { ...process.env, KOPPLER_STATE: dir, KOPPLER_TEMP: dir, KOPPLER_CONFIG_DIR: dir };
-const koppler = (...args) => { const r = spawnSync('node', [path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'src', 'koppler.mjs'), ...args], { encoding: 'utf8', env }); return { out: (r.stdout + r.stderr).trim(), code: r.status }; };
+const koppler = (...args) => { const r = spawnSync('node', [path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'dist', 'koppler.mjs'), ...args], { encoding: 'utf8', env }); return { out: (r.stdout + r.stderr).trim(), code: r.status }; };
 const git = (...a) => execFileSync('git', ['-C', repo, ...a], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
 fs.mkdirSync(path.join(repo, 'Properties'), { recursive: true });
 git('init', '-q', '-b', 'develop'); git('config', 'user.email', 't@t'); git('config', 'user.name', 't');
@@ -61,7 +61,7 @@ console.log('down tests ok');
   fs.writeFileSync(file, `// top\n${after}\n// bottom\n`);
   fs.writeFileSync(path.join(d, 'registry.js'), `window.REGISTRY = ${JSON.stringify({ envs: ['qa'], apps: { api: { name: 'API' } } })};`);
   fs.writeFileSync(path.join(d, 'actions.json'), JSON.stringify([{ kind: 'edit', app: 'api', file, before, after }]));
-  const out = spawnSync('node', [path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'src', 'koppler.mjs'), 'down'], { encoding: 'utf8', env: e });
+  const out = spawnSync('node', [path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'dist', 'koppler.mjs'), 'down'], { encoding: 'utf8', env: e });
   assert.equal(out.status, 0, out.stdout + out.stderr);
   assert.equal(fs.readFileSync(file, 'utf8'), `// top\n${before}\n// bottom\n`);
 }
@@ -70,7 +70,7 @@ console.log('down tests ok');
 {
   const d = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-down-own-')), app = path.join(d, 'app'), bin = path.join(d, 'bin');
   const e = { ...process.env, KOPPLER_STATE: d, KOPPLER_TEMP: d, KOPPLER_CONFIG_DIR: d, PATH: `${bin}:${process.env.PATH}` };
-  const k = (...args) => { const r = spawnSync('node', [path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'src', 'koppler.mjs'), ...args], { encoding: 'utf8', env: e }); return { out: (r.stdout + r.stderr).trim(), code: r.status }; };
+  const k = (...args) => { const r = spawnSync('node', [path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'dist', 'koppler.mjs'), ...args], { encoding: 'utf8', env: e }); return { out: (r.stdout + r.stderr).trim(), code: r.status }; };
   const g = (...a) => execFileSync('git', ['-C', app, ...a], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
   fs.mkdirSync(path.join(app, 'Properties'), { recursive: true }); fs.mkdirSync(bin);
   // A stand-in for npm that notes which branch it was run on.
@@ -97,7 +97,7 @@ console.log('down tests ok');
   log.push({ kind: 'env-file', app: 'app', file: envFile, lines: ['API_URL=http://localhost:5001'] });
   fs.writeFileSync(path.join(d, 'actions.json'), JSON.stringify(log));
   // A local library, after which the user adds an override of their own.
-  const { link } = await import('../src/libraries.mjs');
+  const { link } = await import('../dist/libraries.mjs');
   process.env.PATH = e.PATH;
   const overrides = path.join(app, 'pubspec_overrides.yaml');
   link('app', app, [{ name: 'ui_kit', ecosystem: 'dart', path: '/libs/ui_kit' }, { name: 'left-pad', ecosystem: 'npm', path: '/libs/left-pad' }], path.join(d, 'actions.json'));

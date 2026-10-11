@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { hostsByApp } from './sync.mjs';
 import tunnelPlan from './ports.cjs';
 import kinds from './kinds.cjs';
-import { TEMP } from './paths.mjs';
+import { TEMP } from './paths.ts';
 
 
 const SKIP = new Set(['node_modules', '.git', 'bin', 'obj', 'build', 'dist', '.dart_tool', 'Pods', 'coverage', '.next', 'vendor', 'target']);

@@ -8,7 +8,7 @@ import vm from 'node:vm';
 import { fileURLToPath } from 'node:url';
 import { hostsByApp } from './sync.mjs';
 import { findFiles } from './investigate.mjs';
-import { TEMP } from './paths.mjs';
+import { TEMP } from './paths.ts';
 
 
 const load = (file, key) => {

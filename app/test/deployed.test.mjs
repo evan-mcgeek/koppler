@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { addressOf, assignments, blocks, draftApp, queueUses, readModule, resolve, stackEnv } from '../src/deployed.mjs';
+import { addressOf, assignments, blocks, draftApp, queueUses, readModule, resolve, stackEnv } from '../dist/deployed.mjs';
 
 assert.deepEqual(assignments('a = "x"\n  b = var.y # note\n  m = {\n    dev = "d"\n    prod = "p"\n  }\n  nested {\n    skip = 1\n  }\n"q.r" = 2'),
   [['a', '"x"'], ['b', 'var.y'], ['m', '{\n    dev = "d"\n    prod = "p"\n  }'], ['q.r', '2']]);
@@ -140,7 +140,7 @@ console.log('deployed queue tests ok');
 
 // Outside systems from an app's addresses per environment, and stack queues known by their real name.
 {
-  const { outsideCalls, inStack } = await import('../src/deployed.mjs');
+  const { outsideCalls, inStack } = await import('../dist/deployed.mjs');
   const fs = await import('node:fs'), os = await import('node:os'), path = await import('node:path');
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-outside-'));
   fs.writeFileSync(path.join(dir, 'appsettings.prod.json'), JSON.stringify({ Salesforce: { Url: 'https://acme.my.salesforce.com' }, Other: 'https://api.example.com' }));
@@ -156,7 +156,7 @@ console.log('deployed outside tests ok');
 
 // A SAM app's deploy domains per samconfig.toml environment.
 {
-  const { samDomains } = await import('../src/deployed.mjs');
+  const { samDomains } = await import('../dist/deployed.mjs');
   const toml = 'version = 0.1\n[qa]\n[qa.deploy.parameters]\nparameter_overrides = "Environment=\\"QA\\" HostedZoneName=\\"cdr-qa.example.com\\" CatalogEndpoint=\\"https://other.example.com\\""\n[prod.deploy.parameters]\nparameter_overrides = "DomainName=\\"cdr.example.com\\""\n';
   assert.deepEqual(samDomains(toml), [{ token: 'qa', domains: [{ host: 'cdr-qa.example.com', from: 'api' }] }, { token: 'prod', domains: [{ host: 'cdr.example.com', from: 'api' }] }]);
 }
@@ -176,7 +176,7 @@ console.log('deployed sam tests ok');
 
 // samconfig.toml as people write it: a commented-out line, a list, values without quotes, and hosts that are not the app's own.
 {
-  const { samDomains } = await import('../src/deployed.mjs');
+  const { samDomains } = await import('../dist/deployed.mjs');
   const hosts = toml => samDomains(toml).map(x => `${x.token}: ${x.domains.map(d => d.host).join(' ')}`);
   assert.deepEqual(hosts('[prod.deploy.parameters]\n# parameter_overrides = "DomainName=\\"old.acme.dev\\""\nparameter_overrides = "DomainName=\\"api.acme.dev\\""\n'), ['prod: api.acme.dev']);
   assert.deepEqual(hosts('[qa.deploy.parameters]\nparameter_overrides = [\n  "DomainName=api.qa.acme.dev",\n  "Stage=qa",\n]\n[prod.deploy.parameters]\nparameter_overrides = ["DomainName=api.acme.dev"]\n'), ['qa: api.qa.acme.dev', 'prod: api.acme.dev']);

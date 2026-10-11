@@ -8,7 +8,7 @@ import { localPorts } from './investigate.mjs';
 import { ENV_TOKEN, draftApp, readRepo, stackEnv } from './deployed.mjs';
 import { grepClone, hostsByApp, missingCalls, urlsInClone, validateStack } from './sync.mjs';
 import kinds from './kinds.cjs';
-import { TEMP } from './paths.mjs';
+import { TEMP } from './paths.ts';
 
 const temp = () => process.env.KOPPLER_TEMP || TEMP;
 const load = (file, key) => { try { const sb = { window: {} }; vm.runInNewContext(fs.readFileSync(path.join(temp(), file), 'utf8'), sb); return sb.window[key]; } catch { return null; } };

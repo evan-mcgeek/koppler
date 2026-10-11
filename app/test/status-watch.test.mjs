@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { cableTest, declaredSecrets, fromKoppler, githubFile, presetsIn, sanitizeLayout, sanitizePrompt, tail } from '../src/status-watch.mjs';
+import { cableTest, declaredSecrets, fromKoppler, githubFile, presetsIn, sanitizeLayout, sanitizePrompt, tail } from '../dist/status-watch.mjs';
 
 const file = path.join(os.tmpdir(), `ls-tail-${process.pid}.log`);
 fs.writeFileSync(file, Array.from({ length: 1000 }, (_, i) => `line ${i}`).join('\n') + '\n');
@@ -134,7 +134,7 @@ assert.deepEqual(sanitizeLayout({ nodes: {}, edges: [], dismissed: ['unwired:a>b
 
 // Debug log entries keep only known fields, short texts, and secrets masked.
 {
-  const { cleanDebugEntry } = await import('../src/status-watch.mjs');
+  const { cleanDebugEntry } = await import('../dist/status-watch.mjs');
   assert.deepEqual(cleanDebugEntry({ at: 't', kind: 'click', what: 'button#send "Send to agent"', board: { apps: 8, cables: 16, view: 'edit', env: 'qa', zoom: 0.5, name: 'B', extra: 1 }, evil: 'x' }),
     { at: 't', kind: 'click', what: 'button#send "Send to agent"', board: { apps: 8, cables: 16, view: 'edit', env: 'qa', zoom: 0.5, name: 'B' } });
   assert.equal(cleanDebugEntry({ kind: 'warning', what: 'Login failed: password=hunter2' }).what, 'Login failed: password=***');

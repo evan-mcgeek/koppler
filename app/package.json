@@ -29,21 +29,22 @@
     "linux"
   ],
   "bin": {
-    "koppler": "src/koppler.mjs"
+    "koppler": "dist/koppler.mjs"
   },
   "files": [
-    "src",
-    "bin",
-    "!src/**/*.test.mjs"
+    "dist",
+    "bin"
   ],
   "scripts": {
-    "test": "node --test --test-concurrency=1 test/*.test.mjs",
-    "test:canvas": "playwright test",
+    "test": "npm run build && vitest run && node --test --test-concurrency=1 test/*.test.mjs",
+    "test:canvas": "npm run build && playwright test",
     "start": "node src/koppler.mjs canvas",
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "types": "tsc --noEmit"
+    "types": "tsc --noEmit",
+    "build": "node scripts/build.mjs",
+    "prepack": "npm run build"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
@@ -53,7 +54,8 @@
     "globals": "^17.13.0",
     "prettier": "^3.9.10",
     "typescript": "^6.0.3",
-    "typescript-eslint": "^8.71.1"
+    "typescript-eslint": "^8.71.1",
+    "vitest": "^4.1.11"
   },
   "type": "module"
 }

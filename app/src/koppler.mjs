@@ -24,7 +24,7 @@ import tunnelPlan from './ports.cjs';
 import kinds from './kinds.cjs';
 import { needs as needsFor } from './needs.mjs';
 import { APPROVE, approved, missingTunnels, startsFromStack } from './checks.mjs';
-import { APP, BIN, LOGS, STATE, TEMP } from './paths.mjs';
+import { APP, BIN, LOGS, STATE, TEMP } from './paths.ts';
 import { readActions, updateActions } from './actions.mjs';
 import { appEnv } from './safe-env.mjs';
 import { redact, scrub } from './scrub.mjs';
