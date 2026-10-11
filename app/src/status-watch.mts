@@ -24,7 +24,7 @@ const FONTS = fs.readdirSync(path.join(CODE, 'fonts')).filter(file => /\.(woff2|
 const PAGE_FILES: Record<string, string> = {
   '': 'canvas.html',
   ...Object.fromEntries(
-    ['ports', 'kinds', 'presets', 'plan', 'logfmt'].map(name => [`page/${name}.js`, `page/${name}.js`]),
+    ['ports', 'kinds', 'presets', 'plan', 'logfmt', 'arrange'].map(name => [`page/${name}.js`, `page/${name}.js`]),
   ),
   'temp/status.js': 'temp/status.js',
   'temp/debug.jsonl': 'temp/debug.jsonl',
