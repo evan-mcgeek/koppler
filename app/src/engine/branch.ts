@@ -5,7 +5,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { fail } from '../cli/output.ts';
+import { fail } from '../failure.ts';
 import { readData } from '../data.ts';
 import { updateActions, type Action, type CheckoutAction } from './actions.ts';
 

@@ -2,7 +2,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { fail } from '../cli/output.ts';
+import { fail } from '../failure.ts';
 import type { App } from '../core/stack.ts';
 import { sh } from './processes.ts';
 

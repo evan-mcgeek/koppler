@@ -6,6 +6,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { readStack } from '../data.ts';
+import { Failure } from '../failure.ts';
 import { gh } from '../github.ts';
 
 /** A repo that may be the one meant, and where it was found. */
@@ -150,7 +151,7 @@ export async function findCommand(args: string[]): Promise<void> {
   const names = args.filter(arg => !arg.startsWith('--'));
   if (!names.length) {
     console.error('usage: koppler discover --find "<name> [<name>...]" [--json] [--no-github]');
-    process.exit(1);
+    throw new Failure('', 1);
   }
   const found = await find(names, { registry: readStack(), github: !args.includes('--no-github') });
   if (args.includes('--json')) {

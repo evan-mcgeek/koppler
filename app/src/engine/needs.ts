@@ -3,7 +3,7 @@
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { fail as exit } from '../cli/output.ts';
+import { fail as exit } from '../failure.ts';
 import { isProtected } from '../core/plan.ts';
 import { planSteps, planTunnels, tunnelKind } from '../core/ports.ts';
 import { readClones, readData, readStack } from '../data.ts';

@@ -4,7 +4,8 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { fail, flagValue } from '../cli/output.ts';
+import { flagValue } from '../cli/output.ts';
+import { fail } from '../failure.ts';
 import { TEMP } from '../paths.ts';
 import { runs } from './runs.ts';
 

@@ -1,7 +1,8 @@
 // A cable from one app to another: where the caller must point to reach the local callee, and how it picks that
 // address (a setting, a line in an env file, an edit).
 import path from 'node:path';
-import { fail, flagValue } from '../cli/output.ts';
+import { flagValue } from '../cli/output.ts';
+import { fail } from '../failure.ts';
 import { browserChecks, envFileChange, localAddress } from '../core/addresses.ts';
 import { frameworkOf, type PackageJson } from '../core/frameworks.ts';
 import { of as kindOf } from '../core/kinds.ts';

@@ -11,7 +11,8 @@ import { needs } from '../engine/needs.ts';
 import { live } from '../engine/runs.ts';
 import { tunnelsOf } from '../engine/up.ts';
 import { APP, BIN } from '../paths.ts';
-import { confirm, envOf, fail, positional } from './output.ts';
+import { confirm, envOf, positional } from './output.ts';
+import { fail } from '../failure.ts';
 
 const loaded = (): Registry => readStack() ?? fail('no stack loaded (koppler init)');
 const portOf = (stack: Registry, id: string) => Number(new URL(stack.apps[id]?.url ?? 'http://x').port);

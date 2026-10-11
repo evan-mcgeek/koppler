@@ -1,6 +1,6 @@
 // `koppler run`: one process, started detached and kept track of. A stack app is started by its id, with its stored
 // secrets; anything else is a command of the caller's own, which never gets them.
-import { fail } from '../cli/output.ts';
+import { fail } from '../failure.ts';
 import { appStart } from './app-start.ts';
 import { parseRun, startProcess, type RunOptions } from './processes.ts';
 

@@ -4,7 +4,7 @@
 // Usage: koppler discover --deployed [app...]
 import fs from 'node:fs';
 import path from 'node:path';
-import { fail } from '../cli/output.ts';
+import { fail } from '../failure.ts';
 import { readClones, readStack, type Registry } from '../data.ts';
 import { TEMP } from '../paths.ts';
 import { findFiles } from './investigate.ts';

@@ -3,7 +3,8 @@
 // Usage: koppler discover
 import fs from 'node:fs';
 import path from 'node:path';
-import { fail, table } from '../cli/output.ts';
+import { table } from '../cli/output.ts';
+import { fail } from '../failure.ts';
 import { frameworkOf, type PackageJson } from '../core/frameworks.ts';
 import { defaultPort, detect, of as kindOf, register, type RepoView } from '../core/kinds.ts';
 import { describePlan, planTunnels } from '../core/ports.ts';
