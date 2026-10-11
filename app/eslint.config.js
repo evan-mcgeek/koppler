@@ -32,4 +32,21 @@ export default tseslint.config(
     // `({ dropped, ...kept }) => kept` is how a property is left out.
     rules: { '@typescript-eslint/no-unused-vars': ['error', { ignoreRestSiblings: true }] },
   },
+  // A test feeds made-up and half-shaped data to the code and reads the result as it comes.
+  {
+    files: ['**/*.test.ts'],
+    rules: {
+      '@typescript-eslint/no-unsafe-assignment': 'off',
+      '@typescript-eslint/no-unsafe-member-access': 'off',
+      '@typescript-eslint/no-unsafe-argument': 'off',
+      '@typescript-eslint/no-unsafe-call': 'off',
+      '@typescript-eslint/no-unsafe-return': 'off',
+      '@typescript-eslint/no-explicit-any': 'off',
+      '@typescript-eslint/no-non-null-assertion': 'off',
+      '@typescript-eslint/restrict-template-expressions': 'off',
+      // A stand-in is async because the real thing is, with nothing of its own to wait for.
+      '@typescript-eslint/require-await': 'off',
+      '@typescript-eslint/no-confusing-void-expression': 'off',
+    },
+  },
 );
