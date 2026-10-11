@@ -18,6 +18,15 @@
   const branches = $derived([...new Set([...(app?.branches ?? []), data.branch].filter(Boolean))]);
   const starts = $derived(!!app?.runIn.some(([value]) => value === 'ide'));
   const tunnels = $derived(board.tunnelsOf(id));
+  const queues = $derived(board.queuesOf(id));
+  const hiddenQueues = $derived(queues.filter(queue => board.hiddenQueues[queue]));
+  const noQueues = $derived(queues.length > 0 && hiddenQueues.length === queues.length);
+  const calls = $derived(board.deployedCalls(id));
+  /** "Acme Web Portal" reads as "Web Portal" on an Acme card. */
+  const short = (name: string) => {
+    const [first, ...rest] = name.split(' ');
+    return rest.length && first === data.name.split(' ')[0] ? rest.join(' ') : name;
+  };
   const mobile = $derived(!!app?.platforms.length && data.run === 'cli');
   const platform = $derived(app?.platforms.find(([value]) => value === data.platform)?.[1]);
   /** What the short card says about how it runs. */
@@ -68,6 +77,7 @@
     <p class="glance">
       <span title="Branch: {data.branch || current}">{data.branch || current}</span>
       {#if runLabel}<span>{runLabel}</span>{/if}
+      {#if noQueues}<span title="Its queues are hidden and stay the deployed ones">No queues</span>{/if}
       {#if data.hideTunnels && tunnels.length}<span
           class="off"
           title="Only the API runs; calls through its tunnels fail">No tunnels</span
@@ -92,7 +102,7 @@
           </select>
         </span>
       </label>
-      {#if starts || tunnels.length}
+      {#if starts || tunnels.length || queues.length}
         <div class="row">
           {#if starts}
             <div
@@ -156,6 +166,36 @@
               </label>
             </div>
           {/if}
+          {#if queues.length}
+            <div class="field">
+              Queues
+              <label
+                class="switch"
+                title={noQueues
+                  ? 'Off: its queues are hidden, and stay the deployed ones.'
+                  : 'On: its queues show on the board, where each can be switched to a local copy.'}
+              >
+                <input
+                  type="checkbox"
+                  role="switch"
+                  aria-label="Show {data.name}'s queues"
+                  checked={!noQueues}
+                  onchange={ev => {
+                    board.showQueues(queues, ev.currentTarget.checked);
+                  }}
+                /><span class="track" aria-hidden="true"></span>{noQueues ? 'Off' : 'On'}
+              </label>
+              {#if hiddenQueues.length && !noQueues}
+                <button
+                  class="link"
+                  type="button"
+                  onclick={() => {
+                    board.showQueues(queues, true);
+                  }}>Show {hiddenQueues.length} hidden</button
+                >
+              {/if}
+            </div>
+          {/if}
         </div>
       {/if}
       <label class="field">
@@ -199,6 +239,26 @@
       {:else}
         <button class="note-toggle" type="button" onclick={() => (noting = true)}>Add a note for the agent</button>
       {/if}
+    </div>
+  {/if}
+  {#if calls.length}
+    <div class="calls nodrag nopan">
+      <span class="calls-label">Calls {board.env.toUpperCase()}</span>
+      {#each calls as other (other.id)}
+        {@const onBoard = board.nodes.some(node => node.id === other.id)}
+        {@const can = onBoard || other.cloned}
+        <button
+          class="chip"
+          type="button"
+          disabled={!can}
+          title="{other.name} stays on deployed {board.env.toUpperCase()}.{can
+            ? ` Click to ${onBoard ? 'wire it to your local copy' : 'run it locally too and wire it'}.`
+            : ' It is not cloned on this Mac.'}"
+          onclick={() => {
+            board.callLocally(id, other.id);
+          }}>{short(other.name)}</button
+        >
+      {/each}
     </div>
   {/if}
   <!-- The one anchor Svelte Flow needs to draw this card's cables; the ports below are ours. -->
@@ -447,6 +507,59 @@
     .track::after {
       transition: none;
     }
+  }
+  .link {
+    justify-self: start;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--cable);
+    font: 500 12px var(--sans);
+    cursor: pointer;
+  }
+  .link:hover {
+    text-decoration: underline;
+  }
+  .calls {
+    contain: inline-size;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 12px 10px 16px;
+    border-top: 1px dashed var(--line);
+    cursor: default;
+  }
+  .far .calls {
+    display: none;
+  }
+  .calls-label {
+    margin-right: 2px;
+    color: var(--muted);
+    font-size: 12px;
+  }
+  .chip {
+    max-width: 180px;
+    min-height: 24px;
+    padding: 3px 8px;
+    overflow: hidden;
+    border: 1px dashed color-mix(in oklab, var(--muted) 70%, transparent);
+    border-radius: 999px;
+    background: none;
+    color: var(--ink);
+    font: 500 12px var(--sans);
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    cursor: pointer;
+  }
+  .chip:hover:not(:disabled) {
+    border-style: solid;
+    border-color: var(--cable);
+    color: var(--cable);
+  }
+  .chip:disabled {
+    color: var(--muted);
+    cursor: default;
   }
   .glance .off {
     background: color-mix(in oklab, var(--warn) 14%, transparent);
