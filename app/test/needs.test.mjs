@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { stepsFor, isDone } from '../dist/needs.mjs';
+import { stepsFor, isDone } from '../dist/engine/needs.js';
 
 // The stack a command reads is the one in the run folder.
 process.env.KOPPLER_TEMP = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-needs-'));
@@ -29,7 +29,7 @@ const prodStep = stepsFor('Orders API', [], { appId: 'orders-api', store: 'order
 assert.equal(prodStep.command, 'koppler secret set orders-api@prod ConnectionStrings__DB');
 assert.deepEqual(prodStep.check, { secret: ['orders-api@prod', 'ConnectionStrings__DB'] });
 // On PROD a secret whose fetch steps are only QA's asks for the value by hand, never with QA's command.
-const { needs } = await import('../dist/needs.mjs');
+const { needs } = await import('../dist/engine/needs.js');
 const registry = { envs: ['qa', 'prod'], apps: { o: { name: 'Orders', secrets: [{ env: 'KEY', fetch: { cli: 'aws --profile qa-ops', ui: 'QA console' } }] } } };
 const out = []; const log = console.log; console.log = s => out.push(s);
 useStack(registry); needs(['o', '--env', 'prod', '--json'], { skill: '/skill', fail: e => { throw new Error(e); } });
