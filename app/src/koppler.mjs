@@ -17,7 +17,7 @@ import { canvas, logs, status, stop } from './cli/running.ts';
 import { doctor, ports, secret } from './cli/doctor.ts';
 import { up } from './engine/up.ts';
 import { recipesCommand } from './engine/recipes.ts';
-import { queryCommand } from './query.mjs';
+import { queryCommand } from './engine/query.ts';
 import { findCommand } from './engine/research.ts';
 import { investigate } from './engine/investigate.ts';
 import { deployed } from './engine/deployed.ts';
@@ -141,7 +141,7 @@ const add = async args => {
 const remove = args => { const r = removeApp(positional(args)[0] ?? fail('usage: koppler remove <app>')); if (r.error) fail(r.error); console.log(`Removed ${r.name} from the stack (its clone stays).`); sync([]); };
 const say = args => sayCommand(args);
 const switchBranch = args => switchCommand(args, { temp: TEMP });
-const query = args => queryCommand(args, { fail });
+const query = args => queryCommand(args);
 const listen = async args => (await import('./engine/listen.ts')).listen(args);
 
 // Koppler's version: the package's, or the commit when it runs from a clone.

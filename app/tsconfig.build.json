@@ -7,6 +7,6 @@
     "rewriteRelativeImportExtensions": true,
     "sourceMap": true
   },
-  "include": ["src/**/*.ts", "src/**/*.mjs"],
+  "include": ["src/**/*.ts", "src/**/*.mts", "src/**/*.mjs"],
   "exclude": ["src/**/*.test.ts", "src/**/testing/**"]
 }
