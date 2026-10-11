@@ -16,6 +16,18 @@ export interface CableData extends Record<string, unknown> {
 export type CableEdge = Edge<CableData, 'cable'> & { data: CableData };
 export type CardNode = Node<{ name: string; kind: string; kindLabel: string; branch: string; address: string }, 'app'>;
 export type End = 'from' | 'to';
+export interface StackApp {
+  id: string;
+  name: string;
+  kind: string;
+  kindLabel: string;
+  address: string;
+  /** Its repository, as owner/name. */
+  slug: string;
+  cloned: boolean;
+  /** Why it does not run on this machine. */
+  outside?: string;
+}
 interface Draft {
   a: Point;
   side: Side;
@@ -25,6 +37,8 @@ interface Draft {
 }
 
 const PAD = 24;
+/** The room a new card is given before it has been measured. */
+const PLACE = { w: 300, h: 240, gap: 32 };
 const cardAt = (x: number, y: number) =>
   document
     .elementsFromPoint(x, y)
@@ -242,32 +256,82 @@ class Board {
     addEventListener('pointerup', stop);
   }
 
-  /** Puts the board the server kept on screen: the stack's apps where they were left, and their cables. */
-  open({ stack, clones, saved }: Loaded): void {
-    this.stack = stack.name ?? '';
-    this.env = saved?.env ?? stack.envs[0] ?? '';
-    const placed = Object.entries(saved?.nodes ?? {}).flatMap(([id, at]) => {
-      const app = stack.apps[id];
-      return app && at ? [{ id, app, at }] : [];
-    });
-    this.nodes = placed.map(({ id, app, at }) => ({
+  /** Every app of the stack, as the side panel lists it. */
+  apps = $state.raw<StackApp[]>([]);
+  envs = $state.raw<string[]>([]);
+  /** The folders clones are looked for in, for the "not cloned" hint. */
+  roots = $state.raw<string[]>([]);
+  /** Set by the flow once it is up: the board's place on the page, and a way to bring a card to its middle. */
+  area: () => DOMRect = () => new DOMRect();
+  show: (id: string) => void = () => undefined;
+  #branches: Record<string, string> = {};
+
+  #card(app: StackApp, at: Point, branch = ''): CardNode {
+    const { id, name, kind, kindLabel, address } = app;
+    return {
       id,
       type: 'app',
-      position: { x: at.x, y: at.y },
-      data: {
-        name: app.name,
-        kind: app.kind,
-        kindLabel: kindOf(app).label,
-        branch: at.branch || clones[id]?.branch || '',
-        address: (app.url ?? '').replace(/^https?:\/\//, ''),
-      },
+      position: at,
+      data: { name, kind, kindLabel, address, branch: branch || (this.#branches[id] ?? '') },
+    };
+  }
+
+  /** Puts the board the server kept on screen: the stack's apps where they were left, and their cables. */
+  open({ stack, clones, roots, saved }: Loaded): void {
+    this.stack = stack.name ?? '';
+    this.envs = stack.envs;
+    this.env = saved?.env ?? stack.envs[0] ?? '';
+    this.roots = roots;
+    this.#branches = Object.fromEntries(Object.entries(clones).map(([id, clone]) => [id, clone?.branch ?? '']));
+    this.apps = Object.entries(stack.apps).map(([id, app]) => ({
+      id,
+      name: app.name,
+      kind: app.kind,
+      kindLabel: kindOf(app).label,
+      address: (app.url ?? '').replace(/^https?:\/\//, ''),
+      slug: app.slug ?? '',
+      cloned: !!clones[id],
+      ...(app.outside && { outside: typeof app.outside === 'string' ? app.outside : 'an outside system' }),
     }));
-    const onBoard = new Set(placed.map(({ id }) => id));
+    this.nodes = this.apps.flatMap(app => {
+      const at = saved?.nodes?.[app.id];
+      return at ? [this.#card(app, { x: at.x, y: at.y }, at.branch)] : [];
+    });
+    const onBoard = new Set(this.nodes.map(({ id }) => id));
     this.edges = (saved?.edges ?? [])
       .filter(({ from, to }) => onBoard.has(from) && onBoard.has(to))
       .map(({ from, to, fromSide, toSide }) =>
         cable(from, to, { fromSide: fromSide ?? 'right', toSide: toSide ?? 'left' }),
       );
+  }
+
+  /** Puts an app on the board, in the first empty spot of what is on screen, scanning rows from the top left. */
+  add(id: string): void {
+    const app = this.apps.find(one => one.id === id);
+    if (!app || app.outside || !app.cloned || this.nodes.some(node => node.id === id)) return;
+    const view = this.area();
+    const from = this.toFlow({ x: view.left, y: view.top });
+    const to = this.toFlow({ x: view.right, y: view.bottom });
+    const taken = [...this.boxes.values()];
+    const free = (x: number, y: number) =>
+      taken.every(
+        box =>
+          x + PLACE.w + PLACE.gap <= box.x ||
+          box.x + box.w + PLACE.gap <= x ||
+          y + PLACE.h + PLACE.gap <= box.y ||
+          box.y + box.h + PLACE.gap <= y,
+      );
+    let spot: Point | undefined;
+    for (let y = from.y + 40; !spot && y + PLACE.h <= to.y; y += 40)
+      for (let x = from.x + 40; !spot && x + PLACE.w <= to.x; x += 40) if (free(x, y)) spot = { x, y };
+    const step = this.nodes.length * 32;
+    this.nodes = [...this.nodes, this.#card(app, spot ?? { x: from.x + 48 + step, y: from.y + 48 + step })];
+  }
+
+  /** Takes an app off the board, with its cables. */
+  remove(id: string): void {
+    this.nodes = this.nodes.filter(node => node.id !== id);
+    this.edges = this.edges.filter(edge => edge.source !== id && edge.target !== id);
   }
 
   /** Arrange: places the cards, picks each cable's sides and its order along them, and drops the waypoints. */

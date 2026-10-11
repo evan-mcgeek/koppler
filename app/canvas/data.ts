@@ -11,6 +11,8 @@ export interface SavedBoard {
 export interface Loaded {
   stack: Registry;
   clones: Record<string, Clone | null | undefined>;
+  /** The folders clones are looked for in. */
+  roots: string[];
   saved: SavedBoard | null;
 }
 
@@ -27,8 +29,8 @@ async function ask<T>(name: string): Promise<T | null> {
 export async function load(): Promise<Loaded | null> {
   const [stack, local, saved] = await Promise.all([
     ask<Registry>('registry'),
-    ask<{ apps?: Loaded['clones'] }>('local'),
+    ask<{ apps?: Loaded['clones']; roots?: string[] }>('local'),
     ask<SavedBoard>('state'),
   ]);
-  return stack ? { stack, clones: local?.apps ?? {}, saved } : null;
+  return stack ? { stack, clones: local?.apps ?? {}, roots: local?.roots ?? [], saved } : null;
 }
