@@ -15,6 +15,7 @@ export default tseslint.config(
       'src/fonts/',
       // The canvas spike: not part of the build.
       'spike/',
+      'spike-joint/',
     ],
   },
   { files: ['**/*.{mjs,cjs,js}'], ...js.configs.recommended, languageOptions: { globals: globals.node } },
