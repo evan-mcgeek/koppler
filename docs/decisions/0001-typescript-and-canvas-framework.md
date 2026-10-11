@@ -64,17 +64,24 @@ Svelte Flow (from the same team and on the same core as React Flow) covers what 
 | Pan, zoom, drag, select, keyboard access | Built in; replaces most of the roughly 250 lines of pointer code |
 | App, tunnel, queue and outside cards | Custom node components |
 | Cables as curves through waypoints | A custom edge component that draws our own path |
-| Sockets that slide along a side | Handles positioned by our slot order |
-| Re-plugging a cable's end | Built in (edge reconnect) |
+| Sockets that slide along a side | Our own code: each end is a circle of ours in the library's layer above the cards, placed by our slot order |
+| Drawing a cable through waypoints | Our own code |
 | Arrange | Stays our own algorithm; it only sets positions |
 | Zoomed-out card form | A card variant chosen from the viewport zoom |
 
 What it does not give us, and stays our code: the cable geometry, the slot ordering, Arrange, and the plan and review logic.
 Those move out of the page into plain typed modules with unit tests first, so they survive the move unchanged.
 
-The risk is the socket behaviour (sliding, reordering, starting a cable from an occupied socket), which took several rounds to get right.
-So the first canvas step is a spike: one card type, cables with waypoints and sliding sockets on Svelte Flow, compared against today's canvas.
-If the spike fights the library, the fallback is Svelte for everything around the board and our own SVG layer for cables.
+The risk was the socket behaviour (sliding, reordering, starting a cable from an occupied socket), which took several rounds to get right.
+So the first canvas step was a spike: one card type, cables with waypoints and sliding sockets, compared against today's canvas.
+
+**The spike's result.**
+The same board was built on Svelte Flow, JointJS and diagram-js, and one browser check passed on all three.
+On each of them the socket rule (sliding reorders the cables on that side, pulling away starts a new cable, a click on the empty board drops a waypoint) is our own code, at about the same size: no library ships it.
+Svelte Flow cannot start a connection from code, so its handles are not used for sockets or for drawing; it carries the board instead.
+It is the only one of the three where a card is a plain Svelte component, a dragged card moves live with its cables, and keyboard access is complete.
+JointJS and diagram-js bring cable tools (editing waypoints after drawing, re-plugging an end) and diagram-js an undo history, but both draw nodes themselves, so our HTML cards need glue, and both leave most of the keyboard access to us.
+The canvas is built on Svelte Flow; editing waypoints after drawing and re-plugging an end stay possible later as our own code.
 
 Around the board:
 
