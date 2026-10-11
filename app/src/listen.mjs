@@ -8,7 +8,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { pickPrompts } from './runs.mjs';
+import { pickPrompts } from './engine/runs.ts';
 import { TEMP } from './paths.ts';
 
 // When a process started: a pid alone can belong to an unrelated process by now.

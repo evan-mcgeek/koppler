@@ -9,7 +9,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { runs } from './runs.mjs';
+import { runs } from './engine/runs.ts';
 import { readActions, updateActions } from './engine/actions.ts';
 import { readData } from './data.ts';
 

@@ -20,7 +20,7 @@ import { queryCommand } from './query.mjs';
 import { findCommand } from './research.mjs';
 import { investigate } from './investigate.mjs';
 import { deployed } from './deployed.mjs';
-import { appliedCommand as applied, historyCommand, planCommand, runningNames, appendRun, runRecord, runs as runHistory } from './runs.mjs';
+import { appliedCommand as applied, historyCommand, planCommand, runningNames, appendRun, runRecord, runs as runHistory } from './engine/runs.ts';
 import * as tunnelPlan from './core/ports.ts';
 import * as kinds from './core/kinds.ts';
 import { needs as needsFor } from './needs.mjs';
@@ -144,7 +144,7 @@ function ports(args) {
 // each cable's local address passed to its caller, then starts. What it cannot do alone is listed for the agent (exit 3).
 // Records a board as a run, with its plan against what runs now, as a Run from the canvas would; returns its id.
 async function recordRun(registry, board, label) {
-  const { planFor } = await import('./runs.mjs');
+  const { planFor } = await import('./engine/runs.ts');
   const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
   const data = { id, env: board.env, mode: 'auto', nodes: Object.entries(board.nodes).map(([node, n]) => ({ id: node, ...n })), edges: board.edges, queues: board.queues };
   const plan = planFor({ ...data, nodes: board.nodes });
@@ -172,7 +172,7 @@ async function up(args) {
     if (!ids.length) fail('usage: koppler up <app...> [--cable <caller>:<callee>]... [--env <env>] | --board "<name>" | --run <id>');
     for (const id of ids) if (!registry.apps[id]) fail(`${id} is not an app in the stack`);
     for (const id of ids) if (registry.apps[id].outside) fail(`${registry.apps[id].name ?? id} does not run on this Mac: ${registry.apps[id].outside}`);
-    const env = envOf(registry, args), { live } = await import('./runs.mjs'), now = live();
+    const env = envOf(registry, args), { live } = await import('./engine/runs.ts'), now = live();
     const kept = now?.env === env ? now : { nodes: {}, edges: [], queues: {} };
     const cables = args.flatMap((a, i) => args[i - 1] === '--cable' ? [a] : []).map(c => {
       const [from, to] = c.split(':');
@@ -307,7 +307,7 @@ async function up(args) {
   }
   if (yours.length) console.log(`Start ${yours.join(', ')} in your IDE.`);
   // What runs now is this board, even while something is left for the agent: the canvas shows it running straight away.
-  if (board) { const { nodes, edges } = (await import('./runs.mjs')).runningPart(board); fs.writeFileSync(path.join(TEMP, 'live.json'), JSON.stringify({ id: board.id, at: new Date().toISOString(), env, nodes, edges, ...(board.queues && { queues: board.queues }) }, null, 2) + '\n', { mode: 0o600 }); }
+  if (board) { const { nodes, edges } = (await import('./engine/runs.ts')).runningPart(board); fs.writeFileSync(path.join(TEMP, 'live.json'), JSON.stringify({ id: board.id, at: new Date().toISOString(), env, nodes, edges, ...(board.queues && { queues: board.queues }) }, null, 2) + '\n', { mode: 0o600 }); }
   if (left.length) { console.log(`\nLeft for the agent:\n${left.map(l => `  - ${l}`).join('\n')}`); process.exit(3); }
   console.log(`Up on ${env.toUpperCase()}.`);
   if (board) await applied([board.id]);
@@ -350,7 +350,7 @@ async function doctor(args) {
 // Every connection of what runs now, tested the way the canvas's Flow check does: each app answers, each cable reaches
 // its local app, each tunnel reaches its database or cache.
 async function flowCheck(args) {
-  const registry = registryOrFail(), { live } = await import('./runs.mjs'), board = live();
+  const registry = registryOrFail(), { live } = await import('./engine/runs.ts'), board = live();
   if (!board || !Object.keys(board.nodes ?? {}).length) return console.log('Nothing is running, so there is nothing to test.');
   const env = board.env ?? registry.envs[0], name = id => registry.apps[id]?.name ?? id;
   const ids = Object.keys(board.nodes).filter(id => registry.apps[id]);

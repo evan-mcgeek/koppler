@@ -8,7 +8,7 @@ import { isDeepStrictEqual } from 'node:util';
 import { fail, flagValue } from '../cli/output.ts';
 import { readData } from '../data.ts';
 import { TEMP } from '../paths.ts';
-import { appliedCommand } from '../runs.mjs';
+import { appliedCommand } from './runs.ts';
 import {
   readActions,
   updateActions,
