@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { switchBack, switchTo } from '../dist/branch.mjs';
+import { switchBack, switchTo } from '../dist/engine/branch.js';
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-branch-')), repo = path.join(dir, 'repo'), logFile = path.join(dir, 'actions.json');
 const git = (...a) => execFileSync('git', ['-C', repo, ...a], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
