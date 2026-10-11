@@ -1,0 +1,19 @@
+html,
+body,
+#app {
+  height: 100%;
+  margin: 0;
+}
+body {
+  background: var(--paper);
+  font-family: var(--sans);
+}
+.kind-dotnet {
+  --kind: var(--dotnet);
+}
+.kind-flutter {
+  --kind: var(--flutter);
+}
+.kind-node {
+  --kind: var(--node);
+}

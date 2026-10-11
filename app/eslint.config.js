@@ -13,6 +13,8 @@ export default tseslint.config(
       'test-results/',
       'playwright-report/',
       'src/fonts/',
+      // The canvas spike: not part of the build.
+      'spike/',
     ],
   },
   { files: ['**/*.{mjs,cjs,js}'], ...js.configs.recommended, languageOptions: { globals: globals.node } },
