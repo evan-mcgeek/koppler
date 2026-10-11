@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import { localPorts } from './engine/investigate.ts';
 import { ENV_TOKEN, draftApp, readRepo, stackEnv } from './deployed.mjs';
 import { validateStack } from './core/stack.ts';
-import { grepClone, hostsByApp, missingCalls, urlsInClone } from './sync.mjs';
+import { grepClone, hostsByApp, missingCalls, urlsInClone } from './engine/sync.ts';
 import * as kinds from './core/kinds.ts';
 import { readData } from './data.ts';
 

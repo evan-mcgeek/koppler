@@ -121,8 +121,8 @@ const unnamed = (line: string) => {
  * latest run log and each named log, all scrubbed of secrets and of everything that names the user or their stack.
  */
 async function debugReport(names: string[]): Promise<void> {
-  const { stacksHere } = await import('../sync.mjs');
-  const stacks = (stacksHere() as { dir: string }[]).map(stack => read(path.join(stack.dir, 'stack.json')));
+  const { stacksHere } = await import('../engine/sync.ts');
+  const stacks = stacksHere().map(stack => read(path.join(stack.dir, 'stack.json')));
   let commit: string | null = null;
   try {
     const git = ['-C', CODE, 'rev-parse', '--short', 'HEAD'];

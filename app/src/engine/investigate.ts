@@ -9,7 +9,7 @@ import { defaultPort, detect, of as kindOf, register, type RepoView } from '../c
 import { describePlan, planTunnels } from '../core/ports.ts';
 import { readClones, readStack } from '../data.ts';
 import { TEMP } from '../paths.ts';
-import { hostsByApp } from '../sync.mjs';
+import { hostsByApp } from './sync.ts';
 
 /** A port an app listens on locally, and where in its clone that is said. */
 export interface FoundPort {
@@ -202,7 +202,7 @@ export function investigate({ afterSync = false } = {}): void {
   const clones = readClones();
   register(stack.kinds);
   const found = stack.found ?? {};
-  const known = hostsByApp(stack) as Record<string, Set<string> | undefined>;
+  const known = hostsByApp(stack);
   const apps = Object.entries(stack.apps).map(([id, app]) => {
     const repo = clones[id]?.path;
     const kind = (app.kind as string | undefined) ?? (repo ? (detectKind(repo) ?? undefined) : undefined);

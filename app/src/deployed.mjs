@@ -5,7 +5,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { hostsByApp } from './sync.mjs';
+import { hostsByApp } from './engine/sync.ts';
 import { findFiles } from './engine/investigate.ts';
 import { TEMP } from './paths.ts';
 import { readData } from './data.ts';

@@ -5,8 +5,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { init as initStack, removeApp, stacksCommand, sync, updateClones, useCommand } from './sync.mjs';
-import { discardChanges, linkStack, linkedStatus, proposeChanges, updateStack } from './linked.mjs';
+import { init as initStack, removeApp, stacksCommand, sync, updateClones, useCommand } from './engine/sync.ts';
+import { discardChanges, linkStack, linkedStatus, proposeChanges, updateStack } from './engine/linked.ts';
 import { discoverCommand } from './discover.mjs';
 import { sayCommand } from './engine/messages.ts';
 import { switchCommand } from './engine/branch.ts';
@@ -34,7 +34,7 @@ const init = async args => {
   // A new, empty stack: a name and its deployed environments; its apps are picked next.
   const named = flagValue(args, '--new');
   if (args.includes('--new')) {
-    const { createStack } = await import('./sync.mjs');
+    const { createStack } = await import('./engine/sync.ts');
     const r = createStack({ name: named ?? '', envs: flagValue(args, '--envs') ?? '' });
     if (r.error) fail(r.error);
     console.log(`Created ${named} in ${r.stack}; it is the stack in use.`);
@@ -126,7 +126,7 @@ const recipes = args => {
 const add = async args => {
   const wanted = positional(args);
   if (!wanted.length) fail('usage: koppler add <repo or folder>...  (koppler add --list shows the repos you can add)');
-  const { addApps, candidateRepos } = await import('./sync.mjs');
+  const { addApps, candidateRepos } = await import('./engine/sync.ts');
   const config = JSON.parse(fs.readFileSync(path.join(process.env.KOPPLER_CONFIG_DIR || path.join(os.homedir(), '.config', 'koppler'), 'config.json'), 'utf8'));
   const index = readData('repos') ?? fail('no repos found yet: koppler init');
   const stack = JSON.parse(fs.readFileSync(path.join(config.stack, 'stack.json'), 'utf8'));
