@@ -34,7 +34,7 @@
 
 {#if path}
   <!-- One group, so that the title in it is the SVG one: a cable that starts with <title> is taken for HTML. -->
-  <g>
+  <g role="presentation" onpointerenter={() => (board.hovered = id)} onpointerleave={() => (board.hovered = null)}>
     <title>{name(source)} calls local {name(target)}. Click to unplug.</title>
     <path class="svelte-flow__edge-interaction hit" d={path} />
     <path class="under" d={path} />

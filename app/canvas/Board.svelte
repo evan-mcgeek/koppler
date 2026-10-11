@@ -18,6 +18,7 @@
   import Queue from './Queue.svelte';
   import Tunnel from './Tunnel.svelte';
   import { board, type CardNode, type InfraNode } from './board.svelte.ts';
+  import { theme } from './theme.svelte.ts';
 
   const flow = useSvelteFlow();
   board.toFlow = at => flow.screenToFlowPosition(at, { snapToGrid: false });
@@ -193,7 +194,7 @@
     onedgeclick={({ edge }) => {
       board.cut(edge.source, edge.target);
     }}
-    colorMode="system"
+    colorMode={theme.now}
     minZoom={0.2}
     attributionPosition="bottom-left"
     {...start}
@@ -309,6 +310,7 @@
             <circle
               role="presentation"
               class="plug nodrag nopan"
+              class:cut={board.hovered === edge.id}
               data-cable={edge.id}
               class:grabbed={board.grabbed?.id === edge.id && board.grabbed.end === 'from'}
               cx={a.x}
@@ -339,12 +341,30 @@
       </svg>
     </ViewportPortal>
   </SvelteFlow>
+  {#if !board.nodes.length}
+    <p class="empty">
+      Click the apps you want to run together.<br />Connect them; the board is saved as you go.
+    </p>
+  {/if}
 </div>
 
 <style>
   .area {
     position: absolute;
     inset: 0;
+  }
+  .empty {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-content: center;
+    margin: 0;
+    padding: 0 24px;
+    color: var(--muted);
+    font: 15px/1.55 var(--sans);
+    text-align: center;
+    text-wrap: balance;
+    pointer-events: none;
   }
   .links {
     position: absolute;
@@ -423,6 +443,9 @@
     fill: var(--cable);
     stroke: var(--surface);
     stroke-width: 2;
+  }
+  .plug.cut {
+    fill: var(--bad);
   }
   .plug.grabbed {
     r: 7.5px;

@@ -4,10 +4,11 @@ import type { Edge, Node } from '@xyflow/svelte';
 import { arrange, sidesFor, type Point, type Side } from '../src/core/arrange.ts';
 import { endOffsets, orderSlots, sidePoint, SIDES, type Box, type Cable } from '../src/core/cables.ts';
 import { of as kindOf } from '../src/core/kinds.ts';
-import { LOCAL_QUEUE_TYPES, queuesOf } from '../src/core/plan.ts';
+import { isProtected, LOCAL_QUEUE_TYPES, queuesOf } from '../src/core/plan.ts';
 import { planTunnels, tunnelKind, type Tunnel } from '../src/core/ports.ts';
 import type { Registry } from '../src/data.ts';
 import type { Loaded, SavedBoard } from './data.ts';
+import { toasts } from './toast.svelte.ts';
 
 export interface CableData extends Record<string, unknown> {
   fromSide: Side;
@@ -142,7 +143,12 @@ class Board {
   /** The end being slid along its side. */
   grabbed = $state.raw<{ id: string; end: End } | null>(null);
   /** The card a drawn cable would land on. */
-  drop = $state.raw<string | null>(null);
+  drop = $state.raw<{ id: string; ok: boolean } | null>(null);
+  /** The cable under the pointer: a click unplugs it. */
+  hovered = $state.raw<string | null>(null);
+  /** A protected environment (production, usually): local code runs against its real data. */
+  #guarded = $state.raw<string[]>([]);
+  protected = $derived(this.#guarded.includes(this.env));
   /** Set by the flow once it is up. */
   toFlow: (at: Point) => Point = at => at;
   zoom: () => number = () => 1;
@@ -522,16 +528,22 @@ class Board {
       const at = id && id !== from ? this.boxes.get(id) : undefined;
       return id && at ? { id, side: this.nearestSide(at, points.at(-1) ?? flow(ev)), at } : undefined;
     };
+    const app = (id: string) => this.apps.find(one => one.id === id);
+    const calls = (caller: string, callee: string) => !!app(caller)?.calls.includes(callee);
+    // A cable can land where the caller may call the app, and not against the only direction the code shows.
+    const canCall = (to: string) => !app(from)?.outside && !!app(to) && !app(to)?.outside && !!app(to)?.answers;
+    const wrongWay = (to: string) => !calls(from, to) && calls(to, from);
     const move = (ev: PointerEvent) => {
       const onto = target(ev);
+      const lands = !!onto && canCall(onto.id) && !wrongWay(onto.id);
       this.draft = {
         a,
         side: fromSide,
-        b: onto ? sidePoint(onto.at, onto.side) : flow(ev),
-        bSide: onto?.side ?? null,
+        b: onto && lands ? sidePoint(onto.at, onto.side) : flow(ev),
+        bSide: onto && lands ? onto.side : null,
         points: [...points],
       };
-      this.drop = onto?.id ?? null;
+      this.drop = onto ? { id: onto.id, ok: lands } : null;
     };
     const end = () => {
       removeEventListener('pointermove', move);
@@ -543,6 +555,31 @@ class Board {
       const onto = target(ev);
       end();
       if (!onto) return;
+      const [caller, callee] = [app(from)?.name ?? from, app(onto.id)?.name ?? onto.id];
+      if (!canCall(onto.id)) {
+        const said = app(onto.id)?.answers
+          ? `${caller} doesn't call ${callee}`
+          : `${callee} is a ${app(onto.id)?.kindLabel ?? ''} app: it calls others, nothing calls it.`;
+        toasts.show(said, 'warning');
+        return;
+      }
+      // Drawn against the only call the repos show between these two: no cable is added; the real one is offered.
+      if (wrongWay(onto.id)) {
+        const wired = this.edges.some(edge => edge.id === `${onto.id}>${from}`);
+        toasts.show(
+          `In the code ${callee} calls ${caller}, not the other way round.${wired ? ' That cable is already on the board.' : ''}`,
+          'warning',
+          wired
+            ? undefined
+            : {
+                label: 'Connect that way',
+                run: () => {
+                  this.connect(onto.id, from);
+                },
+              },
+        );
+        return;
+      }
       const drawn = cable(from, onto.id, { fromSide, toSide: onto.side, ...(points.length && { points }) });
       this.edges = [...this.edges.filter(edge => edge.id !== drawn.id), drawn];
     };
@@ -777,6 +814,7 @@ class Board {
   /** Puts the board the server kept on screen: the stack's apps where they were left, and their cables. */
   open({ stack, clones, roots, saved }: Loaded): void {
     this.#registry = stack;
+    this.#guarded = stack.envs.filter(env => isProtected(stack, env));
     this.stack = stack.name ?? '';
     this.envs = stack.envs;
     this.env = saved?.env ?? stack.envs[0] ?? '';
