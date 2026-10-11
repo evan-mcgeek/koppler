@@ -168,8 +168,21 @@ const [crashy, upA, upB, tunA, tunB, runA, runB, agentA, agentB, leftA, leftB] =
   const r = koppler('up', '--run', 'run000011');
   assert.equal(r.code, 3, r.out);
   assert.match(r.out, new RegExp(`Left for the agent:[\\s\\S]*A -> local B: point it at http://localhost:${leftB}\\b`));
-  assert.deepEqual(Object.keys(JSON.parse(fs.readFileSync(path.join(dir, 'live.json'), 'utf8')).nodes).sort(), ['a', 'b']);
+  // The caller waits for its cable: started now it would call the deployed B, and need a restart after the edit.
+  assert.match(r.out, /A is not started until then/);
+  assert.doesNotMatch(r.out, /started a /);
+  assert.deepEqual(Object.keys(JSON.parse(fs.readFileSync(path.join(dir, 'live.json'), 'utf8')).nodes).sort(), ['b']);
   assert.doesNotMatch(fs.readFileSync(path.join(dir, 'history.jsonl'), 'utf8'), /"event":"done"/);
+  // The agent makes the change and logs it: the same run then starts the caller and is done, with nothing left.
+  const logged = fs.existsSync(path.join(dir, 'actions.json')) ? JSON.parse(fs.readFileSync(path.join(dir, 'actions.json'), 'utf8')) : [];
+  const edit = { kind: 'edit', app: 'a', file: path.join(dir, 'client.js'), before: 'const B = "https://b.acme.test";', after: `const B = "http://localhost:${leftB}"; // koppler: do not commit` };
+  fs.writeFileSync(path.join(dir, 'actions.json'), JSON.stringify([...logged, edit]));
+  const again = koppler('up', '--run', 'run000011');
+  assert.equal(again.code, 0, again.out);
+  assert.match(again.out, /started a /);
+  assert.doesNotMatch(again.out, /Left for the agent/);
+  assert.deepEqual(Object.keys(JSON.parse(fs.readFileSync(path.join(dir, 'live.json'), 'utf8')).nodes).sort(), ['a', 'b']);
+  assert.match(fs.readFileSync(path.join(dir, 'history.jsonl'), 'utf8'), /"event":"done"/);
   koppler('stop', '--all', '--yes');
 }
 // stop --apps: everything Koppler runs except the canvas.

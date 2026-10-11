@@ -44,6 +44,8 @@ interface Up {
   left: string[];
   /** Apps that must not start: something they need failed. */
   skip: Set<string>;
+  /** Callers not started yet: a cable of theirs still needs a change in their code. */
+  waits: Set<string>;
   /** Settings each app is started with. */
   setEnv: Record<string, Record<string, string>>;
   logFile: string;
@@ -274,6 +276,27 @@ function applyRemembered(up: Up): void {
   }
 }
 
+/**
+ * Whether the caller's code already points at that address: a change the agent logged for it holds the address, or the
+ * file the stack names does.
+ */
+// ponytail: the address is looked for as text, so port 5001 also matches 50010; compare whole addresses if that bites
+function pointsAt(up: Up, app: string, address: string, file: string | undefined): boolean {
+  const has = (text: string | string[] | undefined) => [text ?? []].flat().some(part => part.includes(address));
+  const logged = readActions(up.logFile).some(
+    action =>
+      action.app === app &&
+      ((action.kind === 'edit' && has(action.after)) || (action.kind === 'env-file' && has(action.lines))),
+  );
+  const repo = up.clones[app]?.path;
+  if (logged || !repo || !file) return logged;
+  try {
+    return has(fs.readFileSync(path.join(repo, file), 'utf8'));
+  } catch {
+    return false;
+  }
+}
+
 /** Each cable: the caller gets its local callee's address at start, or a remembered change already points it there. */
 function wireCables(up: Up): void {
   const { stack, env, left } = up;
@@ -288,11 +311,19 @@ function wireCables(up: Up): void {
     }
     if (wired.how === 'env' && !kindOf(stack.apps[from]).platforms)
       for (const name of [wired.call.env ?? []].flat()) settingsFor(up, from)[name] = wired.value;
-    else if (!viaRecipe) {
+    else if (!viaRecipe && !pointsAt(up, from, wired.value, wired.file ?? wired.call.file)) {
       const where = wired.call.file ? ` in ${wired.call.file}` : '';
       const how =
         wired.how === 'unknown' ? 'how it picks the address is not recorded yet' : `${String(wired.how)}${where}`;
-      left.push(`${nameOf(stack, from)} -> local ${nameOf(stack, to)}: point it at ${wired.value} (${how})`);
+      const caller = nameOf(stack, from);
+      // Started now, the caller would call the deployed app and need a restart once the change is made.
+      const then = running(from)
+        ? `${caller} runs without it: restart it after the change`
+        : up.node(from).run === 'ide'
+          ? `start ${caller} in your IDE after the change`
+          : `${caller} is not started until then: log the change, then run this again`;
+      left.push(`${caller} -> local ${nameOf(stack, to)}: point it at ${wired.value} (${how}); ${then}`);
+      up.waits.add(from);
     }
   }
 }
@@ -429,7 +460,9 @@ async function startApps(up: Up): Promise<void> {
     else if (running(id)) {
       console.log(`${id}: already running`);
       step(id, 'Start', 'done', 'Already running.');
-    } else {
+    } else if (up.waits.has(id))
+      step(id, 'Start', 'todo', 'Waits for a change in its code that points it at a local app.');
+    else {
       const setEnv = up.setEnv[id];
       await run([id, '--env', env, ...(platform ? ['--device', platform] : [])], setEnv ? { setEnv } : {});
       step(id, 'Start', 'done', 'Running.');
@@ -466,6 +499,7 @@ async function carryOut(stack: Registry, args: string[]): Promise<void> {
     edges: (latest?.edges ?? []).filter(edge => ids.includes(edge.from) && ids.includes(edge.to)),
     left: [],
     skip: new Set(),
+    waits: new Set(),
     setEnv: {},
     logFile: path.join(TEMP, 'actions.json'),
     step: progressOf(board, env),
