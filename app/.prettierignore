@@ -1,6 +1,8 @@
 # Not ours to format.
 node_modules/
 dist/
+dist.next/
+dist.previous/
 test-results/
 playwright-report/
 package-lock.json
@@ -10,7 +12,6 @@ PRODUCT.md
 
 # Still in its first form: each file leaves this list in the pull request that converts it to TypeScript.
 src/*.mjs
-src/*.cjs
 src/canvas.html
 src/lambda-secrets-proxy.go
 test/*.mjs

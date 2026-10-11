@@ -6,7 +6,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { hostsByApp } from './sync.mjs';
 import * as tunnelPlan from './core/ports.ts';
-import kinds from './kinds.cjs';
+import * as frameworks from './core/frameworks.ts';
+import * as kinds from './core/kinds.ts';
 import { TEMP } from './paths.ts';
 import { readData } from './data.ts';
 
@@ -54,7 +55,7 @@ export function nodePorts(files) {
   return out;
 }
 
-// A clone as the kind recipes see it (kinds.cjs): which files it has, their text, what a folder holds.
+// A clone as the kind recipes see it (core/kinds): which files it has, their text, what a folder holds.
 export const repoFiles = repo => ({
   has: f => fs.existsSync(path.join(repo, f)),
   read: f => { try { return fs.statSync(path.join(repo, f)).size < 512 * 1024 ? fs.readFileSync(path.join(repo, f), 'utf8') : null; } catch { return null; } },
@@ -73,7 +74,7 @@ export function localPorts(repo, kind) {
     // A front end with no port set uses its framework's default.
     let pkg = null;
     try { pkg = JSON.parse(read(path.join(repo, 'package.json')) ?? 'null'); } catch {}
-    const fw = kind === 'web' ? kinds.frameworkOf(pkg) : null;
+    const fw = kind === 'web' ? frameworks.frameworkOf(pkg) : null;
     return found.length || !fw ? found : [{ port: fw.port, scheme: 'http', where: `${fw.name} default` }];
   }
   const usual = kinds.defaultPort(kind, repoFiles(repo));

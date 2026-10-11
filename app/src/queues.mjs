@@ -4,7 +4,7 @@
 //   Kafka: one local broker in Docker (apache/kafka); the topic is created on it and every app on one starts with its
 //   broker settings pointed at it.
 import { execFileSync } from 'node:child_process';
-import kinds from './kinds.cjs';
+import * as kinds from './core/kinds.ts';
 import * as kp from './core/plan.ts';
 
 export const PORT = 4566, ENDPOINT = `http://127.0.0.1:${PORT}`;

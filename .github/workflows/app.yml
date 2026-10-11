@@ -83,7 +83,7 @@ jobs:
       - run: npm run build
       - name: Script syntax
         run: |
-          for f in dist/*.mjs dist/*.js dist/*.cjs; do node --check "$f"; done
+          for f in dist/*.mjs dist/*.js dist/core/*.js; do node --check "$f"; done
           for f in bin/*; do if head -1 "$f" | grep -q bash; then bash -n "$f"; fi; done
       - name: The command starts
         run: |

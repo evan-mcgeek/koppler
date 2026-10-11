@@ -4,7 +4,17 @@ import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
-  { ignores: ['node_modules/', 'dist/', 'test-results/', 'playwright-report/', 'src/fonts/'] },
+  {
+    ignores: [
+      'node_modules/',
+      'dist/',
+      'dist.next/',
+      'dist.previous/',
+      'test-results/',
+      'playwright-report/',
+      'src/fonts/',
+    ],
+  },
   { files: ['**/*.{mjs,cjs,js}'], ...js.configs.recommended, languageOptions: { globals: globals.node } },
   // An empty catch is this code's way of saying "absent or unreadable is fine"; control characters in a pattern strip terminal colours.
   {
@@ -14,11 +24,6 @@ export default tseslint.config(
       'no-control-regex': 'off',
       'no-unused-vars': ['error', { ignoreRestSiblings: true, caughtErrors: 'none', argsIgnorePattern: '^_' }],
     },
-  },
-  // Shared with the page as plain scripts.
-  {
-    files: ['src/*.cjs'],
-    languageOptions: { sourceType: 'commonjs', globals: { ...globals.node, ...globals.browser } },
   },
   ...tseslint.configs.strictTypeChecked.map(config => ({ ...config, files: ['**/*.ts'] })),
   {

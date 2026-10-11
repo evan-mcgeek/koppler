@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import { localPorts } from './investigate.mjs';
 import { ENV_TOKEN, draftApp, readRepo, stackEnv } from './deployed.mjs';
 import { grepClone, hostsByApp, missingCalls, urlsInClone, validateStack } from './sync.mjs';
-import kinds from './kinds.cjs';
+import * as kinds from './core/kinds.ts';
 import { readData } from './data.ts';
 
 const deployedOf = (app, env, first) => env === first ? app.deployedUrl : app.envs?.[env]?.deployedUrl;
