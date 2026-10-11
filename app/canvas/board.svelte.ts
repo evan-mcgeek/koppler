@@ -4,13 +4,16 @@ import type { Edge, Node } from '@xyflow/svelte';
 import { arrange, sidesFor, type Point, type Side } from '../src/core/arrange.ts';
 import { endOffsets, orderSlots, sidePoint, SIDES, type Box, type Cable } from '../src/core/cables.ts';
 import { of as kindOf } from '../src/core/kinds.ts';
-import type { Loaded } from './data.ts';
+import type { Loaded, SavedBoard } from './data.ts';
 
 export interface CableData extends Record<string, unknown> {
   fromSide: Side;
   toSide: Side;
   fromSlot?: number;
   toSlot?: number;
+  /** How far from the middle of its side Arrange centred the cables this end sits among. */
+  fromShift?: number;
+  toShift?: number;
   points?: Point[];
 }
 export type CableEdge = Edge<CableData, 'cable'> & { data: CableData };
@@ -280,6 +283,12 @@ class Board {
     addEventListener('pointerup', stop);
   }
 
+  /** Where the board was left: its zoom and position. Unset until one is known. */
+  view = $state.raw<{ x: number; y: number; zoom: number } | undefined>();
+  /** Whether the last change reached the server. */
+  unsaved = $state(false);
+  #kept: SavedBoard = {};
+
   /** Every app of the stack, as the side panel lists it. */
   apps = $state.raw<StackApp[]>([]);
   envs = $state.raw<string[]>([]);
@@ -341,9 +350,38 @@ class Board {
     const onBoard = new Set(this.nodes.map(({ id }) => id));
     this.edges = (saved?.edges ?? [])
       .filter(({ from, to }) => onBoard.has(from) && onBoard.has(to))
-      .map(({ from, to, fromSide, toSide }) =>
-        cable(from, to, { fromSide: fromSide ?? 'right', toSide: toSide ?? 'left' }),
+      .map(({ from, to, fromSide, toSide, ...kept }) =>
+        cable(from, to, { fromSide: fromSide ?? 'right', toSide: toSide ?? 'left', ...kept }),
       );
+    this.#kept = saved ?? {};
+    const { zoom, pan } = saved ?? {};
+    this.view = zoom && pan ? { x: pan.x, y: pan.y, zoom } : undefined;
+  }
+
+  /** The board as the server keeps it: what is on screen, over everything it kept that the canvas does not show yet. */
+  saved(): SavedBoard {
+    const before = this.#kept.nodes ?? {};
+    return {
+      mode: 'auto',
+      ...this.#kept,
+      env: this.env,
+      ...(this.view && { zoom: this.view.zoom, pan: { x: this.view.x, y: this.view.y } }),
+      nodes: Object.fromEntries(
+        this.nodes.map(({ id, position, data: { branch, run, platform, note } }) => [
+          id,
+          {
+            ...before[id],
+            x: Math.round(position.x),
+            y: Math.round(position.y),
+            branch,
+            run,
+            ...(platform && { platform }),
+            note,
+          },
+        ]),
+      ),
+      edges: this.edges.map(({ source, target, data }) => ({ from: source, to: target, ...data })),
+    };
   }
 
   /** Puts an app on the board, in the first empty spot of what is on screen, scanning rows from the top left. */
@@ -391,7 +429,8 @@ class Board {
   /** A cable between two cards, on the sides that face each other. */
   connect(from: string, to: string): void {
     const size = (id: string) => this.boxes.get(id) ?? { w: 260, h: 160 };
-    const at = Object.fromEntries([...this.boxes].map(([id, { x, y }]) => [id, { x, y }]));
+    // From the cards themselves: one added a moment ago has a place before it has a size.
+    const at = Object.fromEntries(this.nodes.map(({ id, position }) => [id, position]));
     const drawn = cable(from, to, sidesFor(at, { from, to }, 'down', size));
     this.edges = [...this.edges.filter(edge => edge.id !== drawn.id), drawn];
   }

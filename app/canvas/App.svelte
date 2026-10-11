@@ -3,12 +3,33 @@
   import Board from './Board.svelte';
   import Side from './Side.svelte';
   import { board } from './board.svelte.ts';
-  import { load } from './data.ts';
+  import { load, save } from './data.ts';
 
   /** Asked for once, when the page opens. ponytail: no polling yet; it comes with the live state of the cards. */
   const opened = load().then(loaded => {
     if (loaded) board.open(loaded);
     return !!loaded;
+  });
+
+  // Every change is kept: sent once the board has been still for a moment, and again as the page is left.
+  let sent = '';
+  let waiting: ReturnType<typeof setTimeout> | undefined;
+  const keep = (leaving = false) => {
+    clearTimeout(waiting);
+    const now = JSON.stringify(board.saved());
+    if (now === sent) return;
+    sent = now;
+    void save(board.saved(), leaving).then(kept => (board.unsaved = !kept));
+  };
+  $effect(() => {
+    const now = JSON.stringify(board.saved());
+    if (!board.stack) return;
+    // What the server handed over is what it has.
+    if (!sent) sent = now;
+    else if (now !== sent) waiting = setTimeout(keep, 400);
+    return () => {
+      clearTimeout(waiting);
+    };
   });
 
   const remembered = () => {
@@ -28,6 +49,12 @@
     }
   };
 </script>
+
+<svelte:window
+  onpagehide={() => {
+    keep(true);
+  }}
+/>
 
 <header>
   <button
