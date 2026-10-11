@@ -49,7 +49,8 @@ const listOf = (value: unknown) => (Array.isArray(value) ? (value as unknown[]) 
 const fieldsOf = (value: unknown) => (isObject(value) ? value : {});
 const xy = (value: unknown): Point => ({ x: num(fieldsOf(value)['x']), y: num(fieldsOf(value)['y']) });
 const note = (value: unknown) => (typeof value === 'string' && value ? { note: text(value, MAX_NOTE) } : {});
-const TUNNEL = /^tunnel:[\w.-]{1,253}:\d{1,5}$/;
+/** A card that is not an app: a tunnel, a queue or an outside system. */
+const CARD = /^(tunnel:[\w.-]{1,253}:\d{1,5}|(queue|outside):[a-z0-9-]{1,64})$/;
 const WHEN = /^\d{4}-\d\d-\d\dT[\d:.]+Z$/;
 const TIDY = ['down', 'right'];
 const SIDES = ['top', 'right', 'bottom', 'left'];
@@ -81,7 +82,7 @@ function boardLayout(given: unknown): BoardLayout | null {
   if (!Object.keys(nodes).length) return null;
   const infra = Object.fromEntries(
     Object.entries(fieldsOf(given['infra']))
-      .filter(([key]) => TUNNEL.test(key))
+      .filter(([key]) => CARD.test(key))
       .slice(0, 100)
       .map(([key, at]) => [key, xy(at)]),
   );
@@ -195,10 +196,10 @@ export function sanitizeLayout(input: unknown): Loose | null {
     ...(shift(edge['toShift']) !== null && { toShift: edge['toShift'] }),
     ...(waypoints(edge['points']) && { points: waypoints(edge['points']) }),
   }));
-  // Where tunnel cards sit, keyed by tunnel:<host>:<port>.
+  // Where tunnel, queue and outside cards sit, keyed by tunnel:<host>:<port>, queue:<id> or outside:<id>.
   const infra = Object.fromEntries(
     Object.entries(isMap(input['infra']) ? input['infra'] : {})
-      .filter(([key, at]) => TUNNEL.test(key) && isObject(at))
+      .filter(([key, at]) => CARD.test(key) && isObject(at))
       .slice(0, 100)
       .map(([key, at]) => [key, xy(at)]),
   );
@@ -221,6 +222,15 @@ export function sanitizeLayout(input: unknown): Loose | null {
     .filter(one => typeof one === 'string')
     .slice(0, 200)
     .map(one => one.slice(0, 400));
+  // The queues run locally instead of the deployed ones, and the queues taken off the board.
+  const chosen = (given: unknown, value: unknown) =>
+    Object.fromEntries(
+      Object.entries(isMap(given) ? given : {})
+        .filter(([key, has]) => isId(key) && has === value)
+        .slice(0, 200),
+    );
+  const queues = chosen(input['queues'], 'local');
+  const hiddenQueues = chosen(input['hiddenQueues'], true);
   const { keptLive, tidy, preset } = input;
   const pan = fieldsOf(input['pan']);
   return {
@@ -229,6 +239,8 @@ export function sanitizeLayout(input: unknown): Loose | null {
     ...(dismissed.length && { dismissed }),
     ...(typeof keptLive === 'string' && /^[a-z0-9]{6,40}$/.test(keptLive) && { keptLive }),
     ...(Object.keys(infra).length && { infra }),
+    ...(Object.keys(queues).length && { queues }),
+    ...(Object.keys(hiddenQueues).length && { hiddenQueues }),
     ...(TIDY.includes(tidy as string) && { tidy }),
     ...(input['scratch'] === true && { scratch: true }),
     ...(presets.length && { presets }),
