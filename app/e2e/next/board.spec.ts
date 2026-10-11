@@ -93,7 +93,10 @@ test('Arrange places every card, and zoomed out a card shows its short form', as
   await page.getByRole('button', { name: 'Arrange' }).click();
   await expect.poll(async () => (await middle(card(page, 'orders'))).y).not.toBe(before.y);
   await expect(card(page, 'orders').locator('dl')).toBeVisible();
-  for (let step = 0; step < 4; step++) await page.locator('.svelte-flow__controls-zoomout').click();
-  await expect(card(page, 'orders').locator('.glance')).toBeVisible();
+  // Arrange is still moving the view when the first click lands: zoom out until the short form shows.
+  await expect(async () => {
+    await page.locator('.svelte-flow__controls-zoomout').click({ timeout: 500 });
+    await expect(card(page, 'orders').locator('.glance')).toBeVisible({ timeout: 300 });
+  }).toPass();
   await expect(card(page, 'orders').locator('dl')).toHaveCount(0);
 });
