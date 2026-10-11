@@ -4,7 +4,7 @@ const cleanups = [];
 process.on('exit', () => cleanups.forEach(stopAll => stopAll()));
 import { commandFor, parseRun } from '../src/koppler.mjs';
 import { allowStack } from './allow.mjs';
-import { freePorts } from './helpers.mjs';
+import { freePorts, until } from './helpers.mjs';
 
 // Ports the system says are free; the tunnel one has room after it, for the tunnel that moves.
 const [crashy, upA, upB, tunA, tunB, runA, runB, agentA, agentB, leftA, leftB] = await freePorts(11), [tunnel] = await freePorts(1, { roomAfter: 2 });
@@ -36,8 +36,7 @@ console.log('ok');
   assert.match(koppler('run', 'handover', '--', 'sh', '-c', 'sleep 0.4; exec sleep 30'), /started handover/);
   // With a port, "started" means it answers: a crash during startup is reported with its log, not as started.
   assert.match(koppler('run', 'crashy', '--port', String(crashy), '--', 'sh', '-c', 'sleep 2; echo boom; exit 1'), new RegExp(`crashy exited before answering on port ${crashy}[\\s\\S]*boom`));
-  await new Promise(r => setTimeout(r, 1200));
-  assert.match(koppler('status'), /handover\s+running/);
+  await until('handover showing as running', () => /handover\s+running/.test(koppler('status')));
   assert.match(koppler('stop', 'handover'), /handover: stopped/);
   assert.doesNotMatch(koppler('status'), /handover\s+running/);
   // A worker that ignores the polite signal does not outlive its app.

@@ -61,3 +61,4 @@ You can run these yourself too; the agent uses them to do its part.
 | `KOPPLER_CONFIG_DIR` | `~/.config/koppler` | Which stack is in use, private stacks, approvals |
 | `KOPPLER_PORT` | `4747` | The canvas's port |
 | `KOPPLER_SECRETS` | the Keychain | A folder for secrets instead of the macOS Keychain |
+| `KOPPLER_KEYCHAIN` | your default keychain | A keychain file of its own for secrets, e.g. a throwaway one in tests |
