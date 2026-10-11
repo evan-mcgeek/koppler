@@ -168,7 +168,9 @@ export function secret(args: string[]): never {
     if (!store || !name) fail('usage: koppler secret remove <app>[@<env>] <NAME>');
     process.exit(spawnSync(path.join(BIN, 'secret-store'), ['remove', store, name], { stdio: 'inherit' }).status ?? 1);
   }
-  const script = SCRIPTS[action] ?? fail('usage: koppler secret set|list|remove|psql <app>[@<env>] [<NAME>]');
+  const script =
+    (Object.hasOwn(SCRIPTS, action) ? SCRIPTS[action] : undefined) ??
+    fail('usage: koppler secret set|list|remove|psql <app>[@<env>] [<NAME>]');
   // A protected environment's value is stored so that every read asks the user (the stack says which; else all but
   // the first).
   const stack = readStack();
