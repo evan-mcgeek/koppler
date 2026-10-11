@@ -289,6 +289,60 @@ class Board {
   unsaved = $state(false);
   #kept: SavedBoard = {};
 
+  /** Whether there is a step to go back to, or forward to again. */
+  canUndo = $state(false);
+  canRedo = $state(false);
+  #past: string[] = [];
+  #future: string[] = [];
+  #now = '';
+  #at = 0;
+
+  /** The cards and cables as one text: a step of the undo history. */
+  content(): string {
+    return JSON.stringify({
+      nodes: this.nodes.map(({ id, type, position, data }) => ({ id, type, position, data })),
+      edges: this.edges.map(({ id, source, target, type, data }) => ({ id, source, target, type, data })),
+    });
+  }
+
+  /** Notes a change to the board. Changes less than 0.7 seconds apart, a drag for one, are one step to undo. */
+  record(): void {
+    const now = this.content();
+    if (now === this.#now) return;
+    if (this.#now && Date.now() - this.#at > 700) this.#past.push(this.#now);
+    if (this.#now) this.#future = [];
+    this.#now = now;
+    this.#at = Date.now();
+    this.canUndo = this.#past.length > 0;
+    this.canRedo = false;
+  }
+
+  #step(from: string[], to: string[]): void {
+    const back = from.pop();
+    if (back === undefined) return;
+    to.push(this.#now);
+    this.#now = back;
+    // The next change is a step of its own.
+    this.#at = 0;
+    const { nodes, edges } = JSON.parse(back) as { nodes: CardNode[]; edges: CableEdge[] };
+    this.nodes = nodes;
+    this.edges = edges;
+    this.canUndo = this.#past.length > 0;
+    this.canRedo = this.#future.length > 0;
+  }
+  undo(): void {
+    this.#step(this.#past, this.#future);
+  }
+  redo(): void {
+    this.#step(this.#future, this.#past);
+  }
+
+  /** Takes every card off the board. Undo brings them back. */
+  clear(): void {
+    this.nodes = [];
+    this.edges = [];
+  }
+
   /** Every app of the stack, as the side panel lists it. */
   apps = $state.raw<StackApp[]>([]);
   envs = $state.raw<string[]>([]);

@@ -54,8 +54,15 @@
     ],
   ] as const;
   const shortcut = (ev: KeyboardEvent) => {
-    if (ev.metaKey || ev.ctrlKey || ev.altKey || (ev.target as Element).closest('input, select, textarea')) return;
-    if (ev.key === 'v' || ev.key === 'V') tool = 'select';
+    if (ev.altKey || (ev.target as Element).closest('input, select, textarea')) return;
+    const key = ev.key.toLowerCase();
+    if (ev.metaKey || ev.ctrlKey) {
+      if (key !== 'z') return;
+      ev.preventDefault();
+      if (ev.shiftKey) board.redo();
+      else board.undo();
+    } else if (key === 'f') void flow.fitView(FIT);
+    else if (ev.key === 'v' || ev.key === 'V') tool = 'select';
     else if (ev.key === 'h' || ev.key === 'H') tool = 'hand';
   };
   // The board opens where it was left; one that was never placed is fitted to the window.
@@ -81,13 +88,25 @@
 
 <svelte:window onkeydown={shortcut} />
 
-<div class="area" bind:this={area}>
+<!-- A card reached with Tab is the picked one: the arrow keys move it straight away. -->
+<div
+  class="area"
+  bind:this={area}
+  onfocusin={ev => {
+    const id = (ev.target as Element).matches('.svelte-flow__node')
+      ? (ev.target as Element).getAttribute('data-id')
+      : null;
+    if (id && !board.nodes.find(node => node.id === id)?.selected)
+      board.nodes = board.nodes.map(node => ({ ...node, selected: node.id === id }));
+  }}
+>
   <SvelteFlow
     bind:nodes={board.nodes}
     bind:edges={board.edges}
     nodeTypes={{ app: AppCard }}
     edgeTypes={{ cable: Cable }}
     connectionMode={ConnectionMode.Loose}
+    deleteKey={['Backspace', 'Delete']}
     panOnScroll
     panOnScrollSpeed={1}
     panOnDrag={tool === 'hand' ? true : [1, 2]}
@@ -123,8 +142,37 @@
           {/each}
         </div>
         <span class="sep" aria-hidden="true"></span>
+        <button
+          class="tool"
+          type="button"
+          aria-label="Undo"
+          title="Undo (Ctrl+Z or Cmd+Z)"
+          disabled={!board.canUndo}
+          onclick={() => {
+            board.undo();
+          }}
+        >
+          <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true" class="line">
+            <path d="M5.5 3.5 2.5 6.5l3 3" /><path d="M2.5 6.5h7a3.5 3.5 0 0 1 0 7H7" />
+          </svg>
+        </button>
+        <button
+          class="tool"
+          type="button"
+          aria-label="Redo"
+          title="Redo (Shift+Ctrl+Z or Shift+Cmd+Z)"
+          disabled={!board.canRedo}
+          onclick={() => {
+            board.redo();
+          }}
+        >
+          <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true" class="line">
+            <path d="M10.5 3.5l3 3-3 3" /><path d="M13.5 6.5h-7a3.5 3.5 0 0 0 0 7H9" />
+          </svg>
+        </button>
+        <span class="sep" aria-hidden="true"></span>
         <button title="Arrange cards by who calls whom, callers on top" onclick={arrange}>Arrange</button>
-        <button title="Zoom to fit all apps" onclick={() => void flow.fitView(FIT)}>Fit</button>
+        <button title="Zoom to fit all apps (F)" onclick={() => void flow.fitView(FIT)}>Fit</button>
         <span class="sep" aria-hidden="true"></span>
         <div class="zoom" role="group" aria-label="Zoom">
           <button aria-label="Zoom out" onclick={zoomBy(1 / 1.2)}>−</button>
@@ -133,6 +181,14 @@
           </button>
           <button aria-label="Zoom in" onclick={zoomBy(1.2)}>+</button>
         </div>
+        <span class="sep" aria-hidden="true"></span>
+        <button
+          class="clear"
+          title="Remove every card from this board. Undo brings them back."
+          onclick={() => {
+            board.clear();
+          }}>Clear</button
+        >
       </div>
     </Panel>
     <!-- Above every card, a picked one too: each cable's two ends, which the pointer can grab, and the cable being drawn. -->
@@ -265,6 +321,20 @@
   .tools .tool[aria-checked='true'] {
     background: color-mix(in oklab, var(--cable) 22%, transparent);
     color: var(--ink);
+  }
+  .tools .tool:disabled {
+    opacity: 0.35;
+    cursor: default;
+  }
+  .tools .clear:hover {
+    color: var(--bad);
+  }
+  .line path {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
   }
   .select path {
     fill: currentColor;

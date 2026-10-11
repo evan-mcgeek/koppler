@@ -22,6 +22,9 @@
     void save(board.saved(), leaving).then(kept => (board.unsaved = !kept));
   };
   $effect(() => {
+    if (board.stack) board.record();
+  });
+  $effect(() => {
     const now = JSON.stringify(board.saved());
     if (!board.stack) return;
     // What the server handed over is what it has.
