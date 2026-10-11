@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { find, score, words } from '../dist/research.mjs';
+import { find, score, words } from '../dist/engine/research.js';
 
 assert.deepEqual(words('PushNotification-Service'), ['push', 'notification']);
 assert.equal(score('push notification service', 'push-notification-service'), 1);
