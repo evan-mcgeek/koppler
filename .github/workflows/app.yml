@@ -30,6 +30,21 @@ jobs:
       - name: Tests
         run: npm test
 
+  lint:
+    name: Lint, types and format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run types
+      - run: npm run format:check
+
   canvas:
     name: Canvas in a browser
     runs-on: ubuntu-latest
@@ -61,7 +76,7 @@ jobs:
           node-version: 22
       - name: Script syntax
         run: |
-          for f in src/*.mjs src/*.js; do node --check "$f"; done
+          for f in src/*.mjs src/*.cjs; do node --check "$f"; done
           for f in bin/*; do if head -1 "$f" | grep -q bash; then bash -n "$f"; fi; done
       - name: The command starts
         run: |

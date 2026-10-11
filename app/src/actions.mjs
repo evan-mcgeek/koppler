@@ -32,7 +32,7 @@ export function updateActions(file, change) {
       if (e.code !== 'EEXIST') throw e;
       let age = 0; try { age = Date.now() - fs.statSync(lock).mtimeMs; } catch {}
       if (age > 10000) { fs.rmSync(lock, { recursive: true, force: true }); continue; }
-      if (waited > 10000) throw new Error(`the action log ${file} is busy (another Koppler command is writing it); try again`);
+      if (waited > 10000) throw new Error(`the action log ${file} is busy (another Koppler command is writing it); try again`, { cause: e });
       sleep(50);
     }
   }

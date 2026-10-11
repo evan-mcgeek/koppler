@@ -3,7 +3,6 @@
 // The rows are real data: on PROD the user runs it in their own terminal, never the agent.
 // Usage: koppler query <app> [--env <env>] [--secret <NAME>] "<sql>"
 import { execFile, execFileSync } from 'node:child_process';
-import fs from 'node:fs';
 import path from 'node:path';
 import { parse } from './secret-check.mjs';
 import { BIN } from './paths.mjs';
@@ -85,7 +84,7 @@ export function clientCall(c, sql) {
   return null;
 }
 
-export async function queryCommand(args, { load, fail, here }) {
+export async function queryCommand(args, { load, fail }) {
   const flag = n => { const i = args.indexOf(`--${n}`); return i >= 0 ? args[i + 1] : undefined; };
   const [app, sqlArg] = args.filter((a, i) => !a.startsWith('--') && !['--env', '--secret'].includes(args[i - 1]));
   const registry = load('registry.js', 'REGISTRY') ?? fail('no stack loaded (koppler init)');

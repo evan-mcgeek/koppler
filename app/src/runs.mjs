@@ -4,15 +4,12 @@
 //        koppler history --done [<id>] [--failed <why>]    the agent finished (or gave up on) a run
 //        koppler history                            recent runs and how they ended
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import vm from 'node:vm';
-import { fileURLToPath } from 'node:url';
-import kp from './plan.js';
+import kp from './plan.cjs';
 import { STATE, TEMP } from './paths.mjs';
 import { redact } from './scrub.mjs';
 
-const here = path.dirname(fileURLToPath(import.meta.url));
 const temp = () => process.env.KOPPLER_TEMP || TEMP;
 const stateDir = () => process.env.KOPPLER_STATE || STATE;
 const historyFile = () => path.join(temp(), 'history.jsonl'), liveFile = () => path.join(temp(), 'live.json');

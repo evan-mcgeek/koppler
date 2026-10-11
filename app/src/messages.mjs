@@ -4,11 +4,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { fileURLToPath } from 'node:url';
 import { runs } from './runs.mjs';
 import { TEMP } from './paths.mjs';
 
-const here = path.dirname(fileURLToPath(import.meta.url));
 const file = () => path.join(process.env.KOPPLER_TEMP || TEMP, 'messages.jsonl');
 const text = (v, max) => typeof v === 'string' ? v.trim().slice(0, max) : '';
 const KINDS = ['question', 'result', 'failure', 'info'];
@@ -37,7 +35,7 @@ export const appendAnswer = (id, answer) => fs.appendFileSync(file(), JSON.strin
 
 // The latest messages, each with its answer when there is one. A question about a run a newer Send replaced is closed.
 export function readMessages(limit = 20, history = runs()) {
-  let raw = ''; try { raw = fs.readFileSync(file(), 'utf8'); } catch { return []; }
+  let raw; try { raw = fs.readFileSync(file(), 'utf8'); } catch { return []; }
   const list = [], byId = new Map();
   for (const line of raw.split('\n')) {
     let o; try { o = JSON.parse(line); } catch { continue; }

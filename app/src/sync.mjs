@@ -8,10 +8,10 @@ import os from 'node:os';
 import { execFile, execFileSync } from 'node:child_process';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import kinds from './kinds.js';
-import presets from './presets.js';
+import kinds from './kinds.cjs';
+import presets from './presets.cjs';
 import { TYPES as SECRET_TYPES } from './secret-check.mjs';
-import kp from './plan.js';
+import kp from './plan.cjs';
 const QUEUE_TYPES = kp.QUEUE_TYPES;
 import { detectKind } from './investigate.mjs';
 import { packageOf, librariesFor } from './libraries.mjs';
@@ -19,7 +19,6 @@ import { checkStack as checkLoadedStack } from './checks.mjs';
 import { TEMP } from './paths.mjs';
 import { loadsCode } from './safe-env.mjs';
 
-const here = path.dirname(fileURLToPath(import.meta.url));
 
 const CONFIG_DIR = process.env.KOPPLER_CONFIG_DIR || path.join(os.homedir(), '.config', 'koppler');
 const CONFIG = path.join(CONFIG_DIR, 'config.json');

@@ -1,10 +1,22 @@
 // The Run review: what will happen is shown first, and nothing is sent before it is confirmed.
-import { test, expect, nextEdit } from './canvas.mjs';
+import type { Page } from '@playwright/test';
+import { test, expect, nextEdit } from './canvas.ts';
 
-const cards = page => page.getByRole('main').getByRole('group', { name: /Arrow keys move it/ });
-const openCheckout = async page => { await page.getByRole('button', { name: /^Checkout/ }).click(); await expect(cards(page)).toHaveCount(3); };
+const cards = (page: Page) => page.getByRole('main').getByRole('group', { name: /Arrow keys move it/ });
+const openCheckout = async (page: Page) => {
+  await page.getByRole('button', { name: /^Checkout/ }).click();
+  await expect(cards(page)).toHaveCount(3);
+};
 // Runs are caught before they reach the engine: the test stack has nothing to start.
-const catchRuns = async page => { const sent = []; await page.route('**/prompt?*', route => { sent.push(route.request().postDataJSON()); return route.fulfill({ status: 204 }); }); return sent; };
+type Sent = { tag: string; data: { env: string; nodes: { id: string }[]; edges: { from: string; to: string }[] } };
+const catchRuns = async (page: Page) => {
+  const sent: Sent[] = [];
+  await page.route('**/prompt?*', route => {
+    sent.push(route.request().postDataJSON() as Sent);
+    return route.fulfill({ status: 204 });
+  });
+  return sent;
+};
 
 test('Run shows the plan, and sends it only when confirmed', async ({ page }) => {
   const sent = await catchRuns(page);
@@ -22,10 +34,12 @@ test('Run shows the plan, and sends it only when confirmed', async ({ page }) =>
   await page.getByRole('button', { name: 'Run', exact: true }).click();
   await review.getByRole('button', { name: 'Run', exact: true }).click();
   await expect.poll(() => sent.length).toBe(1);
-  expect(sent[0].tag).toBe('koppler');
-  expect(sent[0].data.env).toBe('qa');
-  expect(sent[0].data.nodes.map(n => n.id).sort()).toEqual(['orders', 'payments', 'web']);
-  expect(sent[0].data.edges.map(e => `${e.from}>${e.to}`).sort()).toEqual(['orders>payments', 'web>orders']);
+  const [run] = sent;
+  if (!run) throw new Error('nothing was sent');
+  expect(run.tag).toBe('koppler');
+  expect(run.data.env).toBe('qa');
+  expect(run.data.nodes.map(n => n.id).sort()).toEqual(['orders', 'payments', 'web']);
+  expect(run.data.edges.map(e => `${e.from}>${e.to}`).sort()).toEqual(['orders>payments', 'web>orders']);
 });
 
 test('a protected environment is named in the review, with its own tunnel', async ({ page }) => {

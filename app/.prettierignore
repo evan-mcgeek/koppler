@@ -1,0 +1,17 @@
+# Not ours to format.
+node_modules/
+dist/
+test-results/
+playwright-report/
+package-lock.json
+src/fonts/
+PRODUCT.md
+.impeccable/
+
+# Still in its first form: each file leaves this list in the pull request that converts it to TypeScript.
+src/*.mjs
+src/*.cjs
+src/canvas.html
+src/lambda-secrets-proxy.go
+test/*.mjs
+bin/

@@ -1212,11 +1212,11 @@
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 <span class="sr" id="health-live" role="status" aria-live="polite"></span>
 
-<script src="ports.js"></script>
-<script src="kinds.js"></script>
-<script src="presets.js"></script>
-<script src="plan.js"></script>
-<script src="logfmt.js"></script>
+<script src="ports.cjs"></script>
+<script src="kinds.cjs"></script>
+<script src="presets.cjs"></script>
+<script src="plan.cjs"></script>
+<script src="logfmt.cjs"></script>
 <script src="temp/registry.js"></script>
 <script src="temp/local.js"></script>
 <script src="temp/repos.js"></script>
@@ -1226,6 +1226,9 @@
 const KEY = 'koppler:v1:' + (window.REGISTRY?.source ?? 'none');
 const SVG = 'http://www.w3.org/2000/svg';
 const JSON_POST = { method: 'POST', headers: { 'content-type': 'application/json' } };
+// Where this page's own server takes a request; null when the page is not served by one. Known from the first moment,
+// not only once the first status has arrived.
+const serverAddress = action => { const token = location.pathname.match(/^\/s\/([0-9a-f]{48})\//)?.[1]; return token ? `${location.origin}/${action}?token=${token}` : null; };
 const board = document.getElementById('board');
 // Below this zoom, cards show in their compact form.
 const FAR_ZOOM = 0.6;
@@ -1238,7 +1241,7 @@ const MIN_WORLD = { w: 3000, h: 2000 }, WORLD = { ...MIN_WORLD }, NODE_W = 260, 
 const ZOOM = { min: 0.25, max: 2, step: 1.2 };
 const SIDES = { top: [0, -1], right: [1, 0], bottom: [0, 1], left: [-1, 0] };
 const OPPOSITE = { top: 'bottom', bottom: 'top', left: 'right', right: 'left' };
-// What each kind of app offers on its card (kinds.js): where it runs, and a platform for mobile apps.
+// What each kind of app offers on its card (kinds.cjs): where it runs, and a platform for mobile apps.
 const kindOf = id => KopplerKinds.of(registry.apps[id]);
 const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), Math.max(lo, hi));
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -1276,7 +1279,7 @@ const load = () => {
 let autosaveTimer, autosaved = '';
 // The watcher's loopback endpoint writes temp/state.js, the only store that survives a full reload inside Lavish.
 function autosave() {
-  const target = status?.save, json = JSON.stringify(state);
+  const target = status?.save ?? serverAddress('state'), json = JSON.stringify(state);
   if (!target || json === autosaved) return;
   fetch(target, { ...JSON_POST, body: json }).then(r => { if (r.ok) autosaved = json; }, () => {});
 }
@@ -1861,7 +1864,7 @@ document.getElementById('tidy').onclick = () => {
 // (Stored as "presets", the name stack.json uses for team boards.)
 var boardsReady = false, openingBoard = false;
 const presetList = () => [...(registry.presets ?? []).map(p => ({ ...p, shared: true })), ...(state.presets ?? [])];
-// What a preset is checked against before it opens (presets.js): this stack's apps, your clones and their branches.
+// What a preset is checked against before it opens (presets.cjs): this stack's apps, your clones and their branches.
 const MAX_BRANCHES = 300;
 const stackFacts = () => ({
   known: id => !!registry.apps[id], cloned, name: id => registry.apps[id]?.name ?? id, canCall,
@@ -2399,7 +2402,7 @@ function missingKinds(id) {
 }
 // An app can run without its tunnels, when only its API is needed: they are then not opened.
 const tunnelsOn = id => state.nodes[id]?.hideTunnels ? [] : tunnelsOf(id);
-// Tunnels for everything on the board, planned together so none clash (ports.js): shared, moved, or on a loopback alias.
+// Tunnels for everything on the board, planned together so none clash (ports.cjs): shared, moved, or on a loopback alias.
 function boardPlan() {
   const ids = Object.keys(state.nodes);
   const entries = ids.flatMap(id => tunnelsOn(id).map(p => ({ app: id, tunnel: p.tunnel, port: p.port, env: p.env, what: KopplerPorts.tunnelKind(p), connectsAs: p.connectsAs })));
@@ -3625,7 +3628,7 @@ function revealBoard() {
 }
 window.__kopplerStatus = next => {
   // The server's addresses come from the page's own, which holds the token.
-  if (next.server) { const token = location.pathname.split('/')[2]; next.save = `${location.origin}/state?token=${token}`; next.prompt = `${location.origin}/prompt?token=${token}`; }
+  if (next.server) { next.save = serverAddress('state'); next.prompt = serverAddress('prompt'); }
   onRunsEnded(next);
   status = next;
   setTimeout(revealBoard, 0);
@@ -4682,9 +4685,10 @@ async function deliver(text, prompt, sent, fallback = text) {
     window.lavish.sendQueuedPrompts();
     toast(sent); return true;
   }
-  if (status?.prompt) {
+  const target = status?.prompt ?? serverAddress('prompt');
+  if (target) {
     try {
-      const res = await fetch(status.prompt, { ...JSON_POST, body: JSON.stringify({ ...prompt, text }) });
+      const res = await fetch(target, { ...JSON_POST, body: JSON.stringify({ ...prompt, text }) });
       if (res.ok) { toast(sent); return true; }
     } catch {}
   }

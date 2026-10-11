@@ -2,11 +2,10 @@
 // Usage: koppler doctor [app...] [--env <env>] [--no-tunnels <app,app>] [--json]   (default: the apps on the canvas)
 import { APPROVE, approved, checksFor, envGaps, stackCommands, startsFromStack } from './checks.mjs';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import tunnelPlan from './ports.js';
-import kp from './plan.js';
+import tunnelPlan from './ports.cjs';
+import kp from './plan.cjs';
 
 // "Cache (Valkey)" -> "Valkey cache", "Database" -> "database": what an address leads to, in plain words.
 const friendly = host => { const k = tunnelPlan.tunnelKind({ tunnel: host }); const m = k.match(/^(\w+) \((.+)\)$/); return m ? `${m[2]} ${m[1].toLowerCase()}` : k === 'Tunnel' ? 'private' : k.toLowerCase(); };

@@ -4,8 +4,8 @@
 //   Kafka: one local broker in Docker (apache/kafka); the topic is created on it and every app on one starts with its
 //   broker settings pointed at it.
 import { execFileSync } from 'node:child_process';
-import kinds from './kinds.js';
-import kp from './plan.js';
+import kinds from './kinds.cjs';
+import kp from './plan.cjs';
 
 export const PORT = 4566, ENDPOINT = `http://127.0.0.1:${PORT}`;
 // Stopping the Docker client does not stop its container: it is removed on stop, and a leftover one before starting.

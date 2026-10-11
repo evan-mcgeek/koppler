@@ -6,17 +6,54 @@
   "license": "MIT",
   "author": "Ivan Yanowsky",
   "homepage": "https://github.com/evan-mcgeek/koppler",
-  "repository": { "type": "git", "url": "git+https://github.com/evan-mcgeek/koppler.git", "directory": "app" },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/evan-mcgeek/koppler.git",
+    "directory": "app"
+  },
   "bugs": "https://github.com/evan-mcgeek/koppler/issues",
-  "keywords": ["local-development", "microservices", "dev-environment", "canvas", "dotnet", "flutter", "aws"],
-  "engines": { "node": ">=22" },
-  "os": ["darwin", "linux"],
-  "bin": { "koppler": "src/koppler.mjs" },
-  "files": ["src", "bin", "!src/**/*.test.mjs"],
+  "keywords": [
+    "local-development",
+    "microservices",
+    "dev-environment",
+    "canvas",
+    "dotnet",
+    "flutter",
+    "aws"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "os": [
+    "darwin",
+    "linux"
+  ],
+  "bin": {
+    "koppler": "src/koppler.mjs"
+  },
+  "files": [
+    "src",
+    "bin",
+    "!src/**/*.test.mjs"
+  ],
   "scripts": {
     "test": "node --test --test-concurrency=1 test/*.test.mjs",
     "test:canvas": "playwright test",
-    "start": "node src/koppler.mjs canvas"
+    "start": "node src/koppler.mjs canvas",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "types": "tsc --noEmit"
   },
-  "devDependencies": { "@playwright/test": "^1.64.0" }
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.64.0",
+    "@types/node": "^22.20.5",
+    "eslint": "^10.12.0",
+    "globals": "^17.13.0",
+    "prettier": "^3.9.10",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.71.1"
+  },
+  "type": "module"
 }

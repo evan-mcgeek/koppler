@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import ports from '../src/ports.js';
+import ports from '../src/ports.cjs';
 const { planTunnels, describePlan, planSteps, tunnelKind, aliasReady } = ports;
 
 assert.equal(tunnelKind({ tunnel: 'valkey-connect-cc-dev.internal' }), 'Cache (Valkey)');

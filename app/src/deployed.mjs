@@ -10,7 +10,6 @@ import { hostsByApp } from './sync.mjs';
 import { findFiles } from './investigate.mjs';
 import { TEMP } from './paths.mjs';
 
-const here = path.dirname(fileURLToPath(import.meta.url));
 
 const load = (file, key) => {
   try { const sandbox = { window: {} }; vm.runInNewContext(fs.readFileSync(path.join(TEMP, file), 'utf8'), sandbox); return sandbox.window[key]; }
