@@ -89,6 +89,14 @@ try {
   }
   assert.equal((await call('POST', save, json, 'a'.repeat(9_000_000))).status, 413);
   assert.equal((await call('POST', save, json, board)).status, 204);
+  // Queue choices and the places of queue and outside cards are kept; anything else under those names is not.
+  const withQueues = JSON.stringify({ nodes: {}, edges: [], env: 'qa', mode: 'auto', queues: { orders: 'local', mail: 'deployed', 'Bad Id': 'local' }, hiddenQueues: { audit: true, mail: false }, infra: { 'queue:orders': { x: 1, y: 2 }, 'outside:billing': { x: 3, y: 4 }, 'tunnel:db.example:5432': { x: 5, y: 6 }, 'queue:Bad Id': { x: 7, y: 8 }, other: { x: 9, y: 9 } } });
+  assert.equal((await call('POST', save, json, withQueues)).status, 204);
+  const queued = JSON.parse((await call('GET', `${page.pathname}data/state.json`)).body.toString());
+  assert.deepEqual(queued.queues, { orders: 'local' });
+  assert.deepEqual(queued.hiddenQueues, { audit: true });
+  assert.deepEqual(Object.keys(queued.infra).sort(), ['outside:billing', 'queue:orders', 'tunnel:db.example:5432']);
+  assert.equal((await call('POST', save, json, board)).status, 204);
   assert.equal((await call('GET', page.pathname)).status, 200);
 
   // Looking for clones again is the server's to run; with no stack set up yet it says so, in words for the page.
