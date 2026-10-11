@@ -1,5 +1,6 @@
 // Lint rules: TypeScript is held to the strict, type-aware set; the JavaScript still to be converted to the recommended one.
 import js from '@eslint/js';
+import svelte from 'eslint-plugin-svelte';
 import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
@@ -25,9 +26,19 @@ export default tseslint.config(
       'no-unused-vars': ['error', { ignoreRestSiblings: true, caughtErrors: 'none', argsIgnorePattern: '^_' }],
     },
   },
-  ...tseslint.configs.strictTypeChecked.map(config => ({ ...config, files: ['**/*.{ts,mts}'] })),
+  ...tseslint.configs.strictTypeChecked.map(config => ({ ...config, files: ['**/*.{ts,mts,svelte}'] })),
+  // The new canvas: Svelte components, held to the same TypeScript rules, and the page's own globals.
+  ...svelte.configs.recommended,
   {
-    files: ['**/*.{ts,mts}'],
+    files: ['canvas/**/*.svelte', 'canvas/**/*.svelte.ts'],
+    languageOptions: {
+      globals: globals.browser,
+      parserOptions: { parser: tseslint.parser, extraFileExtensions: ['.svelte'] },
+    },
+  },
+  { files: ['canvas/**/*.ts'], languageOptions: { globals: globals.browser } },
+  {
+    files: ['**/*.{ts,mts,svelte}'],
     languageOptions: { parserOptions: { projectService: true, tsconfigRootDir: import.meta.dirname } },
     // `({ dropped, ...kept }) => kept` is how a property is left out.
     rules: { '@typescript-eslint/no-unused-vars': ['error', { ignoreRestSiblings: true }] },
