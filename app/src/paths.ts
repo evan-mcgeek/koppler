@@ -8,6 +8,8 @@ import { fileURLToPath } from 'node:url';
 const here = path.dirname(fileURLToPath(import.meta.url));
 // The app's own folder: src/ (the engine, the server, the canvas) and bin/ (the scripts that touch secrets).
 export const APP = path.resolve(here, '..');
+/** The folder the code runs from. */
+export const CODE = here;
 export const BIN = path.join(APP, 'bin');
 const xdgState = process.env.XDG_STATE_HOME || path.join(os.homedir(), '.local', 'state');
 export const STATE = process.env.KOPPLER_STATE || path.join(xdgState, 'koppler');

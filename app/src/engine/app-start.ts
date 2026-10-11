@@ -2,7 +2,6 @@
 // profiles, the device), the command comes from core/launch, and the app's stored secrets are checked and attached.
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
 import { APPROVE, approved, startsFromStack } from './checks.ts';
 import { fail } from '../cli/output.ts';
 import { register } from '../core/kinds.ts';
@@ -12,12 +11,11 @@ import type { App, Secret } from '../core/stack.ts';
 import { readClones, readStack } from '../data.ts';
 import { repoFiles } from '../investigate.mjs';
 import { readJson } from '../json-files.ts';
-import { BIN } from '../paths.ts';
+import { BIN, CODE } from '../paths.ts';
 import { resolveDevice, type RunDevice } from './devices.ts';
 import { sh, type RunOptions } from './processes.ts';
 
 // Koppler's own folder, where its runners (Lambda, SAM) are.
-const ENGINE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 /** What to run for a stack app, ready for the process manager. */
 export interface AppStart {
@@ -79,7 +77,7 @@ function contextFor(
     repo,
     env,
     id,
-    engine: ENGINE,
+    engine: CODE,
     override: Object.keys(options.setEnv ?? {}),
     envNames: [env, ...aliases],
   };
