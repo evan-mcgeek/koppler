@@ -10,10 +10,12 @@
     useViewport,
     ViewportPortal,
   } from '@xyflow/svelte';
-  import { cablePath, throughPath } from '../src/core/cables.ts';
+  import type { Side } from '../src/core/arrange.ts';
+  import { cablePath, sidePoint, throughPath, type Box } from '../src/core/cables.ts';
   import AppCard from './AppCard.svelte';
   import Cable from './Cable.svelte';
-  import { board } from './board.svelte.ts';
+  import Tunnel from './Tunnel.svelte';
+  import { board, type CardNode, type TunnelNode } from './board.svelte.ts';
 
   const flow = useSvelteFlow();
   board.toFlow = at => flow.screenToFlowPosition(at, { snapToGrid: false });
@@ -79,6 +81,32 @@
     });
     if (!shown) void flow.fitView({ ...FIT, duration: 0 });
   });
+  /** A link from an app to a tunnel card: it leaves the app level with the card when it can, so it runs straight. */
+  const linkPath = (app: Box, card: Box) => {
+    const dx = card.x + card.w / 2 - (app.x + app.w / 2);
+    const dy = card.y + card.h / 2 - (app.y + app.h / 2);
+    const across = Math.abs(dx) * 0.6 > Math.abs(dy);
+    const [fromSide, toSide]: [Side, Side] = across
+      ? dx > 0
+        ? ['right', 'left']
+        : ['left', 'right']
+      : dy > 0
+        ? ['bottom', 'top']
+        : ['top', 'bottom'];
+    const to = sidePoint(card, toSide);
+    const from = sidePoint(app, fromSide);
+    const within = (value: number, low: number, high: number) => Math.min(Math.max(value, low), Math.max(low, high));
+    if (across) from.y = within(to.y, app.y + 12, app.y + app.h - 12);
+    else from.x = within(to.x, app.x + 12, app.x + app.w - 12);
+    return cablePath(from, fromSide, to, toSide);
+  };
+  const links = $derived(
+    board.links.flatMap(({ from, to }) => {
+      const app = board.boxes.get(from);
+      const card = board.infraBoxes.get(to);
+      return app && card ? [{ key: `${from}>${to}`, d: linkPath(app, card) }] : [];
+    }),
+  );
   const arrange = () => {
     board.arrange();
     // The cards move first; the view follows once they are placed.
@@ -101,9 +129,24 @@
   }}
 >
   <SvelteFlow
-    bind:nodes={board.nodes}
+    bind:nodes={
+      () => [...board.nodes, ...board.infra],
+      (all: (CardNode | TunnelNode)[]) => {
+        // An app the library moved (a drag, the arrow keys) takes its tunnel cards along, in the same step.
+        const was = new Map(board.nodes.map(node => [node.id, node.position]));
+        let infra = all.filter(node => node.type === 'tunnel');
+        const apps = all.filter(node => node.type === 'app');
+        for (const { id, position } of apps) {
+          const from = was.get(id);
+          if (from && (from.x !== position.x || from.y !== position.y))
+            infra = board.followed(id, { x: position.x - from.x, y: position.y - from.y }, infra);
+        }
+        board.nodes = apps;
+        board.infra = infra;
+      }
+    }
     bind:edges={board.edges}
-    nodeTypes={{ app: AppCard }}
+    nodeTypes={{ app: AppCard, tunnel: Tunnel }}
     edgeTypes={{ cable: Cable }}
     connectionMode={ConnectionMode.Loose}
     deleteKey={['Backspace', 'Delete']}
@@ -191,6 +234,28 @@
         >
       </div>
     </Panel>
+    <!-- Under the cards: the links from each app to its tunnels. -->
+    <ViewportPortal target="back">
+      <svg class="links" aria-hidden="true">
+        <defs>
+          <marker
+            id="link-end"
+            viewBox="-8 -6 10 12"
+            markerWidth="10"
+            markerHeight="12"
+            refX="0"
+            refY="0"
+            orient="auto-start-reverse"
+            markerUnits="userSpaceOnUse"
+          >
+            <path d="M-6,-4.5 L0,0 L-6,4.5" />
+          </marker>
+        </defs>
+        {#each links as link (link.key)}
+          <path class="link" d={link.d} />
+        {/each}
+      </svg>
+    </ViewportPortal>
     <!-- Above every card, a picked one too: each cable's two ends, which the pointer can grab, and the cable being drawn. -->
     <ViewportPortal target="front" style="position: absolute; z-index: 1001">
       <svg class="ends" class:reordering={!!board.grabbed} aria-hidden="true">
@@ -237,6 +302,27 @@
   .area {
     position: absolute;
     inset: 0;
+  }
+  .links {
+    position: absolute;
+    overflow: visible;
+    width: 1px;
+    height: 1px;
+    pointer-events: none;
+  }
+  .links path {
+    fill: none;
+    stroke: var(--muted);
+    stroke-width: 1.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  /* Dashed until its app runs. */
+  .link {
+    stroke-dasharray: 5 5;
+    stroke-linecap: butt;
+    marker-start: url(#link-end);
+    marker-end: url(#link-end);
   }
   .ends {
     position: absolute;

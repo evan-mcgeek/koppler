@@ -177,7 +177,7 @@ test('the Select tool picks the cards in a dragged area, and the Hand tool moves
   await page.mouse.down();
   await page.mouse.move(orders.box.x + 40, orders.box.y + 60, { steps: 6 });
   await page.mouse.up();
-  await expect(page.locator('.svelte-flow__node.selected')).toHaveCount(2);
+  await expect(page.locator('.svelte-flow__node-app.selected')).toHaveCount(2);
 
   await page.keyboard.press('h');
   await expect(page.getByRole('radio', { name: /^Hand/ })).toBeChecked();

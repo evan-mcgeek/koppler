@@ -16,6 +16,8 @@
   const current = $derived(app?.current || 'current branch');
   /** The branches to pick from: the clone's own first, then whatever the board names that the clone does not list. */
   const branches = $derived([...new Set([...(app?.branches ?? []), data.branch].filter(Boolean))]);
+  const starts = $derived(!!app?.runIn.some(([value]) => value === 'ide'));
+  const tunnels = $derived(board.tunnelsOf(id));
   const mobile = $derived(!!app?.platforms.length && data.run === 'cli');
   const platform = $derived(app?.platforms.find(([value]) => value === data.platform)?.[1]);
   /** What the short card says about how it runs. */
@@ -66,6 +68,10 @@
     <p class="glance">
       <span title="Branch: {data.branch || current}">{data.branch || current}</span>
       {#if runLabel}<span>{runLabel}</span>{/if}
+      {#if data.hideTunnels && tunnels.length}<span
+          class="off"
+          title="Only the API runs; calls through its tunnels fail">No tunnels</span
+        >{/if}
     </p>
   {:else}
     <div class="body nodrag nopan">
@@ -86,31 +92,33 @@
           </select>
         </span>
       </label>
-      {#if app?.runIn.some(([value]) => value === 'ide')}
+      {#if starts || tunnels.length}
         <div class="row">
-          <div
-            class="field"
-            role="group"
-            aria-label="Who starts it"
-            title="Koppler: the agent starts it. Me: you start it yourself (IDE, terminal, anything); the agent only prepares it."
-          >
-            Started by
-            <span class="seg">
-              {#each STARTERS as [value, label] (value)}
-                <label>
-                  <input
-                    type="radio"
-                    name="run-{id}"
-                    {value}
-                    checked={data.run === value}
-                    onchange={() => {
-                      board.set(id, { run: value });
-                    }}
-                  />{label}
-                </label>
-              {/each}
-            </span>
-          </div>
+          {#if starts}
+            <div
+              class="field"
+              role="group"
+              aria-label="Who starts it"
+              title="Koppler: the agent starts it. Me: you start it yourself (IDE, terminal, anything); the agent only prepares it."
+            >
+              Started by
+              <span class="seg">
+                {#each STARTERS as [value, label] (value)}
+                  <label>
+                    <input
+                      type="radio"
+                      name="run-{id}"
+                      {value}
+                      checked={data.run === value}
+                      onchange={() => {
+                        board.set(id, { run: value });
+                      }}
+                    />{label}
+                  </label>
+                {/each}
+              </span>
+            </div>
+          {/if}
           {#if mobile}
             <label class="field">
               Platform
@@ -122,10 +130,31 @@
                     board.set(id, { platform: ev.currentTarget.value });
                   }}
                 >
-                  {#each app.platforms as [value, label] (value)}<option {value}>{label}</option>{/each}
+                  {#each app?.platforms ?? [] as [value, label] (value)}<option {value}>{label}</option>{/each}
                 </select>
               </span>
             </label>
+          {/if}
+          {#if tunnels.length}
+            <div class="field">
+              Tunnels
+              <label
+                class="switch"
+                title={data.hideTunnels
+                  ? 'Off: only the API runs; calls through its tunnels fail.'
+                  : 'On: Koppler opens its tunnels. Turn off when you only need the API.'}
+              >
+                <input
+                  type="checkbox"
+                  role="switch"
+                  aria-label="Open {data.name}'s tunnels"
+                  checked={!data.hideTunnels}
+                  onchange={ev => {
+                    board.set(id, { hideTunnels: !ev.currentTarget.checked });
+                  }}
+                /><span class="track" aria-hidden="true"></span>{data.hideTunnels ? 'Off' : 'On'}
+              </label>
+            </div>
           {/if}
         </div>
       {/if}
@@ -360,6 +389,69 @@
   .seg label:has(input:focus-visible) {
     outline: 2px solid var(--cable);
     outline-offset: -2px;
+  }
+  .switch {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 30px;
+    color: var(--ink);
+    font-weight: 600;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .switch input {
+    position: absolute;
+    z-index: 1;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    opacity: 0;
+    cursor: pointer;
+  }
+  .track {
+    position: relative;
+    flex: none;
+    width: 28px;
+    height: 16px;
+    border-radius: 999px;
+    background: color-mix(in oklab, var(--ink) 22%, transparent);
+    transition: background 0.15s;
+  }
+  .track::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--surface);
+    box-shadow: 0 1px 2px rgb(0 0 0 / 0.3);
+    transition: transform 0.15s;
+  }
+  .switch input:checked + .track {
+    background: var(--cable);
+  }
+  .switch input:checked + .track::after {
+    transform: translateX(12px);
+  }
+  .switch input:focus-visible + .track {
+    outline: 2px solid var(--cable);
+    outline-offset: 2px;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .track,
+    .track::after {
+      transition: none;
+    }
+  }
+  .glance .off {
+    background: color-mix(in oklab, var(--warn) 14%, transparent);
+    color: var(--warn);
+    font: 600 15px var(--sans);
   }
   .note-toggle {
     display: inline-flex;
