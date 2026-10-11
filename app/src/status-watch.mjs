@@ -16,7 +16,9 @@ import { addApps, removeApp, createStack, currentStack, forgetStacks, stacksHere
 import { discardChanges, linkStack, linkedStatus, proposeChanges, updateStack } from './engine/linked.ts';
 import { applyFindings, current as currentFindingsStack, discover } from './engine/discover.ts';
 import { appendAnswer, clearMessages, readMessages } from './engine/messages.ts';
-import { githubFile, readFile } from './github.ts';
+import { githubFile } from './github.ts';
+import { fetchPresets, presetsIn, sanitizeLayout, sanitizePrompt } from './server/sanitize.ts';
+import { appendDebugLog, clearDebugLog, tail } from './server/logs.ts';
 import * as kinds from './core/kinds.ts';
 import * as launch from './core/launch.ts';
 import { recipesFor } from './engine/recipes.ts';
@@ -25,7 +27,6 @@ import { redact } from './scrub.ts';
 import { listenerPid } from './engine/listen.ts';
 import * as kp from './core/plan.ts';
 import { readData, writeData } from './data.ts';
-export { githubFile };
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
@@ -33,7 +34,6 @@ const SOURCE = path.join(TEMP, 'status.json');
 const OUT = path.join(TEMP, 'status.js');
 const PROMPTS = path.join(TEMP, 'prompts.jsonl');
 const MAX_STATE_BYTES = 256 * 1024;
-const MAX_NOTE = 4000;
 const STATE_DIR = STATE_HOME;
 export const LOG_DIR = LOGS;
 const PORT = Number(process.env.KOPPLER_PORT) || 4747;
@@ -42,7 +42,7 @@ const STARTED_CODE = codeVersion();
 const STARTED_AT = new Date().toISOString();
 // Run from its source folder rather than an installed plugin: Koppler itself is being worked on, so the debug log stays on.
 const DEV = !fs.realpathSync(here).split(path.sep).join('/').includes('/plugins/cache/');
-const TAIL_BYTES = 96 * 1024, TAIL_LINES = 600, INTERVAL_MS = 1500, MOBILE_INTERVAL_MS = 5000;
+const INTERVAL_MS = 1500, MOBILE_INTERVAL_MS = 5000;
 
 const portOpen = port => new Promise(resolve => {
   const socket = net.connect({ host: '127.0.0.1', port, timeout: 400 });
@@ -51,39 +51,6 @@ const portOpen = port => new Promise(resolve => {
   socket.once('timeout', () => done(false));
   socket.once('error', () => done(false));
 });
-
-// The debug log: what the user did on the canvas, one JSON line each, so a concern can be traced afterwards.
-// Kept to the last MAX_DEBUG_LINES lines; every text goes through `redact`, and only known fields are kept.
-const MAX_DEBUG_LINES = 5000;
-const debugFile = () => path.join(TEMP, 'debug.jsonl');
-export function cleanDebugEntry(e) {
-  if (!e || typeof e !== 'object') return null;
-  const t = v => typeof v === 'string' ? redact(v).slice(0, 300) : undefined, n = v => Number.isFinite(v) ? v : undefined;
-  const b = e.board && typeof e.board === 'object' ? { apps: n(e.board.apps), cables: n(e.board.cables), view: t(e.board.view), env: t(e.board.env), zoom: n(e.board.zoom), name: t(e.board.name) } : undefined;
-  const out = { at: t(e.at) ?? new Date().toISOString(), kind: t(e.kind) ?? 'event', what: t(e.what) ?? '', ...(t(e.detail) && { detail: t(e.detail) }), ...(b && { board: b }) };
-  return out.what || out.detail ? out : null;
-}
-export function appendDebugLog(entries) {
-  const lines = (Array.isArray(entries) ? entries : []).slice(0, 500).map(cleanDebugEntry).filter(Boolean).map(e => JSON.stringify(e));
-  if (!lines.length) return { kept: 0 };
-  fs.appendFileSync(debugFile(), lines.join('\n') + '\n', { mode: 0o600 });
-  const all = fs.readFileSync(debugFile(), 'utf8').split('\n').filter(Boolean);
-  if (all.length > MAX_DEBUG_LINES) fs.writeFileSync(debugFile(), all.slice(-MAX_DEBUG_LINES).join('\n') + '\n', { mode: 0o600 });
-  return { kept: lines.length };
-}
-export function clearDebugLog() { try { fs.rmSync(debugFile()); } catch {} return { cleared: true }; }
-
-export function tail(file, bytes = TAIL_BYTES, lines = TAIL_LINES) {
-  try {
-    const { size } = fs.statSync(file);
-    const fd = fs.openSync(file, 'r');
-    const length = Math.min(size, bytes), buffer = Buffer.alloc(length);
-    fs.readSync(fd, buffer, 0, length, size - length);
-    fs.closeSync(fd);
-    // Color codes, as terminals send them or as `flutter logs` spells them out, are noise on a card.
-    return redact(buffer.toString('utf8').replace(/(?:\x1b|\\\^\[)\[[0-9;]*m/g, '')).trimEnd().split('\n').slice(-lines).map(l => l.length > 4000 ? `${l.slice(0, 4000)} …` : l).join('\n');
-  } catch { return null; }
-}
 
 const run = (cmd, args) => new Promise(resolve =>
   execFile(cmd, args, { timeout: 4000, maxBuffer: 4 * 1024 * 1024 }, (err, stdout) => resolve(err ? '' : stdout)));
@@ -152,71 +119,6 @@ function followIdeLogs() {
 
 const writeAtomic = (file, body) => { fs.writeFileSync(file + '.tmp', body, { mode: 0o600 }); fs.renameSync(file + '.tmp', file); };
 
-// Presets: a name, apps with how they run, cables between them, and where an opened one came from.
-export function sanitizePresets(list) {
-  const text = (v, max = 200) => typeof v === 'string' ? v.slice(0, max) : '';
-  const id = v => typeof v === 'string' && /^[a-z0-9-]{1,64}$/.test(v);
-  return (Array.isArray(list) ? list : []).slice(0, 50).filter(p => p && typeof p.name === 'string' && p.name && p.nodes && typeof p.nodes === 'object' && !Array.isArray(p.nodes)).map(p => ({
-    name: text(p.name, 80),
-    ...(Number.isInteger(p.version) && p.version >= 0 && p.version < 1000 && { version: p.version }),
-    nodes: Object.fromEntries(Object.entries(p.nodes).filter(([k]) => id(k)).map(([k, n]) => [k, { run: text(n?.run, 16), ...(n?.platform && { platform: text(n.platform, 16) }), ...(n?.branch && { branch: text(n.branch) }), ...(typeof n?.note === 'string' && n.note && { note: text(n.note, MAX_NOTE) }), ...(n?.tunnels === false && { tunnels: false }) }])),
-    edges: (Array.isArray(p.edges) ? p.edges : []).filter(e => e && id(e.from) && id(e.to)).map(e => ({ from: e.from, to: e.to })),
-    ...(typeof p.source === 'string' && p.source && { source: text(p.source, 300) }),
-    ...(boardLayout(p.layout, id) && { layout: boardLayout(p.layout, id) }),
-  }));
-}
-// Where a board's cards and tunnels sit, and which sides its cables use: kept with the board so it reopens as it was left.
-function boardLayout(l, id) {
-  if (!l || typeof l !== 'object' || Array.isArray(l) || !l.nodes || typeof l.nodes !== 'object') return null;
-  const num = v => Number.isFinite(v) ? v : 0, xy = v => ({ x: num(v?.x), y: num(v?.y) }), side = v => ['top', 'right', 'bottom', 'left'].includes(v);
-  const nodes = Object.fromEntries(Object.entries(l.nodes).filter(([k]) => id(k)).slice(0, 200).map(([k, v]) => [k, xy(v)]));
-  if (!Object.keys(nodes).length) return null;
-  const infra = Object.fromEntries(Object.entries(l.infra && typeof l.infra === 'object' ? l.infra : {}).filter(([k]) => /^tunnel:[\w.-]{1,253}:\d{1,5}$/.test(k)).slice(0, 100).map(([k, v]) => [k, xy(v)]));
-  const sides = Object.fromEntries(Object.entries(l.sides && typeof l.sides === 'object' ? l.sides : {}).filter(([k, v]) => k.split('>').length === 2 && k.split('>').every(id) && Array.isArray(v) && v.length === 2 && v.every(side)).slice(0, 500));
-  return { nodes, ...(Object.keys(infra).length && { infra }), ...(Object.keys(sides).length && { sides }), ...(['down', 'right'].includes(l.tidy) && { tidy: l.tidy }) };
-}
-// The presets in a file: one preset, a list of them, or a stack.json with "presets".
-export const presetsIn = data => sanitizePresets(Array.isArray(data) ? data : Array.isArray(data?.presets) ? data.presets : [data]);
-
-// A GitHub link to a file, as its repo, ref and path; anything else is refused.
-const MAX_PRESET_BYTES = 300 * 1024;
-// Read through the user's own gh login (private repos), else as a public file.
-export async function fetchPresets(link) {
-  const f = githubFile(link);
-  if (!f) return { error: 'Only https links to a file on GitHub can be opened.' };
-  const body = await readFile(f);
-  if (body === null || body.length > MAX_PRESET_BYTES) return { error: 'Could not read that file. Check the link, and that gh is signed in for a private repo.' };
-  let data; try { data = JSON.parse(body); } catch { return { error: 'That file is not JSON.' }; }
-  const presets = presetsIn(data);
-  return presets.length ? { presets } : { error: 'No board found in that file.' };
-}
-
-// A layout is the canvas state: only its known fields are kept, so the endpoint cannot be used to write anything else.
-export function sanitizeLayout(input) {
-  if (!input || typeof input !== 'object' || Array.isArray(input)) return null;
-  if (!input.nodes || typeof input.nodes !== 'object' || Array.isArray(input.nodes) || !Array.isArray(input.edges)) return null;
-  const text = (v, max = 200) => typeof v === 'string' ? v.slice(0, max) : '';
-  const num = v => Number.isFinite(v) ? v : 0;
-  const id = v => typeof v === 'string' && /^[a-z0-9-]{1,64}$/.test(v);
-  const nodes = {};
-  for (const [key, n] of Object.entries(input.nodes)) {
-    if (!id(key) || !n || typeof n !== 'object') continue;
-    nodes[key] = { x: num(n.x), y: num(n.y), branch: text(n.branch), run: text(n.run, 16), ...(n.platform && { platform: text(n.platform, 16) }), ...(typeof n.note === 'string' && n.note && { note: text(n.note, MAX_NOTE) }), ...(n.hideTunnels === true && { hideTunnels: true }), ...(['set-aside', 'take-along'].includes(n.changes) && { changes: n.changes }) };
-  }
-  const edges = input.edges.filter(e => e && id(e.from) && id(e.to))
-    .map(e => ({ from: e.from, to: e.to, fromSide: text(e.fromSide, 8), toSide: text(e.toSide, 8) }));
-  // Where tunnel cards sit, keyed by tunnel:<host>:<port>.
-  const infra = Object.fromEntries(Object.entries(input.infra && typeof input.infra === 'object' && !Array.isArray(input.infra) ? input.infra : {})
-    .filter(([k, v]) => /^tunnel:[\w.-]{1,253}:\d{1,5}$/.test(k) && v && typeof v === 'object').slice(0, 100).map(([k, v]) => [k, { x: num(v.x), y: num(v.y) }]));
-  const presets = sanitizePresets(input.presets);
-  // Recently deleted boards, newest first, each with when it was deleted.
-  const trash = (Array.isArray(input.trash) ? input.trash : []).slice(0, 20).map(t => { const [p] = sanitizePresets([t]); return p && typeof t.deleted === 'string' && /^\d{4}-\d\d-\d\dT[\d:.]+Z$/.test(t.deleted) ? { ...p, deleted: t.deleted } : null; }).filter(Boolean);
-  // The boards opened lately, newest first, each with when.
-  const recent = (Array.isArray(input.recent) ? input.recent : []).filter(r => r && typeof r.name === 'string' && r.name && typeof r.at === 'string' && /^\d{4}-\d\d-\d\dT[\d:.]+Z$/.test(r.at)).slice(0, 20).map(r => ({ name: text(r.name, 80), at: r.at }));
-  const dismissed = (Array.isArray(input.dismissed) ? input.dismissed : []).filter(d => typeof d === 'string').slice(0, 200).map(d => d.slice(0, 400));
-  return { env: text(input.env, 8), mode: text(input.mode, 8), ...(dismissed.length && { dismissed }), ...(typeof input.keptLive === 'string' && /^[a-z0-9]{6,40}$/.test(input.keptLive) && { keptLive: input.keptLive }), ...(Object.keys(infra).length && { infra }), ...(['down', 'right'].includes(input.tidy) && { tidy: input.tidy }), ...(input.scratch === true && { scratch: true }), ...(presets.length && { presets }), ...(trash.length && { trash }), ...(recent.length && { recent }), ...(typeof input.preset === 'string' && input.preset && { preset: text(input.preset, 80) }), ...(typeof input.note === 'string' && input.note && { note: text(input.note, MAX_NOTE) }), zoom: num(input.zoom) || 1, pan: { x: num(input.pan?.x), y: num(input.pan?.y) }, nodes, edges };
-}
-
 let serving = false;
 const FONTS = fs.readdirSync(path.join(here, 'fonts')).filter(f => /\.(woff2|css)$/.test(f)).map(f => `fonts/${f}`);
 export const PAGE_FILES = { '': 'canvas.html', 'page/ports.js': 'page/ports.js', 'page/kinds.js': 'page/kinds.js', 'page/presets.js': 'page/presets.js', 'page/plan.js': 'page/plan.js', 'page/logfmt.js': 'page/logfmt.js', 'temp/status.js': 'temp/status.js', 'temp/debug.jsonl': 'temp/debug.jsonl', ...Object.fromEntries(FONTS.map(f => [f, f])) };
@@ -227,15 +129,6 @@ const SECURITY_HEADERS = {
   'content-security-policy': "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; frame-ancestors 'none'; base-uri 'none'; form-action 'none'",
   'referrer-policy': 'no-referrer', 'x-content-type-options': 'nosniff', 'x-frame-options': 'DENY', 'cross-origin-resource-policy': 'same-origin',
 };
-const PROMPT_TAGS = new Set(['koppler', 'koppler-stop', 'koppler-reply', 'koppler-fix', 'koppler-facts']);
-
-// A prompt from the standalone page: only the canvas's two kinds, with a bounded text and data object.
-export function sanitizePrompt(input) {
-  if (!input || typeof input !== 'object' || !PROMPT_TAGS.has(input.tag) || typeof input.text !== 'string') return null;
-  const data = input.data && typeof input.data === 'object' && !Array.isArray(input.data) ? input.data : {};
-  return { tag: input.tag, text: input.text.slice(0, 20000), data, at: new Date().toISOString() };
-}
-
 // A confirmed Send (koppler up) or Stop and revert (koppler down), carried out by Koppler itself; leftovers go to the agent.
 function startRun(prompt, record, args) {
   const log = path.join(TEMP, `up-${record.id}.log`), out = fs.openSync(log, 'w', 0o600);
