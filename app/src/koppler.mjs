@@ -13,17 +13,16 @@ import { sayCommand } from './messages.mjs';
 import { switchCommand } from './engine/branch.ts';
 import { down } from './engine/down.ts';
 import { readActions } from './engine/actions.ts';
+import { appStart, secretTest } from './engine/app-start.ts';
+import { wire, wireInfo } from './engine/wire.ts';
 import { recipesCommand } from './recipes.mjs';
 import { queryCommand } from './query.mjs';
 import { findCommand } from './research.mjs';
-import { investigate, repoFiles } from './investigate.mjs';
+import { investigate } from './investigate.mjs';
 import { deployed } from './deployed.mjs';
 import { appliedCommand as applied, historyCommand, planCommand, runningNames, appendRun, runRecord, runs as runHistory } from './runs.mjs';
 import * as tunnelPlan from './core/ports.ts';
-import * as addresses from './core/addresses.ts';
-import * as frameworks from './core/frameworks.ts';
 import * as kinds from './core/kinds.ts';
-import * as launch from './core/launch.ts';
 import { needs as needsFor } from './needs.mjs';
 import { APPROVE, approved, missingTunnels, startsFromStack } from './checks.mjs';
 import { APP, BIN, LOGS, TEMP } from './paths.ts';
@@ -59,110 +58,12 @@ const init = async args => {
 const here = path.dirname(fileURLToPath(import.meta.url));
 
 
-const readJsonFile = file => { try { return JSON.parse(fs.readFileSync(file, 'utf8').replace(/^\uFEFF/, '')); } catch { return null; } };
-
-// Simulators, emulators and phones this Mac can run a mobile app on.
-function devices() {
-  let sims = [];
-  try { sims = Object.values(JSON.parse(sh('xcrun', ['simctl', 'list', 'devices', 'booted', '-j'])).devices).flat().map(d => ({ id: d.udid, name: d.name, platform: 'ios', physical: false })); } catch {}
-  const androids = sh('adb', ['devices', '-l']).split('\n').slice(1).filter(l => /\sdevice\b/.test(l)).map(l => {
-    const id = l.split(/\s+/)[0];
-    return { id, name: l.match(/model:(\S+)/)?.[1]?.replace(/_/g, ' ') ?? id, platform: 'android', physical: !id.startsWith('emulator-') };
-  });
-  let phones = [];
-  const out = path.join(os.tmpdir(), `koppler-devices-${process.pid}.json`);
-  try {
-    sh('xcrun', ['devicectl', 'list', 'devices', '--json-output', out]);
-    phones = (JSON.parse(fs.readFileSync(out, 'utf8')).result?.devices ?? [])
-      .filter(d => d.connectionProperties?.tunnelState === 'connected' || d.connectionProperties?.pairingState === 'paired' && d.connectionProperties?.transportType)
-      .map(d => ({ id: d.hardwareProperties?.udid ?? d.identifier, name: d.deviceProperties?.name ?? 'iPhone', platform: 'ios', physical: true }));
-  } catch {} finally { fs.rmSync(out, { force: true }); }
-  return [...sims, ...androids, ...phones];
-}
-
-// A device to run a mobile app on: ios (simulator), android (emulator), phone (a connected phone), or a device id.
-function resolveDevice(spec, app) {
-  const all = devices();
-  const pick = test => all.find(test);
-  const want = spec ?? (app.mobile?.iosBundleId && pick(d => d.platform === 'ios' && !d.physical) ? 'ios' : pick(d => d.platform === 'android' && !d.physical) ? 'android' : 'ios');
-  const found = want === 'ios' ? pick(d => d.platform === 'ios' && !d.physical)
-    : want === 'android' ? pick(d => d.platform === 'android' && !d.physical)
-    : want === 'phone' ? pick(d => d.physical)
-    : pick(d => d.id === want || d.name === want);
-  if (found) return found;
-  fail({ ios: 'no booted iOS simulator: open -a Simulator, then try again', android: 'no Android emulator running (adb devices)', phone: 'no phone connected: plug it in (or pair it over Wi-Fi) and unlock it' }[want]
-    ?? `no device ${want}; connected: ${all.map(d => `${d.name} (${d.id})`).join(', ') || 'none'}`);
-}
-
-// This Mac's address on its network, for phones on the same Wi-Fi.
-const lanIp = () => { const iface = sh('route', ['-n', 'get', 'default']).match(/interface:\s*(\S+)/)?.[1] ?? 'en0'; return sh('ipconfig', ['getifaddr', iface]) || null; };
-
-// A .NET app's plain http address from its launch profile, for callers that cannot use its development certificate.
-const profilesOf = (app, repo) => app.kind === 'dotnet' && app.launchSettings && repo ? readJsonFile(path.join(repo, app.launchSettings))?.profiles ?? {} : {};
-function httpUrlOf(app, repo, env) {
-  if (app.kind !== 'dotnet' || !app.launchSettings) return null;
-  const profiles = profilesOf(app, repo);
-  const profile = profiles[launch.launchProfile(app, profiles, env).name] ?? {};
-  return String(profile.applicationUrl ?? '').split(';').find(u => u.startsWith('http://')) ?? null;
-}
-
-// Tries one stored secret (secret-check.mjs); the outcome only, never the value.
-function secretTest(store, secret) {
-  try { return { code: 0, message: execFileSync(path.join(BIN, 'secret-test'), [store, secret.env, ...(secret.type ? ['--type', secret.type] : [])], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 40000 }).trim() }; }
-  catch (e) { return { code: e.status ?? 1, message: String(e.stdout ?? '').trim() || 'failed: the check did not finish' }; }
-}
-
-// How to start a stack app by id, for its kind (core/launch), in the chosen environment.
-function appCommand(id, opts) {
-  const registry = readData('registry');
-  const base = registry?.apps?.[id];
-  if (!base) return null;
-  // An app the stack marks as living outside this Mac (a SaaS package, a managed service) is never started here.
-  if (base.outside) fail(`${base.name ?? id} does not run on this Mac: ${base.outside}`);
-  kinds.register(registry.kinds);
-  const env = opts.env ?? registry.envs[0];
-  if (!registry.envs.includes(env)) fail(`unknown env ${env}; the stack has ${registry.envs.join(', ')}`);
-  const app = env === registry.envs[0] ? base : { ...base, ...(base.envs?.[env] ?? {}) };
-  // A start command written in the shared stack runs only once the user has seen and allowed it, and again after it changes.
-  if (startsFromStack(registry, id, env) && !approved(registry.source ?? '', registry)) fail(`${base.name ?? id} is started by a command from the stack that you have not allowed yet, or that changed since. Review it in your own terminal: ${APPROVE}`);
-  const repo = readData('local')?.apps?.[id]?.path ?? fail(`${id} is not cloned (koppler sync --rescan after cloning)`);
-  // Settings given for this start (a cable's local address) come from the environment and must win over the launch profile.
-  const ctx = { repo, env, id, engine: here, override: Object.keys(opts.setEnv ?? START_ENV ?? {}), envNames: [env, ...(registry.envAliases?.[env] ?? [])] };
-  if (app.kind === 'dotnet' && app.launchSettings) ctx.profiles = readJsonFile(path.join(repo, app.launchSettings))?.profiles;
-  if (app.kind === 'node' || app.kind === 'web') { ctx.pkg = readJsonFile(path.join(repo, 'package.json')); ctx.scripts = ctx.pkg?.scripts; }
-  if (app.kind === 'flutter') ctx.device = resolveDevice(opts.device, app);
-  else { ctx.files = repoFiles(repo); if (['ios', 'android'].includes(opts.device)) ctx.platform = opts.device; }
-  if (opts.lan) { ctx.lan = true; ctx.httpPort = Number(new URL(httpUrlOf(app, repo, env) ?? 'http://x').port) || null; }
-  const start = launch.startCommand(app, ctx);
-  if (start.error) fail(`${id}: ${start.error}; or run any command: koppler run ${id} -- <command>`);
-  // Each environment after the first has its own secret store, so a PROD value never replaces or leaks into another environment's.
-  const store = env === registry.envs[0] ? id : `${id}@${env}`;
-  const wanted = (app.secrets ?? []).filter(s => s.env && (!s.when || /^always\b/i.test(s.when.trim()))).map(s => s.env);
-  if (store !== id && wanted.length) {
-    const have = sh(path.join(BIN, 'secret-list'), [store]).split(/\s+/);
-    const missing = wanted.filter(name => !have.includes(name));
-    if (missing.length) fail(`${id} has no ${missing.join(', ')} stored for ${env.toUpperCase()}; see: koppler doctor ${id} --env ${env}`);
-  }
-  // Before starting, each stored secret is tried against the address inside it. A production store asks you on every read,
-  // so it is only tried when asked (--test); --no-test skips the check everywhere.
-  const tests = (app.secrets ?? []).filter(s => s.env);
-  if (!opts.dryRun && tests.length && (opts.test ?? !kp.isProtected(registry, env))) {
-    for (const s of tests) {
-      const r = secretTest(store, s);
-      if (r.code === 1) fail(`${id}: ${s.env} for ${env.toUpperCase()} ${r.message.replace(/^failed: /, 'did not pass its test: ')}. Fix it, or start anyway with --no-test.`);
-      if (r.code === 0) console.log(`${s.env}: ${r.message}`);
-    }
-  }
-  // Only an app started by id gets its stored secrets; an arbitrary command never does.
-  return { ...start, command: [path.join(BIN, 'with-secrets'), store, '--', ...start.command], device: ctx.device, env };
-}
-
 async function run(args, extra = {}) {
   let opts;
   try { opts = { ...parseRun(args), ...extra }; } catch (e) { fail(`${e.message}\nusage: koppler run <app> | koppler run <name> [--cwd <dir>] [--port <n>] [--bind <address>] [--restart] -- <command...>`); }
   // Only a stack app started by id gets its stored secrets; an arbitrary command never does.
   if (!opts.command.length) {
-    const app = appCommand(opts.name, opts) ?? fail(`${opts.name} is not an app in the stack; to run a command: koppler run ${opts.name} -- <command>`);
+    const app = appStart(opts.name, opts) ?? fail(`${opts.name} is not an app in the stack; to run a command: koppler run ${opts.name} -- <command>`);
     Object.assign(opts, { cwd: app.cwd, command: app.command, port: opts.port ?? app.port, onStop: app.onStop ?? [], env: app.env, holdsSecrets: true });
     if (app.device) console.log(`device: ${app.device.name} (${app.device.platform})`);
   }
@@ -173,7 +74,6 @@ async function run(args, extra = {}) {
   }
   await startProcess(opts);
 }
-
 
 
 async function stop(args) {
@@ -187,7 +87,6 @@ async function stop(args) {
   if ((all || apps) && !await confirm(`Stop ${targets.map(r => r.name).join(', ')}?`, args)) fail('nothing stopped (in a script, add --yes)');
   for (const line of await Promise.all(targets.map(stopOne))) console.log(line);
 }
-
 
 
 // What a bug report needs, ready to paste into a public issue: versions, then the tails of the canvas debug log, the
@@ -243,7 +142,6 @@ function ports(args) {
 // Everything a run needs, started in one go: its tunnels, then its apps with the ones called first, each waited for.
 // With --run <id> it carries out that confirmed Send: stops and restarts, branches as chosen on the cards, remembered changes,
 // each cable's local address passed to its caller, then starts. What it cannot do alone is listed for the agent (exit 3).
-let START_ENV = null;
 // Records a board as a run, with its plan against what runs now, as a Run from the canvas would; returns its id.
 async function recordRun(registry, board, label) {
   const { planFor } = await import('./runs.mjs');
@@ -404,10 +302,7 @@ async function up(args) {
     if (skip.has(id)) continue;
     if (node(id).run === 'ide') { yours.push(registry.apps[id].name); continue; }
     if (running(id)) { console.log(`${id}: already running`); step(id, 'Start', 'done', 'Already running.'); continue; }
-    START_ENV = setEnv[id] ?? null;
-    const saved = { ...process.env }; Object.assign(process.env, START_ENV ?? {});
-    await run([id, '--env', env, ...(node(id).platform ? ['--device', node(id).platform] : [])]);
-    process.env = saved; START_ENV = null;
+    await run([id, '--env', env, ...(node(id).platform ? ['--device', node(id).platform] : [])], setEnv[id] ? { setEnv: setEnv[id] } : {});
     step(id, 'Start', 'done', 'Running.');
   }
   if (yours.length) console.log(`Start ${yours.join(', ')} in your IDE.`);
@@ -416,56 +311,6 @@ async function up(args) {
   if (left.length) { console.log(`\nLeft for the agent:\n${left.map(l => `  - ${l}`).join('\n')}`); process.exit(3); }
   console.log(`Up on ${env.toUpperCase()}.`);
   if (board) await applied([board.id]);
-}
-
-// What to change so `from` calls the local `to`: the setting or the file and key, and the value for the device it runs on.
-function wire(args) {
-  const registry = readData('registry') ?? fail('no stack loaded (koppler init)');
-  const local = readData('local')?.apps ?? {};
-  const flag = name => { const i = args.indexOf(`--${name}`); return i >= 0 ? args[i + 1] : undefined; };
-  const [from, to] = args.filter((a, i) => !a.startsWith('--') && !['--device', '--env'].includes(args[i - 1]));
-  if (!registry.apps[from]) fail('usage: koppler plan --wire <caller> <callee> [--device ios|android|phone|<id>] [--json]');
-  const result = wireInfo(registry, local, from, to, flag('env') ?? registry.envs[0], flag('device'));
-  if (result.error) fail(result.error);
-  const caller = registry.apps[from], callee = registry.apps[to], call = result.call, value = result.value, address = { needsLan: result.needsLan };
-  delete result.call;
-  if (args.includes('--json')) return console.log(JSON.stringify(result, null, 2));
-  wirePrint(caller, callee, call, value, address, result);
-}
-// Where `from` must point to reach the local `to`, and how it picks that address; { error } when it cannot be told.
-function wireInfo(registry, local, from, to, env, deviceFlag) {
-  const caller = registry.apps[from], callee = registry.apps[to];
-  if (!callee) return { error: `${to} is not an app in the stack` };
-  const call = caller.consumes?.[to] ?? (registry.found?.[from]?.[to] ? { how: 'unknown', found: registry.found[from][to] } : null);
-  if (!call) return { error: `${from} does not call ${to} as far as the stack knows (koppler sync finds unrecorded calls)` };
-  const device = kinds.of(caller).platforms ? resolveDevice(deviceFlag, caller) : null;
-  const httpUrl = device?.physical && local[to] ? httpUrlOf(callee, local[to].path, env) : null;
-  const address = addresses.localAddress(callee, device, { lanIp: device?.physical ? lanIp() : null, httpUrl, like: call.deployed });
-  if (address.error) return { error: `${from} -> ${to}: ${address.error}` };
-  // A stack may pin an address per simulator or emulator; a phone always gets the computed one.
-  const pinned = call.value && typeof call.value === 'object' && !device?.physical ? call.value[device?.platform] : typeof call.value === 'string' ? call.value : null;
-  const value = pinned ?? address.url;
-  // A browser front end also needs the API to allow its origin (CORS), and no https page calling an http API.
-  const callerUrl = caller.url ?? (kinds.of(caller).browser && local[from] ? `http://localhost:${frameworks.frameworkOf(readJsonFile(path.join(local[from].path, 'package.json')))?.port ?? 3000}` : null);
-  const slot = Object.entries(registry.apps).filter(([, a]) => kinds.of(a).browser && a.consumes?.[to]).map(([id]) => id).sort().indexOf(from);
-  const browser = kinds.of(caller).browser ? addresses.browserChecks(callee, callerUrl, Math.max(slot, 0)) : { settings: [], warnings: [] };
-  const result = { from, to, how: call.how, device: device ? `${device.name} (${device.physical ? 'phone' : device.platform === 'ios' ? 'iOS simulator' : 'Android emulator'})` : null,
-    ...(call.how === 'env' ? { env: call.env, profile: launch.launchProfile(caller, profilesOf(caller, local[from]?.path), env).local } : {}), ...(call.file ? { file: call.file, key: call.key } : {}),
-    ...(call.how === 'env-file' ? addresses.envFileChange(call, value) : {}),
-    value, needsLan: address.needsLan, found: call.found, cors: browser.settings.map(c => ({ ...c, profile: launch.launchProfile(callee, profilesOf(callee, local[to]?.path), env).local })), warnings: browser.warnings,
-    note: [address.note, call.note].filter(Boolean).join(' ') || undefined, call };
-  return result;
-}
-function wirePrint(caller, callee, call, value, address, result) {
-  console.log(`${caller.name} -> local ${callee.name}${result.device ? ` on ${result.device}` : ''}: ${value}`);
-  if (call.how === 'env') console.log(`  set in ${result.profile}: ${[].concat(call.env).map(e => `${e}=${value}`).join(', ')}`);
-  else if (call.how === 'edit') console.log(`  edit ${call.file}: ${call.key} (mark it "koppler: do not commit")`);
-  else if (call.how === 'env-file') console.log(`  write to ${result.file} (git-ignored, read on top of .env): ${result.lines.join(', ')}`);
-  else console.log(`  how ${caller.name} picks this address is not recorded yet${call.found ? `; found at ${call.found}` : ''}: confirm in its repo, then record it in stack.json`);
-  if (address.needsLan) console.log(`  ${callee.name} must listen on the network: koppler run ${result.to} --lan`);
-  for (const c of result.cors) console.log(`  allow the browser origin in ${callee.name}'s ${c.profile}: ${c.env}=${c.value}`);
-  for (const w of result.warnings) console.log(`  warning: ${w}`);
-  if (result.note) console.log(`  note: ${result.note}`);
 }
 
 const registryOrFail = () => readData('registry') ?? fail('no stack loaded (koppler init)');

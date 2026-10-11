@@ -86,6 +86,6 @@ export function browserChecks(
 }
 
 /** The lines to put in a git-ignored local env file, which the framework reads on top of its .env. */
-export function envFileChange(call: { file?: string; env?: string | string[] }, value: string) {
+export function envFileChange(call: { file?: string | undefined; env?: string | string[] | undefined }, value: string) {
   return { file: call.file ?? '.env.local', lines: [call.env ?? []].flat().map(name => `${name}=${value}`) };
 }

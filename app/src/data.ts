@@ -2,6 +2,7 @@
 // found, and the board. Each is one JSON file in the run folder.
 import fs from 'node:fs';
 import path from 'node:path';
+import type { Stack } from './core/stack.ts';
 import { readJson, writeJson } from './json-files.ts';
 import { TEMP } from './paths.ts';
 
@@ -31,6 +32,28 @@ export function readData(name: DataName): Data | null {
   const value = readJson(dataFile(name)) ?? readOldForm(name);
   return isData(value) ? value : null;
 }
+
+/** The stack in use, as the last sync copied it: the stack file, where it came from, and calls found in the code. */
+export type Registry = Stack & {
+  source?: string;
+  /** Calls the stack does not record, found in the clones: caller, then callee, then where. */
+  found?: Record<string, Record<string, string>>;
+  /** No stack yet: the canvas asks for one. */
+  setup?: boolean;
+};
+/** An app's clone on this machine. */
+export interface Clone {
+  path: string;
+  branch?: string | null;
+  dirty?: number;
+  branches?: string[];
+  /** Clones of libraries the app depends on, which it can use in place of the published ones. */
+  libraries?: { name: string; path: string; ecosystem: 'dart' | 'npm' }[];
+}
+/** The stack in use. It passed the stack check when it was copied here, so it is read as one. */
+export const readStack = () => readData('registry') as Registry | null;
+/** The clones the last sync found, by app. */
+export const readClones = () => (readData('local')?.['apps'] ?? {}) as Record<string, Clone | null | undefined>;
 
 export function writeData(name: DataName, value: Data): void {
   writeJson(dataFile(name), value);
