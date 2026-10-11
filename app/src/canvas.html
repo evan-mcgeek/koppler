@@ -677,6 +677,9 @@
   .note { margin: 0 0 4px; font-size: 12px; color: var(--muted); }
   .note:empty { display: none; }
   .note.warn { color: var(--prod); }
+  .note { overflow-wrap: anywhere; }
+  .note .btn, .empty-note .btn { display: block; margin-top: 8px; border-color: var(--line); background: var(--surface); }
+  .note .btn:hover, .empty-note .btn:hover { border-color: var(--cable); }
   .node.flash { box-shadow: 0 0 0 3px color-mix(in oklab, var(--cable) 55%, transparent); transition: box-shadow .2s; }
 
   #board { position: relative; flex: 1; min-height: 0; overflow: clip; background: var(--paper); touch-action: none; }
@@ -1226,6 +1229,22 @@
 const KEY = 'koppler:v1:' + (window.REGISTRY?.source ?? 'none');
 const SVG = 'http://www.w3.org/2000/svg';
 const JSON_POST = { method: 'POST', headers: { 'content-type': 'application/json' } };
+// Looks for clones again: the canvas server runs the scan, and the board loads again with what it found.
+let rescanning = false;
+function rescanButton(label) {
+  const button = Object.assign(document.createElement('button'), { type: 'button', className: 'btn', textContent: label, disabled: rescanning });
+  button.onclick = async () => {
+    const url = serverAddress('rescan');
+    if (!url) return toast('Looking for clones needs the Koppler canvas running (koppler canvas).', 'warning');
+    rescanning = button.disabled = true;
+    const result = await fetch(url, { ...JSON_POST, body: '{}' }).then(r => r.json()).catch(() => ({ error: 'Could not reach the canvas server.' }));
+    rescanning = false;
+    if (!result.error) return location.reload();
+    button.disabled = false;
+    toast(result.error, 'warning');
+  };
+  return button;
+}
 // Where this page's own server takes a request; null when the page is not served by one. Known from the first moment,
 // not only once the first status has arrived.
 const serverAddress = action => { const token = location.pathname.match(/^\/s\/([0-9a-f]{48})\//)?.[1]; return token ? `${location.origin}/${action}?token=${token}` : null; };
@@ -3745,8 +3764,10 @@ function render() {
   // Only worth a line when something needs a new scan: no scan yet, or an app on the stack is not cloned.
   const notCloned = Object.keys(registry.apps).filter(id => !cloned(id) && !registry.apps[id].outside).length;
   note.className = 'note warn';
-  note.textContent = !window.LOCAL ? 'Your clones have not been found yet. Run koppler sync.'
-    : notCloned ? `${notCloned} ${notCloned === 1 ? 'app is' : 'apps are'} not cloned in ${cloneRoots()}. After cloning, run koppler sync --rescan.` : '';
+  const missing = !window.LOCAL ? 'Your clones have not been found yet.'
+    : notCloned ? `${notCloned} ${notCloned === 1 ? 'app is' : 'apps are'} not cloned in ${cloneRoots()}.` : '';
+  // What to do about it is a button, not a command to go and type.
+  note.replaceChildren(...(missing ? [missing, rescanButton(window.LOCAL ? 'Look for clones again' : 'Find my clones')] : []));
   board.querySelectorAll('.node, .tunnel').forEach(n => n.remove());
   Object.keys(state.nodes).forEach(id => world.append(nodeEl(id)));
   renderTunnels();
@@ -4275,7 +4296,8 @@ function renderPicker() {
         <span class="who"><input class="name" value="${esc(p?.name ?? c.name)}" aria-label="Name in the stack" maxlength="80" spellcheck="false"><span class="slug" title="${esc(c.path)}">${esc(c.slug)}</span></span>
         ${c.kind ? `<span class="kind-tag kind-${esc(c.kind)}">${esc(KopplerKinds.of({ kind: c.kind }).label)}</span>` : `<select aria-label="Kind of app"><option value="">Kind?</option>${Object.entries(KopplerKinds.KINDS).map(([k, v]) => `<option value="${k}"${p?.kind === k ? ' selected' : ''}>${esc(v.label)}</option>`).join('')}</select>`}</div>`;
     }).join('')}</section>`;
-  }).join('') : `<p class="empty-note" style="margin:16px 4px;color:var(--muted);font-size:13px">${all.length ? 'No repo matches.' : 'Every clone found is already in the stack. After cloning more, run koppler sync --rescan.'}</p>`;
+  }).join('') : `<p class="empty-note" style="margin:16px 4px;color:var(--muted);font-size:13px">${all.length ? 'No repo matches.' : 'Every clone found is already in the stack.'}</p>`;
+  if (!all.length) pickerList.querySelector('.empty-note').append(rescanButton('Look for clones again'));
   paintPickerFooter();
 }
 function paintPickerFooter() {

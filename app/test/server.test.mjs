@@ -67,6 +67,12 @@ try {
   assert.equal((await call('POST', save, json, 'a'.repeat(9_000_000))).status, 413);
   assert.equal((await call('POST', save, json, board)).status, 204);
   assert.equal((await call('GET', page.pathname)).status, 200);
+
+  // Looking for clones again is the server's to run; with no stack set up yet it says so, in words for the page.
+  const scan = await call('POST', `/rescan?token=${token}`, json, '{}');
+  assert.equal(scan.status, 500);
+  assert.match(JSON.parse(scan.body.toString()).error, /\S/);
+  assert.equal((await call('POST', '/rescan?token=wrong', json, '{}')).status, 404);
   console.log('server tests ok');
 } finally {
   server.kill();
