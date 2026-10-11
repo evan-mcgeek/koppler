@@ -21,7 +21,7 @@ import * as kinds from './core/kinds.ts';
 import * as launch from './core/launch.ts';
 import { recipesFor } from './recipes.mjs';
 import { APP, BIN, LOGS, STATE as STATE_HOME, TEMP } from './paths.ts';
-import { redact } from './scrub.mjs';
+import { redact } from './scrub.ts';
 import { listenerPid } from './listen.mjs';
 import * as kp from './core/plan.ts';
 import { readData, writeData } from './data.ts';

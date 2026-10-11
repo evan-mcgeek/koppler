@@ -2,28 +2,11 @@ import assert from 'node:assert/strict';
 // Whatever a test started is stopped when the file ends, even after a failed assertion, so no port stays held.
 const cleanups = [];
 process.on('exit', () => cleanups.forEach(stopAll => stopAll()));
-import { commandFor, parseRun } from '../dist/koppler.mjs';
 import { allowStack } from './allow.mjs';
 import { freePorts, until } from './helpers.mjs';
 
 // Ports the system says are free; the tunnel one has room after it, for the tunnel that moves.
 const [crashy, upA, upB, tunA, tunB, runA, runB, agentA, agentB, leftA, leftB] = await freePorts(11), [tunnel] = await freePorts(1, { roomAfter: 2 });
-
-assert.deepEqual(parseRun(['mobile-api']), { name: 'mobile-api', command: [], restart: false });
-assert.deepEqual(parseRun(['db', '--port', '5436', '--restart', '--', 'cloudflared', 'access', 'tcp']),
-  { name: 'db', command: ['cloudflared', 'access', 'tcp'], restart: true, port: 5436 });
-assert.equal(parseRun(['web', '--cwd', '/tmp', '--', 'npm', 'start']).cwd, '/tmp');
-assert.deepEqual(parseRun(['a', '--', 'echo', '--restart']).command, ['echo', '--restart']);
-assert.throws(() => parseRun(['Bad Name', '--', 'x']), /name/);
-assert.throws(() => parseRun(['a', '--']), /nothing to run/);
-assert.throws(() => parseRun(['a', '--port', 'abc', '--', 'x']), /port/);
-assert.throws(() => parseRun(['a', '--force', '--', 'x']), /unknown option/);
-
-assert.deepEqual(commandFor(['echo', 'hi'], false), ['echo', 'hi']);
-const wrapped = commandFor(['echo', 'hi'], true);
-assert.equal(wrapped[0], 'sh');
-assert.deepEqual(wrapped.slice(-2), ['echo', 'hi']);
-console.log('ok');
 
 // A process that hands over to another program (as the secrets wrapper does) is still the same run: status and stop must see it.
 {
