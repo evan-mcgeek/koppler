@@ -124,12 +124,17 @@
       const taken = (key: string, side: Side) =>
         board.boxes.has(key) && !!board.ledBy(key).length && board.infraSide(key) === side;
       if (taken(from, sides[0]) || taken(to, sides[1])) sides = level;
+      // A card stacked with its own app is joined to it down their shared left edge, in a shallow bracket.
+      const own = board.ledBy(from).includes(to) || board.ledBy(to).includes(from);
+      if (own) sides = ['left', 'left'];
       const [start, end] = [sidePoint(a, sides[0]), sidePoint(b, sides[1])];
       const [x, y] = SIDES[sides[1]];
       return [
         {
           key: `${from}>${to}`,
-          d: cablePath(start, sides[0], end, sides[1]),
+          d: own
+            ? `M${String(start.x)},${String(start.y)} C${String(start.x - 36)},${String(start.y)} ${String(end.x - 36)},${String(end.y)} ${String(end.x)},${String(end.y)}`
+            : cablePath(start, sides[0], end, sides[1]),
           start,
           head: `translate(${String(end.x + x * 10)} ${String(end.y + y * 10)}) rotate(${String((Math.atan2(-y, -x) * 180) / Math.PI)})`,
           kind: queue ? (board.queues[queue] === 'local' ? 'msg local' : 'msg') : 'ext',
