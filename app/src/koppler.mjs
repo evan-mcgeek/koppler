@@ -20,7 +20,7 @@ import { recipesCommand } from './engine/recipes.ts';
 import { queryCommand } from './query.mjs';
 import { findCommand } from './engine/research.ts';
 import { investigate } from './engine/investigate.ts';
-import { deployed } from './deployed.mjs';
+import { deployed } from './engine/deployed.ts';
 import { appliedCommand as applied, historyCommand, planCommand, runningNames } from './engine/runs.ts';
 import { APPROVE } from './engine/checks.ts';
 import { APP, TEMP } from './paths.ts';
