@@ -77,6 +77,7 @@ Everything else depends on your stack (the .NET SDK, Flutter, Docker, the AWS CL
 | [`docs/`](docs) | User documentation |
 
 Run the tests with `npm test` in `app/`.
+The canvas has tests of its own that drive it in a browser: `npm install`, `npx playwright install chromium` once, then `npm run test:canvas`.
 
 ## Reporting bugs
 
