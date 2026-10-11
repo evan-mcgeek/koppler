@@ -197,3 +197,17 @@ const [crashy, upA, upB, tunA, tunB, runA, runB, agentA, agentB, leftA, leftB] =
     assert.match(r.stderr, /^koppler: usage: koppler secret /, action);
   }
 }
+// A command that does not exist is unknown, also when it is named like a built-in property.
+{
+  const { spawnSync } = await import('node:child_process');
+  const path = await import('node:path'), { fileURLToPath } = await import('node:url');
+  const entry = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'dist', 'koppler.mjs');
+  const koppler = (...args) => spawnSync('node', [entry, ...args], { encoding: 'utf8' });
+  for (const name of ['constructor', 'toString', '__proto__']) {
+    assert.match(koppler(name).stderr, new RegExp(`^koppler: unknown command "${name}"`), name);
+    assert.equal(koppler(name, '--help').status, 2, name);
+    const help = koppler('help', name);
+    assert.equal(help.status, 2, name);
+    assert.match(help.stderr, /^koppler: usage: no command /, name);
+  }
+}

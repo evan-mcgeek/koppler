@@ -443,10 +443,7 @@ const COMMANDS: Command[] = [
     example: 'koppler say --file reply.json',
   },
 ];
-const byName: Record<string, Command | undefined> = Object.fromEntries(
-  COMMANDS.map(command => [command.name, command]),
-);
-const named = (name: string | undefined) => byName[name ?? ''];
+const named = (name: string | undefined) => COMMANDS.find(command => command.name === name);
 
 function help(command?: Command): void {
   if (command) {
