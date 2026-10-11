@@ -24,7 +24,7 @@ import { investigate } from './investigate.mjs';
 import { deployed } from './deployed.mjs';
 import { appliedCommand as applied, historyCommand, planCommand, runningNames } from './engine/runs.ts';
 import * as tunnelPlan from './core/ports.ts';
-import { needs as needsFor } from './needs.mjs';
+import { needs as needsFor } from './engine/needs.ts';
 import { APPROVE, missingTunnels } from './engine/checks.ts';
 import { APP, BIN, TEMP } from './paths.ts';
 import { confirm, envOf, fail, flagValue, positional } from './cli/output.ts';
