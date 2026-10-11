@@ -65,11 +65,12 @@ export const STACK: Stack = {
 type Stack = { name: string; envs: string[]; apps: Record<string, Record<string, unknown>>; presets?: unknown[] };
 type Canvas = { url: string; dir: string; temp: string };
 
-export const test = base.extend<{ stack: Stack; board: object | null; canvas: Canvas }>({
-  // `stack` and `board` can be set per test with test.use.
+export const test = base.extend<{ stack: Stack; board: object | null; uncloned: string[]; canvas: Canvas }>({
+  // `stack`, `board` and `uncloned` (apps with no clone on this machine) can be set per test with test.use.
   stack: [STACK, { option: true }],
   board: [null, { option: true }],
-  canvas: async ({ stack, board }, use) => {
+  uncloned: [[], { option: true }],
+  canvas: async ({ stack, board, uncloned }, use) => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-e2e-')),
       temp = path.join(dir, 'state', 'run'),
       port = await freePort();
@@ -82,10 +83,12 @@ export const test = base.extend<{ stack: Stack; board: object | null; canvas: Ca
       roots: [dir],
       at: new Date().toISOString(),
       apps: Object.fromEntries(
-        Object.keys(stack.apps).map(id => [
-          id,
-          { path: path.join(dir, 'clones', id), branch: 'main', dirty: 0, branches: ['main', 'feature/checkout'] },
-        ]),
+        Object.keys(stack.apps)
+          .filter(id => !uncloned.includes(id))
+          .map(id => [
+            id,
+            { path: path.join(dir, 'clones', id), branch: 'main', dirty: 0, branches: ['main', 'feature/checkout'] },
+          ]),
       ),
     });
     write('repos', { roots: [dir], stack: stack.name, repos: [] });

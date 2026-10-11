@@ -318,7 +318,7 @@ function startServer() {
     }
     const given = Buffer.from(url.searchParams.get('token') || ''), expected = Buffer.from(token);
     const authorized = given.length === expected.length && crypto.timingSafeEqual(given, expected);
-    if (req.method !== 'POST' || !authorized || !['/state', '/prompt', '/preset', '/discover', '/discover-apply', '/stack', '/stack-update', '/stack-discard', '/stack-pr', '/apps', '/apps-remove', '/secret', '/secret-remove', '/secret-test', '/cable-test', '/messages-clear', '/message-dismiss', '/shutdown', '/stop-apps', '/debug-log', '/debug-clear', '/needs'].includes(url.pathname)) return refuse(404);
+    if (req.method !== 'POST' || !authorized || !['/state', '/prompt', '/preset', '/discover', '/discover-apply', '/stack', '/stack-update', '/stack-discard', '/stack-pr', '/apps', '/apps-remove', '/rescan', '/secret', '/secret-remove', '/secret-test', '/cable-test', '/messages-clear', '/message-dismiss', '/shutdown', '/stop-apps', '/debug-log', '/debug-clear', '/needs'].includes(url.pathname)) return refuse(404);
     // A form on another site cannot send JSON without asking first, and that question is never answered.
     if (!/^application\/json\b/i.test(req.headers['content-type'] ?? '')) return refuse(415);
     readBody(req, res, oops, body => {
@@ -363,6 +363,14 @@ function startServer() {
         const result = typeof body?.use === 'string' ? useStack(body.use) : createStack(body);
         if (result.error) { res.writeHead(400, { 'content-type': 'application/json; charset=utf-8' }).end(JSON.stringify(result)); return; }
         execFile('node', [path.join(here, 'koppler.mjs'), 'sync'], { timeout: 120000 }, err => res.writeHead(err ? 500 : 200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' }).end(JSON.stringify(err ? { error: 'The stack was created, but could not be loaded. Run koppler sync.' } : { ok: true })));
+        return;
+      }
+      if (url.pathname === '/rescan') {
+        // Looks through the user's folders for clones again, as `koppler sync --rescan` does.
+        execFile(process.execPath, [path.join(here, 'koppler.mjs'), 'sync', '--rescan'], { timeout: 120000 }, (err, _out, said) => {
+          const why = String(said ?? '').trim().split('\n').pop()?.replace(/^koppler: /, '') || 'The scan did not finish.';
+          res.writeHead(err ? 500 : 200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' }).end(JSON.stringify(err ? { error: why } : { ok: true }));
+        });
         return;
       }
       if (url.pathname === '/apps-remove') {
