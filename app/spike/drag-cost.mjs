@@ -5,6 +5,7 @@ const browser = await chromium.launch();
 for (const [name, url, card] of [
   ['Svelte Flow', 'http://localhost:4799/?cards=60', '.svelte-flow__node[data-id="app25"]'],
   ['JointJS', 'http://localhost:4797/?cards=60', '[data-card="app25"]'],
+  ['diagram-js', 'http://localhost:4796/?cards=60', '[data-card="app25"]'],
 ]) {
   const page = await browser.newPage({ viewport: { width: 1280, height: 860 } });
   await page.goto(url);

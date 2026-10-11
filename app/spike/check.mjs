@@ -2,10 +2,11 @@
 import assert from 'node:assert/strict';
 import { chromium } from '@playwright/test';
 
-// `SPIKE=joint` checks the JointJS spike (`npx vite spike-joint --port 4797`) with the same steps.
-const joint = process.env.SPIKE === 'joint';
-const URL = process.env.SPIKE_URL ?? (joint ? 'http://localhost:4797/' : 'http://localhost:4799/');
-const shots = joint ? 'spike-joint/shots' : 'spike/shots';
+// `SPIKE=joint` (port 4797) or `SPIKE=djs` (diagram-js, port 4796) checks that spike with the same steps.
+const other = { joint: ['4797', 'spike-joint'], djs: ['4796', 'spike-djs'] }[process.env.SPIKE];
+const joint = !!other;
+const URL = process.env.SPIKE_URL ?? `http://localhost:${other?.[0] ?? '4799'}/`;
+const shots = `${other?.[1] ?? 'spike'}/shots`;
 const cardSel = id => (joint ? `[data-card="${id}"]` : `.svelte-flow__node[data-id="${id}"]`);
 const cableSel = id => (joint ? `[data-cable="${id}"]` : `.svelte-flow__edge[data-id="${id}"]`);
 const socketSel = joint ? '.end.to' : '.ends .socket';
