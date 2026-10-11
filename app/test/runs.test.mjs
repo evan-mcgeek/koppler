@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { readRuns, runRecord, strays } from '../dist/runs.mjs';
+import { readRuns, runRecord, strays } from '../dist/engine/runs.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const send = (id, nodes, edges = [], extra = {}) => ({ tag: 'koppler', at: `2026-01-01T00:00:0${id.at(-1)}Z`, data: { id, env: 'qa', mode: 'auto', nodes, edges, evil: '<script>', plan: { starts: nodes.map(n => ({ id: n.id, why: [] })), restarts: [], stops: [], keeps: [{ id: '../bad' }] }, ...extra } });
@@ -63,7 +63,7 @@ console.log('runs tests ok');
 
 // Code changes for the History: removed and added lines per app and file, bounded and cleaned.
 {
-  const { codeChanges } = await import('../dist/runs.mjs');
+  const { codeChanges } = await import('../dist/engine/runs.js');
   const got = codeChanges([
     { kind: 'process', name: 'api', command: 'dotnet run' },
     { kind: 'edit', app: 'api', file: 'appsettings.json', before: '"Url": "https://qa"', after: '"Url": "http://localhost:5001" // koppler: do not commit' },
@@ -85,7 +85,7 @@ console.log('runs tests ok');
 }
 // A queue with several Stops and Sends: only the newest board action goes out, answers stay, each says how long it waited.
 {
-  const { pickPrompts } = await import('../dist/runs.mjs');
+  const { pickPrompts } = await import('../dist/engine/runs.js');
   const at = m => new Date(Date.parse('2026-01-01T10:00:00Z') + m * 60000).toISOString();
   const q = [{ tag: 'koppler-stop', at: at(0), data: { id: 's1' } }, { tag: 'koppler', at: at(5), data: { id: 'r1' } }, { tag: 'koppler-reply', at: at(6), data: {} }, { tag: 'koppler-stop', at: at(28), data: { id: 's2' } }].map(p => JSON.stringify(p));
   const out = pickPrompts([...q, 'junk'], Date.parse(at(30)));

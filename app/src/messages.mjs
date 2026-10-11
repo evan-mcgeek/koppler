@@ -4,7 +4,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { runs } from './runs.mjs';
+import { runs } from './engine/runs.ts';
 import { TEMP } from './paths.ts';
 
 const file = () => path.join(process.env.KOPPLER_TEMP || TEMP, 'messages.jsonl');

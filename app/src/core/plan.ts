@@ -206,8 +206,8 @@ export const QUEUE_TYPES = ['sqs', 'sns', 'eventbridge', 'kafka', 'other'] as co
 export const LOCAL_QUEUE_TYPES = ['sqs', 'kafka'] as const;
 
 interface AppQueues {
-  publishes?: Record<string, unknown>;
-  reads?: Record<string, unknown>;
+  publishes?: Record<string, unknown> | undefined;
+  reads?: Record<string, unknown> | undefined;
 }
 /** The queues an app publishes to or reads, from the stack. */
 export function queuesOf(stack: { apps?: Record<string, AppQueues> } | null | undefined, id: string): string[] {
