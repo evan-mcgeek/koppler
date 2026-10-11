@@ -12,7 +12,7 @@ import { readData, type DataName } from './data.ts';
 import { CODE, LOGS, STATE, TEMP } from './paths.ts';
 import { tail } from './server/logs.ts';
 import { ROUTES } from './server/routes.ts';
-import { publish, SOURCE } from './server/status.ts';
+import { publish, SOURCE, statusJson } from './server/status.ts';
 
 const MAX_BODY_BYTES = 256 * 1024;
 const PORT = Number(process.env['KOPPLER_PORT']) || 4747;
@@ -136,6 +136,11 @@ function servePage(what: string, url: URL, res: Response): void {
     const value = readData(data.name);
     const headers = { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'no-store' };
     res.writeHead(value ? 200 : 404, headers).end(value ? `window.${data.global} = ${JSON.stringify(value)};\n` : '');
+    return;
+  }
+  if (what === 'data/status.json') {
+    const status = statusJson();
+    res.writeHead(status ? 200 : 404, JSON_HEADERS).end(status ?? 'null');
     return;
   }
   const asked = DATA_FILE.exec(what)?.[1] as DataName | undefined;

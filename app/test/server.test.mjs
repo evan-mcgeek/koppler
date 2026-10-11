@@ -61,6 +61,11 @@ try {
   const status = () => { try { return fs.readFileSync(statusFile, 'utf8'); } catch { return ''; } };
   await until('a status from the running server', () => status().includes('"server":true'));
   assert.equal(fs.statSync(statusFile).mode & 0o777, 0o600);
+  // The same status as JSON, for the new canvas; it does not hold the token either.
+  const asJson = await call('GET', `${page.pathname}data/status.json`);
+  assert.equal(asJson.headers['content-type'], 'application/json; charset=utf-8');
+  assert.equal(JSON.parse(asJson.body.toString()).server, true);
+  assert.equal(asJson.body.toString().includes(token), false);
   assert.equal(status().includes(token), false);
 
   // A request that fails is answered, and the server keeps running: a save while its folder cannot be written, a body too large.
