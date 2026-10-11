@@ -4,7 +4,6 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { init as initStack, removeApp, stacksCommand, sync, updateClones, useCommand } from './sync.mjs';
 import { discardChanges, linkStack, linkedStatus, proposeChanges, updateStack } from './linked.mjs';
@@ -12,10 +11,10 @@ import { discoverCommand } from './discover.mjs';
 import { sayCommand } from './messages.mjs';
 import { switchCommand } from './engine/branch.ts';
 import { down } from './engine/down.ts';
-import { secretTest } from './engine/app-start.ts';
 import { wire } from './engine/wire.ts';
 import { run } from './engine/run.ts';
 import { canvas, logs, status, stop } from './cli/running.ts';
+import { doctor, ports, secret } from './cli/doctor.ts';
 import { up } from './engine/up.ts';
 import { recipesCommand } from './engine/recipes.ts';
 import { queryCommand } from './query.mjs';
@@ -23,13 +22,10 @@ import { findCommand } from './research.mjs';
 import { investigate } from './investigate.mjs';
 import { deployed } from './deployed.mjs';
 import { appliedCommand as applied, historyCommand, planCommand, runningNames } from './engine/runs.ts';
-import * as tunnelPlan from './core/ports.ts';
-import { needs as needsFor } from './engine/needs.ts';
-import { APPROVE, missingTunnels } from './engine/checks.ts';
-import { APP, BIN, TEMP } from './paths.ts';
-import { confirm, envOf, fail, flagValue, positional } from './cli/output.ts';
+import { APPROVE } from './engine/checks.ts';
+import { APP, TEMP } from './paths.ts';
+import { fail, flagValue, positional } from './cli/output.ts';
 import { sh } from './engine/processes.ts';
-import * as kp from './core/plan.ts';
 import { readData } from './data.ts';
 
 // A first-time setup ends with the full picture: ports, conflicts and calls of every app.
@@ -58,101 +54,7 @@ const init = async args => {
 const here = path.dirname(fileURLToPath(import.meta.url));
 
 
-// The tunnels a set of apps needs, with shared, moved and loopback-aliased ones worked out (default: the apps on the canvas).
-function ports(args) {
-  const registry = readData('registry') ?? fail('no stack loaded (koppler init)');
-  const json = args.includes('--json'), envAt = args.indexOf('--env');
-  const env = envAt >= 0 ? args[envAt + 1] : registry.envs[0];
-  if (!registry.envs.includes(env)) fail(`unknown env ${env}; the stack has ${registry.envs.join(', ')}`);
-  let ids = args.filter((a, i) => !a.startsWith('--') && (envAt < 0 || i !== envAt + 1));
-  if (!ids.length) ids = Object.keys(readData('state')?.nodes ?? {});
-  for (const id of ids) if (!registry.apps[id]) fail(`${id} is not an app in the stack`);
-  for (const id of ids) if (registry.apps[id].outside) fail(`${registry.apps[id].name ?? id} does not run on this Mac: ${registry.apps[id].outside}`);
-  // An app with no tunnels for this environment never gets the first environment's: that would reach the wrong database.
-  const noTunnel = missingTunnels(registry, env).filter(id => ids.includes(id));
-  if (noTunnel.length) fail(`${noTunnel.map(id => registry.apps[id].name).join(', ')}: the stack has no ${env.toUpperCase()} tunnel. Add it to stack.json (apps.<id>.envs.${env}.prereqs) before running on ${env.toUpperCase()}; never use another environment's.`);
-  const prereqsOf = id => { const a = registry.apps[id]; return env !== registry.envs[0] && a.envs?.[env]?.prereqs ? a.envs[env].prereqs : a.prereqs ?? []; };
-  const entries = ids.flatMap(id => prereqsOf(id).filter(p => p.tunnel && p.port).map(p => ({ app: id, tunnel: p.tunnel, port: p.port, env: p.env, what: p.what, connectsAs: p.connectsAs })));
-  const appPorts = ids.map(id => Number(new URL(registry.apps[id].url ?? 'http://x').port)).filter(Boolean);
-  const plan = tunnelPlan.planTunnels(entries, appPorts).map(t => ({ ...t, steps: tunnelPlan.planSteps(t) }));
-  if (json) return console.log(JSON.stringify(plan, null, 2));
-  if (!plan.length) return console.log(`no tunnels needed for ${ids.join(', ') || 'these apps'}`);
-  const name = id => registry.apps[id].name;
-  for (const line of tunnelPlan.describePlan(plan, name)) console.log(line);
-  for (const t of plan) {
-    console.log(`\n${t.host} -> ${t.bind}:${t.port}  (for ${t.apps.map(name).join(', ')})`);
-    for (const c of t.steps.sudo) console.log(`  you run: ${c}`);
-    for (const c of t.steps.undo) console.log(`  undo:    ${c}`);
-    console.log(`  tunnel:  koppler run ${t.steps.name} --port ${t.port}${t.needsAlias ? ` --bind ${t.bind}` : ''} --restart -- ${t.steps.tunnel}`);
-    for (const s of t.steps.settings) console.log(`  setting: ${s.env}=${s.value} in ${name(s.app)}'s -LOCAL profile`);
-  }
-}
-
 const registryOrFail = () => readData('registry') ?? fail('no stack loaded (koppler init)');
-
-// Tries each stored secret the apps declare and says only whether it works; the values stay in their store.
-function secretTests(registry, ids, env) {
-  return ids.flatMap(id => {
-    const base = registry.apps[id] ?? fail(`${id} is not an app in the stack`);
-    const app = env === registry.envs[0] ? base : { ...base, ...(base.envs?.[env] ?? {}) };
-    return (app.secrets ?? []).filter(s => s.env).map(s => ({ app: id, name: s.env, env, ...secretTest(env === registry.envs[0] ? id : `${id}@${env}`, s) }));
-  });
-}
-
-// Can these apps run here? The tools this stack needs, then what the user still has to do for the apps, then (asked
-// for) whether each stored secret works, or whether every connection of what runs now answers.
-async function doctor(args) {
-  if (args.includes('--flow')) return flowCheck(args);
-  const json = args.includes('--json'), registry = registryOrFail(), env = envOf(registry, args);
-  const ids = positional(args, ['--env', '--no-tunnels']);
-  const { checkTools, report } = await import('./engine/checks.ts');
-  // Approving runs commands from a shared file on this Mac: only a person at the terminal can say yes, never --yes.
-  const tools = await checkTools({ approve: args.includes('--approve'), confirm: question => confirm(question) });
-  if (tools.error) fail(tools.error);
-  const todo = ids.length ? needsFor(args.filter(a => a !== '--secrets' && a !== '--approve'), { skill: APP, fail, collect: json }) : null;
-  const secrets = args.includes('--secrets') ? secretTests(registry, ids.length ? ids : Object.keys(registry.apps), env) : [];
-  if (json) return console.log(JSON.stringify({ tools: tools.results, ...(todo ?? {}), ...(args.includes('--secrets') && { secrets }) }, null, 2));
-  if (!ids.length) report(tools.results);
-  for (const s of secrets) console.log(`${s.app} ${s.name} (${env.toUpperCase()}): ${s.message}`);
-  if (tools.results.some(r => r.state === 'missing') || secrets.some(s => s.code === 1)) process.exitCode = 1;
-}
-
-// Every connection of what runs now, tested the way the canvas's Flow check does: each app answers, each cable reaches
-// its local app, each tunnel reaches its database or cache.
-async function flowCheck(args) {
-  const registry = registryOrFail(), { live } = await import('./engine/runs.ts'), board = live();
-  if (!board || !Object.keys(board.nodes ?? {}).length) return console.log('Nothing is running, so there is nothing to test.');
-  const env = board.env ?? registry.envs[0], name = id => registry.apps[id]?.name ?? id;
-  const ids = Object.keys(board.nodes).filter(id => registry.apps[id]);
-  const prereqsOf = id => { const a = registry.apps[id]; return env !== registry.envs[0] && a.envs?.[env]?.prereqs ? a.envs[env].prereqs : a.prereqs ?? []; };
-  const entries = ids.filter(id => board.nodes[id].tunnels !== false).flatMap(id => prereqsOf(id).filter(p => p.tunnel && p.port).map(p => ({ app: id, tunnel: p.tunnel, port: p.port, env: p.env, what: p.what, connectsAs: p.connectsAs })));
-  const jobs = [
-    ...ids.filter(id => registry.apps[id].url).map(id => ({ label: name(id), body: { env, node: id } })),
-    ...(board.edges ?? []).map(e => ({ label: `${name(e.from)} to local ${name(e.to)}`, body: { env, from: e.from, to: e.to } })),
-    ...tunnelPlan.planTunnels(entries).flatMap(t => t.apps.map(id => ({ label: `${name(id)} to ${t.what ?? t.host}`, body: { env, app: id, host: t.bind, port: t.port, original: t.original } }))),
-  ];
-  const { cableTest } = await import('./status-watch.mjs');
-  const results = [];
-  for (const j of jobs) results.push({ ...j, result: await cableTest(registry, j.body) });
-  if (args.includes('--json')) console.log(JSON.stringify(results.map(r => ({ connection: r.label, ok: r.result.ok, text: r.result.text, detail: r.result.detail })), null, 2));
-  else for (const r of results) console.log(`${r.result.ok ? 'ok     ' : r.result.unsure ? 'unsure ' : 'FAILED '} ${r.label}: ${r.result.text}${r.result.ok ? '' : ` (${r.result.detail})`}`);
-  if (results.some(r => !r.result.ok && !r.result.unsure)) process.exitCode = 1;
-}
-
-// Secrets, in the user's own terminal: the values never pass through Koppler's output.
-function secret(args) {
-  const [action, ...rest] = args, script = { set: 'secret-set', list: 'secret-list', psql: 'secret-psql' }[action];
-  if (action === 'remove') {
-    const [store, name] = rest;
-    if (!store || !name) fail('usage: koppler secret remove <app>[@<env>] <NAME>');
-    return process.exit(spawnSync(path.join(BIN, 'secret-store'), ['remove', store, name], { stdio: 'inherit' }).status ?? 1);
-  }
-  if (!script) fail('usage: koppler secret set|list|remove|psql <app>[@<env>] [<NAME>]');
-  // A protected environment's value is stored so that every read asks the user (the stack says which; else all but the first).
-  const registry = readData('registry'), env = String(rest[0] ?? '').split('@')[1] ?? registry?.envs?.[0];
-  const mark = registry ? { KOPPLER_SECRET_PROTECTED: kp.isProtected(registry, env) ? '1' : '0' } : {};
-  process.exit(spawnSync(path.join(BIN, script), rest, { stdio: 'inherit', env: { ...process.env, ...mark } }).status ?? 1);
-}
 
 // Stacks on this Mac, or switch to one; --boards lists the boards of the stack in use (the team's presets and your own).
 const use = args => {

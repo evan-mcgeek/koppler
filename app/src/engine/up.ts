@@ -60,7 +60,8 @@ const prereqsOf = (stack: Registry, id: string, env: string): Prereq[] => {
   const app = stack.apps[id];
   return (env !== stack.envs[0] && app?.envs?.[env]?.prereqs) || (app?.prereqs ?? []);
 };
-const tunnelsOf = (stack: Registry, id: string, env: string): TunnelNeed[] =>
+/** The tunnels an app needs on an environment, as the stack states them. */
+export const tunnelsOf = (stack: Registry, id: string, env: string): TunnelNeed[] =>
   prereqsOf(stack, id, env).flatMap(({ tunnel, port, env: setting, what, connectsAs }) =>
     tunnel && port ? [{ app: id, tunnel, port, env: setting, what, connectsAs }] : [],
   );
