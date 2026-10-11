@@ -65,11 +65,19 @@ export const STACK: Stack = {
 type Stack = { name: string; envs: string[]; apps: Record<string, Record<string, unknown>>; presets?: unknown[] };
 type Canvas = { url: string; dir: string; temp: string };
 
-export const test = base.extend<{ stack: Stack; board: object | null; uncloned: string[]; canvas: Canvas }>({
+export const test = base.extend<{
+  stack: Stack;
+  board: object | null;
+  uncloned: string[];
+  start: string;
+  canvas: Canvas;
+}>({
   // `stack`, `board` and `uncloned` (apps with no clone on this machine) can be set per test with test.use.
   stack: [STACK, { option: true }],
   board: [null, { option: true }],
   uncloned: [[], { option: true }],
+  // The page under the canvas address to open: today's canvas, or `next/` for the new one.
+  start: ['', { option: true }],
   canvas: async ({ stack, board, uncloned }, use) => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-e2e-')),
       temp = path.join(dir, 'state', 'run'),
@@ -111,10 +119,10 @@ export const test = base.extend<{ stack: Stack; board: object | null; uncloned: 
     server.kill();
     fs.rmSync(dir, { recursive: true, force: true });
   },
-  page: async ({ page, canvas }, use) => {
+  page: async ({ page, canvas, start }, use) => {
     const errors: string[] = [];
     page.on('pageerror', e => errors.push(String(e)));
-    await page.goto(canvas.url);
+    await page.goto(canvas.url + start);
     await use(page);
     expect(errors, 'no script errors on the page').toEqual([]);
   },

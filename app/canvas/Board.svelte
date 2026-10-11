@@ -3,10 +3,10 @@
     Background,
     BackgroundVariant,
     ConnectionMode,
-    Controls,
     Panel,
     SvelteFlow,
     useSvelteFlow,
+    useViewport,
     ViewportPortal,
   } from '@xyflow/svelte';
   import { cablePath, throughPath } from '../src/core/cables.ts';
@@ -17,6 +17,10 @@
   const flow = useSvelteFlow();
   board.toFlow = at => flow.screenToFlowPosition(at, { snapToGrid: false });
   board.zoom = () => flow.getZoom();
+  const viewport = useViewport();
+  const FIT = { padding: 0.15, duration: 200 };
+  // Not the library's zoomIn and zoomOut: taken here, before its board exists, they stay tied to an empty one.
+  const zoomBy = (factor: number) => void flow.setZoom(flow.getZoom() * factor, { duration: 150 });
 
   const draft = $derived.by(() => {
     const drawn = board.draft;
@@ -28,7 +32,7 @@
   const arrange = () => {
     board.arrange();
     // The cards move first; the view follows once they are placed.
-    requestAnimationFrame(() => void flow.fitView({ padding: 0.15, duration: 200 }));
+    requestAnimationFrame(() => void flow.fitView(FIT));
   };
 </script>
 
@@ -40,13 +44,24 @@
   connectionMode={ConnectionMode.Loose}
   colorMode="system"
   minZoom={0.2}
+  attributionPosition="bottom-left"
   fitView
   fitViewOptions={{ padding: 0.15 }}
 >
   <Background variant={BackgroundVariant.Dots} gap={24} size={2.4} bgColor="var(--paper)" patternColor="var(--dot)" />
-  <Controls />
-  <Panel position="top-left">
-    <button class="tool" onclick={arrange}>Arrange</button>
+  <Panel position="bottom-right">
+    <div class="tools" role="toolbar" aria-label="Board">
+      <button title="Arrange cards by who calls whom, callers on top" onclick={arrange}>Arrange</button>
+      <button title="Zoom to fit all apps" onclick={() => void flow.fitView(FIT)}>Fit</button>
+      <span class="sep" aria-hidden="true"></span>
+      <div class="zoom" role="group" aria-label="Zoom">
+        <button aria-label="Zoom out" onclick={() => zoomBy(1 / 1.2)}>−</button>
+        <button title="Reset to 100%" onclick={() => void flow.setZoom(1, { duration: 200 })}>
+          {Math.round(viewport.current.zoom * 100)}%
+        </button>
+        <button aria-label="Zoom in" onclick={() => zoomBy(1.2)}>+</button>
+      </div>
+    </div>
   </Panel>
   <!-- Above every card, a picked one too: each cable's two ends, which the pointer can grab, and the cable being drawn. -->
   <ViewportPortal target="front" style="position: absolute; z-index: 1001">
@@ -132,17 +147,36 @@
     stroke-linecap: round;
     stroke-dasharray: 6 6;
   }
-  .tool {
-    height: 32px;
-    padding: 0 12px;
+  .tools {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding: 3px;
     border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--panel);
+  }
+  .zoom {
+    display: flex;
+    gap: 2px;
+  }
+  .tools button {
+    padding: 6px 12px;
+    border: 1px solid transparent;
     border-radius: 8px;
-    background: var(--surface);
+    background: none;
     color: var(--ink);
     font: 600 13px var(--sans);
+    white-space: nowrap;
     cursor: pointer;
   }
-  .tool:hover {
-    border-color: var(--ink);
+  .tools button:hover {
+    background: color-mix(in oklab, var(--ink) 7%, transparent);
+  }
+  .sep {
+    width: 1px;
+    height: 18px;
+    margin: 0 4px;
+    background: var(--line);
   }
 </style>

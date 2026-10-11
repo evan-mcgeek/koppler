@@ -20,7 +20,7 @@
   class:wiring={!!board.draft}
 >
   <header>
-    <span class="kind">{data.kind}</span>
+    <span class="kind">{data.kindLabel}</span>
     <span class="name">{data.name}</span>
   </header>
   {#if far}
@@ -33,7 +33,7 @@
       </div>
       <div>
         <dt>Address</dt>
-        <dd>localhost:{data.port}</dd>
+        <dd>{data.address}</dd>
       </div>
     </dl>
   {/if}
