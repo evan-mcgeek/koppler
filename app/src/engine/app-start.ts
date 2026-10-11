@@ -9,7 +9,7 @@ import { launchProfile, startCommand, type LaunchProfiles, type StartContext } f
 import { isProtected } from '../core/plan.ts';
 import type { App, Secret } from '../core/stack.ts';
 import { readClones, readStack } from '../data.ts';
-import { repoFiles } from '../investigate.mjs';
+import { repoFiles } from './investigate.ts';
 import { readJson } from '../json-files.ts';
 import { BIN, CODE } from '../paths.ts';
 import { resolveDevice, type RunDevice } from './devices.ts';

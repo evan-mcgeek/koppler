@@ -9,7 +9,7 @@ import { execFile, execFileSync } from 'node:child_process';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import * as kinds from './core/kinds.ts';
-import { detectKind } from './investigate.mjs';
+import { detectKind } from './engine/investigate.ts';
 import { packageOf, librariesFor } from './engine/libraries.ts';
 import { checkStack as checkLoadedStack } from './engine/checks.ts';
 import { TEMP } from './paths.ts';

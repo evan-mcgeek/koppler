@@ -2,7 +2,7 @@
 // where each runs locally, its deployed address per environment (from Terraform), and which apps call which.
 // Nothing is written until the user picks what to keep.
 import fs from 'node:fs';
-import { localPorts } from './investigate.mjs';
+import { localPorts } from './engine/investigate.ts';
 import { ENV_TOKEN, draftApp, readRepo, stackEnv } from './deployed.mjs';
 import { validateStack } from './core/stack.ts';
 import { grepClone, hostsByApp, missingCalls, urlsInClone } from './sync.mjs';
