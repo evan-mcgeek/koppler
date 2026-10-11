@@ -2,7 +2,9 @@
   import { SvelteFlowProvider } from '@xyflow/svelte';
   import { untrack } from 'svelte';
   import Board from './Board.svelte';
+  import Help from './Help.svelte';
   import Side from './Side.svelte';
+  import Toast from './Toast.svelte';
   import { board } from './board.svelte.ts';
   import { load, save } from './data.ts';
 
@@ -78,7 +80,7 @@
   }}
 />
 
-<header>
+<header class:protected={board.protected}>
   <button
     class="side-toggle"
     type="button"
@@ -95,9 +97,16 @@
   <span class="title">Koppler</span>
   {#if board.stack}
     <span class="stack">{board.stack}</span>
-    <span class="env" class:prod={board.env === 'prod'}>{board.env.toUpperCase()}</span>
+    <span class="env" class:prod={board.protected}>{board.env.toUpperCase()}</span>
   {/if}
+  <span class="spacer"></span>
+  <Help />
 </header>
+{#if board.protected}
+  <div class="banner" role="alert">
+    {board.env.toUpperCase()}: local code runs against real {board.env.toUpperCase()} data and secrets.
+  </div>
+{/if}
 <main>
   {#await opened then found}
     {#if found}
@@ -106,6 +115,7 @@
         <SvelteFlowProvider>
           <Board />
         </SvelteFlowProvider>
+        <Toast />
       </div>
     {:else}
       <p class="empty">No stack yet. Run <code>koppler init</code>, then open the canvas again.</p>
@@ -123,6 +133,18 @@
     border-bottom: 1px solid var(--line);
     background: var(--panel);
     color: var(--ink);
+  }
+  header.protected {
+    border-bottom: 3px solid var(--prod);
+  }
+  .spacer {
+    flex: 1;
+  }
+  .banner {
+    padding: 6px 16px;
+    background: color-mix(in oklab, var(--prod) 14%, var(--panel));
+    color: var(--prod);
+    font: 600 13px var(--sans);
   }
   .title {
     font-weight: 700;

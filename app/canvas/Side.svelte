@@ -1,5 +1,6 @@
 <script lang="ts">
   import KindIcon from './KindIcon.svelte';
+  import Settings from './Settings.svelte';
   import { board, type StackApp } from './board.svelte.ts';
 
   type Sort = 'name' | 'added';
@@ -53,7 +54,7 @@
   };
 </script>
 
-<aside aria-label="Board and apps">
+<aside aria-label="Board and apps" class:protected={board.protected}>
   <div class="head">
     <div class="seg" role="radiogroup" aria-label="Environment">
       {#each board.envs as env (env)}
@@ -154,9 +155,12 @@
     </div>
     <p class="note" role="status">{copied}</p>
   </section>
-  {#if board.unsaved}
-    <p class="unsaved" role="alert">Not saved: the canvas server is not answering. Changes stay on this page.</p>
-  {/if}
+  <footer>
+    {#if board.unsaved}
+      <p class="unsaved" role="alert">Not saved: the canvas server is not answering. Changes stay on this page.</p>
+    {/if}
+    <Settings />
+  </footer>
 </aside>
 
 <style>
@@ -367,8 +371,18 @@
     padding: 0 8px;
     color: var(--muted);
   }
+  footer {
+    display: grid;
+    gap: 8px;
+    margin-top: auto;
+    padding: 0 2px;
+  }
+  .protected .seg label:has(input:checked) {
+    background: var(--prod);
+    color: var(--on-accent);
+  }
   .unsaved {
-    margin: auto 0 0;
+    margin: 0;
     padding: 0 8px;
     color: var(--warn);
     font-weight: 600;

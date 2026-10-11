@@ -53,7 +53,8 @@
   class="card kind-{data.kind}"
   class:selected
   class:far
-  class:drop={board.drop === id}
+  class:drop-ok={board.drop?.id === id && board.drop.ok}
+  class:drop-bad={board.drop?.id === id && !board.drop.ok}
   class:wiring={!!board.draft}
 >
   <header>
@@ -297,9 +298,11 @@
     outline: 2px solid var(--cable);
     outline-offset: 3px;
   }
-  .card.drop {
-    outline: 2px solid var(--ok);
-    outline-offset: 3px;
+  .card.drop-ok {
+    box-shadow: 0 0 0 3px var(--ok);
+  }
+  .card.drop-bad {
+    box-shadow: 0 0 0 3px var(--bad);
   }
   /* Only the title sets a card's width: everything below it fits whatever width the title makes. */
   .body,

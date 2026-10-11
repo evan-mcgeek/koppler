@@ -59,13 +59,14 @@ test('cables entering one side fan out, and sliding a socket past its neighbour 
 
 test('pulling an occupied socket away from its side starts a new cable from that port', async ({ page }) => {
   const from = await middle(socket(page, 'orders>catalog'));
-  const onto = await middle(card(page, 'web'));
+  // Catalog API may call Payments API: nothing in the stack says otherwise.
+  const onto = await middle(card(page, 'payments'));
   await page.mouse.move(from.x, from.y);
   await page.mouse.down();
   await page.mouse.move(from.x, from.y - 30, { steps: 4 });
   await page.mouse.move(onto.x, onto.y, { steps: 8 });
   await page.mouse.up();
-  await expect(cable(page, 'catalog>web')).toHaveCount(1);
+  await expect(cable(page, 'catalog>payments')).toHaveCount(1);
 });
 
 test('a cable is drawn through waypoints dropped on the empty board, and Escape cancels one', async ({ page }) => {

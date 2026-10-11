@@ -62,7 +62,14 @@ export const STACK: Stack = {
   ],
 };
 
-type Stack = { name: string; envs: string[]; apps: Record<string, Record<string, unknown>>; presets?: unknown[] };
+type Stack = {
+  name: string;
+  envs: string[];
+  protected?: string[];
+  apps: Record<string, Record<string, unknown>>;
+  queues?: Record<string, Record<string, unknown>>;
+  presets?: unknown[];
+};
 type Canvas = { url: string; dir: string; temp: string };
 
 export const test = base.extend<{
