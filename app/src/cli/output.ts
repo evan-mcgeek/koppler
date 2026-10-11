@@ -36,3 +36,10 @@ export const flagValue = (args: string[], name: string) => {
   const at = args.indexOf(name);
   return at >= 0 ? args[at + 1] : undefined;
 };
+
+/** The environment a command was asked for, the stack's first when none was; an unknown one ends the command. */
+export function envOf(stack: { envs: string[] }, args: string[]): string {
+  const env = flagValue(args, '--env') ?? stack.envs[0] ?? '';
+  if (!stack.envs.includes(env)) fail(`unknown env ${env}; the stack has ${stack.envs.join(', ')}`);
+  return env;
+}
