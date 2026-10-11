@@ -70,6 +70,15 @@ try {
   const kept = await call('GET', `${page.pathname}data/state.json`);
   assert.equal(kept.headers['content-type'], 'application/json; charset=utf-8');
   assert.equal(JSON.parse(kept.body.toString()).env, 'qa');
+  // A cable keeps its place on each side, where Arrange centred it and its waypoints; nothing else rides along.
+  const cable = { from: 'web', to: 'orders', fromSide: 'bottom', toSide: 'top', fromSlot: 1, toSlot: 0, fromShift: 50, toShift: -50, points: [{ x: 10, y: 20, z: 1 }, { x: 'no' }], extra: 'x' };
+  const layout = { nodes: { web: { x: 0, y: 0 } }, sides: { 'web>orders': ['bottom', 'top', 'x', 'y', 1, 0, [{ x: 10, y: 20 }], 50, -50, 'more'], 'web>catalog': ['left', 'right'], 'web>payments': ['up', 'top'] } };
+  const withCable = JSON.stringify({ nodes: {}, edges: [cable], env: 'qa', mode: 'auto', presets: [{ name: 'One', version: 1, nodes: { web: { run: 'cli' } }, edges: [], layout }] });
+  assert.equal((await call('POST', save, json, withCable)).status, 204);
+  const back = JSON.parse((await call('GET', `${page.pathname}data/state.json`)).body.toString());
+  assert.deepEqual(back.edges, [{ from: 'web', to: 'orders', fromSide: 'bottom', toSide: 'top', fromSlot: 1, toSlot: 0, fromShift: 50, toShift: -50, points: [{ x: 10, y: 20 }] }]);
+  assert.deepEqual(back.presets[0].layout.sides, { 'web>orders': ['bottom', 'top', null, null, 1, 0, [{ x: 10, y: 20 }], 50, -50], 'web>catalog': ['left', 'right'] });
+  assert.equal((await call('POST', save, json, board)).status, 204);
   if (process.getuid?.() !== 0) {
     fs.chmodSync(temp, 0o500);
     try {
