@@ -4,11 +4,13 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { until } from './helpers.mjs';
 
 // One session listens at a time; one the user moved away from cannot take the connection back by listening again.
 const koppler = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'src', 'koppler.mjs');
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-listen-')), env = { ...process.env, KOPPLER_TEMP: dir };
-const listener = () => JSON.parse(fs.readFileSync(path.join(dir, 'listener.json'), 'utf8'));
+const listener = () => { try { return JSON.parse(fs.readFileSync(path.join(dir, 'listener.json'), 'utf8')); } catch { return {}; } };
+const gone = child => new Promise(resolve => child.exitCode !== null || child.signalCode ? resolve() : child.once('exit', resolve));
 const start = (...args) => new Promise(resolve => { const p = spawn('node', [koppler, 'listen', ...args], { env }); let out = ''; p.stdout.on('data', d => { out += d; if (out.includes('\n')) resolve({ p, out }); }); setTimeout(() => resolve({ p, out }), 1500); });
 const wait = ms => new Promise(r => setTimeout(r, ms));
 
@@ -17,8 +19,9 @@ const idA = a.out.match(/session (\w+)/)[1];
 assert.equal(listener().session, idA);
 const b = await start('--take');
 const idB = b.out.match(/session (\w+)/)[1];
-await wait(300);
 assert.notEqual(idA, idB);
+// A is stopped by B taking over, and B stays the one connected.
+await gone(a.p);
 assert.equal(listener().session, idB);
 // A listens again as itself: refused, B keeps the connection.
 const again = spawnSync('node', [koppler, 'listen', '--as', idA], { env, encoding: 'utf8' });
@@ -26,8 +29,9 @@ assert.equal(again.status, 3);
 assert.match(again.stderr, /Another session is connected/);
 assert.equal(listener().session, idB);
 // B listening again as itself is fine.
-b.p.kill(); await wait(300);
-const bAgain = spawn('node', [koppler, 'listen', '--as', idB], { env }); await wait(500);
+b.p.kill(); await gone(b.p);
+const bAgain = spawn('node', [koppler, 'listen', '--as', idB], { env });
+await until('B listening again', () => listener().pid === bAgain.pid);
 assert.equal(listener().session, idB);
 bAgain.kill(); a.p.kill();
 fs.rmSync(dir, { recursive: true, force: true });
@@ -65,6 +69,7 @@ console.log('listen tests ok');
   { const t = fresh(); const bystander = spawn('sleep', ['30']);
     fs.writeFileSync(t.file('listener.json'), JSON.stringify({ pid: bystander.pid, started: 'Thu Jan  1 00:00:00 1970', since: 't', session: 'old00001' }));
     const b = await begin(t, '--take'); assert.match(b.out, /connected as session/);
+    // Nothing to wait for but time: a signal sent by mistake would have arrived by now.
     run(t, '--stop'); await ended(b); await wait(200);
     assert.equal(bystander.exitCode ?? bystander.signalCode, null); bystander.kill(); }
   console.log('listen cases ok');

@@ -4,6 +4,10 @@ const cleanups = [];
 process.on('exit', () => cleanups.forEach(stopAll => stopAll()));
 import { commandFor, parseRun } from '../src/koppler.mjs';
 import { allowStack } from './allow.mjs';
+import { freePorts, until } from './helpers.mjs';
+
+// Ports the system says are free; the tunnel one has room after it, for the tunnel that moves.
+const [crashy, upA, upB, tunA, tunB, runA, runB, agentA, agentB, leftA, leftB] = await freePorts(11), [tunnel] = await freePorts(1, { roomAfter: 2 });
 
 assert.deepEqual(parseRun(['mobile-api']), { name: 'mobile-api', command: [], restart: false });
 assert.deepEqual(parseRun(['db', '--port', '5436', '--restart', '--', 'cloudflared', 'access', 'tcp']),
@@ -31,9 +35,8 @@ console.log('ok');
   const koppler = (...args) => { const r = spawnSync('node', [path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'src', 'koppler.mjs'), ...args], { encoding: 'utf8', env }); return (r.stdout + r.stderr).trim(); };
   assert.match(koppler('run', 'handover', '--', 'sh', '-c', 'sleep 0.4; exec sleep 30'), /started handover/);
   // With a port, "started" means it answers: a crash during startup is reported with its log, not as started.
-  assert.match(koppler('run', 'crashy', '--port', '59981', '--', 'sh', '-c', 'sleep 2; echo boom; exit 1'), /crashy exited before answering on port 59981[\s\S]*boom/);
-  await new Promise(r => setTimeout(r, 1200));
-  assert.match(koppler('status'), /handover\s+running/);
+  assert.match(koppler('run', 'crashy', '--port', String(crashy), '--', 'sh', '-c', 'sleep 2; echo boom; exit 1'), new RegExp(`crashy exited before answering on port ${crashy}[\\s\\S]*boom`));
+  await until('handover showing as running', () => /handover\s+running/.test(koppler('status')));
   assert.match(koppler('stop', 'handover'), /handover: stopped/);
   assert.doesNotMatch(koppler('status'), /handover\s+running/);
   // A worker that ignores the polite signal does not outlive its app.
@@ -52,7 +55,7 @@ console.log('ok');
   cleanups.push(() => spawnSync('node', [path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'src', 'koppler.mjs'), 'stop', '--all', '--yes'], { env }));
   const koppler = (...args) => { const r = spawnSync('node', [path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'src', 'koppler.mjs'), ...args], { encoding: 'utf8', env }); return (r.stdout + r.stderr).trim(); };
   const app = port => ({ name: `App ${port}`, kind: 'other', start: `python3 -m http.server ${port} --bind 127.0.0.1`, url: `http://localhost:${port}` });
-  { const stack = { envs: ['qa'], apps: { a: { ...app(59971), consumes: { b: { how: 'env', env: 'B_URL' } } }, b: app(59972) } }; fs.writeFileSync(path.join(dir, 'registry.js'), `window.REGISTRY = ${JSON.stringify(stack)};`); allowStack(dir, stack); }
+  { const stack = { envs: ['qa'], apps: { a: { ...app(upA), consumes: { b: { how: 'env', env: 'B_URL' } } }, b: app(upB) } }; fs.writeFileSync(path.join(dir, 'registry.js'), `window.REGISTRY = ${JSON.stringify(stack)};`); allowStack(dir, stack); }
   fs.writeFileSync(path.join(dir, 'local.js'), `window.LOCAL = ${JSON.stringify({ apps: { a: { path: dir }, b: { path: dir } } })};`);
   const out = koppler('up', 'a', 'b', '--cable', 'a:b');
   assert.ok(out.indexOf('started b') >= 0 && out.indexOf('started b') < out.indexOf('started a'), out);
@@ -72,15 +75,15 @@ console.log('ok');
   fs.mkdirSync(bin);
   fs.writeFileSync(path.join(bin, 'cloudflared'), '#!/bin/sh\nfor last; do :; done\nexec python3 -m http.server "${last##*:}" --bind 127.0.0.1\n', { mode: 0o755 });
   const app = (port, tunnel) => ({ name: `App ${port}`, kind: 'other', start: `echo "DB_ADDR=\${DB_ADDR:-unset}"; exec python3 -m http.server ${port} --bind 127.0.0.1`, url: `http://localhost:${port}`, prereqs: [tunnel] });
-  const stack = { envs: ['qa'], apps: { a: app(59941, { tunnel: 'db-a.internal', port: 59951 }), b: app(59942, { tunnel: 'db-b.internal', port: 59951, env: 'DB_ADDR' }) } };
+  const stack = { envs: ['qa'], apps: { a: app(tunA, { tunnel: 'db-a.internal', port: tunnel }), b: app(tunB, { tunnel: 'db-b.internal', port: tunnel, env: 'DB_ADDR' }) } };
   fs.writeFileSync(path.join(dir, 'registry.js'), `window.REGISTRY = ${JSON.stringify(stack)};`); allowStack(dir, stack);
   fs.writeFileSync(path.join(dir, 'local.js'), `window.LOCAL = ${JSON.stringify({ apps: { a: { path: dir }, b: { path: dir } } })};`);
   const r = koppler('up', 'a', 'b');
   assert.equal(r.code, 0, r.out);
-  assert.match(r.out, /started tunnel-db-a-59951/);
-  assert.match(r.out, /started tunnel-db-b-59953/);
+  assert.match(r.out, new RegExp(`started tunnel-db-a-${tunnel}\\b`));
+  assert.match(r.out, new RegExp(`started tunnel-db-b-${tunnel + 2}\\b`));
   const log = id => fs.readFileSync(path.join(dir, 'logs', `${id}.log`), 'utf8');
-  assert.match(log('b'), /DB_ADDR=localhost:59953/);
+  assert.match(log('b'), new RegExp(`DB_ADDR=localhost:${tunnel + 2}\\b`));
   assert.match(log('a'), /DB_ADDR=unset/);
   koppler('stop', '--all', '--yes');
   console.log('moved tunnel ok');
@@ -94,8 +97,8 @@ console.log('ok');
   cleanups.push(() => spawnSync('node', [path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'src', 'koppler.mjs'), 'stop', '--all', '--yes'], { env }));
   const koppler = (...args) => { const r = spawnSync('node', [path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'src', 'koppler.mjs'), ...args], { encoding: 'utf8', env }); return { out: (r.stdout + r.stderr).trim(), code: r.status }; };
   const apps = {
-    a: { name: 'A', kind: 'other', start: 'echo "B_URL=$B_URL"; exec python3 -m http.server 59961 --bind 127.0.0.1', url: 'http://localhost:59961', consumes: { b: { how: 'env', env: 'B_URL' } } },
-    b: { name: 'B', kind: 'other', start: 'exec python3 -m http.server 59962 --bind 127.0.0.1', url: 'http://localhost:59962' },
+    a: { name: 'A', kind: 'other', start: `echo "B_URL=\$B_URL"; exec python3 -m http.server ${runA} --bind 127.0.0.1`, url: `http://localhost:${runA}`, consumes: { b: { how: 'env', env: 'B_URL' } } },
+    b: { name: 'B', kind: 'other', start: `exec python3 -m http.server ${runB} --bind 127.0.0.1`, url: `http://localhost:${runB}` },
   };
   { const stack = { envs: ['qa'], apps }; fs.writeFileSync(path.join(dir, 'registry.js'), `window.REGISTRY = ${JSON.stringify(stack)};`); allowStack(dir, stack); }
   fs.writeFileSync(path.join(dir, 'local.js'), `window.LOCAL = ${JSON.stringify({ apps: { a: { path: dir }, b: { path: dir } } })};`);
@@ -103,7 +106,7 @@ console.log('ok');
   const r = koppler('up', '--run', 'run000010');
   assert.equal(r.code, 0, r.out);
   assert.ok(r.out.indexOf('started b') < r.out.indexOf('started a'), r.out);
-  assert.match(fs.readFileSync(path.join(dir, 'logs', 'a.log'), 'utf8'), /B_URL=http:\/\/localhost:59962/);
+  assert.match(fs.readFileSync(path.join(dir, 'logs', 'a.log'), 'utf8'), new RegExp(`B_URL=http://localhost:${runB}\\b`));
   assert.match(fs.readFileSync(path.join(dir, 'history.jsonl'), 'utf8'), /"event":"done"/);
   assert.deepEqual(Object.keys(JSON.parse(fs.readFileSync(path.join(dir, 'live.json'), 'utf8')).nodes).sort(), ['a', 'b']);
   koppler('stop', '--all', '--yes');
@@ -117,8 +120,8 @@ console.log('ok');
   cleanups.push(() => spawnSync('node', [path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'src', 'koppler.mjs'), 'stop', '--all', '--yes'], { env }));
   const koppler = (...args) => { const r = spawnSync('node', [path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'src', 'koppler.mjs'), ...args], { encoding: 'utf8', env }); return { out: (r.stdout + r.stderr).trim(), code: r.status }; };
   const apps = {
-    a: { name: 'A', kind: 'other', start: 'echo "B_URL=$B_URL"; exec python3 -m http.server 59951 --bind 127.0.0.1', url: 'http://localhost:59951', consumes: { b: { how: 'env', env: 'B_URL' } } },
-    b: { name: 'B', kind: 'other', start: 'exec python3 -m http.server 59952 --bind 127.0.0.1', url: 'http://localhost:59952' },
+    a: { name: 'A', kind: 'other', start: `echo "B_URL=\$B_URL"; exec python3 -m http.server ${agentA} --bind 127.0.0.1`, url: `http://localhost:${agentA}`, consumes: { b: { how: 'env', env: 'B_URL' } } },
+    b: { name: 'B', kind: 'other', start: `exec python3 -m http.server ${agentB} --bind 127.0.0.1`, url: `http://localhost:${agentB}` },
   };
   { const stack = { envs: ['qa'], apps }; fs.writeFileSync(path.join(dir, 'registry.js'), `window.REGISTRY = ${JSON.stringify(stack)};`); allowStack(dir, stack); }
   fs.writeFileSync(path.join(dir, 'local.js'), `window.LOCAL = ${JSON.stringify({ apps: { a: { path: dir }, b: { path: dir } } })};`);
@@ -126,7 +129,7 @@ console.log('ok');
   const r = koppler('up', 'a', '--cable', 'a:b');
   assert.equal(r.code, 0, r.out);
   assert.match(r.out, /b: already running/);
-  assert.match(fs.readFileSync(path.join(dir, 'logs', 'a.log'), 'utf8'), /B_URL=http:\/\/localhost:59952/);
+  assert.match(fs.readFileSync(path.join(dir, 'logs', 'a.log'), 'utf8'), new RegExp(`B_URL=http://localhost:${agentB}\\b`));
   const live = JSON.parse(fs.readFileSync(path.join(dir, 'live.json'), 'utf8'));
   assert.deepEqual([Object.keys(live.nodes).sort(), live.edges], [['a', 'b'], [{ from: 'a', to: 'b' }]]);
   assert.equal((fs.readFileSync(path.join(dir, 'history.jsonl'), 'utf8').match(/"event":"done"/g) ?? []).length, 2);
@@ -173,15 +176,15 @@ console.log('ok');
   cleanups.push(() => spawnSync('node', [path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'src', 'koppler.mjs'), 'stop', '--all', '--yes'], { env }));
   const koppler = (...args) => { const r = spawnSync('node', [path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'src', 'koppler.mjs'), ...args], { encoding: 'utf8', env }); return { out: (r.stdout + r.stderr).trim(), code: r.status }; };
   const apps = {
-    a: { name: 'A', kind: 'other', start: 'exec python3 -m http.server 59941 --bind 127.0.0.1', url: 'http://localhost:59941', consumes: { b: { how: 'unknown' } } },
-    b: { name: 'B', kind: 'other', start: 'exec python3 -m http.server 59942 --bind 127.0.0.1', url: 'http://localhost:59942' },
+    a: { name: 'A', kind: 'other', start: `exec python3 -m http.server ${leftA} --bind 127.0.0.1`, url: `http://localhost:${leftA}`, consumes: { b: { how: 'unknown' } } },
+    b: { name: 'B', kind: 'other', start: `exec python3 -m http.server ${leftB} --bind 127.0.0.1`, url: `http://localhost:${leftB}` },
   };
   { const stack = { envs: ['qa'], apps }; fs.writeFileSync(path.join(dir, 'registry.js'), `window.REGISTRY = ${JSON.stringify(stack)};`); allowStack(dir, stack); }
   fs.writeFileSync(path.join(dir, 'local.js'), `window.LOCAL = ${JSON.stringify({ apps: { a: { path: dir }, b: { path: dir } } })};`);
   fs.writeFileSync(path.join(dir, 'history.jsonl'), JSON.stringify({ id: 'run000011', at: 't', kind: 'run', env: 'qa', nodes: { a: { run: 'cli' }, b: { run: 'cli' } }, edges: [{ from: 'a', to: 'b' }], plan: { starts: [], restarts: [], stops: [], keeps: [] } }) + '\n');
   const r = koppler('up', '--run', 'run000011');
   assert.equal(r.code, 3, r.out);
-  assert.match(r.out, /Left for the agent:[\s\S]*A -> local B: point it at http:\/\/localhost:59942/);
+  assert.match(r.out, new RegExp(`Left for the agent:[\\s\\S]*A -> local B: point it at http://localhost:${leftB}\\b`));
   assert.deepEqual(Object.keys(JSON.parse(fs.readFileSync(path.join(dir, 'live.json'), 'utf8')).nodes).sort(), ['a', 'b']);
   assert.doesNotMatch(fs.readFileSync(path.join(dir, 'history.jsonl'), 'utf8'), /"event":"done"/);
   koppler('stop', '--all', '--yes');
