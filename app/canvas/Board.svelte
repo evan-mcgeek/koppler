@@ -3,6 +3,7 @@
     Background,
     BackgroundVariant,
     ConnectionMode,
+    SelectionMode,
     Panel,
     SvelteFlow,
     useSvelteFlow,
@@ -38,12 +39,33 @@
       ? throughPath(drawn.a, drawn.side, drawn.b, drawn.bSide, drawn.points)
       : cablePath(drawn.a, drawn.side, drawn.b, drawn.bSide);
   });
+  /** What a drag on the empty board does: select an area, or move the board. Space held moves it either way. */
+  let tool = $state<'select' | 'hand'>('select');
+  const TOOLS = [
+    [
+      'select',
+      'Select (V): drag on the board to select an area',
+      'M3.5 2.5 L12 8.2 L8.3 8.9 L10.4 13.2 L8.8 14 L6.7 9.7 L3.9 12.2 Z',
+    ],
+    [
+      'hand',
+      'Hand (H): drag to move around. Or hold Space while dragging',
+      'M5 8V3.6a1 1 0 0 1 2 0V7.5M7 7V2.8a1 1 0 0 1 2 0V7M9 7.2V3.6a1 1 0 0 1 2 0V8.5M11 8V5.6a1 1 0 0 1 2 0V9.5c0 2.6-1.8 4.5-4.4 4.5H8c-1.5 0-2.5-.6-3.4-1.8L2.8 9.8a1 1 0 0 1 1.6-1.1L5 9.4',
+    ],
+  ] as const;
+  const shortcut = (ev: KeyboardEvent) => {
+    if (ev.metaKey || ev.ctrlKey || ev.altKey || (ev.target as Element).closest('input, select, textarea')) return;
+    if (ev.key === 'v' || ev.key === 'V') tool = 'select';
+    else if (ev.key === 'h' || ev.key === 'H') tool = 'hand';
+  };
   const arrange = () => {
     board.arrange();
     // The cards move first; the view follows once they are placed.
     requestAnimationFrame(() => void flow.fitView(FIT));
   };
 </script>
+
+<svelte:window onkeydown={shortcut} />
 
 <div class="area" bind:this={area}>
   <SvelteFlow
@@ -52,6 +74,14 @@
     nodeTypes={{ app: AppCard }}
     edgeTypes={{ cable: Cable }}
     connectionMode={ConnectionMode.Loose}
+    panOnScroll
+    panOnScrollSpeed={1}
+    panOnDrag={tool === 'hand' ? true : [1, 2]}
+    selectionOnDrag={tool === 'select'}
+    selectionMode={SelectionMode.Partial}
+    onedgeclick={({ edge }) => {
+      board.cut(edge.source, edge.target);
+    }}
     colorMode="system"
     minZoom={0.2}
     attributionPosition="bottom-left"
@@ -61,6 +91,22 @@
     <Background variant={BackgroundVariant.Dots} gap={24} size={2.4} bgColor="var(--paper)" patternColor="var(--dot)" />
     <Panel position="bottom-right">
       <div class="tools" role="toolbar" aria-label="Board">
+        <div class="switch" role="radiogroup" aria-label="Dragging on the board">
+          {#each TOOLS as [name, title, d] (name)}
+            <button
+              class="tool"
+              type="button"
+              role="radio"
+              aria-checked={tool === name}
+              aria-label={title}
+              {title}
+              onclick={() => (tool = name)}
+            >
+              <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true" class={name}><path {d} /></svg>
+            </button>
+          {/each}
+        </div>
+        <span class="sep" aria-hidden="true"></span>
         <button title="Arrange cards by who calls whom, callers on top" onclick={arrange}>Arrange</button>
         <button title="Zoom to fit all apps" onclick={() => void flow.fitView(FIT)}>Fit</button>
         <span class="sep" aria-hidden="true"></span>
@@ -187,6 +233,37 @@
   }
   .tools button:hover {
     background: color-mix(in oklab, var(--ink) 7%, transparent);
+  }
+  .switch {
+    display: flex;
+    gap: 2px;
+  }
+  .tools .tool {
+    display: grid;
+    place-items: center;
+    width: 30px;
+    height: 28px;
+    padding: 0;
+    color: var(--muted);
+  }
+  .tools .tool[aria-checked='true'] {
+    background: color-mix(in oklab, var(--cable) 22%, transparent);
+    color: var(--ink);
+  }
+  .select path {
+    fill: currentColor;
+  }
+  .hand path {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.3;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .area :global(.svelte-flow__selection) {
+    border: 1px solid var(--cable);
+    border-radius: 3px;
+    background: color-mix(in oklab, var(--cable) 12%, transparent);
   }
   .sep {
     width: 1px;

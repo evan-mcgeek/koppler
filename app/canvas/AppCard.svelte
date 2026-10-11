@@ -436,20 +436,21 @@
   .port:hover {
     border-color: var(--cable);
   }
+  /* On the card's outer edge, where its cables end: one pixel out from where the border's inside puts them. */
   .port.top {
     left: 50%;
-    top: 0;
+    top: -1px;
   }
   .port.right {
-    left: 100%;
+    left: calc(100% + 1px);
     top: 50%;
   }
   .port.bottom {
     left: 50%;
-    top: 100%;
+    top: calc(100% + 1px);
   }
   .port.left {
-    left: 0;
+    left: -1px;
     top: 50%;
   }
   .card :global(.anchor) {
