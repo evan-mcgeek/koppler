@@ -19,7 +19,7 @@ import { findCommand } from './research.mjs';
 import { investigate, repoFiles } from './investigate.mjs';
 import { deployed } from './deployed.mjs';
 import { appliedCommand as applied, historyCommand, planCommand, runningNames, appendRun, runRecord, runs as runHistory } from './runs.mjs';
-import tunnelPlan from './ports.cjs';
+import * as tunnelPlan from './core/ports.ts';
 import kinds from './kinds.cjs';
 import { needs as needsFor } from './needs.mjs';
 import { APPROVE, approved, missingTunnels, startsFromStack } from './checks.mjs';
@@ -27,7 +27,7 @@ import { APP, BIN, LOGS, STATE, TEMP } from './paths.ts';
 import { readActions, updateActions } from './actions.mjs';
 import { appEnv } from './safe-env.mjs';
 import { redact, scrub } from './scrub.mjs';
-import kp from './plan.cjs';
+import * as kp from './core/plan.ts';
 import { readData } from './data.ts';
 
 // A first-time setup ends with the full picture: ports, conflicts and calls of every app.

@@ -5,7 +5,7 @@
 //   broker settings pointed at it.
 import { execFileSync } from 'node:child_process';
 import kinds from './kinds.cjs';
-import kp from './plan.cjs';
+import * as kp from './core/plan.ts';
 
 export const PORT = 4566, ENDPOINT = `http://127.0.0.1:${PORT}`;
 // Stopping the Docker client does not stop its container: it is removed on stop, and a leftover one before starting.

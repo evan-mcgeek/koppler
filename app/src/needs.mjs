@@ -4,8 +4,8 @@ import { APPROVE, approved, checksFor, envGaps, stackCommands, startsFromStack }
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import tunnelPlan from './ports.cjs';
-import kp from './plan.cjs';
+import * as tunnelPlan from './core/ports.ts';
+import * as kp from './core/plan.ts';
 import { readData } from './data.ts';
 
 // "Cache (Valkey)" -> "Valkey cache", "Database" -> "database": what an address leads to, in plain words.

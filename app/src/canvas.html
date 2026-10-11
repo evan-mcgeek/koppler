@@ -1212,11 +1212,11 @@
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 <span class="sr" id="health-live" role="status" aria-live="polite"></span>
 
-<script src="ports.cjs"></script>
+<script src="page/ports.js"></script>
 <script src="kinds.cjs"></script>
-<script src="presets.cjs"></script>
-<script src="plan.cjs"></script>
-<script src="logfmt.cjs"></script>
+<script src="page/presets.js"></script>
+<script src="page/plan.js"></script>
+<script src="page/logfmt.js"></script>
 <script src="temp/registry.js"></script>
 <script src="temp/local.js"></script>
 <script src="temp/repos.js"></script>
@@ -1864,7 +1864,7 @@ document.getElementById('tidy').onclick = () => {
 // (Stored as "presets", the name stack.json uses for team boards.)
 var boardsReady = false, openingBoard = false;
 const presetList = () => [...(registry.presets ?? []).map(p => ({ ...p, shared: true })), ...(state.presets ?? [])];
-// What a preset is checked against before it opens (presets.cjs): this stack's apps, your clones and their branches.
+// What a preset is checked against before it opens (core/presets): this stack's apps, your clones and their branches.
 const MAX_BRANCHES = 300;
 const stackFacts = () => ({
   known: id => !!registry.apps[id], cloned, name: id => registry.apps[id]?.name ?? id, canCall,
@@ -2402,7 +2402,7 @@ function missingKinds(id) {
 }
 // An app can run without its tunnels, when only its API is needed: they are then not opened.
 const tunnelsOn = id => state.nodes[id]?.hideTunnels ? [] : tunnelsOf(id);
-// Tunnels for everything on the board, planned together so none clash (ports.cjs): shared, moved, or on a loopback alias.
+// Tunnels for everything on the board, planned together so none clash (core/ports): shared, moved, or on a loopback alias.
 function boardPlan() {
   const ids = Object.keys(state.nodes);
   const entries = ids.flatMap(id => tunnelsOn(id).map(p => ({ app: id, tunnel: p.tunnel, port: p.port, env: p.env, what: KopplerPorts.tunnelKind(p), connectsAs: p.connectsAs })));
