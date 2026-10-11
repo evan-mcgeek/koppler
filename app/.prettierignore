@@ -9,8 +9,7 @@ package-lock.json
 src/fonts/
 .impeccable/
 
-# Still in its first form: each file leaves this list in the pull request that converts it to TypeScript.
-src/*.mjs
+# Still in its first form.
 src/canvas.html
 src/lambda-secrets-proxy.go
 test/*.mjs
