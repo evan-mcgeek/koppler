@@ -4,7 +4,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { fileUrl, githubFile, proposeFile, readFile } from './github.mjs';
+import { fileUrl, githubFile, proposeFile, readFile } from './github.ts';
 import { validateStack } from './core/stack.ts';
 import { setStack } from './sync.mjs';
 

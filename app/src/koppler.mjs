@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { init as initStack, removeApp, stacksCommand, sync, updateClones, useCommand } from './sync.mjs';
 import { discardChanges, linkStack, linkedStatus, proposeChanges, updateStack } from './linked.mjs';
 import { discoverCommand } from './discover.mjs';
-import { sayCommand } from './messages.mjs';
+import { sayCommand } from './engine/messages.ts';
 import { switchCommand } from './engine/branch.ts';
 import { down } from './engine/down.ts';
 import { wire } from './engine/wire.ts';

@@ -5,7 +5,7 @@ import path from 'node:path';
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-msg-'));
 process.env.KOPPLER_TEMP = dir;
-const { appendAnswer, appendMessage, clearMessages, readMessages, sanitizeMessage } = await import('../dist/messages.mjs');
+const { appendAnswer, appendMessage, clearMessages, readMessages, sanitizeMessage } = await import('../dist/engine/messages.js');
 
 assert.match(sanitizeMessage(null).error, /JSON object/);
 assert.match(sanitizeMessage({ summary: 'x' }).error, /needs a title/);

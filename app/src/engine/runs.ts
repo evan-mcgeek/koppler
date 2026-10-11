@@ -397,7 +397,7 @@ function changesAfter(run: Run, all: Run[]): CodeChange[] {
 /** While Koppler itself is worked on, a finished Stop ends a session: it is gathered, and the agent is asked to review it. */
 async function gatherSession(stop: Run): Promise<void> {
   try {
-    const { isDev, collectSession } = await import('../session.mjs');
+    const { isDev, collectSession } = await import('./session.ts');
     if (!isDev()) return;
     const dir = collectSession({ temp: temp(), logsDir: path.join(stateDir(), 'logs'), stop, runs: runs() });
     const review = `The session ended with a full Stop. Review it using the koppler-run skill: read ${dir}/summary.md and the files next to it, find every problem the user ran into, fix them in Koppler, verify each fix, and report.`;

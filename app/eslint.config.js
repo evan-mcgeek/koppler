@@ -29,5 +29,7 @@ export default tseslint.config(
   {
     files: ['**/*.ts'],
     languageOptions: { parserOptions: { projectService: true, tsconfigRootDir: import.meta.dirname } },
+    // `({ dropped, ...kept }) => kept` is how a property is left out.
+    rules: { '@typescript-eslint/no-unused-vars': ['error', { ignoreRestSiblings: true }] },
   },
 );

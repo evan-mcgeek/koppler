@@ -5,7 +5,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { gh } from './github.mjs';
+import { gh } from './github.ts';
 import { readData } from './data.ts';
 
 const CONFIG_DIR = process.env.KOPPLER_CONFIG_DIR || path.join(os.homedir(), '.config', 'koppler');
