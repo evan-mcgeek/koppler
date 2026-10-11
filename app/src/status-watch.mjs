@@ -15,8 +15,8 @@ import { appendRun, live, runRecord, runningEnvs, runningNames, runs } from './e
 import { addApps, removeApp, createStack, currentStack, forgetStacks, stacksHere, useStack } from './sync.mjs';
 import { discardChanges, linkStack, linkedStatus, proposeChanges, updateStack } from './linked.mjs';
 import { applyFindings, current as currentFindingsStack, discover } from './discover.mjs';
-import { appendAnswer, clearMessages, readMessages } from './messages.mjs';
-import { githubFile, readFile } from './github.mjs';
+import { appendAnswer, clearMessages, readMessages } from './engine/messages.ts';
+import { githubFile, readFile } from './github.ts';
 import * as kinds from './core/kinds.ts';
 import * as launch from './core/launch.ts';
 import { recipesFor } from './engine/recipes.ts';

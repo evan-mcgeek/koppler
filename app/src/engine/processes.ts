@@ -7,7 +7,7 @@ import { fail } from '../cli/output.ts';
 import { LOGS, STATE } from '../paths.ts';
 import { appEnv } from '../safe-env.ts';
 import { redact } from '../scrub.ts';
-import { keepPreviousLog } from '../session.mjs';
+import { keepPreviousLog } from './session.ts';
 
 const PROCS = path.join(STATE, 'procs');
 /** What a process started by Koppler can be called. */
