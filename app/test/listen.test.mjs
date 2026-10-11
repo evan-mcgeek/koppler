@@ -33,7 +33,8 @@ b.p.kill(); await gone(b.p);
 const bAgain = spawn('node', [koppler, 'listen', '--as', idB], { env });
 await until('B listening again', () => listener().pid === bAgain.pid);
 assert.equal(listener().session, idB);
-bAgain.kill(); a.p.kill();
+// A listener releases its connection on its way out, which writes in the folder: wait for it before removing the folder.
+bAgain.kill(); a.p.kill(); await gone(bAgain);
 fs.rmSync(dir, { recursive: true, force: true });
 console.log('listen tests ok');
 
