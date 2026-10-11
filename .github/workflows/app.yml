@@ -1,11 +1,11 @@
 name: App
 
+# Runs on pull requests only: a merge to main holds what its pull request already checked. Run it by hand for main
+# when in doubt (Actions, App, Run workflow).
 on:
-  push:
-    branches: [main]
-    paths: [app/**, .github/workflows/app.yml]
   pull_request:
     paths: [app/**, .github/workflows/app.yml]
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -19,8 +19,9 @@ defaults:
     working-directory: app
 
 jobs:
-  test:
-    name: Tests
+  # One job: each job is billed by the started minute and installs everything again.
+  app:
+    name: App
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -30,57 +31,27 @@ jobs:
           cache: npm
           cache-dependency-path: app/package-lock.json
       - run: npm ci
-      - name: Tests
-        run: npm test
-
-  lint:
-    name: Lint, types and format
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
-        with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: app/package-lock.json
-      - run: npm ci
-      - run: npm run lint
-      - run: npm run types
-      - run: npm run format:check
-
-  canvas:
-    name: Canvas in a browser
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
-        with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: app/package-lock.json
-      - run: npm ci
+      - name: Lint
+        run: npm run lint
+      - name: Types
+        run: npm run types
+      - name: Format
+        run: npm run format:check
+      - name: Build
+        run: npm run build
+      - name: Unit tests
+        run: npx vitest run
+      - name: End-to-end tests
+        run: node --test --test-concurrency=1 test/*.test.mjs
       - run: npx playwright install --with-deps chromium
-      - name: Canvas tests
-        run: npm run test:canvas
+      - name: Canvas in a browser
+        run: npx playwright test
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
           name: canvas-traces
           path: app/test-results
           retention-days: 7
-
-  check:
-    name: Syntax and package
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
-        with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: app/package-lock.json
-      - run: npm ci
-      - run: npm run build
       - name: Script syntax
         run: |
           for f in dist/*.mjs dist/*.js dist/core/*.js; do node --check "$f"; done
