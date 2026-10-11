@@ -3,7 +3,7 @@
 // Nothing is written until the user picks what to keep.
 import fs from 'node:fs';
 import { localPorts } from './engine/investigate.ts';
-import { ENV_TOKEN, draftApp, readRepo, stackEnv } from './deployed.mjs';
+import { ENV_TOKEN, draftApp, readRepo, stackEnv } from './engine/deployed.ts';
 import { validateStack } from './core/stack.ts';
 import { grepClone, hostsByApp, missingCalls, urlsInClone } from './engine/sync.ts';
 import * as kinds from './core/kinds.ts';
