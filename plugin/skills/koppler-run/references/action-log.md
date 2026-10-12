@@ -13,7 +13,7 @@ The log says how to undo things; which runs and Stops happened, and how they end
 | `kind` | Fields |
 |---|---|
 | `edit` | `app`, `file`, `before`, `after` (exact strings), `recipe?` (set by `koppler recipes --apply` for a remembered change) |
-| `profile` | `app`, `file`, `name`, `created` (bool), `previous` (env object, when an existing profile was updated) |
+| `profile` | `app`, `file` (the full path, like every `file` in this log), `name`, `created` (bool), `previous` (env object, when an existing profile was updated) |
 | `process` | `name` (the `koppler run` name), `command`, `port?`. For the rare process not started through `koppler` (e.g. `flutter run` in the background): `label`, `pid` (the program's own pid, not a shell wrapper: find it by the listening port or the first word of `ps -o command=`, never with a bare `pgrep -f`), `command`, `port?` |
 | `env-file` | `app`, `file` (e.g. `.env.local`), `lines` added, `created` (bool: Koppler created the file) |
 | `file` | `app`, `file`, `before` (the file's text before the run, `null` when Koppler created it), `after` (the text Koppler wrote last): a local library's `pubspec_overrides.yaml`; Stop puts `before` back or removes the file, and leaves a file that no longer reads as `after` for you to sort out |

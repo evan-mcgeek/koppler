@@ -71,6 +71,33 @@ const [crashy, upA, upB, tunA, tunB, runA, runB, agentA, agentB, leftA, leftB] =
   koppler('stop', '--all', '--yes');
   console.log('moved tunnel ok');
 }
+// koppler up: an app that reads its settings from AWS is not started on an expired sign-in; the run says how to sign in instead.
+{
+  const { spawnSync } = await import('node:child_process');
+  const fs = await import('node:fs'), os = await import('node:os'), path = await import('node:path'), { fileURLToPath } = await import('node:url');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-upsso-')), bin = path.join(dir, 'bin');
+  const env = { ...process.env, KOPPLER_STATE: dir, KOPPLER_TEMP: dir, KOPPLER_CONFIG_DIR: dir, PATH: `${bin}:${process.env.PATH}` };
+  cleanups.push(() => spawnSync('node', [path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'dist', 'koppler.mjs'), 'stop', '--all', '--yes'], { env }));
+  const koppler = (...args) => { const r = spawnSync('node', [path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'dist', 'koppler.mjs'), ...args], { encoding: 'utf8', env }); return { out: (r.stdout + r.stderr).trim(), code: r.status }; };
+  // A stand-in for the AWS command: signed in only while the file it looks for is there.
+  fs.mkdirSync(bin);
+  fs.writeFileSync(path.join(bin, 'aws'), `#!/bin/sh\n[ -f "${dir}/signed-in" ] || { echo "Token has expired and refresh failed" >&2; exit 255; }\n`, { mode: 0o755 });
+  const [port] = await freePorts(1);
+  const stack = { envs: ['qa'], apps: { api: { name: 'Orders API', kind: 'other', start: `echo started > "${dir}/started"; exec python3 -m http.server ${port} --bind 127.0.0.1`, url: `http://localhost:${port}`, prereqs: [{ sso: 'acme-qa' }] } } };
+  fs.writeFileSync(path.join(dir, 'registry.json'), JSON.stringify(stack)); allowStack(dir, stack);
+  fs.writeFileSync(path.join(dir, 'local.json'), JSON.stringify({ apps: { api: { path: dir } } }));
+  const refused = koppler('up', 'api');
+  assert.equal(refused.code, 1, refused.out);
+  assert.match(refused.out, /Sign in to AWS first: Orders API reads its settings from AWS at start/);
+  assert.match(refused.out, /aws sso login --profile acme-qa/);
+  assert.equal(fs.existsSync(path.join(dir, 'started')), false, 'nothing was started');
+  fs.writeFileSync(path.join(dir, 'signed-in'), '');
+  const started = koppler('up', 'api');
+  assert.equal(started.code, 0, started.out);
+  assert.equal(fs.existsSync(path.join(dir, 'started')), true);
+  koppler('stop', '--all', '--yes');
+  console.log('sign-in before start ok');
+}
 // koppler up --run: a confirmed Send carried out by Koppler itself; a cable's address reaches its caller at start, and the run is done.
 {
   const { spawnSync } = await import('node:child_process');
