@@ -6,6 +6,7 @@
   import Help from './Help.svelte';
   import Logs from './Logs.svelte';
   import Menu from './Menu.svelte';
+  import Rail from './Rail.svelte';
   import Review from './Review.svelte';
   import { runs } from './run.svelte.ts';
   import Side from './Side.svelte';
@@ -251,7 +252,7 @@
   <main inert={!!loading}>
     {#await opened then found}
       {#if found}
-        {#if side}<Side />{/if}
+        {#if side}<Side />{:else}<Rail open={toggleSide} />{/if}
         <div class="stage">
           <div class="board">
             <SvelteFlowProvider>
