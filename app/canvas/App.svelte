@@ -1,6 +1,7 @@
 <script lang="ts">
   import { SvelteFlowProvider } from '@xyflow/svelte';
   import { untrack } from 'svelte';
+  import Agent from './Agent.svelte';
   import Board from './Board.svelte';
   import Help from './Help.svelte';
   import Logs from './Logs.svelte';
@@ -135,6 +136,7 @@
     <span class="env" class:prod={board.protected}>{board.env.toUpperCase()}</span>
   {/if}
   <span class="spacer"></span>
+  {#if board.stack}<Agent />{/if}
   <Help />
   {#if board.stack}
     <span class="split" inert={!!loading}>
