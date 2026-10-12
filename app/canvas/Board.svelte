@@ -19,6 +19,7 @@
   import Tunnel from './Tunnel.svelte';
   import { board, type CardNode, type InfraNode } from './board.svelte.ts';
   import { live } from './live.svelte.ts';
+  import { probes } from './probes.svelte.ts';
   import { theme } from './theme.svelte.ts';
 
   const flow = useSvelteFlow();
@@ -38,6 +39,12 @@
   // Not the library's zoomIn and zoomOut: taken here, before its board exists, they stay tied to an empty one.
   const zoomBy = (factor: number) => () => void flow.setZoom(flow.getZoom() * factor, { duration: 150 });
 
+  /** Where a socket was pressed, to tell a click in place from a slide. */
+  let pressedAt = { x: 0, y: 0 };
+  // Whenever what runs or what is cabled changes, cables whose apps both answer are tested.
+  $effect(() => {
+    probes.follow();
+  });
   const draft = $derived.by(() => {
     const drawn = board.draft;
     if (!drawn) return '';
@@ -363,19 +370,42 @@
                 board.grabEnd(ev, edge.id, 'from');
               }}
             />
+            {@const tested = probes.shown(edge.source, edge.target)}
+            {@const probe = probes.results[edge.id]}
             <circle
               role="presentation"
               class="socket nodrag nopan"
+              class:tested
               data-cable={edge.id}
               class:grabbed={board.grabbed?.id === edge.id && board.grabbed.end === 'to'}
               cx={b.x}
               cy={b.y}
               r="8"
               onpointerdown={ev => {
+                pressedAt = { x: ev.clientX, y: ev.clientY };
                 board.grabEnd(ev, edge.id, 'to');
               }}
+              onclick={ev => {
+                // A press that slid reordered the cables or drew a new one: only a press in place tests.
+                if (tested && Math.hypot(ev.clientX - pressedAt.x, ev.clientY - pressedAt.y) < 6)
+                  void probes.test(edge.source, edge.target);
+              }}
+              >{#if tested}<title
+                  >{probe?.state === 'busy'
+                    ? 'Testing…'
+                    : probe?.detail
+                      ? `${probe.text ?? ''}. ${probe.detail} Click to test again.`
+                      : `Not tested yet. Click to test that local ${board.apps.find(app => app.id === edge.target)?.name ?? edge.target} answers.`}</title
+                >{/if}</circle
+            >
+            <circle
+              class="light"
+              data-state={tested ? (probe?.state ?? 'idle') : undefined}
+              data-light={edge.id}
+              cx={b.x}
+              cy={b.y}
+              r="3.4"
             />
-            <circle class="light" cx={b.x} cy={b.y} r="3.4" />
           {/if}
         {/each}
         {#if draft}
@@ -509,6 +539,32 @@
   .light {
     fill: var(--socket-rim);
   }
+  .light[data-state='ok'] {
+    fill: var(--ok);
+  }
+  .light[data-state='warn'] {
+    fill: var(--warn);
+  }
+  .light[data-state='bad'] {
+    fill: var(--bad);
+    stroke: color-mix(in oklab, var(--bad) 35%, transparent);
+    stroke-width: 5;
+    paint-order: stroke;
+  }
+  .light[data-state='busy'] {
+    fill: var(--warn);
+    animation: testing 0.9s ease-in-out infinite alternate;
+  }
+  @keyframes testing {
+    to {
+      opacity: 0.25;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .light[data-state='busy'] {
+      animation: none;
+    }
+  }
   .draft {
     fill: none;
     stroke: var(--cable);
@@ -552,6 +608,10 @@
   /* In Live nothing on the board is pulled or unplugged. */
   .ends.still :is(.plug, .socket) {
     pointer-events: none;
+  }
+  .ends.still .socket.tested {
+    pointer-events: auto;
+    cursor: pointer;
   }
   .area:has(.ends.still) :global(.svelte-flow__edge) {
     pointer-events: none;

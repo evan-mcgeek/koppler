@@ -686,7 +686,7 @@ class Board {
    */
   grabEnd(ev: PointerEvent, id: string, end: End): void {
     const pressed = this.edges.find(edge => edge.id === id);
-    if (ev.button !== 0 || !pressed) return;
+    if (ev.button !== 0 || !pressed || this.live) return;
     ev.preventDefault();
     ev.stopPropagation();
     const card = end === 'from' ? pressed.source : pressed.target;

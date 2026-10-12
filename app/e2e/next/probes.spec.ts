@@ -1,0 +1,78 @@
+// The new canvas tests a cable: the light at its socket says whether the call reaches the local app.
+import fs from 'node:fs';
+import net, { type AddressInfo } from 'node:net';
+import path from 'node:path';
+import { test, expect } from '../canvas.ts';
+
+const at = (x: number, y: number) => ({ x, y, run: 'cli', branch: 'main' });
+test.use({
+  start: 'next/',
+  board: {
+    env: 'qa',
+    mode: 'auto',
+    zoom: 0.8,
+    pan: { x: 80, y: 60 },
+    nodes: { web: at(0, 0), orders: at(420, 0), payments: at(840, 0) },
+    edges: [
+      { from: 'web', to: 'orders', fromSide: 'right', toSide: 'left' },
+      { from: 'orders', to: 'payments', fromSide: 'right', toSide: 'left' },
+    ],
+  },
+});
+
+test('a cable is tested once both its apps answer, and again on a click at its socket', async ({ page, canvas }) => {
+  const light = (id: string) => page.locator(`.light[data-light="${id}"]`);
+  const socket = (id: string) => page.locator(`.socket[data-cable="${id}"]`);
+  // Nothing runs: no cable has a light to read.
+  await expect(light('web>orders')).not.toHaveAttribute('data-state');
+
+  // The server's own test is stood in for: the first one passes, later ones fail.
+  const asked: { from: string; to: string; env: string; auto?: boolean }[] = [];
+  await page.route('**/cable-test?*', async route => {
+    asked.push(route.request().postDataJSON() as (typeof asked)[number]);
+    const body =
+      asked.length === 1
+        ? { ok: true, text: 'Works', detail: 'Orders API answered in 12 ms.' }
+        : { ok: false, text: 'No answer', detail: 'Orders API does not answer on localhost:5001.' };
+    await route.fulfill({ json: body });
+  });
+  const listen = () =>
+    new Promise<net.Server>(resolve => {
+      const server = net.createServer();
+      server.listen(0, '127.0.0.1', () => {
+        resolve(server);
+      });
+    });
+  const [web, orders] = [await listen(), await listen()];
+  const port = (server: net.Server) => (server.address() as AddressInfo).port;
+  const write = (name: string, value: unknown) => {
+    fs.writeFileSync(path.join(canvas.temp, `${name}.json`), JSON.stringify(value));
+  };
+  // Web Shop and Orders API answer; Payments API was started and does not.
+  write('status', { apps: { web: { port: port(web) }, orders: { port: port(orders) }, payments: { port: 1 } } });
+  write('progress', { run: 'run12345', env: 'qa', apps: { web: [], orders: [], payments: [] } });
+  try {
+    await expect(light('web>orders')).toHaveAttribute('data-state', 'ok');
+    expect(asked).toEqual([{ env: 'qa', from: 'web', to: 'orders', auto: true }]);
+    await expect(socket('web>orders').locator('title')).toHaveText(
+      'Works. Orders API answered in 12 ms. Click to test again.',
+    );
+    // The cable to the app that does not answer waits: a light, not tested yet.
+    await expect(light('orders>payments')).toHaveAttribute('data-state', 'idle');
+    await page.screenshot({ path: 'test-results/next-probe-ok.png' });
+
+    await socket('web>orders').click();
+    await expect(light('web>orders')).toHaveAttribute('data-state', 'bad');
+    await expect(page.getByRole('alert')).toContainText('Orders API does not answer on localhost:5001.');
+    expect(asked[1]).toEqual({ env: 'qa', from: 'web', to: 'orders' });
+    await page.screenshot({ path: 'test-results/next-probe-bad.png' });
+
+    // In the Live view the light is still there to press.
+    await page.getByRole('radio', { name: 'Live' }).check();
+    await socket('web>orders').click();
+    await expect.poll(() => asked.length).toBe(3);
+  } finally {
+    web.close();
+    orders.close();
+  }
+});
