@@ -10,7 +10,7 @@ import { listenerPid } from '../engine/listen.ts';
 import { readMessages } from '../engine/messages.ts';
 import { recipesFor } from '../engine/recipes.ts';
 import { live, notes, runningEnvs, runningNames, runs } from '../engine/runs.ts';
-import { currentStack, stacksHere } from '../engine/sync.ts';
+import { currentStack, LOADING, stacksHere } from '../engine/sync.ts';
 import { CODE, LOGS, STATE, TEMP } from '../paths.ts';
 import { redact } from '../scrub.ts';
 import { tail } from './logs.ts';
@@ -224,6 +224,7 @@ async function snapshot(serving: boolean): Promise<Status> {
   status['recipes'] = recipesByApp();
   const inUse = currentStack();
   status['stack'] = loadedStack(inUse);
+  status['loading'] = loadingStack();
   status['checks'] = lastChecks();
   status['stacks'] = stacksHere();
   status['linked'] = inUse ? linkedStatus(inUse) : null;
@@ -263,6 +264,17 @@ function loadedStack(inUse: string | null): string | null {
   const registry = readStack();
   if (!inUse || (registry?.source === path.join(inUse, 'stack.json') && registry.found)) shown = inUse;
   return shown;
+}
+
+/** The stack a running `koppler sync` is loading, when it is not the one the page shows already. */
+function loadingStack(): string | null {
+  try {
+    const { stack, pid } = readJson(LOADING) as { stack: unknown; pid: number };
+    process.kill(pid, 0);
+    return typeof stack === 'string' && stack !== shown ? stack : null;
+  } catch {
+    return null;
+  }
 }
 
 let latest: string | null = null;

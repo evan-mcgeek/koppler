@@ -106,7 +106,12 @@
   @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .prod-banner { color: var(--prod); } }
   :root[data-theme="dark"] .prod-banner { color: var(--prod); }
 
-  .main { display: flex; flex: 1; min-height: 0; }
+  .main { position: relative; display: flex; flex: 1; min-height: 0; }
+  .stack-loading { position: absolute; inset: 0; z-index: 40; display: grid; place-items: center; background: color-mix(in srgb, var(--desk) 70%, transparent); }
+  .stack-loading p { display: flex; align-items: center; gap: 10px; max-width: min(420px, 80%); margin: 0; padding: 10px 16px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--ink); font: 600 13px var(--sans); }
+  .stack-loading .label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .stack-loading .dot { flex: none; width: 12px; height: 12px; border: 1.5px solid var(--line); border-top-color: var(--cable); border-radius: 50%; animation: probe 0.7s linear infinite; }
+  @media (prefers-reduced-motion: reduce) { .stack-loading .dot { animation: none; } }
   aside { width: 324px; flex-shrink: 0; display: flex; flex-direction: column; gap: 18px; overflow-y: auto; scrollbar-width: thin; border-right: 1px solid var(--line); padding: 0 12px 14px; }
   aside > *, .finder > * { flex-shrink: 0; }
   /* Status sits in a fixed column, and every row keeps the dot's space, so tags and statuses line up. */
@@ -1024,6 +1029,7 @@
 </div>
 <div class="prod-banner" role="alert"></div>
 <div class="main">
+  <div class="stack-loading" id="stack-loading" role="status" hidden><p><span class="dot" aria-hidden="true"></span><span class="label"></span></p></div>
   <aside id="side" data-lavish-action>
     <div class="side-head">
       <button class="preset-picker" type="button" id="preset-picker" aria-haspopup="listbox" aria-expanded="false" aria-controls="preset-pop">
@@ -3503,7 +3509,7 @@ window.__kopplerStatus = next => {
   status = next;
   setTimeout(revealBoard, 0);
   // Checks that waited for a starting app run once it answers, or once its process is gone.
-  for (const [key, r] of probes) if (r.starting && !appStarting(r.starting)) runProbe(key, r.payload, r.auto, r.label); applyStatus(); renderCreds(); renderHistory(); renderInbox(); followStack(); keepLiveBoard(); followRun(); paintNeeds(); autosave(); autoProbe(); paintHealth(); paintFlow();
+  for (const [key, r] of probes) if (r.starting && !appStarting(r.starting)) runProbe(key, r.payload, r.auto, r.label); applyStatus(); renderCreds(); renderHistory(); renderInbox(); followStack(); paintStackLoading(); keepLiveBoard(); followRun(); paintNeeds(); autosave(); autoProbe(); paintHealth(); paintFlow();
   if (next.pageVersion) loadedVersion ??= next.pageVersion;
   paintRunButtons(); paintDebug();
   // A newer page loads by itself once you are not in the middle of something; the board is saved first, so nothing is lost.
@@ -4070,10 +4076,11 @@ async function postStack(payload, error, button) {
   const url = status?.save?.replace('/state?', '/stack?');
   if (!url) { error.textContent = 'This needs the Koppler canvas running (koppler init --pick).'; return; }
   button.disabled = true; error.textContent = '';
+  switchingTo = payload.use ?? null; paintStackLoading();
   let result;
   try { result = await (await fetch(url, { ...JSON_POST, body: JSON.stringify(payload) })).json(); }
   catch { result = { error: 'This works only in the standalone canvas.' }; }
-  if (result.error) { error.textContent = result.error; button.disabled = false; return; }
+  if (result.error) { error.textContent = result.error; button.disabled = false; switchingTo = null; paintStackLoading(); return; }
   location.reload();
 }
 const setupCard = document.getElementById('setup-form');
@@ -4251,6 +4258,16 @@ function paintStackPicker() {
   stackPicker.hidden = !!registry.setup;
   stackPicker.querySelector('.label').textContent = registry.name || 'Stack';
   stackPicker.title = `${registry.name}: switch to another stack, or start a new one`;
+}
+// A stack on its way in, from here, another tab or the terminal: the board waits behind a notice until the page reloads with it.
+let switchingTo = null;
+function paintStackLoading() {
+  const dir = switchingTo ?? status?.loading ?? null, mine = registry.source?.replace(/\/stack\.json$/, '');
+  const on = !!dir && dir !== mine, name = (status?.stacks ?? []).find(st => st.dir === dir)?.name;
+  const notice = document.getElementById('stack-loading');
+  if (on) notice.querySelector('.label').textContent = `Loading ${name || 'the stack'}...`;
+  notice.hidden = !on;
+  for (const el of [...notice.parentElement.children, document.querySelector('.topbar .actions')]) if (el !== notice) el.inert = on;
 }
 const appCount = st => st.dir === status?.stack ? Object.keys(registry.apps).length : st.apps;
 function openStackMenu() {
