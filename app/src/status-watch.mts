@@ -149,6 +149,11 @@ function servePage(what: string, url: URL, res: Response): void {
     res.writeHead(value ? 200 : 404, JSON_HEADERS).end(JSON.stringify(value));
     return;
   }
+  // Without its closing slash the new canvas would look for its files one folder up.
+  if (what === 'next') {
+    res.writeHead(308, { location: 'next/' }).end();
+    return;
+  }
   const file = Object.hasOwn(PAGE_FILES, what) ? PAGE_FILES[what] : nextFile(what);
   if (!file) {
     res.writeHead(404).end();

@@ -42,7 +42,11 @@ try {
   assert.doesNotMatch(next.body.toString(), /(href|src)="https?:\/\//);
   const script = /assets\/[\w.-]+\.js/.exec(next.body.toString())[0];
   assert.equal((await call('GET', `${page.pathname}next/${script}`)).headers['content-type'], 'text/javascript; charset=utf-8');
-  for (const not of ['next', 'next/index.html', 'next/assets/', 'next/assets/..%2Findex.html', 'next/assets/%2e%2e/index.html', 'data/secrets.json', 'data/state.json'])
+  // Asked for without its closing slash, it is sent on to the address with it.
+  const bare = await call('GET', `${page.pathname}next`);
+  assert.equal(bare.status, 308);
+  assert.equal(bare.headers.location, 'next/');
+  for (const not of ['next/index.html', 'next/assets/', 'next/assets/..%2Findex.html', 'next/assets/%2e%2e/index.html', 'data/secrets.json', 'data/state.json'])
     assert.equal((await call('GET', page.pathname + not)).status, 404, not);
 
   // Another site's name pointed at this machine, or a request another site makes, is refused.
