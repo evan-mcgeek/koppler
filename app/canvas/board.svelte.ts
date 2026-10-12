@@ -740,6 +740,25 @@ class Board {
   unsaved = $state(false);
   #kept: SavedBoard = {};
 
+  /** The Live view: the same board, in the same places, as read-only cards with their state. */
+  live = $state(false);
+  #edit = '';
+  #keptEdit: SavedBoard = {};
+
+  /** Shows the board as it runs. What Edit holds (the cards beside a card that changes size, the undo history) is put aside untouched. */
+  goLive(): void {
+    if (this.live) return;
+    this.#keptEdit = this.saved();
+    this.#edit = this.content();
+    this.live = true;
+  }
+  /** Back to the board as it was left in Edit. */
+  goEdit(): void {
+    if (!this.live) return;
+    this.#apply(this.#edit);
+    this.live = false;
+  }
+
   /** Whether there is a step to go back to, or forward to again. */
   canUndo = $state(false);
   canRedo = $state(false);
@@ -761,6 +780,7 @@ class Board {
 
   /** Notes a change to the board. Changes less than 0.7 seconds apart, a drag for one, are one step to undo. */
   record(): void {
+    if (this.live) return;
     const now = this.content();
     if (now === this.#now) return;
     if (this.#now && Date.now() - this.#at > 700) this.#past.push(this.#now);
@@ -778,6 +798,12 @@ class Board {
     this.#now = back;
     // The next change is a step of its own.
     this.#at = 0;
+    this.#apply(back);
+    this.canUndo = this.#past.length > 0;
+    this.canRedo = this.#future.length > 0;
+  }
+  /** Puts back a board held as text: its cards, cables and the cards beside them. */
+  #apply(back: string): void {
     const { nodes, edges, infra, queues, hiddenQueues } = JSON.parse(back) as {
       nodes: CardNode[];
       edges: CableEdge[];
@@ -794,8 +820,6 @@ class Board {
       ...card,
       position: infra.find(one => one.id === card.id)?.position ?? card.position,
     }));
-    this.canUndo = this.#past.length > 0;
-    this.canRedo = this.#future.length > 0;
   }
   undo(): void {
     this.#step(this.#past, this.#future);
@@ -889,6 +913,8 @@ class Board {
 
   /** The board as the server keeps it: what is on screen, over everything it kept that the canvas does not show yet. */
   saved(): SavedBoard {
+    // Cards change size in Live, which nudges the cards stacked under them: what is kept is the board as Edit left it.
+    if (this.live) return { ...this.#keptEdit, env: this.env };
     const before = this.#kept.nodes ?? {};
     return {
       mode: 'auto',
