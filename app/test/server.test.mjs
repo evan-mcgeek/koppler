@@ -94,6 +94,12 @@ try {
   }
   assert.equal((await call('POST', save, json, 'a'.repeat(9_000_000))).status, 413);
   assert.equal((await call('POST', save, json, board)).status, 204);
+  // A card keeps the libraries it uses a local copy of, by name; anything else in that list is dropped.
+  const withLibraries = JSON.stringify({ nodes: { web: { x: 0, y: 0, run: 'cli', libraries: ['acme-ui', 7, '', '@acme/kit'] }, orders: { x: 0, y: 0, libraries: 'acme-ui' } }, edges: [], env: 'qa', mode: 'auto' });
+  assert.equal((await call('POST', save, json, withLibraries)).status, 204);
+  const cards = JSON.parse((await call('GET', `${page.pathname}data/state.json`)).body.toString()).nodes;
+  assert.deepEqual(cards.web.libraries, ['acme-ui', '@acme/kit']);
+  assert.equal('libraries' in cards.orders, false);
   // Queue choices and the places of queue and outside cards are kept; anything else under those names is not.
   const withQueues = JSON.stringify({ nodes: {}, edges: [], env: 'qa', mode: 'auto', queues: { orders: 'local', mail: 'deployed', 'Bad Id': 'local' }, hiddenQueues: { audit: true, mail: false }, infra: { 'queue:orders': { x: 1, y: 2 }, 'outside:billing': { x: 3, y: 4 }, 'tunnel:db.example:5432': { x: 5, y: 6 }, 'queue:Bad Id': { x: 7, y: 8 }, other: { x: 9, y: 9 } } });
   assert.equal((await call('POST', save, json, withQueues)).status, 204);
