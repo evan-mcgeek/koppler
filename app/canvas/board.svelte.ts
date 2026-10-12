@@ -322,7 +322,7 @@ class Board {
     this.hiddenQueues = Object.fromEntries(show ? kept : [...kept, ...ids.map(id => [id, true] as const)]);
   }
   /** Which apps each tunnel card is linked to. */
-  links = $derived(this.plan.flatMap(tunnel => tunnel.apps.map(app => ({ from: app, to: tunnelKey(tunnel) }))));
+  links = $derived(this.plan.flatMap(tunnel => tunnel.apps.map(app => ({ from: app, to: tunnelKey(tunnel), tunnel }))));
 
   /** How much of a card's bottom edge the tunnel cards under it cover, and whether they sit at its right end. */
   #coveredBelow(id: string) {

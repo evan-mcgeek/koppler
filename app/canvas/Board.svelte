@@ -19,7 +19,7 @@
   import Tunnel from './Tunnel.svelte';
   import { board, type CardNode, type InfraNode } from './board.svelte.ts';
   import { live } from './live.svelte.ts';
-  import { probes } from './probes.svelte.ts';
+  import { probes, type Job, type Probe } from './probes.svelte.ts';
   import { theme } from './theme.svelte.ts';
 
   const flow = useSvelteFlow();
@@ -43,7 +43,7 @@
   let pressedAt = { x: 0, y: 0 };
   // Whenever what runs or what is cabled changes, cables whose apps both answer are tested.
   $effect(() => {
-    probes.follow();
+    probes.follow(jobs);
   });
   const draft = $derived.by(() => {
     const drawn = board.draft;
@@ -111,15 +111,34 @@
     const within = (value: number, low: number, high: number) => Math.min(Math.max(value, low), Math.max(low, high));
     if (across) from.y = within(to.y, app.y + 12, app.y + app.h - 12);
     else from.x = within(to.x, app.x + 12, app.x + app.w - 12);
-    return cablePath(from, fromSide, to, toSide);
+    return { d: cablePath(from, fromSide, to, toSide), end: to };
   };
   const links = $derived(
-    board.links.flatMap(({ from, to }) => {
+    board.links.flatMap(({ from, to, tunnel }) => {
       const app = board.boxes.get(from);
       const card = board.infraBoxes.get(to);
-      return app && card ? [{ key: `${from}>${to}`, d: linkPath(app, card), idle: !live.up(from) }] : [];
+      if (!app || !card) return [];
+      const payload = { app: from, host: tunnel.bind, port: tunnel.port, original: tunnel.original };
+      return [{ key: `${from}>${to}`, from, what: tunnel.what, payload, ...linkPath(app, card), idle: !live.up(from) }];
     }),
   );
+  const name = (id: string) => board.apps.find(app => app.id === id)?.name ?? id;
+  /** What a light says when the pointer rests on it. */
+  const about = (probe: Probe | undefined, what: string) =>
+    probe?.state === 'busy'
+      ? 'Testing…'
+      : probe?.detail
+        ? `${probe.text ?? ''}. ${probe.detail} Click to test again.`
+        : `Not tested yet. Click to test that ${what}.`;
+  /** Every cable and tunnel link that can be tested, with the apps that have to answer first. */
+  const jobs = $derived<Job[]>([
+    ...board.edges.map(({ id, source, target }) => ({
+      key: id,
+      apps: [source, target],
+      payload: { from: source, to: target },
+    })),
+    ...links.map(({ key, from, payload }) => ({ key, apps: [from], payload })),
+  ]);
   /** A message link or a call to an outside system, between the sides of its two cards that face each other. */
   const flows = $derived(
     board.flows.flatMap(({ from, to, queue }) => {
@@ -370,7 +389,7 @@
                 board.grabEnd(ev, edge.id, 'from');
               }}
             />
-            {@const tested = probes.shown(edge.source, edge.target)}
+            {@const tested = live.sent(edge.source) && live.sent(edge.target)}
             {@const probe = probes.results[edge.id]}
             <circle
               role="presentation"
@@ -388,15 +407,9 @@
               onclick={ev => {
                 // A press that slid reordered the cables or drew a new one: only a press in place tests.
                 if (tested && Math.hypot(ev.clientX - pressedAt.x, ev.clientY - pressedAt.y) < 6)
-                  void probes.test(edge.source, edge.target);
+                  void probes.test({ key: edge.id, payload: { from: edge.source, to: edge.target } });
               }}
-              >{#if tested}<title
-                  >{probe?.state === 'busy'
-                    ? 'Testing…'
-                    : probe?.detail
-                      ? `${probe.text ?? ''}. ${probe.detail} Click to test again.`
-                      : `Not tested yet. Click to test that local ${board.apps.find(app => app.id === edge.target)?.name ?? edge.target} answers.`}</title
-                >{/if}</circle
+              >{#if tested}<title>{about(probe, `local ${name(edge.target)} answers`)}</title>{/if}</circle
             >
             <circle
               class="light"
@@ -404,6 +417,35 @@
               data-light={edge.id}
               cx={b.x}
               cy={b.y}
+              r="3.4"
+            />
+          {/if}
+        {/each}
+        <!-- Where a tunnel link reaches its card: whether the app gets to its database or cache through the tunnel. -->
+        {#each links as link (link.key)}
+          {#if live.sent(link.from)}
+            {@const probe = probes.results[link.key]}
+            <circle
+              role="presentation"
+              class="socket tested press nodrag nopan"
+              data-link={link.key}
+              cx={link.end.x}
+              cy={link.end.y}
+              r="7"
+              onpointerdown={ev => {
+                ev.stopPropagation();
+              }}
+              onclick={() => void probes.test(link)}
+              ><title
+                >{about(probe, `${name(link.from)} reaches its ${link.what.toLowerCase()} through the tunnel`)}</title
+              ></circle
+            >
+            <circle
+              class="light"
+              data-state={probe?.state ?? 'idle'}
+              data-light={link.key}
+              cx={link.end.x}
+              cy={link.end.y}
               r="3.4"
             />
           {/if}
@@ -532,6 +574,9 @@
     fill: var(--socket);
     stroke: var(--socket-rim);
     stroke-width: 2;
+  }
+  .socket.press {
+    cursor: pointer;
   }
   .socket.grabbed {
     r: 10px;
