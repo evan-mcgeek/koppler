@@ -981,10 +981,15 @@ class Board {
     };
   }
 
-  /** Puts an app on the board, in the first empty spot of what is on screen, scanning rows from the top left. */
-  add(id: string): void {
+  /** Puts an app on the board: where it is dropped, its header under the pointer, or else in the first empty spot of what is on screen, scanning rows from the top left. */
+  add(id: string, dropped?: Point): void {
     const app = this.apps.find(one => one.id === id);
     if (!app || app.outside || !app.cloned || this.nodes.some(node => node.id === id)) return;
+    if (dropped) {
+      const at = this.toFlow(dropped);
+      this.nodes = [...this.nodes, this.#card(app, { x: at.x - PLACE.w / 2, y: at.y - 22 })];
+      return;
+    }
     const view = this.area();
     const from = this.toFlow({ x: view.left, y: view.top });
     const to = this.toFlow({ x: view.right, y: view.bottom });
