@@ -27,14 +27,21 @@ test('a cable is tested once both its apps answer, and again on a click at its s
   await expect(light('web>orders')).not.toHaveAttribute('data-state');
 
   // The server's own test is stood in for: the first one passes, later ones fail.
-  const asked: { from: string; to: string; env: string; auto?: boolean }[] = [];
+  const asked: { from?: string; to?: string; app?: string; env: string; auto?: boolean }[] = [];
+  const tunnels: object[] = [];
   await page.route('**/cable-test?*', async route => {
-    asked.push(route.request().postDataJSON() as (typeof asked)[number]);
-    const body =
+    const body = route.request().postDataJSON() as (typeof asked)[number];
+    if (body.app) {
+      tunnels.push(body);
+      await route.fulfill({ json: { ok: true, unsure: true, text: 'Open', detail: 'The port is open.' } });
+      return;
+    }
+    asked.push(body);
+    const answer =
       asked.length === 1
         ? { ok: true, text: 'Works', detail: 'Orders API answered in 12 ms.' }
         : { ok: false, text: 'No answer', detail: 'Orders API does not answer on localhost:5001.' };
-    await route.fulfill({ json: body });
+    await route.fulfill({ json: answer });
   });
   const listen = () =>
     new Promise<net.Server>(resolve => {
@@ -57,6 +64,14 @@ test('a cable is tested once both its apps answer, and again on a click at its s
     await expect(socket('web>orders').locator('title')).toHaveText(
       'Works. Orders API answered in 12 ms. Click to test again.',
     );
+    // Orders API's way to its database through the tunnel is tested too; it could not be told either way.
+    const link = 'orders>tunnel:db.qa.acme.example:5432';
+    await expect(light(link)).toHaveAttribute('data-state', 'warn');
+    expect(tunnels).toEqual([{ env: 'qa', app: 'orders', host: 'localhost', port: 5432, original: 5432, auto: true }]);
+    await page.locator(`.socket[data-link="${link}"]`).click();
+    await expect.poll(() => tunnels.length).toBe(2);
+    await expect(page.getByRole('alert')).toContainText('The port is open.');
+    await page.getByRole('alert').getByRole('button', { name: 'Dismiss' }).click();
     // The cable to the app that does not answer waits: a light, not tested yet.
     await expect(light('orders>payments')).toHaveAttribute('data-state', 'idle');
     await page.screenshot({ path: 'test-results/next-probe-ok.png' });
