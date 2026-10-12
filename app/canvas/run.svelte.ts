@@ -326,6 +326,24 @@ class Runs {
     };
   }
 
+  /** Hands what the stack misses for an environment to the agent, which proposes the additions and waits for a yes. */
+  askFacts(env: string, gaps: string[]): Promise<boolean> {
+    const text = [
+      'Find the missing facts for this environment in the stack, using the koppler-run skill.',
+      `ENV ${env.toUpperCase()}`,
+      'MISSING:',
+      ...gaps.map(gap => `  ${gap}`),
+      "Read each app's repo (infrastructure files such as Terraform tfvars, workflow files) and the user's local tunnel aliases. Never read or print a secret value.",
+      'Propose the stack.json additions (apps.<id>.envs.<env>.prereqs, .secrets with fetch steps) and wait for the user to confirm before writing them.',
+    ].join('\n');
+    const waiting = (live.status?.agent?.state ?? 'none') === 'none';
+    return this.deliver(
+      text,
+      { tag: 'koppler-facts', data: { env, gaps } },
+      waiting ? 'Saved. The agent gets it when one connects.' : 'Sent to the agent',
+    );
+  }
+
   /** Asks the agent to find out why an app failed to start; it says what it would change and asks before acting. */
   askToFix(id: string, step: string): Promise<boolean> {
     const env = board.env.toUpperCase();

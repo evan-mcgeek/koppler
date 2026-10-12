@@ -1052,6 +1052,8 @@ class Board {
     return JSON.stringify({ name, version: migrate(preset).preset?.version ?? PRESET_VERSION, nodes, edges }, null, 2);
   }
 
+  /** The notes about this board the user dismissed. */
+  dismissed = $state.raw<string[]>([]);
   /** A board for one app run alone: not kept while it holds only that app. */
   scratch = $state(false);
   /** One app on a board of its own. Gives the board that was on screen, to go back to. */
@@ -1066,6 +1068,7 @@ class Board {
   /** A board to start from: empty, and named once it holds an app. */
   newBoard(): void {
     this.scratch = false;
+    this.dismissed = [];
     this.name = null;
     this.nodes = [];
     this.edges = [];
@@ -1099,6 +1102,7 @@ class Board {
     const ids = Object.keys(preset.nodes);
     const placed = ids.every(place);
     this.scratch = false;
+    this.dismissed = [];
     this.recent = [
       { name: preset.name, at: new Date().toISOString() },
       ...this.recent.filter(one => one.name !== preset.name),
@@ -1228,6 +1232,7 @@ class Board {
     this.name = typeof saved?.['preset'] === 'string' ? saved['preset'] : null;
     this.own = (Array.isArray(saved?.['presets']) ? saved['presets'] : []) as StoredPreset[];
     this.scratch = saved?.['scratch'] === true;
+    this.dismissed = (Array.isArray(saved?.['dismissed']) ? saved['dismissed'] : []) as string[];
     this.trash = (Array.isArray(saved?.['trash']) ? saved['trash'] : []) as Deleted[];
     this.recent = (Array.isArray(saved?.['recent']) ? saved['recent'] : []) as Opened[];
     this.infra = [];
@@ -1252,6 +1257,7 @@ class Board {
       trash: this.trash,
       recent: this.recent,
       scratch: this.scratch || undefined,
+      dismissed: this.dismissed.length ? this.dismissed : undefined,
       env: this.env,
       ...(this.view && { zoom: this.view.zoom, pan: { x: this.view.x, y: this.view.y } }),
       nodes: Object.fromEntries(

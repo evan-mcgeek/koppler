@@ -56,7 +56,7 @@ test('a cable to an app that answers no calls is refused, and one the stack allo
   await page.mouse.up();
   await expect(page.getByRole('alert')).toContainText('In the code Web Shop calls Orders API');
   await expect(page.getByRole('alert')).toContainText('That cable is already on the board.');
-  await page.getByRole('button', { name: 'Dismiss' }).click();
+  await page.getByRole('button', { name: 'Dismiss', exact: true }).click();
 
   await dragCable(page, 'web', 'payments');
   await expect(card(page, 'payments').locator('.card')).toHaveClass(/drop-ok/);

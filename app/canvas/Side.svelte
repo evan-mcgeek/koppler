@@ -1,7 +1,9 @@
 <script lang="ts">
   import BoardPicker from './BoardPicker.svelte';
   import KindIcon from './KindIcon.svelte';
+  import Needs from './Needs.svelte';
   import Repos from './Repos.svelte';
+  import Summary from './Summary.svelte';
   import Settings from './Settings.svelte';
   import { board, type StackApp } from './board.svelte.ts';
   import { openBoard } from './boards.ts';
@@ -51,6 +53,24 @@
   };
   const roots = $derived(board.roots.map(root => root.replace(/^\/Users\/[^/]+/, '~')).join(', '));
   let picker = $state<{ open: () => Promise<void> }>();
+  const notCloned = $derived(board.apps.filter(app => !app.cloned && !app.outside).length);
+  let scanning = $state(false);
+  const rescan = async () => {
+    scanning = true;
+    const said = await post('rescan');
+    scanning = false;
+    if ('error' in said) toasts.show(said.error, 'warning');
+    else location.reload();
+  };
+  const copyRestart = async () => {
+    const command = live.status?.restart ?? '';
+    const done = await navigator.clipboard.writeText(command).then(
+      () => true,
+      () => false,
+    );
+    if (done) toasts.show('Restart command copied');
+    else toasts.show(`Copy is blocked here. Restart it with: ${command}`, 'warning');
+  };
   // Run alone: one app and its tunnels on a board of its own, straight to the review; the board before is one click
   // back, from the review itself.
   const runAlone = (app: StackApp) => {
@@ -261,11 +281,25 @@
     <button class="add-repos" type="button" onclick={() => void picker?.open()}>Add repos…</button>
     <Repos bind:this={picker} />
     <p class="note" role="status">{copied}</p>
+    <Summary />
   </section>
   <footer>
     {#if board.unsaved}
       <p class="unsaved" role="alert">Not saved: the canvas server is not answering. Changes stay on this page.</p>
     {/if}
+    {#if live.status?.restart}
+      <p class="warn">
+        The canvas server runs older code, so some buttons fail until it restarts. In your terminal:
+        <button type="button" onclick={() => void copyRestart()}>Copy restart command</button>
+      </p>
+    {/if}
+    {#if notCloned}
+      <p class="warn">
+        {notCloned === 1 ? '1 app is' : `${String(notCloned)} apps are`} not cloned in {roots}.
+        <button type="button" disabled={scanning} onclick={() => void rescan()}>Look for clones again</button>
+      </p>
+    {/if}
+    <Needs />
     <Settings />
   </footer>
 </aside>
@@ -277,7 +311,7 @@
     display: flex;
     flex-direction: column;
     gap: 18px;
-    overflow-y: auto;
+    overflow: hidden auto;
     scrollbar-width: thin;
     padding: 0 12px 14px;
     border-right: 1px solid var(--line);
@@ -529,6 +563,7 @@
   }
   footer {
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     gap: 8px;
     margin-top: auto;
     padding: 0 2px;
@@ -542,6 +577,23 @@
     padding: 0 8px;
     color: var(--warn);
     font-weight: 600;
+  }
+  footer .warn {
+    margin: 0;
+    padding: 0 8px;
+    color: var(--warn);
+    font-size: 12.5px;
+  }
+  footer .warn button {
+    display: block;
+    margin-top: 6px;
+    padding: 3px 9px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: none;
+    color: var(--ink);
+    font: 600 12px var(--sans);
+    cursor: pointer;
   }
   .note:empty {
     display: none;
