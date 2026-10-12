@@ -17,6 +17,7 @@ import { readActions, type Action } from './actions.ts';
 import { switchTo, type Carry } from './branch.ts';
 import { APPROVE, approved, startsFromStack } from './checks.ts';
 import { link } from './libraries.ts';
+import { isDone } from './needs.ts';
 import { alive, listener, readRecord, sh, sleep, stopOne } from './processes.ts';
 import * as localQueue from './queues.ts';
 import { matches, prepare, recipesFor } from './recipes.ts';
@@ -488,6 +489,16 @@ async function carryOut(stack: Registry, args: string[]): Promise<void> {
   if (waiting.length && !approved(stack.source ?? '', stack))
     fail(
       `${waiting.map(id => nameOf(stack, id)).join(', ')}: started by a command from the stack that the user has not allowed yet, or that changed since. They review it in their own terminal: ${APPROVE}`,
+    );
+  // An app that reads its settings from AWS crashes at start on an expired sign-in, with an error of its own.
+  const signIns = new Map<string, string[]>();
+  for (const id of ids)
+    for (const { sso } of prereqsOf(stack, id, env))
+      if (sso) signIns.set(sso, [...(signIns.get(sso) ?? []), nameOf(stack, id)]);
+  const expired = [...signIns].filter(([profile]) => isDone({ sso: profile }) === false);
+  if (expired.length)
+    fail(
+      `Sign in to AWS first: ${expired.map(([, apps]) => apps.join(', ')).join(', ')} ${expired.flatMap(([, apps]) => apps).length === 1 ? 'reads its' : 'read their'} settings from AWS at start, and the sign-in has expired. In your own terminal:\n${expired.map(([profile]) => `  aws sso login --profile ${profile}`).join('\n')}\nthen run again`,
     );
   const up: Up = {
     stack,
