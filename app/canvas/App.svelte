@@ -3,6 +3,7 @@
   import { untrack } from 'svelte';
   import Agent from './Agent.svelte';
   import Board from './Board.svelte';
+  import Credentials from './Credentials.svelte';
   import Help from './Help.svelte';
   import History from './History.svelte';
   import Logs from './Logs.svelte';
@@ -162,7 +163,7 @@
   {/if}
   <span class="spacer"></span>
   {#if board.stack}<Agent />{/if}
-  {#if board.stack}<History />{/if}
+  {#if board.stack}<History /><Credentials />{/if}
   <Help />
   {#if board.stack}
     <span class="split" inert={!!loading}>
