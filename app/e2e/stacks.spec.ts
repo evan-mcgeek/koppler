@@ -33,3 +33,22 @@ test('a stack switched to shows its own clones, not the ones of the stack before
   await expect(row).not.toContainText('not cloned');
   await expect(row.getByRole('button', { name: 'Add Reports to the board' })).toBeVisible();
 });
+
+test('a stack being loaded from elsewhere is named over the board, which waits', async ({ page, canvas }) => {
+  const other = path.join(canvas.dir, 'config', 'stacks', 'other');
+  fs.mkdirSync(other, { recursive: true });
+  fs.writeFileSync(path.join(other, 'stack.json'), JSON.stringify({ name: 'Other Stack', envs: ['qa'], apps: {} }));
+  const notice = page.getByRole('status').filter({ hasText: 'Loading' });
+  await expect(page.getByRole('button', { name: /Acme Shop/ })).toBeVisible();
+  await expect(notice).toBeHidden();
+  // What `koppler sync` leaves while it runs: the stack it is loading and its own process.
+  const marker = path.join(canvas.temp, 'loading.json');
+  fs.writeFileSync(marker, JSON.stringify({ stack: other, pid: process.pid }));
+  await expect(notice).toHaveText('Loading Other Stack...', { timeout: 15000 });
+  await expect(page.locator('#side')).toHaveAttribute('inert', '');
+  await expect(page.locator('.topbar .actions')).toHaveAttribute('inert', '');
+  // The load ended without this stack coming into use: the board is back.
+  fs.rmSync(marker);
+  await expect(notice).toBeHidden({ timeout: 15000 });
+  await expect(page.locator('#side')).not.toHaveAttribute('inert', '');
+});

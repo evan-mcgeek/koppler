@@ -518,6 +518,8 @@ const PER_STACK = [
   'stack.suggestions.json',
   'stack.deployed.json',
 ];
+/** Says which stack a `koppler sync` is loading, for as long as it runs. */
+export const LOADING = path.join(TEMP, 'loading.json');
 export const stackKey = (dir: string): string =>
   crypto.createHash('sha1').update(path.resolve(dir)).digest('hex').slice(0, 12);
 /** Moves each per-stack file that is in `from` to `to`. */
@@ -825,13 +827,19 @@ export function sync(args: string[]): void {
   }
   if (flags.roots.length) config.roots = flags.roots;
   if (!config.stack) fail('no stack set yet: koppler init');
-  let index = readIndex();
-  if (!index || flags.rescan || flags.roots.length) {
-    if (!config.roots?.length) fail('no repos scanned yet: koppler init');
-    index = scan(config.roots, config.depth ?? DEFAULT_DEPTH);
+  fs.mkdirSync(TEMP, { recursive: true });
+  writeJson(LOADING, { stack: config.stack, pid: process.pid });
+  try {
+    let index = readIndex();
+    if (!index || flags.rescan || flags.roots.length) {
+      if (!config.roots?.length) fail('no repos scanned yet: koppler init');
+      index = scan(config.roots, config.depth ?? DEFAULT_DEPTH);
+    }
+    writeJson(CONFIG, config);
+    syncStack(config.stack, index);
+  } finally {
+    fs.rmSync(LOADING, { force: true });
   }
-  writeJson(CONFIG, config);
-  syncStack(config.stack, index);
   // A stack says what it needs when it loads: missing programs, and its own checks once they were approved.
   console.log('');
   checkLoadedStack();
