@@ -75,6 +75,17 @@ class Inbox {
     }
     this.#answered[message.id] = { at: new Date().toISOString(), via: 'dismissed' };
   }
+  /** What was sent for an agent and not taken yet, newest first. */
+  get waiting() {
+    return [...(live.status?.waiting ?? [])].reverse().filter(one => !this.#dropped.includes(one.key));
+  }
+  #dropped = $state<string[]>([]);
+  /** Takes a waiting request out of the queue, so no agent gets it. */
+  async drop(key: string): Promise<void> {
+    const answer = await send('prompt-drop', { key });
+    if (answer?.ok || answer?.status === 409) this.#dropped = [...this.#dropped, key];
+    else toasts.show('Could not drop it.', 'warning');
+  }
   /** Empties the history; a question still waiting for an answer stays. */
   async clear(): Promise<void> {
     const answer = await send('messages-clear', {});
