@@ -18,6 +18,7 @@
   import Queue from './Queue.svelte';
   import Tunnel from './Tunnel.svelte';
   import { board, type CardNode, type InfraNode } from './board.svelte.ts';
+  import { ago, openBoard } from './boards.ts';
   import { live } from './live.svelte.ts';
   import { probes, type Job, type Probe } from './probes.svelte.ts';
   import { theme } from './theme.svelte.ts';
@@ -39,6 +40,17 @@
   // Not the library's zoomIn and zoomOut: taken here, before its board exists, they stay tied to an empty one.
   const zoomBy = (factor: number) => () => void flow.setZoom(flow.getZoom() * factor, { duration: 150 });
 
+  /** For an empty board: the six boards opened last, then the rest in the order they are kept. */
+  const lately = $derived(
+    [...board.team.map(preset => ({ preset, team: true })), ...board.own.map(preset => ({ preset, team: false }))]
+      .map((one, index) => ({
+        ...one,
+        index,
+        at: board.recent.find(opened => opened.name === one.preset.name)?.at ?? '',
+      }))
+      .sort((a, b) => (a.at === b.at ? a.index - b.index : a.at > b.at ? -1 : 1))
+      .slice(0, 6),
+  );
   /** Where a socket was pressed, to tell a click in place from a slide. */
   let pressedAt = { x: 0, y: 0 };
   // Whenever what runs or what is cabled changes, cables whose apps both answer are tested.
@@ -475,9 +487,26 @@
     </ViewportPortal>
   </SvelteFlow>
   {#if !board.nodes.length}
-    <p class="empty">
-      Click the apps you want to run together.<br />Connect them; the board is saved as you go.
-    </p>
+    <div class="empty">
+      <p>Click the apps you want to run together.<br />Connect them; the board is saved as you go.</p>
+      {#if lately.length && !board.live}
+        <ul aria-label="Or open a board">
+          {#each lately as { preset, team, at } (preset.name)}
+            <li>
+              <button
+                type="button"
+                onclick={() => {
+                  openBoard(preset);
+                }}
+              >
+                <span class="name">{preset.name}</span>
+                <span class="meta">{team ? 'Team board' : 'Your board'}{at ? `, opened ${ago(at)}` : ''}</span>
+              </button>
+            </li>
+          {/each}
+        </ul>
+      {/if}
+    </div>
   {/if}
 </div>
 
@@ -498,6 +527,59 @@
     text-align: center;
     text-wrap: balance;
     pointer-events: none;
+  }
+  .empty p {
+    margin: 0;
+  }
+  .empty ul {
+    display: flex;
+    flex-direction: column;
+    width: min(380px, 100%);
+    margin: 18px auto 0;
+    padding: 0;
+    overflow: hidden;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--surface);
+    list-style: none;
+    text-align: left;
+    pointer-events: auto;
+  }
+  .empty ul::before {
+    content: 'Or open a board';
+    padding: 10px 14px 6px;
+    color: var(--muted);
+    font-size: 12.5px;
+  }
+  .empty li + li {
+    border-top: 1px solid var(--line);
+  }
+  .empty button {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    width: 100%;
+    min-height: 44px;
+    padding: 8px 14px;
+    border: 0;
+    background: none;
+    color: var(--ink);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+  .empty button:hover,
+  .empty button:focus-visible {
+    background: color-mix(in oklab, var(--ink) 6%, transparent);
+    outline: none;
+  }
+  .empty .name {
+    font-weight: 600;
+    font-size: 14px;
+  }
+  .empty .meta {
+    color: var(--muted);
+    font-size: 12px;
   }
   .links {
     position: absolute;
