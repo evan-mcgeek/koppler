@@ -66,15 +66,40 @@ test('a note for the agent is written on the card, and the card is removed from 
   await expect(page.locator('.svelte-flow__edge')).toHaveCount(0);
 });
 
-test('typing in a card and using its menus does not drag it', async ({ page }) => {
-  const before = await card(page, 'orders').boundingBox();
-  const menu = await card(page, 'orders').getByLabel('Branch').boundingBox();
-  if (!before || !menu) throw new Error('no card');
-  await page.mouse.move(menu.x + 40, menu.y + 10);
+test('a card drags by its fields too, and a field opens on a press that did not move', async ({ page }) => {
+  const orders = card(page, 'orders');
+  const branch = orders.getByLabel('Branch');
+  const before = await orders.boundingBox();
+  const field = await branch.boundingBox();
+  if (!before || !field) throw new Error('no card');
+  await page.mouse.move(field.x + 40, field.y + 10);
   await page.mouse.down();
-  await page.mouse.move(menu.x + 140, menu.y + 80, { steps: 5 });
+  // Held back on the press: nothing is focused while it may still become a drag.
+  await expect(branch).not.toBeFocused();
+  await page.mouse.move(field.x + 140, field.y + 80, { steps: 50 });
   await page.mouse.up();
-  expect(await card(page, 'orders').boundingBox()).toEqual(before);
+  // It follows the pointer from where the press became a drag, a few pixels in.
+  const after = await orders.boundingBox();
+  expect((after?.x ?? 0) - before.x).toBeGreaterThan(90);
+  expect((after?.y ?? 0) - before.y).toBeGreaterThan(60);
+  await expect(branch).not.toBeFocused();
+
+  await branch.click();
+  await expect(branch).toBeFocused();
+  await branch.fill('feature/checkout');
+  // While it is typed in, a press inside it places the caret and does not move the card.
+  const typing = await branch.boundingBox();
+  if (!typing) throw new Error('no field');
+  await page.mouse.move(typing.x + 20, typing.y + 10);
+  await page.mouse.down();
+  await page.mouse.move(typing.x + 80, typing.y + 12, { steps: 5 });
+  await page.mouse.up();
+  expect(await orders.boundingBox()).toEqual(after);
+  await expect(branch).toBeFocused();
+  // A menu opens on the click as well.
+  const cables = orders.getByLabel('Add or remove a cable from Orders API');
+  await cables.click();
+  await expect(cables).toBeFocused();
 });
 
 test.describe('a clone with uncommitted changes', () => {

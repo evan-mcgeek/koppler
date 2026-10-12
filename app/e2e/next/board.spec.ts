@@ -128,8 +128,12 @@ test('the keyboard moves a picked card and removes a picked cable', async ({ pag
   await card(page, 'web').focus();
   await page.keyboard.press('Enter');
   await page.keyboard.press('ArrowLeft');
-  await page.keyboard.press('ArrowLeft');
-  expect((await middle(card(page, 'web'))).x).toBeLessThan(before.x);
+  const stepped = await middle(card(page, 'web'));
+  expect(stepped.x).toBeLessThan(before.x);
+  // With Shift a step is four times as far.
+  await page.keyboard.press('Shift+ArrowLeft');
+  const far = await middle(card(page, 'web'));
+  expect((stepped.x - far.x) / (before.x - stepped.x)).toBeCloseTo(4, 1);
   await cable(page, 'web>orders').focus();
   await page.keyboard.press('Enter');
   await page.keyboard.press('Backspace');
