@@ -80,6 +80,15 @@ test('the environment is switched in the panel, and the panel folds away', async
   await expect(page.getByRole('banner')).toContainText('PROD');
   await page.getByRole('button', { name: 'Hide the side pane' }).click();
   await expect(page.getByRole('complementary')).toHaveCount(0);
-  await page.getByRole('button', { name: 'Show the side pane' }).click();
+  // A rail is left: where the board stands, the settings, and the way back in.
+  const rail = page.getByRole('navigation', { name: 'Side pane, folded' });
+  await expect(rail.getByRole('button', { name: 'Board and environment: PROD' })).toHaveText('PROD');
+  await expect(rail.getByRole('button', { name: 'Apps: 2 of 4 on the board' })).toHaveText('2/4');
+  await rail.getByRole('button', { name: 'Settings' }).click();
+  await expect(page.getByRole('radiogroup', { name: 'Theme' })).toBeVisible();
+  await page.screenshot({ path: 'test-results/next-rail.png' });
+  await page.keyboard.press('Escape');
+  await rail.getByRole('button', { name: /^Apps/ }).click();
   await expect(page.getByText('2 of 4 on the board')).toBeVisible();
+  await expect(rail).toHaveCount(0);
 });
