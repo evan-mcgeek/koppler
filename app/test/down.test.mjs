@@ -16,7 +16,7 @@ fs.writeFileSync(path.join(repo, 'Startup.cs'), 'validate = true;\n');
 fs.writeFileSync(path.join(repo, 'Properties/launchSettings.json'), JSON.stringify({ profiles: { QA: { environmentVariables: { A: '1' } } } }, null, 2) + '\n');
 git('add', '.'); git('commit', '-qm', 'one'); git('branch', 'feature/x');
 fs.writeFileSync(path.join(dir, 'registry.json'), JSON.stringify({ envs: ['qa'], apps: { api: { name: 'API' } } }));
-fs.writeFileSync(path.join(dir, 'local.json'), JSON.stringify({ apps: { api: { path: repo } } }));
+fs.writeFileSync(path.join(dir, 'local.json'), JSON.stringify({ roots: [dir], apps: { api: { path: repo } } }));
 
 // The run: branch switched over a set-aside change, then an edit, a new launch profile and an env file, all logged.
 fs.writeFileSync(path.join(repo, 'mine.txt'), 'my work\n');
@@ -27,7 +27,8 @@ const ls = path.join(repo, 'Properties/launchSettings.json'), settings = JSON.pa
 settings.profiles['QA-LOCAL'] = { environmentVariables: { B: '2' } }; fs.writeFileSync(ls, JSON.stringify(settings, null, 2) + '\n');
 fs.writeFileSync(path.join(repo, '.env.local'), 'API_URL=http://localhost:5001\n');
 log.push({ kind: 'edit', app: 'api', file: path.join(repo, 'Startup.cs'), before: 'validate = true;', after: 'validate = false;' },
-  { kind: 'profile', app: 'api', file: ls, name: 'QA-LOCAL', created: true },
+  // Logged without its folder, as seen from where the clones are: the Stop runs somewhere else and still finds it.
+  { kind: 'profile', app: 'api', file: path.relative(dir, ls), name: 'QA-LOCAL', created: true },
   { kind: 'env-file', app: 'api', file: path.join(repo, '.env.local'), lines: ['API_URL=http://localhost:5001'], created: true });
 fs.writeFileSync(path.join(dir, 'actions.json'), JSON.stringify(log));
 fs.writeFileSync(path.join(dir, 'history.jsonl'), JSON.stringify({ id: 'stop00001', at: new Date().toISOString(), kind: 'stop', nodes: {}, edges: [] }) + '\n');

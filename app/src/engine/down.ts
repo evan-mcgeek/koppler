@@ -178,12 +178,23 @@ export async function down(args: string[]): Promise<void> {
       action.kind === 'process' ? (action.label ?? action.command) : 'repo' in action ? action.repo : undefined;
     return (action.app ? (apps[action.app]?.name ?? action.app) : fallback) ?? '';
   };
+  // A file logged without its folder is looked for where it can be: from here, in the app's clone, then under each
+  // folder the clones are scanned in. Whoever wrote the log may have stood somewhere else than this Stop runs.
+  const local = readData('local');
+  const roots = (local?.['roots'] ?? []) as string[];
+  const cloneOf = (app?: string) =>
+    (app && (local?.['apps'] as Record<string, { path?: string } | null> | undefined)?.[app]?.path) || '';
+  const located = (action: Action): Action => {
+    if (!('file' in action) || !action.file || path.isAbsolute(action.file)) return action;
+    const from = ['', cloneOf(action.app), ...roots].map(base => path.resolve(base, action.file));
+    return { ...action, file: from.find(file => fs.existsSync(file)) ?? action.file };
+  };
   const left: string[] = [];
   const keep: Action[] = [];
   for (const action of log.toReversed()) {
     let result: Undone;
     try {
-      result = undo(action);
+      result = undo(located(action));
     } catch (error) {
       result = { state: 'left', why: `could not undo ${action.kind} (${reason(error)})` };
     }
