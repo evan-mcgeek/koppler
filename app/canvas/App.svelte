@@ -4,6 +4,7 @@
   import Board from './Board.svelte';
   import Help from './Help.svelte';
   import Logs from './Logs.svelte';
+  import Menu from './Menu.svelte';
   import Review from './Review.svelte';
   import { runs } from './run.svelte.ts';
   import Side from './Side.svelte';
@@ -12,6 +13,8 @@
   import { load, save } from './data.ts';
   import { live } from './live.svelte.ts';
 
+  let noting = $state<HTMLDialogElement>();
+  let note = $state('');
   /** Asked for once, when the page opens. ponytail: no polling yet; it comes with the live state of the cards. */
   const opened = load().then(loaded => {
     if (loaded) {
@@ -115,33 +118,104 @@
   <span class="spacer"></span>
   <Help />
   {#if board.stack}
-    <button
-      class="stop"
-      type="button"
-      title="Stop what the agent started and revert all temporary code changes"
-      onclick={() => {
-        runs.stop();
-      }}
-    >
-      <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"
-        ><rect x="3" y="3" width="10" height="10" rx="1.5" /></svg
+    <span class="split">
+      <button
+        class="stop"
+        type="button"
+        title="Stop what the agent started and revert all temporary code changes"
+        onclick={() => {
+          runs.stop();
+        }}
       >
-      Stop
-    </button>
-    <button
-      class="run"
-      type="button"
-      disabled={!board.nodes.length}
-      title={board.nodes.length
-        ? 'Review what will run, then send it (Cmd or Ctrl + Enter)'
-        : 'Add an app to the board first'}
-      onclick={() => {
-        runs.start();
-      }}>Run</button
-    >
+        <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"
+          ><rect x="3" y="3" width="10" height="10" rx="1.5" /></svg
+        >
+        Stop
+      </button>
+      <Menu
+        label="More ways to stop"
+        tone="stop"
+        items={[
+          {
+            label: 'Stop apps, keep changes',
+            about: runs.started.length
+              ? 'Stops every app, API and tunnel; branches and code changes stay until you revert'
+              : 'Nothing is running',
+            off: !runs.started.length,
+            run: () => {
+              runs.stopApps();
+            },
+          },
+          {
+            label: 'Shut down Koppler',
+            about: 'Stops the agent listener and this canvas server; apps and tunnels keep running',
+            danger: true,
+            run: () => {
+              runs.shutDown();
+            },
+          },
+        ]}
+      />
+    </span>
+    <span class="split">
+      <button
+        class="run"
+        type="button"
+        disabled={!board.nodes.length}
+        title={board.nodes.length
+          ? 'Review what will run, then send it (Cmd or Ctrl + Enter)'
+          : 'Add an app to the board first'}
+        onclick={() => {
+          runs.start();
+        }}>Run</button
+      >
+      {#if board.nodes.length}
+        <Menu
+          label="More ways to run"
+          tone="run"
+          items={[
+            {
+              label: 'Run with a note for the agent…',
+              about: 'Tell the agent something for this run, like a test account or a flag',
+              run: () => {
+                noting?.showModal();
+              },
+            },
+            {
+              label: 'Get a checklist instead',
+              about: 'The agent changes nothing and lists the steps for you to do yourself',
+              run: () => {
+                runs.start({ manual: true });
+              },
+            },
+          ]}
+        />
+      {/if}
+    </span>
   {/if}
 </header>
 <Review />
+<dialog bind:this={noting} class="noting" aria-labelledby="noting-title" onclose={() => (note = '')}>
+  <form
+    method="dialog"
+    onsubmit={() => {
+      runs.start({ note: note.trim() });
+    }}
+  >
+    <label id="noting-title" for="run-note">Note for the agent</label>
+    <textarea
+      id="run-note"
+      rows="3"
+      required
+      placeholder="e.g. log in as the test account, or turn on the new checkout"
+      bind:value={note}
+    ></textarea>
+    <div class="noting-acts">
+      <button type="button" onclick={() => noting?.close()}>Cancel</button>
+      <button class="go" type="submit">Review and send</button>
+    </div>
+  </form>
+</dialog>
 {#if board.protected}
   <div class="banner" role="alert">
     {board.env.toUpperCase()}: local code runs against real {board.env.toUpperCase()} data and secrets.
@@ -199,6 +273,61 @@
     border-radius: 8px;
     font: 600 13px var(--sans);
     cursor: pointer;
+  }
+  /* A main button and the arrow beside it read as one. */
+  .split {
+    display: inline-flex;
+    align-items: stretch;
+  }
+  .split > :is(.stop, .run):has(+ :global(.more)) {
+    border-radius: 8px 0 0 8px;
+  }
+  .noting {
+    width: min(420px, calc(100vw - 32px));
+    padding: 16px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--surface);
+    color: var(--ink);
+    box-shadow: var(--lift);
+  }
+  .noting::backdrop {
+    background: color-mix(in oklab, var(--desk) 60%, transparent);
+  }
+  .noting form {
+    display: grid;
+    gap: 8px;
+  }
+  .noting label {
+    font: 600 13px var(--sans);
+  }
+  .noting textarea {
+    padding: 8px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: var(--paper);
+    color: var(--ink);
+    font: 13px var(--sans);
+    resize: vertical;
+  }
+  .noting-acts {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+  .noting-acts button {
+    padding: 6px 12px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: none;
+    color: var(--ink);
+    font: 600 13px var(--sans);
+    cursor: pointer;
+  }
+  .noting-acts .go {
+    border-color: transparent;
+    background: var(--cable);
+    color: var(--on-accent);
   }
   .stop {
     border-color: color-mix(in oklab, var(--prod) 45%, transparent);
