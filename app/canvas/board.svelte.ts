@@ -43,6 +43,16 @@ export interface CardData extends Record<string, unknown> {
   libraries?: string[];
 }
 export type Changes = 'set-aside' | 'take-along';
+/** A stack on this machine. */
+export interface KnownStack {
+  dir: string;
+  path: string;
+  name: string;
+  apps: number;
+  envs: string[];
+  shared: boolean;
+  linked?: string;
+}
 /** A board in the recently deleted, with when it went there. */
 export type Deleted = StoredPreset & { deleted: string };
 interface Opened {
@@ -155,6 +165,10 @@ class Board {
   stack = $state('');
   /** The folder of the stack in use. */
   dir = $state('');
+  /** No stack yet: the page asks for one. */
+  setup = $state(false);
+  /** The stacks found on this machine, for choosing one when there is none. */
+  known = $state.raw<KnownStack[]>([]);
   env = $state('');
   nodes = $state.raw<CardNode[]>([]);
   edges = $state.raw<CableEdge[]>([]);
@@ -1195,6 +1209,8 @@ class Board {
     this.#guarded = stack.envs.filter(env => isProtected(stack, env));
     this.stack = stack.name ?? '';
     this.dir = (stack.source ?? '').replace(/\/stack\.json$/, '');
+    this.setup = !!stack.setup;
+    this.known = (stack as { stacks?: KnownStack[] }).stacks ?? [];
     this.envs = stack.envs;
     this.env = saved?.env ?? stack.envs[0] ?? '';
     this.roots = roots;
