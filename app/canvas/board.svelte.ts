@@ -114,6 +114,8 @@ export interface StackApp {
   known: string[];
   /** Whether anything can call it: it serves, or some app is known to call it. */
   answers: boolean;
+  /** Whether it has a local address of its own to ask for an answer. */
+  serves: boolean;
   /** Who may start it and, for a mobile app, on what. */
   runIn: readonly (readonly [string, string])[];
   platforms: readonly (readonly [string, string])[];
@@ -1210,6 +1212,7 @@ class Board {
         Object.entries(stack.apps).some(
           ([from, other]) => from !== id && (other.consumes?.[id] ?? stack.found?.[from]?.[id]),
         ),
+      serves: !!app.url,
       runIn: kindOf(app).runIn,
       platforms: kindOf(app).platforms ?? [],
       current: clones[id]?.branch ?? '',

@@ -4,6 +4,7 @@
   import Agent from './Agent.svelte';
   import Board from './Board.svelte';
   import Credentials from './Credentials.svelte';
+  import Health from './Health.svelte';
   import Help from './Help.svelte';
   import History from './History.svelte';
   import Logs from './Logs.svelte';
@@ -162,7 +163,7 @@
     <span class="env" class:prod={board.protected}>{board.env.toUpperCase()}</span>
   {/if}
   <span class="spacer"></span>
-  {#if board.stack}<Agent />{/if}
+  {#if board.stack}<Health /><Agent />{/if}
   {#if board.stack}<History /><Credentials />{/if}
   <Help />
   {#if board.stack}
