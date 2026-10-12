@@ -47,6 +47,8 @@ interface Status {
   stack?: string | null;
   loading?: string | null;
   stacks?: { dir: string; name: string; path: string; apps: number; shared: boolean; linked?: string }[];
+  /** Koppler runs from its source folder: it is being worked on. */
+  dev?: boolean;
   /** The command that starts the canvas again. */
   start?: string;
   /** The credentials each app declares per environment, and whether each is stored. */
