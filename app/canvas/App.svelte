@@ -6,6 +6,8 @@
   import Credentials from './Credentials.svelte';
   import Health from './Health.svelte';
   import Help from './Help.svelte';
+  import Inbox from './Inbox.svelte';
+  import { inbox } from './inbox.svelte.ts';
   import History from './History.svelte';
   import Logs from './Logs.svelte';
   import Menu from './Menu.svelte';
@@ -40,6 +42,10 @@
   };
   let noting = $state<HTMLDialogElement>();
   let note = $state('');
+  // Whatever the agent says next opens its panel, or is announced.
+  $effect(() => {
+    inbox.follow();
+  });
   /** A stack on its way in, from here, another tab or the terminal: the board waits until the page reloads with it. */
   const loading = $derived(
     runs.switching ?? (live.status?.loading && live.status.loading !== board.dir ? live.status.loading : null),
@@ -295,6 +301,7 @@
       {/if}
     {/await}
   </main>
+  <Inbox />
 </div>
 
 <style>

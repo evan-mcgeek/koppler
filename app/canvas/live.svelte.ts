@@ -34,6 +34,25 @@ interface Credential {
   fetchUi?: string;
   fetchCli?: string;
 }
+/** How a question was closed: answered here or in the chat, dismissed, or replaced by a newer run. */
+export interface Answered {
+  at: string;
+  via: string;
+  choice?: string;
+  text?: string;
+}
+/** Something the agent said on the canvas. */
+export interface Message {
+  id: string;
+  kind: string;
+  at?: string;
+  title: string;
+  summary?: string;
+  run?: string;
+  sections?: { title?: string; items?: string[]; commands?: string[] }[];
+  choices?: { id: string; label: string; detail?: string }[];
+  answered?: Answered | null;
+}
 /** A run or a Stop as the history keeps it, or a note of something that stopped outside one. */
 export interface Run {
   id?: string;
@@ -69,6 +88,8 @@ interface Status {
   startedAt?: string;
   /** Whether an agent session takes what the canvas sends: listening, busy or none. */
   agent?: { state?: string };
+  /** What the agent said: questions, results and failures, oldest first. */
+  messages?: Message[];
   /** Requests no agent session has taken yet. */
   queued?: number;
   /** The stack in use once its data is loaded, the one a sync is loading meanwhile, and every stack on this machine. */
