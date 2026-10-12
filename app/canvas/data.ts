@@ -73,3 +73,30 @@ export async function save(board: SavedBoard, leaving = false): Promise<boolean>
     return false;
   }
 }
+
+/** Asks the canvas server to do something. Gives its answer, or why it was not done. */
+export async function post<T extends object>(route: string, body: object = {}): Promise<T | { error: string }> {
+  const token = location.pathname.split('/')[2] ?? '';
+  try {
+    const answer = await fetch(`/${route}?token=${encodeURIComponent(token)}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    return (await answer.json()) as T | { error: string };
+  } catch {
+    return { error: 'Could not reach the canvas server.' };
+  }
+}
+
+/** A clone found on this machine, for the repo picker. */
+export interface Candidate {
+  slug: string;
+  name: string;
+  kind: string | null;
+  path: string;
+  folder: string;
+  inStack?: string;
+}
+/** The clones the last scan found, and the folders it looked in. Null when there was no scan yet. */
+export const repos = () => ask<{ roots: string[]; repos: Candidate[] }>('repos');

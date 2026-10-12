@@ -959,6 +959,9 @@ class Board {
       return;
     }
     if (!this.nodes.length) return;
+    // A board for one app alone is not kept; a second app makes it a board of the user's.
+    if (this.scratch && this.nodes.length < 2) return;
+    this.scratch = false;
     const team = this.team.find(one => one.name === this.name);
     // A team board stays the team's until it is changed; branches, notes and how apps run count as changes too.
     const told = (preset: { nodes: unknown; edges: { from: string; to: string }[] }) =>
@@ -1049,8 +1052,20 @@ class Board {
     return JSON.stringify({ name, version: migrate(preset).preset?.version ?? PRESET_VERSION, nodes, edges }, null, 2);
   }
 
+  /** A board for one app run alone: not kept while it holds only that app. */
+  scratch = $state(false);
+  /** One app on a board of its own. Gives the board that was on screen, to go back to. */
+  alone(id: string): StoredPreset | undefined {
+    const back = [...this.own, ...this.team].find(one => one.name === this.name);
+    this.newBoard();
+    this.scratch = true;
+    this.add(id);
+    this.opened = 'fit';
+    return back;
+  }
   /** A board to start from: empty, and named once it holds an app. */
   newBoard(): void {
+    this.scratch = false;
     this.name = null;
     this.nodes = [];
     this.edges = [];
@@ -1083,6 +1098,7 @@ class Board {
     };
     const ids = Object.keys(preset.nodes);
     const placed = ids.every(place);
+    this.scratch = false;
     this.recent = [
       { name: preset.name, at: new Date().toISOString() },
       ...this.recent.filter(one => one.name !== preset.name),
@@ -1211,6 +1227,7 @@ class Board {
     this.#kept = saved ?? {};
     this.name = typeof saved?.['preset'] === 'string' ? saved['preset'] : null;
     this.own = (Array.isArray(saved?.['presets']) ? saved['presets'] : []) as StoredPreset[];
+    this.scratch = saved?.['scratch'] === true;
     this.trash = (Array.isArray(saved?.['trash']) ? saved['trash'] : []) as Deleted[];
     this.recent = (Array.isArray(saved?.['recent']) ? saved['recent'] : []) as Opened[];
     this.infra = [];
@@ -1234,6 +1251,7 @@ class Board {
       presets: this.own,
       trash: this.trash,
       recent: this.recent,
+      scratch: this.scratch || undefined,
       env: this.env,
       ...(this.view && { zoom: this.view.zoom, pan: { x: this.view.x, y: this.view.y } }),
       nodes: Object.fromEntries(

@@ -23,6 +23,8 @@ export interface Review {
   /** Something has to be put right first: the confirm button is off. */
   blocked: boolean;
   confirm: () => void;
+  /** Another way out than Cancel, when the review was opened by a step that can be taken back. */
+  back?: { label: string; run: () => void };
 }
 const VERBS = [
   ['starts', 'Starts'],

@@ -1,9 +1,14 @@
 <script lang="ts">
   import BoardPicker from './BoardPicker.svelte';
   import KindIcon from './KindIcon.svelte';
+  import Repos from './Repos.svelte';
   import Settings from './Settings.svelte';
   import { board, type StackApp } from './board.svelte.ts';
+  import { openBoard } from './boards.ts';
+  import { post } from './data.ts';
   import { live } from './live.svelte.ts';
+  import { runs } from './run.svelte.ts';
+  import { toasts } from './toast.svelte.ts';
 
   type Sort = 'name' | 'added';
   const remembered = (): Sort => {
@@ -45,6 +50,41 @@
     }
   };
   const roots = $derived(board.roots.map(root => root.replace(/^\/Users\/[^/]+/, '~')).join(', '));
+  let picker = $state<{ open: () => Promise<void> }>();
+  // Run alone: one app and its tunnels on a board of its own, straight to the review; the board before is one click
+  // back, from the review itself.
+  const runAlone = (app: StackApp) => {
+    const before = board.alone(app.id);
+    runs.start();
+    if (!before || !runs.review) return;
+    runs.review = {
+      ...runs.review,
+      back: {
+        label: `Back to ${before.name}`,
+        run: () => {
+          openBoard(before);
+        },
+      },
+    };
+  };
+  const askDrop = (app: StackApp) => {
+    runs.review = {
+      title: `Remove ${app.name} from the stack?`,
+      sub: 'The repo stays on your Mac. Other apps stop listing it as something they call.',
+      notices: [],
+      groups: [],
+      ok: 'Remove from stack',
+      prod: true,
+      blocked: false,
+      confirm: () => {
+        void post('apps-remove', { id: app.id }).then(said => {
+          if ('error' in said) toasts.show(said.error, 'warning');
+          // The stack changed: the page opens again with it.
+          else location.reload();
+        });
+      },
+    };
+  };
   const cloneCommand = (app: StackApp) => `git clone git@github.com:${app.slug}.git`;
   const copyClone = async (app: StackApp) => {
     try {
@@ -124,6 +164,19 @@
               ><span class="name">{app.name}</span></span
             >
             <span class="state">outside</span>
+            <button
+              class="act drop"
+              type="button"
+              aria-label="Remove {app.name} from the stack"
+              title="Remove from the stack (the repo stays on your Mac)"
+              onclick={() => {
+                askDrop(app);
+              }}
+            >
+              <svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true"
+                ><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" /></svg
+              >
+            </button>
           {:else if !app.cloned}
             <button
               class="main"
@@ -134,6 +187,19 @@
               <span class="name">{app.name}</span>
             </button>
             <span class="state">not cloned</span>
+            <button
+              class="act drop"
+              type="button"
+              aria-label="Remove {app.name} from the stack"
+              title="Remove from the stack (the repo stays on your Mac)"
+              onclick={() => {
+                askDrop(app);
+              }}
+            >
+              <svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true"
+                ><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" /></svg
+              >
+            </button>
           {:else}
             <button
               class="main"
@@ -148,6 +214,32 @@
               }}
             >
               <span class="name">{app.name}</span>
+            </button>
+            <button
+              class="act drop"
+              type="button"
+              aria-label="Remove {app.name} from the stack"
+              title="Remove from the stack (the repo stays on your Mac)"
+              onclick={() => {
+                askDrop(app);
+              }}
+            >
+              <svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true"
+                ><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" /></svg
+              >
+            </button>
+            <button
+              class="act alone"
+              type="button"
+              aria-label="Run {app.name} alone"
+              title="Run alone: just this app and its tunnels, on a board of its own"
+              onclick={() => {
+                runAlone(app);
+              }}
+            >
+              <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"
+                ><path class="fill" d="M4.5 2.8v10.4l8.6-5.2z" /></svg
+              >
             </button>
             <button
               class="act add"
@@ -166,6 +258,8 @@
         <p class="empty">{board.apps.length ? 'No app matches.' : 'No apps in this stack yet.'}</p>
       {/each}
     </div>
+    <button class="add-repos" type="button" onclick={() => void picker?.open()}>Add repos…</button>
+    <Repos bind:this={picker} />
     <p class="note" role="status">{copied}</p>
   </section>
   <footer>
@@ -374,8 +468,33 @@
     background: color-mix(in oklab, var(--ink) 10%, transparent);
     color: var(--ink);
   }
-  .act.remove:hover {
+  .act.remove:hover,
+  .act.drop:hover {
     color: var(--bad);
+  }
+  .act.drop path {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .act.alone .fill {
+    fill: currentColor;
+    stroke: none;
+  }
+  .add-repos {
+    margin: 4px 0 0 4px;
+    padding: 6px 4px;
+    border: 0;
+    background: none;
+    color: var(--cable-ink);
+    font: 600 13px var(--sans);
+    text-align: left;
+    cursor: pointer;
+  }
+  .add-repos:hover {
+    text-decoration: underline;
   }
   .act.add {
     color: var(--cable);
