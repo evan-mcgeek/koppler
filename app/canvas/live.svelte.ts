@@ -96,6 +96,8 @@ interface Status {
   stack?: string | null;
   loading?: string | null;
   stacks?: { dir: string; name: string; path: string; apps: number; shared: boolean; linked?: string }[];
+  /** For a stack linked from GitHub: what this copy has that the shared one does not, and a pull request already open. */
+  linked?: { url?: string; changes: string[]; pr?: string } | null;
   /** What the stack needs on this machine, as the last check found it. */
   checks?:
     | { name: string; state: string; detail?: string; for?: string[]; app?: string; env?: string; kind?: string }[]

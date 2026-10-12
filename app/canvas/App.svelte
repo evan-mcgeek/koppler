@@ -4,6 +4,7 @@
   import Agent from './Agent.svelte';
   import Board from './Board.svelte';
   import Credentials from './Credentials.svelte';
+  import Findings from './Findings.svelte';
   import Health from './Health.svelte';
   import Help from './Help.svelte';
   import Inbox from './Inbox.svelte';
@@ -12,13 +13,16 @@
   import Logs from './Logs.svelte';
   import Menu from './Menu.svelte';
   import Rail from './Rail.svelte';
+  import Repos from './Repos.svelte';
   import Review from './Review.svelte';
   import { runs } from './run.svelte.ts';
+  import Setup from './Setup.svelte';
   import Side from './Side.svelte';
   import StackPicker from './StackPicker.svelte';
   import Toast from './Toast.svelte';
   import { board } from './board.svelte.ts';
   import { openFile } from './boards.ts';
+  import { dialogs } from './dialogs.svelte.ts';
   import { load, save } from './data.ts';
   import { live } from './live.svelte.ts';
 
@@ -69,6 +73,12 @@
     if (loaded) {
       board.open(loaded);
       live.watch();
+      // With no stack the page asks for one; with a stack that has no apps yet, for its repos.
+      if (board.setup) dialogs.setup?.open();
+      else if (!board.apps.length || location.hash === '#pick') {
+        history.replaceState(null, '', location.pathname + location.search);
+        void dialogs.repos?.open();
+      }
     }
     return !!loaded;
   });
@@ -251,6 +261,9 @@
 </header>
 {#if dropping}<div class="dropping">Drop to open this board</div>{/if}
 <Review />
+<Setup bind:this={dialogs.setup} />
+<Repos bind:this={dialogs.repos} />
+<Findings bind:this={dialogs.findings} />
 <dialog bind:this={noting} class="noting" aria-labelledby="noting-title" onclose={() => (note = '')}>
   <form
     method="dialog"

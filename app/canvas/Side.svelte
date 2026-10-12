@@ -2,12 +2,12 @@
   import BoardPicker from './BoardPicker.svelte';
   import KindIcon from './KindIcon.svelte';
   import Needs from './Needs.svelte';
-  import Repos from './Repos.svelte';
   import Summary from './Summary.svelte';
   import Settings from './Settings.svelte';
   import { board, type StackApp } from './board.svelte.ts';
   import { openBoard } from './boards.ts';
   import { post } from './data.ts';
+  import { dialogs } from './dialogs.svelte.ts';
   import { live } from './live.svelte.ts';
   import { runs } from './run.svelte.ts';
   import { toasts } from './toast.svelte.ts';
@@ -52,7 +52,6 @@
     }
   };
   const roots = $derived(board.roots.map(root => root.replace(/^\/Users\/[^/]+/, '~')).join(', '));
-  let picker = $state<{ open: () => Promise<void> }>();
   const notCloned = $derived(board.apps.filter(app => !app.cloned && !app.outside).length);
   let scanning = $state(false);
   const rescan = async () => {
@@ -278,8 +277,7 @@
         <p class="empty">{board.apps.length ? 'No app matches.' : 'No apps in this stack yet.'}</p>
       {/each}
     </div>
-    <button class="add-repos" type="button" onclick={() => void picker?.open()}>Add repos…</button>
-    <Repos bind:this={picker} />
+    <button class="add-repos" type="button" onclick={() => void dialogs.repos?.open()}>Add repos…</button>
     <p class="note" role="status">{copied}</p>
     <Summary />
   </section>

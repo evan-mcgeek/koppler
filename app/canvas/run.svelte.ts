@@ -2,7 +2,7 @@
 // request the agent or Koppler gets once it is confirmed. The plan itself is core/plan.
 import { describe, plan, type Plan } from '../src/core/plan.ts';
 import { board } from './board.svelte.ts';
-import { save } from './data.ts';
+import { post, save } from './data.ts';
 import { live } from './live.svelte.ts';
 import { toasts } from './toast.svelte.ts';
 
@@ -411,6 +411,102 @@ class Runs {
           text,
           { tag: 'koppler-stop', data: { action: 'stop', id: newRunId(), switchTo: to.dir } },
           'Sent. Koppler switches once everything is stopped',
+        );
+      },
+    };
+  }
+  /** Calls a stack action on the server that answers with a result or an error. */
+  async #stack<T extends object>(action: string): Promise<T | null> {
+    const said = await post<T>(action);
+    if (!('error' in said)) return said;
+    toasts.show(said.error, 'warning');
+    return null;
+  }
+  /** Brings in what changed in the shared stack on GitHub. */
+  async updateStack(): Promise<void> {
+    const said = await this.#stack<{ updated?: boolean; message?: string }>('stack-update');
+    if (said?.updated) location.reload();
+    else if (said) toasts.show(said.message ?? 'Already up to date.');
+  }
+  /** What this copy of a linked stack has that the shared one does not: shared as a pull request, or dropped. */
+  shareChanges(): void {
+    const linked = live.status?.linked;
+    if (!linked) return;
+    const items = linked.changes.map(change => ({
+      name: change.replace(/^./, first => first.toUpperCase()),
+      notes: [],
+    }));
+    const groups = [{ verb: 'keeps', label: 'Changes', items }];
+    this.review = {
+      title: 'Changes not in the shared stack yet',
+      sub: `What Koppler learned here, kept in your copy of ${board.stack}. The shared stack on GitHub stays as it is until a pull request is merged.`,
+      notices: [
+        ...(linked.pr
+          ? [
+              {
+                text: `A pull request is already open: ${linked.pr}. Opening another replaces nothing; close the old one if you open a new one.`,
+              },
+            ]
+          : []),
+        {
+          text: 'Opening a pull request pushes a new branch to the shared repo with your GitHub account, for your team to review. No secret values are in it.',
+        },
+      ],
+      groups,
+      ok: 'Open pull request',
+      prod: false,
+      blocked: false,
+      confirm: () => {
+        toasts.show('Opening the pull request…');
+        void this.#stack<{ url?: string }>('stack-pr').then(said => {
+          if (said)
+            toasts.show('Pull request opened', 'message', {
+              label: 'View',
+              run: () => window.open(said.url, '_blank', 'noopener'),
+            });
+        });
+      },
+      back: {
+        label: 'Discard my changes instead',
+        run: () => {
+          this.review = {
+            title: 'Discard your changes',
+            sub: `Your copy of ${board.stack} goes back to the shared stack as last fetched. What Koppler learned here is lost.`,
+            notices: [],
+            groups,
+            ok: 'Discard',
+            prod: true,
+            blocked: false,
+            confirm: () => {
+              void this.#stack('stack-discard').then(said => {
+                if (said) location.reload();
+              });
+            },
+          };
+        },
+      },
+    };
+  }
+  /** A new stack, or one from GitHub: asked for at once when nothing runs, else after a Stop and revert. */
+  addStack(ask: () => void): void {
+    const steps = this.#plan({ env: board.env, nodes: {}, edges: [] });
+    if (!steps.stops.length && !this.started.length) {
+      ask();
+      return;
+    }
+    this.review = {
+      title: 'Start a new stack',
+      sub: `${board.stack} still has something running. It is stopped and reverted first; then choose Add a stack again.`,
+      notices: [{ text: `Your boards and history for ${board.stack} are kept and come back when you switch back.` }],
+      groups: this.#groups(steps).filter(group => group.verb === 'stops'),
+      ok: 'Stop and revert',
+      prod: true,
+      blocked: false,
+      confirm: () => {
+        void this.deliver(
+          'Stop and revert this stack using the koppler-run skill (stop every process the agent started, revert every temporary code change), so the user can start a new stack. Report what was stopped and reverted.',
+          { tag: 'koppler-stop', data: { action: 'stop', id: newRunId() } },
+          'Stopping and reverting',
         );
       },
     };

@@ -5,6 +5,7 @@
   import { KINDS, of as kindOf } from '../src/core/kinds.ts';
   import { board } from './board.svelte.ts';
   import { post, repos, type Candidate } from './data.ts';
+  import { dialogs } from './dialogs.svelte.ts';
 
   let dialog = $state<HTMLDialogElement>();
   let found = $state.raw<{ roots: string[]; repos: Candidate[] } | null>(null);
@@ -47,8 +48,13 @@
     const apps = [...picks].map(([slug, { name, kind }]) => ({ slug, name: name.trim() || slug, kind }));
     const said = await post('apps', { apps });
     adding = false;
-    if ('error' in said) error = said.error;
-    // The stack changed: the page opens again with it.
+    if ('error' in said) {
+      error = said.error;
+      return;
+    }
+    // The stack changed: what the new repos say is shown next, and then the page opens again with it.
+    dialog?.close();
+    if (dialogs.findings) void dialogs.findings.open({ afterAdding: true });
     else location.reload();
   };
 </script>

@@ -1,6 +1,7 @@
 <script lang="ts">
   // The stack in use, next to the name: a menu of every stack on this machine, to switch to another.
   import { board } from './board.svelte.ts';
+  import { dialogs } from './dialogs.svelte.ts';
   import { live } from './live.svelte.ts';
   import { runs } from './run.svelte.ts';
 
@@ -9,6 +10,36 @@
   let list = $state<HTMLDivElement>();
   let open = $state(false);
   const stacks = $derived(live.status?.stacks ?? []);
+  const linked = $derived(live.status?.linked);
+  /** What else can be done with stacks, under the list. */
+  const acts = $derived([
+    ...(linked
+      ? [{ icon: '↻', label: 'Check for updates from GitHub', count: 0, run: () => void runs.updateStack() }]
+      : []),
+    ...(linked?.changes.length
+      ? [
+          {
+            icon: '●',
+            label: 'Changes not shared yet',
+            count: linked.changes.length,
+            run: () => {
+              runs.shareChanges();
+            },
+          },
+        ]
+      : []),
+    ...(board.apps.length
+      ? [{ icon: '⌕', label: 'Look through the repos again', count: 0, run: () => void dialogs.findings?.open() }]
+      : []),
+    {
+      icon: '+',
+      label: 'Add a stack: new, or from GitHub',
+      count: 0,
+      run: () => {
+        runs.addStack(() => dialogs.setup?.open());
+      },
+    },
+  ]);
   const options = () => [...(list?.querySelectorAll<HTMLButtonElement>('button:not(:disabled)') ?? [])];
   const place = () => {
     const at = picker?.getBoundingClientRect();
@@ -73,9 +104,23 @@
         {apps === 1 ? 'app' : 'apps'}</span
       >
     </button>
-  {:else}
-    <p>No other stack is known yet. The stack list comes with the canvas server.</p>
   {/each}
+  <div class="more">
+    {#each acts as act (act.label)}
+      <button
+        type="button"
+        role="menuitem"
+        onclick={() => {
+          list?.hidePopover();
+          act.run();
+        }}
+      >
+        <span class="ico" aria-hidden="true">{act.icon}</span>
+        <span class="name">{act.label}</span>
+        {#if act.count}<span class="meta">{act.count}</span>{/if}
+      </button>
+    {/each}
+  </div>
 </div>
 
 <style>
@@ -170,10 +215,15 @@
     font-weight: 400;
     font-size: 12px;
   }
-  .menu p {
-    margin: 0;
-    padding: 8px 10px;
-    color: var(--muted);
-    font-size: 13px;
+  .more {
+    margin-top: 4px;
+    padding-top: 4px;
+    border-top: 1px solid var(--line);
+  }
+  .more button {
+    color: var(--cable-ink);
+  }
+  .ico {
+    text-align: center;
   }
 </style>
