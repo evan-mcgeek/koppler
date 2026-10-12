@@ -209,3 +209,12 @@ test("a lone cable's plug sits in the middle of its port's ring", async ({ page 
   expect(Math.abs((plug[0] ?? 0) - (ring[0] ?? 9))).toBeLessThan(0.6);
   expect(Math.abs((plug[1] ?? 0) - (ring[1] ?? 9))).toBeLessThan(0.6);
 });
+
+test.describe('asked for without its closing slash', () => {
+  test.use({ start: 'next' });
+
+  test('the new canvas still opens, at its own address', async ({ page }) => {
+    await expect(card(page, 'web')).toBeVisible();
+    expect(new URL(page.url()).pathname).toMatch(/\/next\/$/);
+  });
+});
