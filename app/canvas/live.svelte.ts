@@ -47,6 +47,12 @@ interface Status {
   stack?: string | null;
   loading?: string | null;
   stacks?: { dir: string; name: string; path: string; apps: number; shared: boolean; linked?: string }[];
+  /** What the stack needs on this machine, as the last check found it. */
+  checks?:
+    | { name: string; state: string; detail?: string; for?: string[]; app?: string; env?: string; kind?: string }[]
+    | null;
+  /** The command that restarts the canvas server, when it runs older code than is on disk. */
+  restart?: string;
   /** Koppler runs from its source folder: it is being worked on. */
   dev?: boolean;
   /** The command that starts the canvas again. */

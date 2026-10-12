@@ -2,8 +2,10 @@
   // What is left of the side pane when it is folded: where the board stands, and the way back in.
   import Settings from './Settings.svelte';
   import { board } from './board.svelte.ts';
+  import { live } from './live.svelte.ts';
 
   const { open }: { open: () => void } = $props();
+  const needs = $derived((live.status?.checks ?? []).some(check => check.state !== 'ok'));
 </script>
 
 <nav aria-label="Side pane, folded" class:protected={board.protected}>
@@ -29,7 +31,18 @@
     </svg>
     <span>{board.nodes.length}/{board.apps.length}</span>
   </button>
-  <div class="foot"><Settings /></div>
+  <div class="foot">
+    {#if needs}
+      <button
+        class="needs"
+        type="button"
+        title="This stack needs something on this Mac"
+        aria-label="This stack needs something on this Mac"
+        onclick={open}>!</button
+      >
+    {/if}
+    <Settings />
+  </div>
 </nav>
 
 <style>
@@ -75,6 +88,20 @@
     color: var(--prod);
   }
   .foot {
+    display: grid;
+    justify-items: center;
+    gap: 8px;
     margin-top: auto;
+  }
+  .needs {
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: var(--warn);
+    color: var(--on-accent);
+    font: 700 13px var(--sans);
+    cursor: pointer;
   }
 </style>
