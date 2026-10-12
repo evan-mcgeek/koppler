@@ -73,7 +73,7 @@ test('on a protected environment the review says so, in red', async ({ page }) =
 });
 
 test('Stop says what it leaves alone, and is carried out when confirmed', async ({ page, canvas }) => {
-  await page.getByRole('button', { name: 'Stop' }).click();
+  await page.getByRole('button', { name: 'Stop', exact: true }).click();
   await expect(review(page).getByRole('heading')).toHaveText('Revert temporary changes');
   await expect(review(page)).toContainText('Left alone: anything you started yourself');
   await review(page).getByRole('button', { name: 'Revert' }).click();
@@ -90,4 +90,72 @@ test('Stop says what it leaves alone, and is carried out when confirmed', async 
 test('Run is off on an empty board', async ({ page }) => {
   await page.getByRole('button', { name: 'Clear' }).click();
   await expect(page.getByRole('button', { name: 'Run', exact: true })).toBeDisabled();
+});
+
+test('Run has a menu: with a note for this run, or as a checklist', async ({ page, canvas }) => {
+  const menu = page.getByRole('menu', { name: 'More ways to run' });
+  await page.getByRole('button', { name: 'More ways to run' }).click();
+  await page.screenshot({ path: 'test-results/next-run-menu.png' });
+  await menu.getByRole('menuitem', { name: /Run with a note/ }).click();
+  await page
+    .getByRole('dialog', { name: 'Note for the agent' })
+    .getByRole('textbox')
+    .fill('log in as the test account');
+  await page.screenshot({ path: 'test-results/next-run-note.png' });
+  await page.getByRole('button', { name: 'Review and send' }).click();
+  await expect(review(page).getByRole('heading')).toHaveText('Run on QA');
+  await expect(review(page)).toContainText('The agent does exactly this, with your note');
+  await expect(review(page)).toContainText('Your note: log in as the test account');
+  await review(page).getByRole('button', { name: 'Run', exact: true }).click();
+  await expect.poll(() => sent(canvas.temp).length).toBe(1);
+  expect(sent(canvas.temp)[0]?.data['note']).toBe('log in as the test account');
+  expect(sent(canvas.temp)[0]?.text).toContain('NOTE log in as the test account');
+
+  // The keyboard reaches the second way: the arrow opens the menu on its first item.
+  await page.getByRole('button', { name: 'More ways to run' }).focus();
+  await page.keyboard.press('Enter');
+  await expect(menu.getByRole('menuitem', { name: /Run with a note/ })).toBeFocused();
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('Enter');
+  await expect(review(page).getByRole('heading')).toHaveText('Checklist for QA');
+  await expect(review(page)).toContainText('The agent changes nothing.');
+  await review(page).getByRole('button', { name: 'Get the checklist' }).click();
+  await expect.poll(() => sent(canvas.temp).length).toBe(2);
+  expect(sent(canvas.temp)[1]?.data['mode']).toBe('manual');
+  expect(sent(canvas.temp)[1]?.text).toContain('MODE manual: give me a checklist, change nothing');
+});
+
+test('Stop has a menu: stop the apps and keep the changes, or shut Koppler down', async ({ page }) => {
+  const menu = page.getByRole('menu', { name: 'More ways to stop' });
+  await page.getByRole('button', { name: 'More ways to stop' }).click();
+  // Nothing runs: there is nothing to stop, and the item says so.
+  await expect(menu.getByRole('menuitem', { name: /Stop apps, keep changes/ })).toBeDisabled();
+  await expect(menu).toContainText('Nothing is running');
+  await page.keyboard.press('Escape');
+  await expect(menu).toBeHidden();
+
+  // Two things run, as the server would report them.
+  await page.route('**/data/status.json', route =>
+    route.fulfill({ json: { apps: {}, running: ['orders', 'tunnel-db', 'canvas'] } }),
+  );
+  await page.route('**/stop-apps?*', route => route.fulfill({ json: { stopped: ['orders', 'tunnel-db'] } }));
+  await expect(async () => {
+    await page.getByRole('button', { name: 'More ways to stop' }).click();
+    await expect(menu.getByRole('menuitem', { name: /Stop apps, keep changes/ })).toBeEnabled({ timeout: 500 });
+  }).toPass();
+  await page.screenshot({ path: 'test-results/next-stop-menu.png' });
+  await menu.getByRole('menuitem', { name: /Stop apps, keep changes/ }).click();
+  await expect(review(page).getByRole('heading')).toHaveText('Stop apps, keep changes');
+  await expect(review(page)).toContainText('Orders API');
+  await expect(review(page)).toContainText('Tunnel db');
+  await review(page).getByRole('button', { name: 'Stop apps' }).click();
+  await expect(page.getByRole('status')).toContainText('Stopped 2 processes. Your changes stay until you revert.');
+
+  await page.getByRole('button', { name: 'More ways to stop' }).click();
+  await menu.getByRole('menuitem', { name: /Shut down Koppler/ }).click();
+  await expect(review(page).getByRole('heading')).toHaveText('Shut down Koppler');
+  await expect(review(page)).toContainText('The canvas server');
+  await expect(review(page)).toContainText('Keeps running: orders, tunnel-db.');
+  await review(page).getByRole('button', { name: 'Shut down' }).click();
+  await expect(page.getByRole('status')).toContainText('Koppler is shut down. Start it again with koppler canvas.');
 });

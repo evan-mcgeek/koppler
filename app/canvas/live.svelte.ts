@@ -41,6 +41,8 @@ interface Status {
   runs?: { state?: string; kind?: string; changes?: { app: string; title: string; file?: string }[] }[];
   /** Whether an agent session takes what the canvas sends: listening, busy or none. */
   agent?: { state?: string };
+  /** The command that starts the canvas again. */
+  start?: string;
   /** The credentials each app declares per environment, and whether each is stored. */
   secrets?: Record<string, Record<string, { name: string; stored?: boolean; when?: string }[] | undefined> | undefined>;
 }
