@@ -9,6 +9,10 @@
   const { id, data, selected }: NodeProps<CardNode> = $props();
   const SIDES: Side[] = ['top', 'right', 'bottom', 'left'];
   const FAR_ZOOM = 0.6;
+  const CHANGES = [
+    ['set-aside', 'Set aside', 'Kept aside while it runs the other branch, back on Stop'],
+    ['take-along', 'Take along', 'Carried to the other branch, and back on Stop'],
+  ] as const;
   const STARTERS = [
     ['cli', 'Koppler'],
     ['ide', 'Me'],
@@ -19,8 +23,7 @@
   const brief = $derived(far || board.live);
   const app = $derived(board.apps.find(one => one.id === id));
   const current = $derived(app?.current || 'current branch');
-  /** The branches to pick from: the clone's own first, then whatever the board names that the clone does not list. */
-  const branches = $derived([...new Set([...(app?.branches ?? []), data.branch].filter(Boolean))]);
+  const uncommitted = $derived(`${String(app?.dirty ?? 0)} uncommitted ${app?.dirty === 1 ? 'change' : 'changes'}`);
   const starts = $derived(!!app?.runIn.some(([value]) => value === 'ide'));
   const tunnels = $derived(board.tunnelsOf(id));
   const queues = $derived(board.queuesOf(id));
@@ -112,21 +115,48 @@
     <div class="body nodrag nopan">
       <label class="field">
         Branch
-        <span class="combo">
-          <select
-            class="mono"
-            value={data.branch === app?.current ? '' : data.branch}
-            onchange={ev => {
-              board.set(id, { branch: ev.currentTarget.value });
-            }}
-          >
-            <option value="">{current}{app?.dirty ? ', with your uncommitted changes' : ''}</option>
-            {#each branches.filter(branch => branch !== app?.current) as branch (branch)}
-              <option value={branch}>{branch}</option>
-            {/each}
-          </select>
-        </span>
+        <!-- The clone's branches are offered as it is typed in; a name they do not list is kept too. -->
+        <input
+          class="mono"
+          list="branches-{id}"
+          autocomplete="off"
+          spellcheck="false"
+          placeholder={current}
+          title={app?.dirty && !board.switchesOver(id) ? `Runs with your ${uncommitted}` : undefined}
+          value={data.branch}
+          onchange={ev => {
+            board.set(id, { branch: ev.currentTarget.value.trim() });
+          }}
+        />
+        <datalist id="branches-{id}">
+          {#each app?.branches ?? [] as branch (branch)}<option value={branch}></option>{/each}
+        </datalist>
       </label>
+      {#if board.switchesOver(id)}
+        <div
+          class="field"
+          role="radiogroup"
+          aria-label="Your {uncommitted} on {current}"
+          title="Your {uncommitted} on {current}: set aside while it runs the other branch, or taken along. Back on Stop either way."
+        >
+          {uncommitted}
+          <span class="seg">
+            {#each CHANGES as [value, label, tip] (value)}
+              <label title={tip}>
+                <input
+                  type="radio"
+                  name="changes-{id}"
+                  {value}
+                  checked={(data.changes ?? 'set-aside') === value}
+                  onchange={() => {
+                    board.set(id, { changes: value });
+                  }}
+                />{label}
+              </label>
+            {/each}
+          </span>
+        </div>
+      {/if}
       {#if starts || tunnels.length || queues.length}
         <div class="row">
           {#if starts}
@@ -478,6 +508,20 @@
     border-bottom: 1.5px solid var(--muted);
     transform: translateY(-70%) rotate(45deg);
     pointer-events: none;
+  }
+  .field > input {
+    width: 100%;
+    height: 30px;
+    padding: 0 8px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: var(--paper);
+    color: var(--ink);
+    font: 12px var(--mono);
+    text-overflow: ellipsis;
+  }
+  .field > input::placeholder {
+    color: var(--muted);
   }
   select {
     width: 100%;

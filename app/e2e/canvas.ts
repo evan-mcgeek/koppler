@@ -76,16 +76,19 @@ export const test = base.extend<{
   stack: Stack;
   board: object | null;
   uncloned: string[];
+  dirty: string[];
   start: string;
   canvas: Canvas;
 }>({
-  // `stack`, `board` and `uncloned` (apps with no clone on this machine) can be set per test with test.use.
+  // `stack`, `board`, `uncloned` (apps with no clone on this machine) and `dirty` (apps whose clone has three
+  // uncommitted changes) can be set per test with test.use.
   stack: [STACK, { option: true }],
   board: [null, { option: true }],
   uncloned: [[], { option: true }],
+  dirty: [[], { option: true }],
   // The page under the canvas address to open: today's canvas, or `next/` for the new one.
   start: ['', { option: true }],
-  canvas: async ({ stack, board, uncloned }, use) => {
+  canvas: async ({ stack, board, uncloned, dirty }, use) => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-e2e-')),
       temp = path.join(dir, 'state', 'run'),
       port = await freePort();
@@ -102,7 +105,12 @@ export const test = base.extend<{
           .filter(id => !uncloned.includes(id))
           .map(id => [
             id,
-            { path: path.join(dir, 'clones', id), branch: 'main', dirty: 0, branches: ['main', 'feature/checkout'] },
+            {
+              path: path.join(dir, 'clones', id),
+              branch: 'main',
+              dirty: dirty.includes(id) ? 3 : 0,
+              branches: ['main', 'feature/checkout'],
+            },
           ]),
       ),
     });
