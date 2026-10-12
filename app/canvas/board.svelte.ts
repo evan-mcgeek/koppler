@@ -38,6 +38,8 @@ export interface CardData extends Record<string, unknown> {
   hideTunnels?: boolean;
   /** What happens to the clone's uncommitted changes when another branch runs; set aside unless chosen. */
   changes?: Changes;
+  /** The libraries it runs with the local copy of, by name. */
+  libraries?: string[];
 }
 export type Changes = 'set-aside' | 'take-along';
 export type CardNode = Node<CardData, 'app'>;
@@ -112,6 +114,8 @@ export interface StackApp {
   current: string;
   branches: string[];
   dirty: number;
+  /** The libraries it depends on that are cloned here, and where. */
+  libraries: { name: string; path: string }[];
 }
 interface Draft {
   a: Point;
@@ -251,6 +255,13 @@ class Board {
     const branch = this.nodes.find(node => node.id === id)?.data.branch;
     const app = this.apps.find(one => one.id === id);
     return !!(branch && app?.current && branch !== app.current && app.dirty);
+  }
+
+  /** The libraries a card runs with the local copy of, among the ones cloned here. */
+  localLibraries(id: string): string[] {
+    const chosen = this.nodes.find(node => node.id === id)?.data.libraries ?? [];
+    const here = this.apps.find(one => one.id === id)?.libraries ?? [];
+    return chosen.filter(name => here.some(library => library.name === name));
   }
 
   borrowsTunnels(id: string): boolean {
@@ -871,6 +882,9 @@ class Board {
         kindLabel,
         ...(chosen.hideTunnels === true && { hideTunnels: true }),
         ...((chosen.changes === 'take-along' || chosen.changes === 'set-aside') && { changes: chosen.changes }),
+        ...(Array.isArray(chosen.libraries) && {
+          libraries: chosen.libraries.filter(name => typeof name === 'string'),
+        }),
         branch: chosen.branch ?? '',
         run: run ?? 'cli',
         ...(platform && { platform }),
@@ -906,6 +920,7 @@ class Board {
       current: clones[id]?.branch ?? '',
       branches: clones[id]?.branches ?? [],
       dirty: clones[id]?.dirty ?? 0,
+      libraries: (clones[id]?.libraries ?? []).map(({ name, path }) => ({ name, path })),
       ...(app.outside && { outside: typeof app.outside === 'string' ? app.outside : 'an outside system' }),
     }));
     this.nodes = this.apps.flatMap(app => {
@@ -938,7 +953,7 @@ class Board {
       env: this.env,
       ...(this.view && { zoom: this.view.zoom, pan: { x: this.view.x, y: this.view.y } }),
       nodes: Object.fromEntries(
-        this.nodes.map(({ id, position, data: { branch, run, platform, note, hideTunnels, changes } }) => [
+        this.nodes.map(({ id, position, data: { branch, run, platform, note, hideTunnels, changes, libraries } }) => [
           id,
           {
             ...before[id],
@@ -950,6 +965,7 @@ class Board {
             note,
             hideTunnels: hideTunnels ? true : undefined,
             changes,
+            libraries: libraries?.length ? libraries : undefined,
           },
         ]),
       ),

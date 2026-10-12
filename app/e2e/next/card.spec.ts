@@ -125,3 +125,21 @@ test.describe('a clone with uncommitted changes', () => {
     );
   });
 });
+
+test.describe('an app that depends on a library cloned here', () => {
+  test.use({ libraries: { orders: ['acme-ui', '@acme/kit'] } });
+
+  test('runs with the local copy when its switch is on, and the run says so', async ({ page }) => {
+    const orders = card(page, 'orders');
+    const kit = orders.getByRole('switch', { name: 'Use the local @acme/kit' });
+    await expect(orders.getByRole('switch', { name: 'Use the local acme-ui' })).not.toBeChecked();
+    await expect(card(page, 'payments').getByText('Libraries')).toHaveCount(0);
+    await kit.check();
+    await orders.screenshot({ path: 'test-results/next-card-libraries.png' });
+    await nextEdit(page);
+    await page.reload();
+    await expect(kit).toBeChecked();
+    await page.getByRole('button', { name: 'Run', exact: true }).click();
+    await expect(page.getByRole('dialog')).toContainText('Uses your local @acme/kit');
+  });
+});
