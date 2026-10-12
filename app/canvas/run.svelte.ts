@@ -50,6 +50,7 @@ class Runs {
         ...(board.switchesOver(id) && { changes: data.changes ?? ('set-aside' as const) }),
         ...(data.platform && data.run === 'cli' && !!app?.platforms.length && { platform: data.platform }),
         ...(data.note.trim() && { note: data.note.trim() }),
+        ...(board.localLibraries(id).length > 0 && { libraries: board.localLibraries(id) }),
       };
     });
     const edges = board.edges.map(({ source, target }) => ({ from: source, to: target }));
@@ -189,6 +190,9 @@ class Runs {
           : []),
         ...(node.data.run === 'ide' ? [{ text: 'You start it; the agent only prepares it' }] : []),
         ...(node.data.note ? [{ text: `Note: ${node.data.note}` }] : []),
+        ...(board.localLibraries(id).length
+          ? [{ text: `Uses your local ${board.localLibraries(id).join(', ')}` }]
+          : []),
       ];
     };
     const called: Record<string, string[]> = {};

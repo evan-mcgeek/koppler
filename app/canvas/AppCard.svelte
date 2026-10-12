@@ -35,6 +35,10 @@
     const [first, ...rest] = name.split(' ');
     return rest.length && first === data.name.split(' ')[0] ? rest.join(' ') : name;
   };
+  const local = $derived(board.localLibraries(id));
+  const useLocal = (name: string, on: boolean) => {
+    board.set(id, { libraries: on ? [...local, name] : local.filter(one => one !== name) });
+  };
   const mobile = $derived(!!app?.platforms.length && data.run === 'cli');
   const platform = $derived(app?.platforms.find(([value]) => value === data.platform)?.[1]);
   /** What the short card says about how it runs. */
@@ -251,6 +255,30 @@
               {/if}
             </div>
           {/if}
+        </div>
+      {/if}
+      {#if app?.libraries.length}
+        <div class="field">
+          Libraries
+          {#each app.libraries as library (library.name)}
+            {@const on = local.includes(library.name)}
+            <label
+              class="switch"
+              title={on
+                ? `On: ${data.name} uses your local copy in ${library.path.replace(/^\/Users\/[^/]+/, '~')}`
+                : `Off: ${data.name} uses the published ${library.name}`}
+            >
+              <input
+                type="checkbox"
+                role="switch"
+                aria-label="Use the local {library.name}"
+                checked={on}
+                onchange={ev => {
+                  useLocal(library.name, ev.currentTarget.checked);
+                }}
+              /><span class="track" aria-hidden="true"></span>{library.name}
+            </label>
+          {/each}
         </div>
       {/if}
       <label class="field">
