@@ -88,7 +88,7 @@ const [crashy, upA, upB, tunA, tunB, runA, runB, agentA, agentB, leftA, leftB] =
   fs.writeFileSync(path.join(dir, 'local.json'), JSON.stringify({ apps: { api: { path: dir } } }));
   const refused = koppler('up', 'api');
   assert.equal(refused.code, 1, refused.out);
-  assert.match(refused.out, /Sign in to AWS first: Orders API reads its settings from AWS at start/);
+  assert.match(refused.out, /Sign in first: Orders API needs AWS \(acme-qa\) at start/);
   assert.match(refused.out, /aws sso login --profile acme-qa/);
   assert.equal(fs.existsSync(path.join(dir, 'started')), false, 'nothing was started');
   fs.writeFileSync(path.join(dir, 'signed-in'), '');
@@ -97,6 +97,36 @@ const [crashy, upA, upB, tunA, tunB, runA, runB, agentA, agentB, leftA, leftB] =
   assert.equal(fs.existsSync(path.join(dir, 'started')), true);
   koppler('stop', '--all', '--yes');
   console.log('sign-in before start ok');
+}
+// koppler up: a sign-in the stack declares itself (not AWS) is checked the same way, once its command is allowed, and what it gives the app reaches it.
+{
+  const { spawnSync } = await import('node:child_process');
+  const fs = await import('node:fs'), os = await import('node:os'), path = await import('node:path'), { fileURLToPath } = await import('node:url');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-upsignin-'));
+  const env = { ...process.env, KOPPLER_STATE: dir, KOPPLER_TEMP: dir, KOPPLER_CONFIG_DIR: dir };
+  cleanups.push(() => spawnSync('node', [path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'dist', 'koppler.mjs'), 'stop', '--all', '--yes'], { env }));
+  const koppler = (...args) => { const r = spawnSync('node', [path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'dist', 'koppler.mjs'), ...args], { encoding: 'utf8', env }); return { out: (r.stdout + r.stderr).trim(), code: r.status }; };
+  const [port] = await freePorts(1);
+  const signIns = { 'acme-cloud': { what: 'Acme Cloud', check: `test -f "${dir}/signed-in"`, login: 'acme login --tenant shop', env: { ACME_TENANT: 'shop' } } };
+  const stack = { envs: ['qa'], signIns, apps: { api: { name: 'Orders API', kind: 'other', start: `echo "TENANT=$ACME_TENANT" > "${dir}/started"; exec python3 -m http.server ${port} --bind 127.0.0.1`, url: `http://localhost:${port}`, prereqs: [{ signIn: 'acme-cloud' }] } } };
+  fs.writeFileSync(path.join(dir, 'registry.json'), JSON.stringify({ ...stack, source: path.join(dir, 'stack.json') }));
+  fs.writeFileSync(path.join(dir, 'local.json'), JSON.stringify({ apps: { api: { path: dir } } }));
+  // Its check is a command of the stack's: nothing runs until the user allowed it.
+  const unseen = koppler('up', 'api');
+  assert.equal(unseen.code, 1, unseen.out);
+  assert.match(unseen.out, /koppler doctor --approve/);
+  allowStack(dir, { ...stack, source: path.join(dir, 'stack.json') });
+  const refused = koppler('up', 'api');
+  assert.equal(refused.code, 1, refused.out);
+  assert.match(refused.out, /Sign in first: Orders API needs Acme Cloud at start/);
+  assert.match(refused.out, /acme login --tenant shop/);
+  assert.equal(fs.existsSync(path.join(dir, 'started')), false, 'nothing was started');
+  fs.writeFileSync(path.join(dir, 'signed-in'), '');
+  const started = koppler('up', 'api');
+  assert.equal(started.code, 0, started.out);
+  assert.equal(fs.readFileSync(path.join(dir, 'started'), 'utf8').trim(), 'TENANT=shop');
+  koppler('stop', '--all', '--yes');
+  console.log('a stack sign-in before start ok');
 }
 // koppler up --run: a confirmed Send carried out by Koppler itself; a cable's address reaches its caller at start, and the run is done.
 {

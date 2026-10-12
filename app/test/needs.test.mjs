@@ -12,6 +12,14 @@ const steps = stepsFor('Orders API', [{ sso: 'acme-qa' }, { hosts: 'db.cluster.a
   { appId: 'orders-api', skill: '/skill', repo: '/repo', secrets: [{ env: 'ConnectionStrings__DB', when: 'always', fetch: { cli: 'aws ... | <skill>/bin/secret-set orders-api ConnectionStrings__DB --stdin', ui: 'console' } }, { file: 'src/app.secrets.json' }] });
 assert.deepEqual(steps.map(s => s.title), ['Sign in to AWS (acme-qa)', 'Point the database address at your Mac', 'Trust the local HTTPS certificate', 'Store ConnectionStrings__DB for Orders API', 'Put app.secrets.json in place for Orders API']);
 assert.equal(steps[0].command, 'aws sso login --profile acme-qa');
+// A sign-in the stack declares itself reads the same way, with its own command.
+{
+  const signIns = { 'acme-cloud': { what: 'Acme Cloud', check: 'acme whoami', login: 'acme login --tenant shop' } };
+  const [own] = stepsFor('Orders API', [{ signIn: 'acme-cloud' }], { signIns });
+  assert.equal(own.title, 'Sign in to Acme Cloud');
+  assert.equal(own.command, 'acme login --tenant shop');
+  assert.equal(own.id, 'sign-in:acme-cloud');
+}
 assert.equal(steps[1].command, 'echo "127.0.0.1 db.cluster.acme.dev" | sudo tee -a /etc/hosts');
 assert.equal(steps[3].command, 'aws ... | /skill/bin/secret-set orders-api ConnectionStrings__DB --stdin');
 assert.match(steps[3].where, /not the agent/);

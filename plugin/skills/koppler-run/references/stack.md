@@ -55,7 +55,7 @@ It holds facts about the apps, never secret values.
 | `kinds` | Top-level: the stack's own kinds, `{ "<id>": { "label", "detect": [files that must all exist], "start": "<command>", "port" } }`, for a technology Koppler has no recipe for. |
 | `slug` | `owner/repo` for GitHub, or `host/path` for any other git host (`gitlab.com/group/sub/repo`, `dev.azure.com/org/project/repo`); `koppler init` matches it against the remotes of the user's clones. |
 | `consumes.<app>` | How this app calls another: `how: env` (env vars in a `-LOCAL` launch profile), `how: env-file` (lines in a git-ignored local env file, `file` default `.env.local`, for front ends whose variables need the framework's prefix such as `VITE_` or `NEXT_PUBLIC_`), `how: edit` (a marked temporary code edit at `file` / `key`; `value` is optional, `koppler plan --wire` works out the address for each device, and a `value` per `ios` / `android` pins it), or `how: unknown` (the call is known from the repo, `found` says where, but how a local run repoints it is not: work it out from the repo on first use and write the real `how` back). |
-| `prereqs` | `sso`, `tunnel` (+ `port`, `cmd`; optional `what` such as `"Database (Aurora)"`, else guessed from the host name; optional `env`, the app setting that holds the tunnel's `host:port`, which lets Koppler move the tunnel to a free port when another one needs the same port; optional `connectsAs`, the host name the app actually dials when it is not the tunnel host, e.g. a database endpoint from a secret mapped to the tunnel by a `hosts` entry), `hosts`, `devCerts`, `file`, `nuget`, each with an optional `note`. |
+| `prereqs` | `sso` (an AWS profile) or `signIn` (the name of a sign-in under the stack's `signIns`, for anything else), `tunnel` (+ `port`, `cmd`; optional `what` such as `"Database (Aurora)"`, else guessed from the host name; optional `env`, the app setting that holds the tunnel's `host:port`, which lets Koppler move the tunnel to a free port when another one needs the same port; optional `connectsAs`, the host name the app actually dials when it is not the tunnel host, e.g. a database endpoint from a secret mapped to the tunnel by a `hosts` entry), `hosts`, `devCerts`, `file`, `nuget`, each with an optional `note`. |
 | `secrets` | What the user must store (`env` or `file`), `when` it is needed, `fetch.cli` / `fetch.ui` steps, and for a database or cache connection an optional `type` (`postgres`, `mysql`, `redis`) so it can be tested. See `secrets.md`. |
 | `mobile` | `iosBundleId` / `androidPackage`, so the watcher can tell whether the app is running, and `koppler stop` can close it on the device. |
 | `flutter` | For `kind: flutter`: `fvm` (run through fvm), `flavor` (pass the env as `--flavor`), `defineFile` (e.g. `.env_{env}.json` for `--dart-define-from-file`). |
@@ -154,3 +154,25 @@ It reads out names and plain addresses only (a host, or an http(s) URL with no c
 Environments come from variable files named after them (`deployment-dev.tfvars`) or, without those, from trying each stack environment and alias as the Terraform workspace.
 What it cannot work out (a domain passed in by the deploy pipeline, a name built from a random suffix) is reported as not found or counted.
 The draft, with a `suggestions` block shaped like `stack.json`, goes to `<state>/stack.deployed.json`. Review it before copying anything across.
+
+## Sign-ins that are not AWS
+
+`sso` is shorthand for an AWS profile.
+Any other sign-in (Azure, Google Cloud, Firebase, a company tool) is declared once at the top of the stack and named by the apps that need it:
+
+```json
+"signIns": {
+  "acme-dev": {
+    "what": "Azure",
+    "check": "az account get-access-token --tenant acme",
+    "login": "az login --tenant acme",
+    "env": { "AZURE_TENANT_ID": "acme" }
+  }
+},
+"apps": { "orders": { "prereqs": [{ "signIn": "acme-dev" }] } }
+```
+
+- `check` succeeds while the sign-in holds. Koppler runs it before a run starts anything, and it is a command of the stack, so it runs only after `koppler doctor --approve`.
+- `login` is what the user runs to sign in. Koppler shows it and never runs it.
+- `env` is given to the app when Koppler starts it.
+- Like `sso`, a sign-in belongs to one environment: each environment that needs one lists its own.

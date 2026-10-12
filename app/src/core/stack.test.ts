@@ -103,3 +103,16 @@ test('each part is named where it is wrong', () => {
   ];
   for (const [bad, problem] of cases) expect(validateStack(bad), problem).toContain(problem);
 });
+
+test('a stack declares its own sign-ins, and an app names one that exists', () => {
+  const azure = { what: 'Azure', check: 'az account show', login: 'az login', env: { AZURE_TENANT_ID: 'acme' } };
+  const using = (name: string, signIns: object = { 'acme-dev': azure }) =>
+    stack({ signIns, apps: { orders: { ...app, prereqs: [{ signIn: name }] } } });
+  expect(validateStack(using('acme-dev'))).toEqual([]);
+  expect(validateStack(using('other'))).toContain(
+    'apps.orders.prereqs[0].signIn: no sign-in called other under signIns',
+  );
+  expect(validateStack(using('acme-dev', { 'acme-dev': { what: 'Azure', login: 'az login' } })).join()).toMatch(
+    /signIns\.acme-dev\.check/,
+  );
+});

@@ -271,10 +271,6 @@ class Board {
   queueName(id: string): string {
     return this.#registry?.queues?.[id]?.name ?? id;
   }
-  /**
-   * An app whose stack entry has no sign-in, tunnel or hosts entry of its own for this environment while the first
-   * environment has one: it would run on another environment's.
-   */
   /** A branch other than the clone's is asked for while the clone has uncommitted changes. */
   switchesOver(id: string): boolean {
     const branch = this.nodes.find(node => node.id === id)?.data.branch;
@@ -289,14 +285,21 @@ class Board {
     return chosen.filter(name => here.some(library => library.name === name));
   }
 
+  /**
+   * An app whose stack entry has no sign-in, tunnel or hosts entry of its own for this environment while the first
+   * environment has one: it would run on another environment's.
+   */
   borrowsTunnels(id: string): boolean {
     if (this.env === this.envs[0]) return false;
     const app = this.#registry?.apps[id];
     const own = app?.envs?.[this.env]?.prereqs ?? [];
     const hidden = this.nodes.find(node => node.id === id)?.data.hideTunnels;
-    return (['sso', 'tunnel', 'hosts'] as const).some(
+    return (['sso', 'signIn', 'tunnel', 'hosts'] as const).some(
       kind =>
-        (app?.prereqs ?? []).some(need => need[kind]) && !own.some(need => need[kind]) && !(kind !== 'sso' && hidden),
+        (app?.prereqs ?? []).some(need => need[kind]) &&
+        !own.some(need => need[kind]) &&
+        // A sign-in is needed with or without its tunnels.
+        !(kind !== 'sso' && kind !== 'signIn' && hidden),
     );
   }
   /** An app's queues that the stack describes. */
