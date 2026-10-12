@@ -26,6 +26,14 @@ interface AppStatus {
   /** The last lines of its log. */
   logTail?: string | null;
 }
+/** A credential an app declares: its name, whether it is stored, and what the stack says about getting it. Never its value. */
+interface Credential {
+  name: string;
+  stored?: boolean;
+  when?: string;
+  fetchUi?: string;
+  fetchCli?: string;
+}
 /** A run or a Stop as the history keeps it, or a note of something that stopped outside one. */
 export interface Run {
   id?: string;
@@ -78,7 +86,7 @@ interface Status {
   /** The command that starts the canvas again. */
   start?: string;
   /** The credentials each app declares per environment, and whether each is stored. */
-  secrets?: Record<string, Record<string, { name: string; stored?: boolean; when?: string }[] | undefined> | undefined>;
+  secrets?: Record<string, Record<string, Credential[] | undefined> | undefined>;
 }
 
 class Live {
