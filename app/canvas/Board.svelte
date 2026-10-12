@@ -371,20 +371,6 @@
     <!-- Under the cards: the links from each app to its tunnels. -->
     <ViewportPortal target="back">
       <svg class="links" aria-hidden="true">
-        <defs>
-          <marker
-            id="link-end"
-            viewBox="-8 -6 10 12"
-            markerWidth="10"
-            markerHeight="12"
-            refX="0"
-            refY="0"
-            orient="auto-start-reverse"
-            markerUnits="userSpaceOnUse"
-          >
-            <path d="M-6,-4.5 L0,0 L-6,4.5" />
-          </marker>
-        </defs>
         {#each links as link (link.key)}
           <path class="link" class:idle={link.idle} d={link.d} />
         {/each}
@@ -392,7 +378,7 @@
           <g class="flow {flow.kind}">
             <path class="under" d={flow.d} />
             <path class="wire" d={flow.d} />
-            <path class="head" d="M-8,-5.5 L0,0 L-8,5.5" transform={flow.head} />
+            <path class="head" d="M-9,-4.5 L0,0 L-9,4.5 L-6.75,0 Z" transform={flow.head} />
             <circle class="plug" cx={flow.start.x} cy={flow.start.y} r="5" />
           </g>
         {/each}
@@ -595,11 +581,7 @@
     stroke-linecap: round;
     stroke-linejoin: round;
   }
-  .link {
-    marker-start: url(#link-end);
-    marker-end: url(#link-end);
-  }
-  /* Dashed until its app runs. */
+  /* A tunnel link says "uses", not a direction: a plain line. Dashed until its app runs. */
   .link.idle {
     stroke-dasharray: 5 5;
     stroke-linecap: butt;
@@ -610,12 +592,17 @@
     stroke-width: 7;
     opacity: 0.75;
   }
-  .flow .wire,
-  .flow .head {
+  .flow .wire {
     stroke-width: 2;
+  }
+  .flow .head {
+    stroke-width: 1.5;
   }
   .flow.msg :is(.wire, .head) {
     stroke: var(--msg);
+  }
+  .flow.msg .head {
+    fill: var(--msg);
   }
   .flow.msg .wire {
     stroke-dasharray: 7 5;
@@ -633,6 +620,9 @@
   .flow.ext :is(.wire, .head) {
     stroke: var(--socket-rim);
     stroke-width: 1.5;
+  }
+  .flow.ext .head {
+    fill: var(--socket-rim);
   }
   .flow.ext .wire {
     stroke-dasharray: 2 5;
