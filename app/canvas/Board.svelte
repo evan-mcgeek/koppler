@@ -174,6 +174,14 @@
     // The cards move first; the view follows once they are placed.
     requestAnimationFrame(() => void flow.fitView(FIT));
   };
+  // A board that was just opened: once its cards have their sizes it is arranged, or only brought into view.
+  $effect(() => {
+    const how = board.opened;
+    if (!how || !board.nodes.every(node => node.measured?.width)) return;
+    board.opened = null;
+    if (how === 'arrange') arrange();
+    else requestAnimationFrame(() => void flow.fitView(FIT));
+  });
 </script>
 
 <svelte:window onkeydown={shortcut} />
