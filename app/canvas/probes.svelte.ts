@@ -23,7 +23,8 @@ const CANNOT: Tested = {
 };
 
 /** What is tested: a call between two apps, or an app's way to a database or cache through its tunnel. */
-export type Payload = { from: string; to: string } | { app: string; host: string; port: number; original: number };
+export type Payload =
+  { node: string } | { from: string; to: string } | { app: string; host: string; port: number; original: number };
 /** A cable or a tunnel link, with the apps that have to answer before it is tested by itself. */
 export interface Job {
   key: string;
@@ -50,6 +51,11 @@ class Probes {
     this.results[key] = { state: out.unsure ? 'warn' : out.ok ? 'ok' : 'bad', text: out.text, detail: out.detail };
     // A test that passes shows on its light; one pressed by hand that fails, or could not be done, says why.
     if (!auto && (!out.ok || out.unsure)) toasts.show(out.detail, 'warning');
+  }
+
+  /** Drops the results of these, so they are tested afresh. */
+  forget(keys: string[]): void {
+    this.results = Object.fromEntries(Object.entries(this.results).filter(([key]) => !keys.includes(key)));
   }
 
   /** Tests each one once when its apps answer, and forgets its result when one of them stops. */
