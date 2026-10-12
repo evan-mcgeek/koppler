@@ -47,6 +47,7 @@ class Runs {
         branch: data.branch || null,
         run: data.run as 'cli' | 'ide',
         ...(data.hideTunnels && board.tunnelsOf(id).length > 0 && { tunnels: false as const }),
+        ...(board.switchesOver(id) && { changes: data.changes ?? ('set-aside' as const) }),
         ...(data.platform && data.run === 'cli' && !!app?.platforms.length && { platform: data.platform }),
         ...(data.note.trim() && { note: data.note.trim() }),
       };
@@ -179,7 +180,12 @@ class Runs {
         { text: node.data.branch || app.current || 'current branch', kind: 'host' },
         ...(app.dirty && onCurrent ? [{ text: `With your ${changes}`, kind: 'flag' as const }] : []),
         ...(app.dirty && !onCurrent
-          ? [{ text: `Your ${changes} on ${app.current}: set aside, back on Stop`, kind: 'flag' as const }]
+          ? [
+              {
+                text: `Your ${changes} on ${app.current}: ${node.data.changes === 'take-along' ? 'taken along' : 'set aside'}, back on Stop`,
+                kind: 'flag' as const,
+              },
+            ]
           : []),
         ...(node.data.run === 'ide' ? [{ text: 'You start it; the agent only prepares it' }] : []),
         ...(node.data.note ? [{ text: `Note: ${node.data.note}` }] : []),

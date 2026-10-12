@@ -38,7 +38,7 @@ test('the page shows the stack, its environment and the board the server kept', 
   await expect(page.getByRole('banner')).toContainText('QA');
   await expect(card(page, 'orders')).toContainText('Orders API');
   await expect(card(page, 'orders')).toContainText('.NET');
-  await expect(card(page, 'orders').getByLabel('Branch').locator('option:checked')).toHaveText('main');
+  await expect(card(page, 'orders').getByLabel('Branch')).toHaveValue('main');
   await expect(page.locator('.svelte-flow__edge')).toHaveCount(4);
 });
 

@@ -1,6 +1,6 @@
 // The new canvas's app card: what the user chooses on it.
 import type { Page } from '@playwright/test';
-import { test, expect, STACK } from '../canvas.ts';
+import { test, expect, nextEdit, STACK } from '../canvas.ts';
 
 const card = (page: Page, id: string) => page.locator(`.svelte-flow__node[data-id="${id}"]`);
 const at = (x: number, y: number) => ({ x, y, run: 'cli', branch: 'main' });
@@ -25,8 +25,9 @@ test.use({
 
 test("a card offers the clone's branches, who starts it, and for a mobile app its platform", async ({ page }) => {
   const branch = card(page, 'orders').getByLabel('Branch');
-  await expect(branch.locator('option')).toHaveText(['main', 'feature/checkout']);
-  await branch.selectOption('feature/checkout');
+  await expect(card(page, 'orders').locator('datalist option')).toHaveCount(2);
+  await branch.fill('feature/checkout');
+  await branch.blur();
   await expect(branch).toHaveValue('feature/checkout');
 
   await expect(card(page, 'mobile').getByLabel('Platform')).toHaveValue('ios');
@@ -74,4 +75,28 @@ test('typing in a card and using its menus does not drag it', async ({ page }) =
   await page.mouse.move(menu.x + 140, menu.y + 80, { steps: 5 });
   await page.mouse.up();
   expect(await card(page, 'orders').boundingBox()).toEqual(before);
+});
+
+test.describe('a clone with uncommitted changes', () => {
+  test.use({ dirty: ['orders'] });
+
+  test('another branch asks what happens to them, a typed one too, and the review says it', async ({ page }) => {
+    const orders = card(page, 'orders');
+    const choice = orders.getByRole('radiogroup', { name: 'Your 3 uncommitted changes on main' });
+    await expect(choice).toHaveCount(0);
+    // A branch the clone does not list is kept as typed.
+    await orders.getByLabel('Branch').fill('fix/not-fetched-yet');
+    await orders.getByLabel('Branch').blur();
+    await expect(choice.getByRole('radio', { name: 'Set aside' })).toBeChecked();
+    await choice.getByRole('radio', { name: 'Take along' }).check();
+    await orders.screenshot({ path: 'test-results/next-card-changes.png' });
+    await nextEdit(page);
+    await page.reload();
+    await expect(orders.getByLabel('Branch')).toHaveValue('fix/not-fetched-yet');
+    await expect(choice.getByRole('radio', { name: 'Take along' })).toBeChecked();
+    await page.getByRole('button', { name: 'Run', exact: true }).click();
+    await expect(page.getByRole('dialog')).toContainText(
+      'Your 3 uncommitted changes on main: taken along, back on Stop',
+    );
+  });
 });

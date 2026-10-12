@@ -36,7 +36,10 @@ export interface CardData extends Record<string, unknown> {
   note: string;
   /** Runs without its tunnels, when only its API is needed. */
   hideTunnels?: boolean;
+  /** What happens to the clone's uncommitted changes when another branch runs; set aside unless chosen. */
+  changes?: Changes;
 }
+export type Changes = 'set-aside' | 'take-along';
 export type CardNode = Node<CardData, 'app'>;
 /** A tunnel to a database or cache: a read-only card beside the first app on the board that uses it. */
 export interface TunnelData extends Record<string, unknown> {
@@ -243,6 +246,13 @@ class Board {
    * An app whose stack entry has no sign-in, tunnel or hosts entry of its own for this environment while the first
    * environment has one: it would run on another environment's.
    */
+  /** A branch other than the clone's is asked for while the clone has uncommitted changes. */
+  switchesOver(id: string): boolean {
+    const branch = this.nodes.find(node => node.id === id)?.data.branch;
+    const app = this.apps.find(one => one.id === id);
+    return !!(branch && app?.current && branch !== app.current && app.dirty);
+  }
+
   borrowsTunnels(id: string): boolean {
     if (this.env === this.envs[0]) return false;
     const app = this.#registry?.apps[id];
@@ -860,6 +870,7 @@ class Board {
         kind,
         kindLabel,
         ...(chosen.hideTunnels === true && { hideTunnels: true }),
+        ...((chosen.changes === 'take-along' || chosen.changes === 'set-aside') && { changes: chosen.changes }),
         branch: chosen.branch ?? '',
         run: run ?? 'cli',
         ...(platform && { platform }),
@@ -927,7 +938,7 @@ class Board {
       env: this.env,
       ...(this.view && { zoom: this.view.zoom, pan: { x: this.view.x, y: this.view.y } }),
       nodes: Object.fromEntries(
-        this.nodes.map(({ id, position, data: { branch, run, platform, note, hideTunnels } }) => [
+        this.nodes.map(({ id, position, data: { branch, run, platform, note, hideTunnels, changes } }) => [
           id,
           {
             ...before[id],
@@ -938,6 +949,7 @@ class Board {
             ...(platform && { platform }),
             note,
             hideTunnels: hideTunnels ? true : undefined,
+            changes,
           },
         ]),
       ),

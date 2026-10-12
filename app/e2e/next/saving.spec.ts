@@ -33,7 +33,8 @@ test('the board opens where it was left, and a moved view is kept', async ({ pag
 });
 
 test('what is changed on the board comes back after a reload', async ({ page, canvas }) => {
-  await card(page, 'orders').getByLabel('Branch').selectOption('feature/checkout');
+  await card(page, 'orders').getByLabel('Branch').fill('feature/checkout');
+  await card(page, 'orders').getByLabel('Branch').blur();
   await card(page, 'orders').getByRole('radio', { name: 'Me' }).check();
   await card(page, 'web').getByRole('button', { name: 'Add a note for the agent' }).click();
   await card(page, 'web').getByLabel('Note for the agent').fill('use the test account');
