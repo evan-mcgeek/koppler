@@ -64,6 +64,21 @@
     else if (what === '-') board.cut(id, to);
     menu.value = '';
   };
+  const fieldAt = (ev: Event) =>
+    (ev.target as Element).closest<HTMLElement>('select, textarea, input:not([type="radio"], [type="checkbox"])');
+  // The whole card drags, so a field is held back on a press and opened by the click that follows a press that did
+  // not move. One that is being typed in takes the press itself, for the caret, and the card stays.
+  const hold = (ev: MouseEvent) => {
+    const field = fieldAt(ev);
+    if (field === document.activeElement) ev.stopPropagation();
+    else if (field) ev.preventDefault();
+  };
+  const release = (ev: MouseEvent) => {
+    const field = fieldAt(ev);
+    if (!field || field === document.activeElement) return;
+    field.focus();
+    if (field instanceof HTMLSelectElement) field.showPicker();
+  };
   const grow = (box: HTMLTextAreaElement) => {
     box.style.height = 'auto';
     box.style.height = `${String(box.scrollHeight + 2)}px`;
@@ -112,7 +127,8 @@
         >{/if}
     </p>
   {:else}
-    <div class="body nodrag nopan">
+    <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+    <div class="body" onmousedowncapture={hold} onclick={release}>
       <label class="field">
         Branch
         <!-- The clone's branches are offered as it is typed in; a name they do not list is kept too. -->
