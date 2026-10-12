@@ -4625,6 +4625,12 @@ async function deliver(text, prompt, sent, fallback = text) {
   if (registry.setup) openSetup();
   else if (!Object.keys(registry.apps).length || location.hash === '#pick') openPicker();
   for (const e of state.edges) { if (!SIDES[e.fromSide]) e.fromSide = 'right'; if (!SIDES[e.toSide]) e.toSide = 'left'; }
+  // `koppler canvas --board "<name>"` opens on that board, once: the address is cleaned so a reload keeps what the user opens next.
+  if (location.hash.startsWith('#board=')) {
+    const want = decodeURIComponent(location.hash.slice(7)).toLowerCase(), asked = presetList().find(p => p.name.toLowerCase() === want);
+    history.replaceState(null, '', location.pathname + location.search);
+    if (asked && asked.name !== state.preset) loadPreset(asked);
+  }
   render();
   // Opens in the view it was left in (the whole board when that would show no card); cards that grew into each other since it was arranged are arranged again.
   const ids = Object.keys(state.nodes), space = cardSpace(ids), box = id => ({ ...state.nodes[id], ...space[id] });

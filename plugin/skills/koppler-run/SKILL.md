@@ -1,6 +1,6 @@
 ---
 name: koppler-run
-description: Use when the user wants to connect this Claude Code session to the Koppler canvas ("/koppler-run connect", "disconnect"), or wants to run several apps or services of their stack locally, wired to each other, while the rest keeps calling a deployed environment, or says "koppler", "local stack", "run X locally against local Y", "point X at my local Y", or submits a graph from the Koppler canvas. In auto mode it applies the config changes and starts logins, tunnels and apps itself; in manual mode it hands over a per-app checklist. Not for deploying, debugging deployed services, or fetching secrets.
+description: Use when the user wants to connect this Claude Code session to the Koppler canvas ("/koppler-run connect", "disconnect"), or wants to run several apps or services of their stack locally, wired to each other, while the rest keeps calling a deployed environment, or says "koppler", "local stack", "run koppler with the X board", "run X locally against local Y", "point X at my local Y", or submits a graph from the Koppler canvas. In auto mode it applies the config changes and starts logins, tunnels and apps itself; in manual mode it hands over a per-app checklist. Not for deploying, debugging deployed services, or fetching secrets.
 ---
 
 # Koppler
@@ -114,6 +114,16 @@ A cable left for you ("point it at ...") means its caller is not started yet: ma
 To check data (after a fix, for a report), propose `koppler query <app> --env <env> "<one SQL statement>"`: read-only, the stored connection, rows only. On PROD the user runs it in their own terminal and tells you what matters; never run it yourself there, the rows are production data.
 Allowing the safe `koppler` commands without prompts: `references/permissions.md`.
 When the user asks in chat, start with `koppler up <apps> --cable <caller>:<callee>... --env <env>` too: one `--cable` per call that should reach a local app. It is recorded like Run on the canvas and added to what already runs on that environment, so the canvas, the history and Stop all see it. A single `koppler run <app>` is not part of any run; the canvas shows it as running outside a run, so use it only for one-off commands, never to start a board. If you are blocked from starting something (auto mode, PROD), never hand over a list of commands: point the user to press Run on the canvas, or give the single `koppler up <apps> --env <env>` line.
+
+### A board asked for in chat
+
+A sentence such as "run koppler on qa with the checkout board" names a board, and often an environment or another task next to it.
+1. Find the board: `koppler use --boards`, matched loosely on the name (a typo or a part of it is fine). With several matches or none, list them and ask.
+2. Start it: `koppler up --board "<name>" --env <env>` (without `--env`, the stack's first environment).
+3. Open it: `koppler canvas --board "<name>"`, every time, also when the canvas already runs. It opens that board in the browser.
+4. Paste the canvas address (`<state>/canvas-url`) in the chat reply as a link, next to what is running.
+
+Do steps 3 and 4 even when step 2 is blocked or fails, so the user can press Run on the board themselves.
 
 Order callees before callers (topological over edges); cycles are fine, start either.
 Shared prerequisites first: AWS logins, then tunnels, then apps in order.
