@@ -16,6 +16,7 @@ import { redact } from '../scrub.ts';
 import { tail } from './logs.ts';
 import { mobileState, refreshMobile, type MobileApp } from './mobile.ts';
 import { secretsStatus } from './secrets.ts';
+import { waiting } from './waiting.ts';
 
 type Loose = Record<string, unknown>;
 interface Step {
@@ -36,7 +37,6 @@ type Status = Loose & { apps: Record<string, AppStatus> };
 
 export const SOURCE = path.join(TEMP, 'status.json');
 const OUT = path.join(TEMP, 'status.js');
-const PROMPTS = path.join(TEMP, 'prompts.jsonl');
 const RUN_ID = /^[a-z0-9]{6,40}$/;
 const APP_ID = /^[a-z0-9-]{1,64}$/;
 const STEP_STATES = ['done', 'failed', 'user', 'todo'];
@@ -232,11 +232,8 @@ async function snapshot(serving: boolean): Promise<Status> {
   status['messages'] = readMessages();
   status['agent'] = agentState();
   // Sends, Stops and answers no session has taken yet.
-  try {
-    status['queued'] = fs.readFileSync(PROMPTS, 'utf8').split('\n').filter(Boolean).length;
-  } catch {
-    status['queued'] = 0;
-  }
+  status['waiting'] = waiting();
+  status['queued'] = (status['waiting'] as unknown[]).length;
   status['running'] = runningNames();
   status['runningEnvs'] = runningEnvs();
   status['runs'] = runs()

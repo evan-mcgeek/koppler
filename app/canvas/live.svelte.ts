@@ -90,7 +90,8 @@ interface Status {
   agent?: { state?: string };
   /** What the agent said: questions, results and failures, oldest first. */
   messages?: Message[];
-  /** Requests no agent session has taken yet. */
+  /** The requests no agent session has taken yet, oldest first, and how many they are. */
+  waiting?: { key: string; tag: string; at: string; what: string }[];
   queued?: number;
   /** The stack in use once its data is loaded, the one a sync is loading meanwhile, and every stack on this machine. */
   stack?: string | null;

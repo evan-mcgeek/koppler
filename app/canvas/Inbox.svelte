@@ -1,6 +1,7 @@
 <script lang="ts">
   // The agent's messages, beside the board: questions to answer, and what it finished or failed at.
   import InboxMessage from './InboxMessage.svelte';
+  import { ago } from './boards.ts';
   import { inbox, type Message } from './inbox.svelte.ts';
   import { live } from './live.svelte.ts';
 
@@ -40,7 +41,28 @@
       <button class="close" type="button" aria-label="Close" onclick={() => (inbox.open = false)}>×</button>
     </header>
     <div class="list">
-      {#if !list.length}
+      {#if inbox.waiting.length}
+        <section class="waiting" aria-labelledby="waiting-title">
+          <h3 id="waiting-title">Waiting for an agent ({inbox.waiting.length})</h3>
+          <p>
+            Sent while no agent was connected. One gets them when you run <code>/koppler-run connect</code> in your agent
+            session; of several runs and Stops only the newest is acted on.
+          </p>
+          <ul>
+            {#each inbox.waiting as one (one.key)}
+              <li>
+                <span class="what">{one.what}<small>{ago(one.at)}</small></span>
+                <button type="button" aria-label="Drop: {one.what}" onclick={() => void inbox.drop(one.key)}
+                  >Drop</button
+                >
+              </li>
+            {/each}
+          </ul>
+        </section>
+      {/if}
+      {#if !list.length && inbox.waiting.length}
+        <p class="none">The agent has said nothing yet.</p>
+      {:else if !list.length}
         <p class="none">
           Nothing yet. When the agent needs a decision about your run, or finishes one, it shows up here.
         </p>
@@ -111,6 +133,61 @@
   .none {
     margin: 0;
     color: var(--muted);
+  }
+  .waiting {
+    display: grid;
+    gap: 6px;
+    padding: 10px 12px;
+    border: 1px solid color-mix(in oklab, var(--warn) 45%, transparent);
+    border-radius: 10px;
+    background: color-mix(in oklab, var(--warn) 8%, var(--surface));
+  }
+  .waiting h3,
+  .waiting p,
+  .waiting ul {
+    margin: 0;
+  }
+  .waiting h3 {
+    font-size: 13px;
+  }
+  .waiting p {
+    color: var(--muted);
+    font-size: 12px;
+  }
+  .waiting code {
+    font: 12px var(--mono);
+  }
+  .waiting ul {
+    display: grid;
+    gap: 4px;
+    padding: 0;
+    list-style: none;
+  }
+  .waiting li {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .what {
+    display: grid;
+    flex: 1;
+    min-width: 0;
+    font-weight: 600;
+  }
+  .what small {
+    color: var(--muted);
+    font-weight: 400;
+    font-size: 12px;
+  }
+  .waiting button {
+    flex: none;
+    padding: 4px 10px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: none;
+    color: var(--ink);
+    font: 600 12px var(--sans);
+    cursor: pointer;
   }
   summary {
     color: var(--muted);

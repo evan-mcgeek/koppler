@@ -16,6 +16,7 @@ import { cableTest } from './cable-test.ts';
 import { appendDebugLog, clearDebugLog } from './logs.ts';
 import { fetchPresets, sanitizeLayout, sanitizePrompt, type Prompt } from './sanitize.ts';
 import { secretRequest } from './secrets.ts';
+import { drop } from './waiting.ts';
 
 type Loose = Record<string, unknown>;
 /** How a request is answered; `after` runs once the answer has been sent. */
@@ -239,6 +240,11 @@ export const ROUTES: Record<string, Route> = {
     return { status: 200, body: await test };
   },
   '/messages-clear': () => ({ status: 200, body: clearMessages() }),
+  // A request no agent took yet is taken out of the queue.
+  '/prompt-drop': body =>
+    drop(typeof body['key'] === 'string' ? body['key'] : '')
+      ? { status: 200, body: { ok: true } }
+      : { status: 409, body: { error: 'That request is no longer waiting.' } },
   '/message-dismiss': body => {
     const open = readMessages(200).find(one => one.id === body['id'] && one.kind === 'question' && !one.answered);
     if (open) appendAnswer(open.id, { via: 'dismissed' });

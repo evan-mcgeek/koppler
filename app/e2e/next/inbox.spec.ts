@@ -1,4 +1,6 @@
 // The new canvas's agent inbox: questions the agent asks about a run, answered from the page, and what it finished.
+import fs from 'node:fs';
+import path from 'node:path';
 import { test, expect } from '../canvas.ts';
 
 test.use({
@@ -70,4 +72,38 @@ test('a question opens the panel and is answered from it; results are announced 
   await page.route('**/messages-clear?*', route => route.fulfill({ json: { cleared: 2 } }));
   await panel.getByRole('button', { name: 'Clear' }).click();
   await expect(panel).toContainText('Nothing yet.');
+});
+
+test('what was sent while no agent listened is listed in the panel, and can be dropped', async ({ page, canvas }) => {
+  const queue = path.join(canvas.temp, 'prompts.jsonl');
+  const at = new Date(Date.now() - 5 * 60_000).toISOString();
+  const fix = {
+    tag: 'koppler-fix',
+    text: 'Fix this failed start.',
+    at,
+    data: { env: 'qa', failures: [{ connection: 'Orders API' }] },
+  };
+  const stop = {
+    tag: 'koppler-stop',
+    text: 'Stop and revert this stack.',
+    at,
+    data: { action: 'stop', id: 'stop000001' },
+  };
+  fs.writeFileSync(queue, [fix, stop].map(one => JSON.stringify(one) + '\n').join(''));
+  const chip = page.locator('header .agent');
+  await expect(chip).toHaveText('No agent listening, 2 waiting');
+  await chip.click();
+  const panel = page.getByRole('dialog', { name: 'Messages from the agent' });
+  const waiting = panel.getByRole('region', { name: 'Waiting for an agent (2)' });
+  await expect(waiting.getByRole('listitem')).toHaveText([
+    /Stop and revert\s*5 minutes ago/,
+    /Fix Orders API\s*5 minutes ago/,
+  ]);
+  await expect(waiting).toContainText('/koppler-run connect');
+  await page.screenshot({ path: 'test-results/next-waiting.png' });
+  await waiting.getByRole('button', { name: 'Drop: Fix Orders API' }).click();
+  await expect(panel.getByRole('region', { name: 'Waiting for an agent (1)' })).toBeVisible();
+  await expect(chip).toHaveText('No agent listening, 1 waiting');
+  const left = fs.readFileSync(queue, 'utf8').split('\n').filter(Boolean);
+  expect(left.map(line => (JSON.parse(line) as { tag: string }).tag)).toEqual(['koppler-stop']);
 });
