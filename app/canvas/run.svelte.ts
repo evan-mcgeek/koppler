@@ -367,6 +367,52 @@ class Runs {
     return (live.status?.running ?? []).filter(one => one !== 'canvas');
   }
 
+  /** The stack being switched to from this page, until the page reloads with it. */
+  switching = $state<string | null>(null);
+
+  /** Another stack: at once when nothing runs here, else after the Stop and revert its review shows. */
+  useStack(to: { dir: string; name: string }): void {
+    const steps = this.#plan({ env: board.env, nodes: {}, edges: [] });
+    if (!steps.stops.length && !this.started.length) {
+      void this.#switch(to.dir);
+      return;
+    }
+    this.review = {
+      title: `Switch to ${to.name}`,
+      sub: `${board.stack} still has something running. It is stopped and reverted first, then Koppler switches.`,
+      notices: [{ text: `Your boards and history for ${board.stack} are kept and come back when you switch back.` }],
+      groups: this.#groups(steps).filter(group => group.verb === 'stops'),
+      ok: 'Stop, revert and switch',
+      prod: true,
+      blocked: false,
+      confirm: () => {
+        const text = `Stop and revert this stack using the koppler-run skill (stop every process the agent started, revert every temporary code change), then switch Koppler to the stack "${to.name}": koppler history --done <this run's id>, then koppler use "${to.dir}". Report what was stopped and reverted.`;
+        void this.deliver(
+          text,
+          { tag: 'koppler-stop', data: { action: 'stop', id: newRunId(), switchTo: to.dir } },
+          'Sent. Koppler switches once everything is stopped',
+        );
+      },
+    };
+  }
+  async #switch(dir: string): Promise<void> {
+    this.switching = dir;
+    const token = location.pathname.split('/')[2] ?? '';
+    const said = await fetch(`/stack?token=${encodeURIComponent(token)}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ use: dir }),
+    })
+      .then(answer => answer.json() as Promise<{ error?: string }>)
+      .catch(() => ({ error: 'Could not reach the canvas server.' }));
+    if (!said.error) {
+      location.reload();
+      return;
+    }
+    this.switching = null;
+    toasts.show(said.error, 'warning');
+  }
+
   /** Stops every app and tunnel now; branches and code changes stay until a Stop and revert. */
   stopApps(): void {
     // An app from the IDE only has Koppler's log follower here: the app itself keeps running in the IDE.

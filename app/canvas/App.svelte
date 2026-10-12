@@ -8,6 +8,7 @@
   import Review from './Review.svelte';
   import { runs } from './run.svelte.ts';
   import Side from './Side.svelte';
+  import StackPicker from './StackPicker.svelte';
   import Toast from './Toast.svelte';
   import { board } from './board.svelte.ts';
   import { load, save } from './data.ts';
@@ -15,6 +16,24 @@
 
   let noting = $state<HTMLDialogElement>();
   let note = $state('');
+  /** A stack on its way in, from here, another tab or the terminal: the board waits until the page reloads with it. */
+  const loading = $derived(
+    runs.switching ?? (live.status?.loading && live.status.loading !== board.dir ? live.status.loading : null),
+  );
+  const loadingName = $derived(live.status?.stacks?.find(stack => stack.dir === loading)?.name ?? 'the stack');
+  // The stack in use changed and its data is loaded: this page shows the old one, so it opens again.
+  $effect(() => {
+    const here = live.status?.stack;
+    if (!here || !board.dir || here === board.dir) return;
+    try {
+      // ponytail: at most one reload in ten seconds, so a stack that fails to match cannot loop the page.
+      if (Number(sessionStorage.getItem('koppler-stack-reload')) > Date.now() - 10000) return;
+      sessionStorage.setItem('koppler-stack-reload', String(Date.now()));
+    } catch {
+      return;
+    }
+    location.reload();
+  });
   /** Asked for once, when the page opens. ponytail: no polling yet; it comes with the live state of the cards. */
   const opened = load().then(loaded => {
     if (loaded) {
@@ -112,13 +131,13 @@
   </button>
   <span class="title">Koppler</span>
   {#if board.stack}
-    <span class="stack">{board.stack}</span>
+    <StackPicker />
     <span class="env" class:prod={board.protected}>{board.env.toUpperCase()}</span>
   {/if}
   <span class="spacer"></span>
   <Help />
   {#if board.stack}
-    <span class="split">
+    <span class="split" inert={!!loading}>
       <button
         class="stop"
         type="button"
@@ -157,7 +176,7 @@
         ]}
       />
     </span>
-    <span class="split">
+    <span class="split" inert={!!loading}>
       <button
         class="run"
         type="button"
@@ -221,24 +240,31 @@
     {board.env.toUpperCase()}: local code runs against real {board.env.toUpperCase()} data and secrets.
   </div>
 {/if}
-<main>
-  {#await opened then found}
-    {#if found}
-      {#if side}<Side />{/if}
-      <div class="stage">
-        <div class="board">
-          <SvelteFlowProvider>
-            <Board />
-          </SvelteFlowProvider>
-          <Toast />
+<div class="work">
+  {#if loading}
+    <div class="loading" role="status">
+      <p><span class="dot" aria-hidden="true"></span><span class="what">Loading {loadingName}...</span></p>
+    </div>
+  {/if}
+  <main inert={!!loading}>
+    {#await opened then found}
+      {#if found}
+        {#if side}<Side />{/if}
+        <div class="stage">
+          <div class="board">
+            <SvelteFlowProvider>
+              <Board />
+            </SvelteFlowProvider>
+            <Toast />
+          </div>
+          <Logs />
         </div>
-        <Logs />
-      </div>
-    {:else}
-      <p class="empty">No stack yet. Run <code>koppler init</code>, then open the canvas again.</p>
-    {/if}
-  {/await}
-</main>
+      {:else}
+        <p class="empty">No stack yet. Run <code>koppler init</code>, then open the canvas again.</p>
+      {/if}
+    {/await}
+  </main>
+</div>
 
 <style>
   header {
@@ -361,16 +387,6 @@
     font-size: 17px;
     letter-spacing: -0.01em;
   }
-  .stack {
-    font-weight: 600;
-    font-size: 14px;
-  }
-  .stack::before {
-    content: '/';
-    margin-right: 12px;
-    color: var(--muted);
-    font-weight: 400;
-  }
   .env {
     padding: 1px 8px;
     border-radius: 999px;
@@ -406,10 +422,63 @@
   .side-toggle[aria-expanded='true'] path {
     stroke-width: 2.6;
   }
-  main {
+  .work {
+    position: relative;
     display: flex;
     flex: 1;
     min-height: 0;
+  }
+  main {
+    display: flex;
+    flex: 1;
+    min-width: 0;
+    min-height: 0;
+  }
+  .loading {
+    position: absolute;
+    z-index: 40;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    background: color-mix(in srgb, var(--desk) 70%, transparent);
+  }
+  .loading p {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    max-width: min(420px, 80%);
+    margin: 0;
+    padding: 10px 16px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--panel);
+    color: var(--ink);
+    font: 600 13px var(--sans);
+  }
+  .loading .what {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .loading .dot {
+    flex: none;
+    width: 12px;
+    height: 12px;
+    border: 1.5px solid var(--line);
+    border-top-color: var(--cable);
+    border-radius: 50%;
+    animation: turning 0.7s linear infinite;
+  }
+  @keyframes turning {
+    to {
+      rotate: 360deg;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .loading .dot {
+      animation: none;
+    }
   }
   .stage {
     display: flex;
