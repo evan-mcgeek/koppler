@@ -6,7 +6,7 @@ import { endOffsets, orderSlots, sidePoint, SIDES, type Box, type Cable } from '
 import { of as kindOf } from '../src/core/kinds.ts';
 import { isProtected, LOCAL_QUEUE_TYPES, queuesOf } from '../src/core/plan.ts';
 import { planTunnels, tunnelKind, type Tunnel } from '../src/core/ports.ts';
-import { check, VERSION as PRESET_VERSION, type StackFacts, type StoredPreset } from '../src/core/presets.ts';
+import { check, migrate, VERSION as PRESET_VERSION, type StackFacts, type StoredPreset } from '../src/core/presets.ts';
 import type { Registry } from '../src/data.ts';
 import type { Loaded, SavedBoard } from './data.ts';
 import { toasts } from './toast.svelte.ts';
@@ -43,6 +43,12 @@ export interface CardData extends Record<string, unknown> {
   libraries?: string[];
 }
 export type Changes = 'set-aside' | 'take-along';
+/** A board in the recently deleted, with when it went there. */
+export type Deleted = StoredPreset & { deleted: string };
+interface Opened {
+  name: string;
+  at: string;
+}
 export type CardNode = Node<CardData, 'app'>;
 /** A tunnel to a database or cache: a read-only card beside the first app on the board that uses it. */
 export interface TunnelData extends Record<string, unknown> {
@@ -973,6 +979,76 @@ class Board {
     for (let count = 2; taken.has(name); count++) name = `${base} (${String(count)})`;
     return name;
   }
+  /** Boards deleted lately, newest first: they wait here to be restored. */
+  trash = $state.raw<Deleted[]>([]);
+  /** The boards opened lately, newest first. */
+  recent = $state.raw<Opened[]>([]);
+  /** Names the user's board on screen. Gives why it cannot be called that, when it cannot. */
+  rename(to: string): string | null {
+    const name = to.trim().slice(0, 80);
+    const from = this.name;
+    if (!this.own.some(one => one.name === from)) return 'Only a board of your own can be renamed.';
+    if (!name) return 'Give the board a name first.';
+    if (name === from) return null;
+    if ([...this.team, ...this.own].some(one => one.name === name))
+      return `A board is already called ${name}. Pick another name.`;
+    this.own = this.own.map(one => (one.name === from ? { ...one, name } : one));
+    this.name = name;
+    return null;
+  }
+  /** Keeps the board on screen a second time, as a copy that is now the one on screen. */
+  duplicate(): void {
+    if (!this.nodes.length) return;
+    this.#keep();
+    const first = this.nodes[0]?.data.name ?? 'Untitled';
+    const name = this.uniqueName(`${this.name ?? first} copy`);
+    this.own = [...this.own, { ...this.#asPreset(name), layout: this.#layout() }];
+    this.name = name;
+  }
+  /** Moves one of the user's boards to the recently deleted; the board on screen empties when it is that one. */
+  deleteBoard(name: string): void {
+    const gone = this.own.find(one => one.name === name);
+    if (!gone) return;
+    this.own = this.own.filter(one => one !== gone);
+    this.trash = [{ ...gone, deleted: new Date().toISOString() }, ...this.trash].slice(0, 20);
+    if (this.name === name) this.newBoard();
+  }
+  /** Brings a deleted board back among the user's, and onto an empty screen. */
+  restore(gone: Deleted): void {
+    const { deleted: _when, ...kept } = gone;
+    const back = { ...kept, name: this.uniqueName(gone.name) } as StoredPreset;
+    this.trash = this.trash.filter(one => one !== gone);
+    this.own = [...this.own, back];
+    if (!this.nodes.length) this.openBoard(back);
+  }
+  /**
+   * Boards read from a file or a link: kept among the user's (in place of ones of the same name) and the first one
+   * opened. One that cannot open is not kept either.
+   */
+  importBoards(
+    data: unknown,
+    source: string,
+  ): { notes: string[]; name: string; error?: undefined } | { error: string } {
+    const held = (data as { presets?: unknown } | null)?.presets;
+    const all = Array.isArray(data) ? (data as unknown[]) : Array.isArray(held) ? (held as unknown[]) : [data];
+    const read = all.map(one => migrate(one));
+    const list = read.flatMap(one =>
+      one.preset ? [{ ...one.preset, name: one.preset.name.trim().slice(0, 80), source }] : [],
+    );
+    const [first] = list;
+    if (!first) return { error: read[0]?.error ?? 'No board found in it.' };
+    const checked = check(first, this.#facts());
+    if (checked.error !== undefined) return { error: checked.error };
+    this.own = [...this.own.filter(one => !list.some(other => other.name === one.name)), ...list];
+    const out = this.openBoard(first);
+    return out.error === undefined ? { notes: out.notes, name: first.name } : out;
+  }
+  /** One of the user's boards as text for the stack's presets: what runs and the cables, without its places. */
+  asShared(preset: StoredPreset): string {
+    const { name, nodes, edges } = preset;
+    return JSON.stringify({ name, version: migrate(preset).preset?.version ?? PRESET_VERSION, nodes, edges }, null, 2);
+  }
+
   /** A board to start from: empty, and named once it holds an app. */
   newBoard(): void {
     this.name = null;
@@ -1007,6 +1083,10 @@ class Board {
     };
     const ids = Object.keys(preset.nodes);
     const placed = ids.every(place);
+    this.recent = [
+      { name: preset.name, at: new Date().toISOString() },
+      ...this.recent.filter(one => one.name !== preset.name),
+    ].slice(0, 20);
     this.name = preset.name;
     this.queues = {};
     this.hiddenQueues = Object.fromEntries(
@@ -1131,6 +1211,8 @@ class Board {
     this.#kept = saved ?? {};
     this.name = typeof saved?.['preset'] === 'string' ? saved['preset'] : null;
     this.own = (Array.isArray(saved?.['presets']) ? saved['presets'] : []) as StoredPreset[];
+    this.trash = (Array.isArray(saved?.['trash']) ? saved['trash'] : []) as Deleted[];
+    this.recent = (Array.isArray(saved?.['recent']) ? saved['recent'] : []) as Opened[];
     this.infra = [];
     this.queues = (saved?.['queues'] ?? {}) as Record<string, 'local'>;
     this.hiddenQueues = (saved?.['hiddenQueues'] ?? {}) as Record<string, true>;
@@ -1150,6 +1232,8 @@ class Board {
       ...this.#kept,
       preset: this.name,
       presets: this.own,
+      trash: this.trash,
+      recent: this.recent,
       env: this.env,
       ...(this.view && { zoom: this.view.zoom, pan: { x: this.view.x, y: this.view.y } }),
       nodes: Object.fromEntries(

@@ -13,9 +13,28 @@
   import StackPicker from './StackPicker.svelte';
   import Toast from './Toast.svelte';
   import { board } from './board.svelte.ts';
+  import { openFile } from './boards.ts';
   import { load, save } from './data.ts';
   import { live } from './live.svelte.ts';
 
+  // A board file can be dropped anywhere on the page, which shows where it will land.
+  let dropping = $state(false);
+  const withFile = (ev: DragEvent) => !!ev.dataTransfer?.types.includes('Files');
+  const dragIn = (ev: DragEvent) => {
+    if (withFile(ev)) dropping = true;
+  };
+  const dragOver = (ev: DragEvent) => {
+    if (withFile(ev)) ev.preventDefault();
+  };
+  const dragOut = (ev: DragEvent) => {
+    if (!ev.relatedTarget) dropping = false;
+  };
+  const dropped = (ev: DragEvent) => {
+    if (!withFile(ev)) return;
+    ev.preventDefault();
+    dropping = false;
+    void openFile(ev.dataTransfer?.files[0]);
+  };
   let noting = $state<HTMLDialogElement>();
   let note = $state('');
   /** A stack on its way in, from here, another tab or the terminal: the board waits until the page reloads with it. */
@@ -115,6 +134,10 @@
   onpagehide={() => {
     keep(true);
   }}
+  ondragenter={dragIn}
+  ondragover={dragOver}
+  ondragleave={dragOut}
+  ondrop={dropped}
 />
 
 <header class:protected={board.protected}>
@@ -216,6 +239,7 @@
     </span>
   {/if}
 </header>
+{#if dropping}<div class="dropping">Drop to open this board</div>{/if}
 <Review />
 <dialog bind:this={noting} class="noting" aria-labelledby="noting-title" onclose={() => (note = '')}>
   <form
@@ -424,6 +448,19 @@
   }
   .side-toggle[aria-expanded='true'] path {
     stroke-width: 2.6;
+  }
+  .dropping {
+    position: fixed;
+    z-index: 60;
+    inset: 12px;
+    display: grid;
+    place-items: center;
+    border: 2px dashed var(--cable);
+    border-radius: 14px;
+    background: color-mix(in oklab, var(--cable) 10%, transparent);
+    color: var(--cable-ink);
+    font: 600 16px var(--sans);
+    pointer-events: none;
   }
   .work {
     position: relative;
