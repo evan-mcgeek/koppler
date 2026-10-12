@@ -5,6 +5,9 @@ import '../src/fonts/fonts.css';
 import './tokens.css';
 import './page.css';
 import App from './App.svelte';
+import { debug } from './debug.svelte.ts';
+
+debug.watch();
 
 const target = document.getElementById('app');
 if (target) mount(App, { target });
