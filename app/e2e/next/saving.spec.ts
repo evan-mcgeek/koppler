@@ -54,9 +54,13 @@ test('what is changed on the board comes back after a reload', async ({ page, ca
   await expect(page.locator('.svelte-flow__edge')).toHaveCount(2);
   await expect(page.locator('.svelte-flow__edge[data-id="web>catalog"]')).toHaveCount(1);
 
-  // What the new canvas does not show yet is still in the server's copy.
-  const now = (await (await page.request.get(`${canvas.url}data/state.json`)).json()) as typeof board;
-  expect(now.presets).toHaveLength(1);
+  // The board the user already had is still in the server's copy. The one on screen is kept beside it, under the
+  // name it got from its apps when it was first kept.
+  const now = (await (await page.request.get(`${canvas.url}data/state.json`)).json()) as typeof board & {
+    preset?: string;
+  };
+  expect(now.presets.map(preset => preset.name)).toEqual(['Checkout', 'Web Shop + 1']);
+  expect(now.preset).toBe('Web Shop + 1');
   expect(now.infra).toEqual(board.infra);
 });
 

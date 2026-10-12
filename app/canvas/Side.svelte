@@ -1,4 +1,5 @@
 <script lang="ts">
+  import BoardPicker from './BoardPicker.svelte';
   import KindIcon from './KindIcon.svelte';
   import Settings from './Settings.svelte';
   import { board, type StackApp } from './board.svelte.ts';
@@ -57,6 +58,7 @@
 
 <aside aria-label="Board and apps" class:protected={board.protected}>
   <div class="head">
+    <BoardPicker />
     <div class="seg" role="radiogroup" aria-label="Environment">
       {#each board.envs as env (env)}
         <label><input type="radio" name="env" value={env} bind:group={board.env} />{env.toUpperCase()}</label>
@@ -190,6 +192,8 @@
     font: 13px/1.4 var(--sans);
   }
   .head {
+    display: grid;
+    gap: 8px;
     position: sticky;
     top: 0;
     z-index: 2;
