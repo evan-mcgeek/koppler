@@ -4,6 +4,7 @@
   import Agent from './Agent.svelte';
   import Board from './Board.svelte';
   import Help from './Help.svelte';
+  import History from './History.svelte';
   import Logs from './Logs.svelte';
   import Menu from './Menu.svelte';
   import Rail from './Rail.svelte';
@@ -161,6 +162,7 @@
   {/if}
   <span class="spacer"></span>
   {#if board.stack}<Agent />{/if}
+  {#if board.stack}<History />{/if}
   <Help />
   {#if board.stack}
     <span class="split" inert={!!loading}>
