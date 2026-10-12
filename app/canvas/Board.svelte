@@ -174,18 +174,24 @@
         // An app the library moved (a drag, the arrow keys) takes its tunnel cards along, in the same step.
         const was = new Map(board.nodes.map(node => [node.id, node.position]));
         const tall = new Map(board.nodes.map(node => [node.id, node.measured?.height]));
+        let nudged = false;
         let infra = all.filter(node => node.type !== 'app');
         const apps = all.filter(node => node.type === 'app');
         for (const { id, position, measured } of apps) {
           // A card that grows or shrinks (its steps open, a note) moves the cards stacked under it by as much.
           const [before, now] = [tall.get(id), measured?.height];
-          if (before && now && before !== now) infra = board.pushed(id, position.y + before, now - before, infra);
+          if (before && now && before !== now) {
+            infra = board.pushed(id, position.y + before, now - before, infra);
+            nudged = true;
+          }
           const from = was.get(id);
           if (from && (from.x !== position.x || from.y !== position.y))
             infra = board.followed(id, { x: position.x - from.x, y: position.y - from.y }, infra);
         }
         board.nodes = apps;
         board.infra = infra;
+        // Moved by a card's change of size, not by anyone: no step of its own to undo.
+        if (nudged) board.adopt();
       }
     }
     bind:edges={board.edges}

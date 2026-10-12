@@ -3,6 +3,7 @@
   import { untrack } from 'svelte';
   import Board from './Board.svelte';
   import Help from './Help.svelte';
+  import Logs from './Logs.svelte';
   import Review from './Review.svelte';
   import { runs } from './run.svelte.ts';
   import Side from './Side.svelte';
@@ -150,11 +151,14 @@
   {#await opened then found}
     {#if found}
       {#if side}<Side />{/if}
-      <div class="board">
-        <SvelteFlowProvider>
-          <Board />
-        </SvelteFlowProvider>
-        <Toast />
+      <div class="stage">
+        <div class="board">
+          <SvelteFlowProvider>
+            <Board />
+          </SvelteFlowProvider>
+          <Toast />
+        </div>
+        <Logs />
       </div>
     {:else}
       <p class="empty">No stack yet. Run <code>koppler init</code>, then open the canvas again.</p>
@@ -278,10 +282,16 @@
     flex: 1;
     min-height: 0;
   }
+  .stage {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-width: 0;
+  }
   .board {
     position: relative;
     flex: 1;
-    min-width: 0;
+    min-height: 0;
   }
   .empty {
     margin: 0;

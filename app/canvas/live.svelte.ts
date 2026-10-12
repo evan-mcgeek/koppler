@@ -23,6 +23,8 @@ interface AppStatus {
   /** A mobile app: the simulators and devices it runs on. */
   running?: Running[];
   steps?: Step[];
+  /** The last lines of its log. */
+  logTail?: string | null;
 }
 interface Status {
   apps?: Record<string, AppStatus | undefined>;
@@ -127,6 +129,14 @@ class Live {
         ? { ...step, state: 'todo', detail: 'Not running right now.' }
         : step,
     );
+  }
+  /** Whether the app has a log to show, whichever board it ran for. */
+  hasLog(id: string): boolean {
+    return !!this.status?.apps?.[id]?.logTail;
+  }
+  /** The last lines of an app's log, as the status carries them. */
+  tail(id: string): string {
+    return this.status?.apps?.[id]?.logTail ?? '';
   }
   /** Whether something listens on a tunnel's port; undefined when no sent app needs it. */
   tunnel(port: string, apps: string[]): boolean | undefined {
