@@ -174,6 +174,11 @@ export function sanitizeLayout(input: unknown): Loose | null {
   for (const [key, node] of Object.entries(input['nodes'])) {
     if (!isId(key) || !isObject(node)) continue;
     const changes = node['changes'];
+    // The libraries the app runs with a local copy of, by package name.
+    const libraries = listOf(node['libraries'])
+      .filter(name => typeof name === 'string' && name)
+      .slice(0, 50)
+      .map(name => text(name, 214));
     nodes[key] = {
       x: num(node['x']),
       y: num(node['y']),
@@ -183,6 +188,7 @@ export function sanitizeLayout(input: unknown): Loose | null {
       ...note(node['note']),
       ...(node['hideTunnels'] === true && { hideTunnels: true }),
       ...(['set-aside', 'take-along'].includes(changes as string) && { changes }),
+      ...(libraries.length > 0 && { libraries }),
     };
   }
   const edges = cables(input['edges']).map(edge => ({

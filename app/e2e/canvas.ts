@@ -77,18 +77,21 @@ export const test = base.extend<{
   board: object | null;
   uncloned: string[];
   dirty: string[];
+  libraries: Record<string, string[]>;
   start: string;
   canvas: Canvas;
 }>({
-  // `stack`, `board`, `uncloned` (apps with no clone on this machine) and `dirty` (apps whose clone has three
-  // uncommitted changes) can be set per test with test.use.
+  // `stack`, `board`, `uncloned` (apps with no clone on this machine), `dirty` (apps whose clone has three
+  // uncommitted changes) and `libraries` (per app, the libraries it uses that are cloned here) can be set per test
+  // with test.use.
   stack: [STACK, { option: true }],
   board: [null, { option: true }],
   uncloned: [[], { option: true }],
   dirty: [[], { option: true }],
+  libraries: [{}, { option: true }],
   // The page under the canvas address to open: today's canvas, or `next/` for the new one.
   start: ['', { option: true }],
-  canvas: async ({ stack, board, uncloned, dirty }, use) => {
+  canvas: async ({ stack, board, uncloned, dirty, libraries }, use) => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-e2e-')),
       temp = path.join(dir, 'state', 'run'),
       port = await freePort();
@@ -110,6 +113,13 @@ export const test = base.extend<{
               branch: 'main',
               dirty: dirty.includes(id) ? 3 : 0,
               branches: ['main', 'feature/checkout'],
+              ...(libraries[id] && {
+                libraries: libraries[id].map(name => ({
+                  name,
+                  path: path.join(dir, 'clones', name),
+                  ecosystem: 'npm',
+                })),
+              }),
             },
           ]),
       ),
