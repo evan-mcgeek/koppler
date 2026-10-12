@@ -223,7 +223,7 @@ async function snapshot(serving: boolean): Promise<Status> {
   status['secrets'] = await secretsStatus().catch(() => ({}));
   status['recipes'] = recipesByApp();
   const inUse = currentStack();
-  status['stack'] = inUse;
+  status['stack'] = loadedStack(inUse);
   status['checks'] = lastChecks();
   status['stacks'] = stacksHere();
   status['linked'] = inUse ? linkedStatus(inUse) : null;
@@ -255,6 +255,14 @@ async function snapshot(serving: boolean): Promise<Status> {
   status['start'] = 'koppler canvas';
   if (codeVersion() > STARTED_CODE) status['restart'] = 'koppler stop canvas && koppler canvas';
   return status;
+}
+
+let shown: string | null = null;
+/** The stack the page is told about: one just switched to is named once its data is loaded, never half way. */
+function loadedStack(inUse: string | null): string | null {
+  const registry = readStack();
+  if (!inUse || (registry?.source === path.join(inUse, 'stack.json') && registry.found)) shown = inUse;
+  return shown;
 }
 
 let latest: string | null = null;
