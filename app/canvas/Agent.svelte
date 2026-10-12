@@ -1,5 +1,6 @@
 <script lang="ts">
   // Whether an agent session takes what the canvas sends, and how to connect one.
+  import { inbox } from './inbox.svelte.ts';
   import { live } from './live.svelte.ts';
 
   const ABOUT: Record<string, readonly [string, string]> = {
@@ -8,6 +9,7 @@
       'An agent session is listening: notes, checklists and fix requests reach it right away.',
     ],
     busy: ['Agent working', 'The connected agent is working on a request; the next one waits for it.'],
+    question: ['Agent needs you', 'The agent asked something about your run. Click to answer.'],
     none: [
       'No agent listening',
       'Runs work without one. Notes, checklists and fix requests wait until an agent connects; press ↻ to see how.',
@@ -19,7 +21,8 @@
   let pop = $state<HTMLDivElement>();
   let open = $state(false);
   let copied = $state(false);
-  const agent = $derived(live.status?.agent?.state ?? 'none');
+  const listening = $derived(live.status?.agent?.state ?? 'none');
+  const agent = $derived(inbox.question ? 'question' : listening);
   const [name, about] = $derived(ABOUT[agent] ?? ABOUT['none'] ?? ['', '']);
   const queued = $derived(live.status?.queued ?? 0);
   const waiting = $derived(queued > 0 && agent !== 'listening');
@@ -45,15 +48,22 @@
   };
   // An agent connected while the steps were open: they are no longer needed.
   $effect(() => {
-    if (agent !== 'none' && open) pop?.hidePopover();
+    if (listening !== 'none' && open) pop?.hidePopover();
   });
 </script>
 
 {#if live.status}
-  <span class="agent" data-state={tone} {title}>
+  <button
+    class="agent"
+    type="button"
+    data-state={tone}
+    {title}
+    aria-expanded={inbox.open}
+    onclick={() => (inbox.open = !inbox.open)}
+  >
     <span class="dot" aria-hidden="true"></span>{label}
-  </span>
-  {#if agent === 'none'}
+  </button>
+  {#if listening === 'none'}
     <button
       bind:this={how}
       class="how"
@@ -105,10 +115,28 @@
     align-items: center;
     gap: 7px;
     height: 32px;
-    padding: 0 4px 0 10px;
+    padding: 0 10px;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    background: none;
     color: var(--muted);
+    cursor: pointer;
     font: 500 12.5px var(--sans);
     white-space: nowrap;
+  }
+  .agent:hover,
+  .agent[aria-expanded='true'] {
+    border-color: var(--line);
+    color: var(--ink);
+  }
+  .agent[data-state='question'] {
+    border-color: color-mix(in oklab, var(--warn) 55%, transparent);
+    background: color-mix(in oklab, var(--warn) 12%, transparent);
+    color: var(--ink);
+    font-weight: 600;
+  }
+  [data-state='question'] .dot {
+    background: var(--warn);
   }
   .dot {
     width: 8px;
