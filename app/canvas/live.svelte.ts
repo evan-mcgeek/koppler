@@ -41,6 +41,10 @@ interface Status {
   runs?: { state?: string; kind?: string; changes?: { app: string; title: string; file?: string }[] }[];
   /** Whether an agent session takes what the canvas sends: listening, busy or none. */
   agent?: { state?: string };
+  /** The stack in use once its data is loaded, the one a sync is loading meanwhile, and every stack on this machine. */
+  stack?: string | null;
+  loading?: string | null;
+  stacks?: { dir: string; name: string; path: string; apps: number; shared: boolean; linked?: string }[];
   /** The command that starts the canvas again. */
   start?: string;
   /** The credentials each app declares per environment, and whether each is stored. */

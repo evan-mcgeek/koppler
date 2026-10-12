@@ -144,6 +144,8 @@ export const cable = (from: string, to: string, data: CableData): CableEdge => (
 class Board {
   /** The stack's name and the environment the board runs against; empty until the board is opened. */
   stack = $state('');
+  /** The folder of the stack in use. */
+  dir = $state('');
   env = $state('');
   nodes = $state.raw<CardNode[]>([]);
   edges = $state.raw<CableEdge[]>([]);
@@ -898,6 +900,7 @@ class Board {
     this.#registry = stack;
     this.#guarded = stack.envs.filter(env => isProtected(stack, env));
     this.stack = stack.name ?? '';
+    this.dir = (stack.source ?? '').replace(/\/stack\.json$/, '');
     this.envs = stack.envs;
     this.env = saved?.env ?? stack.envs[0] ?? '';
     this.roots = roots;
