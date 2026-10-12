@@ -101,3 +101,32 @@ test('a card lists the apps it still calls in the deployed environment, and a cl
   await expect(page.locator('.svelte-flow__edge[data-id="orders>payments"]')).toHaveCount(1);
   await expect(calls).toHaveCount(0);
 });
+
+test('a queue card is joined to its own app on whichever side of the app it is moved to', async ({ page }) => {
+  const events = queue(page).filter({ hasText: 'Order events' });
+  const link = page.locator('.links .flow.msg .wire').first();
+  const app = await card(page, 'orders').boundingBox();
+  if (!app) throw new Error('no card');
+  /** The end of the link at the app, as a place on the screen. */
+  const start = () =>
+    link.evaluate(el => {
+      const path = el as SVGPathElement;
+      const at = path.getPointAtLength(0).matrixTransform(path.getScreenCTM() ?? new DOMMatrix());
+      return [Math.round(at.x), Math.round(at.y)];
+    });
+  const moveTo = async (x: number, y: number) => {
+    const box = await events.boundingBox();
+    if (!box) throw new Error('no queue card');
+    await page.mouse.move(box.x + 30, box.y + 12);
+    await page.mouse.down();
+    await page.mouse.move(x + 30, y + 12, { steps: 8 });
+    await page.mouse.up();
+  };
+  const [right, bottom] = [Math.round(app.x + app.width), Math.round(app.y + app.height)];
+  // Under the app: the link leaves the app's bottom edge.
+  await moveTo(app.x, bottom + 60);
+  expect(Math.abs(((await start())[1] ?? 0) - bottom)).toBeLessThanOrEqual(1);
+  // To its right, level with it: the right edge.
+  await moveTo(right + 80, app.y + 40);
+  expect(Math.abs(((await start())[0] ?? 0) - right)).toBeLessThanOrEqual(1);
+});

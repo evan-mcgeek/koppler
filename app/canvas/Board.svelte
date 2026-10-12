@@ -124,21 +124,18 @@
       const level: [Side, Side] = dx > 0 ? ['right', 'left'] : ['left', 'right'];
       let sides: [Side, Side] =
         Math.abs(dx) * 0.6 > Math.abs(dy) ? level : dy > 0 ? ['bottom', 'top'] : ['top', 'bottom'];
-      // An app's side with its tunnel cards is left to them: the link leaves sideways instead.
+      // An app's side with its tunnel and queue cards is left to them: a link from elsewhere leaves sideways
+      // instead. A card of the app's own stack is joined on whichever side it sits, as it is moved around the app.
+      const own = board.ledBy(from).includes(to) || board.ledBy(to).includes(from);
       const taken = (key: string, side: Side) =>
         board.boxes.has(key) && !!board.ledBy(key).length && board.infraSide(key) === side;
-      if (taken(from, sides[0]) || taken(to, sides[1])) sides = level;
-      // A card stacked with its own app is joined to it down their shared left edge, in a shallow bracket.
-      const own = board.ledBy(from).includes(to) || board.ledBy(to).includes(from);
-      if (own) sides = ['left', 'left'];
+      if (!own && (taken(from, sides[0]) || taken(to, sides[1]))) sides = level;
       const [start, end] = [sidePoint(a, sides[0]), sidePoint(b, sides[1])];
       const [x, y] = SIDES[sides[1]];
       return [
         {
           key: `${from}>${to}`,
-          d: own
-            ? `M${String(start.x)},${String(start.y)} C${String(start.x - 36)},${String(start.y)} ${String(end.x - 36)},${String(end.y)} ${String(end.x)},${String(end.y)}`
-            : cablePath(start, sides[0], end, sides[1]),
+          d: cablePath(start, sides[0], end, sides[1]),
           start,
           head: `translate(${String(end.x + x * 10)} ${String(end.y + y * 10)}) rotate(${String((Math.atan2(-y, -x) * 180) / Math.PI)})`,
           kind: queue ? (board.queues[queue] === 'local' ? 'msg local' : 'msg') : 'ext',
