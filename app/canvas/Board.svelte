@@ -197,6 +197,8 @@
     connectionMode={ConnectionMode.Loose}
     deleteKey={board.live ? null : ['Backspace', 'Delete']}
     nodesDraggable={!board.live}
+    nodeDragThreshold={4}
+    nodeClickDistance={4}
     panOnScroll
     panOnScrollSpeed={1}
     panOnDrag={tool === 'hand' ? true : [1, 2]}
