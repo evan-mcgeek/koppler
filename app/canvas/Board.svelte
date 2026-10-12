@@ -181,7 +181,17 @@
 <!-- A card reached with Tab is the picked one: the arrow keys move it straight away. -->
 <div
   class="area"
+  role="presentation"
   bind:this={area}
+  ondragover={ev => {
+    if (ev.dataTransfer?.types.includes('text/app')) ev.preventDefault();
+  }}
+  ondrop={ev => {
+    const id = ev.dataTransfer?.getData('text/app');
+    if (!id || board.live) return;
+    ev.preventDefault();
+    board.add(id, { x: ev.clientX, y: ev.clientY });
+  }}
   onfocusin={ev => {
     const id = (ev.target as Element).matches('.svelte-flow__node')
       ? (ev.target as Element).getAttribute('data-id')

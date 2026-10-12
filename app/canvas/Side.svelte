@@ -136,7 +136,11 @@
             <button
               class="main"
               type="button"
-              title="Add {app.name} to the board"
+              title="Add {app.name} to the board: click, or drag it there"
+              draggable="true"
+              ondragstart={ev => {
+                ev.dataTransfer?.setData('text/app', app.id);
+              }}
               onclick={() => {
                 board.add(app.id);
               }}

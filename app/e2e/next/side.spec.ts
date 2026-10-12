@@ -92,3 +92,19 @@ test('the environment is switched in the panel, and the panel folds away', async
   await expect(page.getByText('2 of 4 on the board')).toBeVisible();
   await expect(rail).toHaveCount(0);
 });
+
+test('a row dragged onto the board puts the card where it is dropped', async ({ page }) => {
+  const row = page.getByRole('complementary').getByRole('button', { name: 'Catalog API', exact: true });
+  const area = page.locator('.area');
+  const box = await area.boundingBox();
+  if (!box) throw new Error('no board');
+  const drop = { x: box.width - 200, y: box.height - 300 };
+  await row.dragTo(area, { targetPosition: drop });
+  const placed = await card(page, 'catalog').boundingBox();
+  if (!placed) throw new Error('no card');
+  // Its header is under the pointer.
+  expect(placed.x).toBeLessThan(box.x + drop.x);
+  expect(placed.x + placed.width).toBeGreaterThan(box.x + drop.x);
+  expect(Math.abs(placed.y + 22 * (placed.width / 300) - (box.y + drop.y))).toBeLessThan(12);
+  await expect(page.getByText('3 of 4 on the board')).toBeVisible();
+});
