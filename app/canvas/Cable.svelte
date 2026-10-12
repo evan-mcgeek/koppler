@@ -45,7 +45,7 @@
     <path class="svelte-flow__edge-interaction hit" d={path} />
     <path class="under" d={path} />
     <path class="wire" d={path} />
-    <path class="head" d="M-8,-5.5 L0,0 L-8,5.5" transform={head} />
+    <path class="head" d="M-10,-5 L0,0 L-10,5 L-7.5,0 Z" transform={head} />
     <g class="cut" transform={middle}>
       <circle r="8" />
       <path d="M-3,-3 L3,3 M3,-3 L-3,3" />
@@ -80,9 +80,15 @@
   :global(.svelte-flow__edge:hover) :is(.wire, .head) {
     stroke: var(--bad);
   }
+  :global(.svelte-flow__edge:hover) .head {
+    fill: var(--bad);
+  }
   /* Dashed until the apps at both ends run. */
   .idle :is(.wire, .head) {
     stroke: color-mix(in oklab, var(--cable) 38%, var(--line));
+  }
+  .idle .head {
+    fill: color-mix(in oklab, var(--cable) 38%, var(--line));
   }
   .idle .wire {
     stroke-dasharray: 6 6;
@@ -97,14 +103,25 @@
     stroke-width: 8;
     opacity: 0.75;
   }
-  .wire,
-  .head {
+  .wire {
     stroke: var(--cable);
     stroke-width: 2.5;
   }
-  :global(.svelte-flow__edge.selected) :is(.wire, .head),
-  :global(.svelte-flow__edge:focus-visible) :is(.wire, .head) {
+  /* A solid head with a notched back; its thin outline only rounds the corners. */
+  .head {
+    fill: var(--cable);
+    stroke: var(--cable);
+    stroke-width: 1.5;
+  }
+  :global(.svelte-flow__edge.selected) .wire,
+  :global(.svelte-flow__edge:focus-visible) .wire {
     stroke: var(--cable-ink);
     stroke-width: 4;
+  }
+  :global(.svelte-flow__edge.selected) .head,
+  :global(.svelte-flow__edge:focus-visible) .head {
+    fill: var(--cable-ink);
+    stroke: var(--cable-ink);
+    stroke-width: 3;
   }
 </style>
