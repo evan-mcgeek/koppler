@@ -1,6 +1,8 @@
 // The new canvas's side panel: the stack's apps, found, added to the board and taken off it.
 import type { Page } from '@playwright/test';
-import { test, expect } from '../canvas.ts';
+import fs from 'node:fs';
+import path from 'node:path';
+import { test, expect, nextEdit } from '../canvas.ts';
 
 const card = (page: Page, id: string) => page.locator(`.svelte-flow__node[data-id="${id}"]`);
 const rows = (page: Page) => page.getByRole('complementary').getByRole('listitem');
@@ -64,7 +66,7 @@ test('the list is filtered by a name or a kind, and an app that is not cloned of
   await expect(page.getByText('No app matches.')).toBeVisible();
   await search.fill('pay');
   await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
-  await page.getByRole('complementary').getByRole('button', { name: 'Payments API' }).click();
+  await page.getByRole('complementary').getByRole('button', { name: 'Payments API', exact: true }).click();
   await expect(page.getByRole('complementary').getByRole('status')).toHaveText(
     'Clone command for Payments API copied.',
   );
@@ -107,4 +109,88 @@ test('a row dragged onto the board puts the card where it is dropped', async ({ 
   expect(placed.x + placed.width).toBeGreaterThan(box.x + drop.x);
   expect(Math.abs(placed.y + 22 * (placed.width / 300) - (box.y + drop.y))).toBeLessThan(12);
   await expect(page.getByText('3 of 4 on the board')).toBeVisible();
+});
+
+test('repos found on this machine are added to the stack from a picker', async ({ page, canvas }) => {
+  const repo = (name: string, kind: string | null, folder: string, inStack?: string) => ({
+    slug: `acme/${name}`,
+    name: name.replace(/^./, first => first.toUpperCase()),
+    kind,
+    path: `${folder}/${name}`,
+    folder,
+    ...(inStack && { inStack }),
+  });
+  const found = [
+    repo('web', 'node', '~/work', 'web'),
+    repo('mailer', 'node', '~/work'),
+    repo('reports', null, '~/work'),
+    repo('tools', 'dotnet', '~/other'),
+  ];
+  fs.writeFileSync(
+    path.join(canvas.temp, 'repos.json'),
+    JSON.stringify({ roots: ['~/work', '~/other'], repos: found }),
+  );
+  const asked: unknown[] = [];
+  await page.route('**/apps?*', async route => {
+    asked.push(route.request().postDataJSON());
+    await route.fulfill({ json: { added: ['mailer', 'reports'] } });
+  });
+  await page.getByRole('button', { name: 'Add repos…' }).click();
+  const picker = page.getByRole('dialog', { name: 'Add repos to Acme Shop' });
+  // What is in the stack already is not offered.
+  await expect(picker.getByRole('checkbox')).toHaveCount(3);
+  await expect(picker.getByRole('button', { name: /^Add/ })).toBeDisabled();
+  await picker.getByRole('button', { name: 'Pick all 2' }).click();
+  await picker.getByLabel('Name of acme/mailer in the stack').fill('Mail service');
+  await page.screenshot({ path: 'test-results/next-repos.png' });
+  await picker.getByRole('button', { name: 'Add 2 apps' }).click();
+  await expect(picker.getByRole('alert')).toHaveText('Choose what kind of app Reports is.');
+  await picker.getByLabel('Kind of app for Reports').selectOption('dotnet');
+  await picker.getByLabel('Find a repo').fill('tools');
+  await expect(picker.getByRole('checkbox')).toHaveCount(1);
+  await picker.getByRole('button', { name: 'Add 2 apps' }).click();
+  await expect
+    .poll(() => asked)
+    .toEqual([
+      {
+        apps: [
+          { slug: 'acme/mailer', name: 'Mail service', kind: 'node' },
+          { slug: 'acme/reports', name: 'Reports', kind: 'dotnet' },
+        ],
+      },
+    ]);
+});
+
+test('an app is removed from the stack after a question', async ({ page }) => {
+  const asked: unknown[] = [];
+  await page.route('**/apps-remove?*', async route => {
+    asked.push(route.request().postDataJSON());
+    await route.fulfill({ json: { removed: 'catalog' } });
+  });
+  await page.getByRole('button', { name: 'Remove Catalog API from the stack' }).click();
+  const ask = page.getByRole('dialog').filter({ hasText: 'Remove Catalog API from the stack?' });
+  await expect(ask).toContainText('The repo stays on your Mac.');
+  await ask.getByRole('button', { name: 'Remove from stack' }).click();
+  await expect.poll(() => asked).toEqual([{ id: 'catalog' }]);
+});
+
+test('an app runs alone on a board of its own, with the board before one click back', async ({ page, canvas }) => {
+  await nextEdit(page);
+  await page.getByRole('button', { name: 'Run Catalog API alone' }).click();
+  const review = page.getByRole('dialog').filter({ hasText: 'Run on QA' });
+  await expect(review).toContainText('Catalog API');
+  await expect(review).not.toContainText('Orders API');
+  await expect(page.getByRole('button', { name: 'Board: Catalog API alone' })).toBeVisible();
+  await expect(card(page, 'catalog')).toBeVisible();
+  await expect(page.locator('.svelte-flow__node-app')).toHaveCount(1);
+  // One app alone is not kept as a board; the board before still is.
+  await nextEdit(page);
+  const kept = (await (await page.request.get(`${canvas.url}data/state.json`)).json()) as {
+    presets?: { name: string }[];
+  };
+  expect(kept.presets?.map(one => one.name)).toEqual(['Web Shop + 1']);
+  await review.getByRole('button', { name: 'Back to Web Shop + 1' }).click();
+  await expect(review).toBeHidden();
+  await expect(page.locator('.svelte-flow__node-app')).toHaveCount(2);
+  await expect(page.locator('.svelte-flow__edge')).toHaveCount(1);
 });

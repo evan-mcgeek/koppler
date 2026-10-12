@@ -41,6 +41,17 @@
       {/each}
     </div>
     <div class="actions">
+      {#if review.back}
+        <button
+          class="back"
+          type="button"
+          onclick={() => {
+            const { back } = review;
+            runs.review = null;
+            back?.run();
+          }}>{review.back.label}</button
+        >
+      {/if}
       <button
         type="button"
         onclick={() => {
@@ -163,6 +174,9 @@
     justify-content: flex-end;
     gap: 8px;
     margin-top: 18px;
+  }
+  .back {
+    margin-right: auto;
   }
   button {
     padding: 6px 12px;

@@ -19,6 +19,9 @@
   let busy = $state(false);
   const mine = $derived(board.own.some(one => one.name === board.name));
   const shared = $derived(!mine && board.team.some(one => one.name === board.name));
+  const label = $derived(
+    board.name ?? (board.scratch && board.nodes[0] ? `${board.nodes[0].data.name} alone` : 'New board'),
+  );
   const options = () => [...(list?.querySelectorAll<HTMLButtonElement>('.row > button:first-child') ?? [])];
   const close = () => list?.hidePopover();
   const place = () => {
@@ -101,7 +104,7 @@
   class="picker"
   class:chosen={!!board.name}
   type="button"
-  aria-label="Board: {board.name ?? 'New board'}"
+  aria-label="Board: {label}"
   aria-haspopup="dialog"
   aria-expanded={open}
   title={mine
@@ -111,7 +114,7 @@
       : 'Saved as soon as it has an app'}
   popovertarget={id}
 >
-  <span class="name">{board.name ?? 'New board'}</span>
+  <span class="name">{label}</span>
 </button>
 <div
   bind:this={list}
