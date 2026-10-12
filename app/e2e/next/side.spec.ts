@@ -142,6 +142,15 @@ test('repos found on this machine are added to the stack from a picker', async (
   await expect(picker.getByRole('button', { name: /^Add/ })).toBeDisabled();
   await picker.getByRole('button', { name: 'Pick all 2' }).click();
   await picker.getByLabel('Name of acme/mailer in the stack').fill('Mail service');
+  // A name reads as text until it is pointed at or typed in; the kind sits in one column on every row.
+  await expect(picker.getByLabel('Name of acme/tools in the stack')).toHaveCSS('border-top-color', 'rgba(0, 0, 0, 0)');
+  const kinds = await picker
+    .locator('.pick > :last-child')
+    .evaluateAll(all => all.map(one => Math.round(one.getBoundingClientRect().left)));
+  expect(new Set(kinds).size).toBe(1);
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await picker.screenshot({ path: 'test-results/next-repos-dark.png' });
+  await page.emulateMedia({ colorScheme: 'light' });
   await page.screenshot({ path: 'test-results/next-repos.png' });
   await picker.getByRole('button', { name: 'Add 2 apps' }).click();
   await expect(picker.getByRole('alert')).toHaveText('Choose what kind of app Reports is.');

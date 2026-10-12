@@ -191,9 +191,7 @@
     font-size: 18px;
     cursor: pointer;
   }
-  input[type='search'],
-  .name,
-  select {
+  input[type='search'] {
     height: 30px;
     padding: 0 8px;
     border: 1px solid var(--line);
@@ -239,36 +237,80 @@
     font: 600 12px var(--sans);
     cursor: pointer;
   }
+  /* A row reads as a line of text: its name turns into a field only when it is pointed at or typed in. */
   .pick {
     display: grid;
-    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-columns: 18px minmax(0, 1fr) 96px;
     align-items: center;
-    gap: 10px;
-    padding: 6px 12px;
+    column-gap: 10px;
+    padding: 5px 12px;
+  }
+  .pick:hover {
+    background: color-mix(in oklab, var(--ink) 5%, transparent);
   }
   .pick.on {
     background: color-mix(in oklab, var(--cable) 8%, transparent);
   }
+  .pick input[type='checkbox'] {
+    width: 16px;
+    height: 16px;
+    margin: 0;
+    accent-color: var(--cable);
+  }
   .who {
     display: grid;
-    gap: 2px;
+    min-width: 0;
   }
   .name {
     width: 100%;
-    font-weight: 600;
+    margin-left: -6px;
+    padding: 2px 6px;
+    border: 1px solid transparent;
+    border-radius: 5px;
+    background: none;
+    color: var(--muted);
+    font: 500 13.5px var(--sans);
+    text-overflow: ellipsis;
+  }
+  .pick.on .name {
+    color: var(--ink);
+  }
+  .name:hover,
+  .name:focus {
+    border-color: var(--line);
+    background: var(--paper);
+    color: var(--ink);
+    outline: 0;
+  }
+  .name:focus {
+    border-color: var(--cable);
   }
   .slug {
     overflow: hidden;
     color: var(--muted);
-    font: 11.5px var(--mono);
+    font: 12px var(--mono);
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+  /* The kind sits in one column, whether it was told from the repo or has to be chosen. */
   .kind {
-    padding: 1px 8px;
+    justify-self: start;
+    padding: 1px 7px;
     border-radius: 999px;
-    background: color-mix(in oklab, var(--ink) 8%, transparent);
-    font: 600 11px/1.6 var(--sans);
+    background: color-mix(in oklab, var(--kind) 14%, transparent);
+    color: var(--kind);
+    font: 600 12px/1.5 var(--sans);
+    white-space: nowrap;
+  }
+  select {
+    width: 100%;
+    height: 24px;
+    padding: 0 4px;
+    border: 1px solid var(--warn);
+    border-radius: 5px;
+    background: var(--paper);
+    color: var(--ink);
+    font: 12px var(--sans);
   }
   .none {
     margin: 16px 12px;
