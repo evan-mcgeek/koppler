@@ -13,6 +13,8 @@
   ] as const;
   const viewport = useViewport();
   const far = $derived(viewport.current.zoom < FAR_ZOOM);
+  /** The short card: zoomed out, or in the Live view. It shows state, not fields. */
+  const brief = $derived(far || board.live);
   const app = $derived(board.apps.find(one => one.id === id));
   const current = $derived(app?.current || 'current branch');
   /** The branches to pick from: the clone's own first, then whatever the board names that the clone does not list. */
@@ -65,7 +67,9 @@
 <article
   class="card kind-{data.kind}"
   class:selected
+  class:short={brief}
   class:far
+  class:reading={board.live}
   class:drop-ok={board.drop?.id === id && board.drop.ok}
   class:drop-bad={board.drop?.id === id && !board.drop.ok}
   class:wiring={!!board.draft}
@@ -91,7 +95,7 @@
       }}>×</button
     >
   </header>
-  {#if far}
+  {#if brief}
     <p class="glance">
       <span title="Branch: {data.branch || current}">{data.branch || current}</span>
       {#if runLabel}<span>{runLabel}</span>{/if}
@@ -368,7 +372,7 @@
     border-bottom: 1px solid var(--line);
     cursor: grab;
   }
-  .far header {
+  .short header {
     border-bottom: 0;
   }
   .grip {
@@ -396,8 +400,8 @@
     text-wrap: balance;
     overflow-wrap: anywhere;
   }
-  .far .name {
-    font-size: 26px;
+  .short .name {
+    font-size: 22px;
   }
   .remove {
     width: 26px;
@@ -753,7 +757,7 @@
     border-top: 1px dashed var(--line);
     cursor: default;
   }
-  .far .calls {
+  .reading.far .calls {
     display: none;
   }
   .calls-label {
@@ -783,6 +787,46 @@
   .chip:disabled {
     color: var(--muted);
     cursor: default;
+  }
+  /* The short card reads at a glance: larger, and nothing on it to edit or pull. */
+  .short {
+    min-width: 300px;
+    max-width: 460px;
+    padding-bottom: 4px;
+  }
+  .short header {
+    min-height: 60px;
+  }
+  .short :is(.remove, .port) {
+    display: none;
+  }
+  .short .progress {
+    padding: 12px 16px;
+    font-size: 21px;
+  }
+  .short .marks i {
+    transform: scale(1.4);
+  }
+  .short .chev {
+    font-size: 14px;
+  }
+  .short .where {
+    font-size: 16px;
+  }
+  .short .why {
+    font-size: 16px;
+  }
+  .short :is(.calls-label, .chip) {
+    font-size: 15px;
+  }
+  .reading.far .name {
+    font-size: 26px;
+  }
+  .reading.far .progress {
+    font-size: 24px;
+  }
+  .reading.far :is(.glance, .where, .chev) {
+    display: none;
   }
   .glance .off {
     background: color-mix(in oklab, var(--warn) 14%, transparent);

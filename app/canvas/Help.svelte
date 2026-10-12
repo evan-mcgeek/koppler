@@ -26,6 +26,8 @@
   <dl>
     <dt><kbd>F</kbd></dt>
     <dd>Fit the whole board in view</dd>
+    <dt><kbd>E</kbd> / <kbd>L</kbd></dt>
+    <dd>Edit view / Live view</dd>
     <dt><kbd>V</kbd> / <kbd>H</kbd>, hold <kbd>Space</kbd></dt>
     <dd>Select / move around the board</dd>
     <dt><kbd>Cmd</kbd> or <kbd>Ctrl</kbd> + <kbd>Z</kbd></dt>

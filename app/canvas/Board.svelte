@@ -68,6 +68,8 @@
       if (ev.shiftKey) board.redo();
       else board.undo();
     } else if (key === 'f') void flow.fitView(FIT);
+    else if (key === 'e') board.goEdit();
+    else if (key === 'l') board.goLive();
     else if (ev.key === 'v' || ev.key === 'V') tool = 'select';
     else if (ev.key === 'h' || ev.key === 'H') tool = 'hand';
   };
@@ -190,24 +192,54 @@
     nodeTypes={{ app: AppCard, tunnel: Tunnel, queue: Queue, outside: Outside }}
     edgeTypes={{ cable: Cable }}
     connectionMode={ConnectionMode.Loose}
-    deleteKey={['Backspace', 'Delete']}
+    deleteKey={board.live ? null : ['Backspace', 'Delete']}
+    nodesDraggable={!board.live}
     panOnScroll
     panOnScrollSpeed={1}
     panOnDrag={tool === 'hand' ? true : [1, 2]}
     selectionOnDrag={tool === 'select'}
     selectionMode={SelectionMode.Partial}
     onedgeclick={({ edge }) => {
-      board.cut(edge.source, edge.target);
+      if (!board.live) board.cut(edge.source, edge.target);
     }}
     colorMode={theme.now}
     minZoom={0.2}
     attributionPosition="bottom-left"
     {...start}
     onmoveend={(_event, viewport) => {
-      board.view = viewport;
+      if (!board.live) board.view = viewport;
     }}
   >
     <Background variant={BackgroundVariant.Dots} gap={24} size={2.4} bgColor="var(--paper)" patternColor="var(--dot)" />
+    <Panel position="top-left">
+      <div
+        class="views"
+        role="radiogroup"
+        aria-label="Board view"
+        title="Edit (E): set up apps and cables. Live (L): what is running, large enough to read at a glance."
+      >
+        <label>
+          <input
+            type="radio"
+            name="view"
+            checked={!board.live}
+            onchange={() => {
+              board.goEdit();
+            }}
+          />Edit
+        </label>
+        <label>
+          <input
+            type="radio"
+            name="view"
+            checked={board.live}
+            onchange={() => {
+              board.goLive();
+            }}
+          />Live
+        </label>
+      </div>
+    </Panel>
     <Panel position="bottom-right">
       <div class="tools" role="toolbar" aria-label="Board">
         <div class="switch" role="radiogroup" aria-label="Dragging on the board">
@@ -307,7 +339,7 @@
     </ViewportPortal>
     <!-- Above every card, a picked one too: each cable's two ends, which the pointer can grab, and the cable being drawn. -->
     <ViewportPortal target="front" style="position: absolute; z-index: 1001">
-      <svg class="ends" class:reordering={!!board.grabbed} aria-hidden="true">
+      <svg class="ends" class:reordering={!!board.grabbed} class:still={board.live} aria-hidden="true">
         {#each board.edges as edge, index (edge.id)}
           {@const a = board.endPoint(index, 'from')}
           {@const b = board.endPoint(index, 'to')}
@@ -478,6 +510,46 @@
     stroke-width: 2.5;
     stroke-linecap: round;
     stroke-dasharray: 6 6;
+  }
+  .views {
+    display: inline-flex;
+    gap: 2px;
+    padding: 2px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--panel);
+  }
+  .views label {
+    position: relative;
+    padding: 3px 12px;
+    border-radius: 6px;
+    color: var(--muted);
+    font: 600 13px var(--sans);
+  }
+  .views input {
+    position: absolute;
+    inset: 0;
+    margin: 0;
+    opacity: 0;
+    cursor: pointer;
+  }
+  .views label:has(input:checked) {
+    background: var(--surface);
+    color: var(--ink);
+    box-shadow:
+      0 0 0 1px var(--line),
+      0 1px 2px rgb(0 0 0 / 0.12);
+  }
+  .views label:has(input:focus-visible) {
+    outline: 2px solid var(--cable);
+    outline-offset: -2px;
+  }
+  /* In Live nothing on the board is pulled or unplugged. */
+  .ends.still :is(.plug, .socket) {
+    pointer-events: none;
+  }
+  .area:has(.ends.still) :global(.svelte-flow__edge) {
+    pointer-events: none;
   }
   .tools {
     display: flex;
