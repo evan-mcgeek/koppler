@@ -3,6 +3,8 @@
   import type { Side } from '../src/core/arrange.ts';
   import { board, type CardNode } from './board.svelte.ts';
   import { live, progress } from './live.svelte.ts';
+  import { logs } from './logs.svelte.ts';
+  import { runs } from './run.svelte.ts';
 
   const { id, data, selected }: NodeProps<CardNode> = $props();
   const SIDES: Side[] = ['top', 'right', 'bottom', 'left'];
@@ -43,6 +45,7 @@
   const [tone, said] = $derived(steps.length ? progress(steps) : ['todo', '']);
   const failed = $derived(steps.find(step => step.state === 'failed'));
   let open = $state(false);
+  let asked = $state(false);
   let copiedStep = $state(-1);
   const copyStep = async (command: string, at: number) => {
     await navigator.clipboard.writeText(command).catch(() => undefined);
@@ -295,6 +298,30 @@
         {/each}
       </ul>
     {/if}
+  {/if}
+  {#if live.hasLog(id) || failed}
+    <div class="acts nodrag">
+      {#if live.hasLog(id)}
+        <button
+          class="act"
+          type="button"
+          onclick={() => {
+            logs.open(id);
+          }}>Show log</button
+        >
+      {/if}
+      {#if failed}
+        <!-- The failure goes to the agent with the app and step; it says what it would change and asks before it acts. -->
+        <button
+          class="act fix"
+          type="button"
+          disabled={asked}
+          onclick={async () => {
+            asked = await runs.askToFix(id, `${failed.label}${failed.detail ? `: ${failed.detail}` : ''}`);
+          }}>{asked ? 'Sent to the agent' : 'Ask the agent to fix'}</button
+        >
+      {/if}
+    </div>
   {/if}
   {#if calls.length}
     <div class="calls nodrag nopan">
@@ -734,6 +761,37 @@
     color: var(--ink);
     font: 600 12px var(--sans);
     cursor: pointer;
+  }
+  .acts {
+    contain: inline-size;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 0 14px 12px 16px;
+    cursor: default;
+  }
+  .act {
+    padding: 2px 8px;
+    border: 1px solid var(--line);
+    border-radius: 5px;
+    background: none;
+    color: var(--ink);
+    font: 600 12px var(--sans);
+    cursor: pointer;
+  }
+  .act:hover {
+    background: color-mix(in oklab, var(--ink) 8%, transparent);
+  }
+  .act.fix {
+    border-color: color-mix(in oklab, var(--bad) 45%, var(--line));
+    background: color-mix(in oklab, var(--bad) 10%, transparent);
+  }
+  .act:disabled {
+    opacity: 0.6;
+    cursor: default;
+  }
+  .short .act {
+    font-size: 16px;
   }
   .link {
     justify-self: start;

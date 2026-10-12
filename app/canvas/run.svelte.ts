@@ -118,7 +118,8 @@ class Runs {
   }
 
   /** Hands a request to the server, for Koppler or the agent. Copied instead when the server does not take it. */
-  async #deliver(text: string, prompt: { tag: string; data: object }, sent: string): Promise<boolean> {
+  /** Hands a request to the server, for Koppler or the agent. Copied instead when the server does not take it. */
+  async deliver(text: string, prompt: { tag: string; data: object }, sent: string): Promise<boolean> {
     const token = location.pathname.split('/')[2] ?? '';
     try {
       const answer = await fetch(`/prompt?token=${encodeURIComponent(token)}`, {
@@ -296,13 +297,35 @@ class Runs {
         const layout = board.saved();
         void save(layout);
         const data = { ...graph, id: newRunId(), plan: confirmed, layout };
-        void this.#deliver(
+        void this.deliver(
           text,
           { tag: 'koppler', data },
           byAgent ? 'Sent. Waiting for the agent' : 'Sent. Koppler is starting it',
         );
       },
     };
+  }
+
+  /** Asks the agent to find out why an app failed to start; it says what it would change and asks before acting. */
+  askToFix(id: string, step: string): Promise<boolean> {
+    const env = board.env.toUpperCase();
+    const text = [
+      'Fix this failed start, using the koppler-run skill.',
+      `ENV ${env}`,
+      `APP ${name(id)} (${id})`,
+      `FAILED ${step}`,
+      'Find the cause, say what you would change, and ask before you start, stop or restart anything.',
+    ].join('\n');
+    const data = {
+      env: board.env,
+      failures: [{ connection: name(id), result: 'Failed to start', detail: step, app: id }],
+    };
+    const waiting = (live.status?.agent?.state ?? 'none') === 'none';
+    return this.deliver(
+      text,
+      { tag: 'koppler-fix', data },
+      waiting ? 'Saved. The agent gets it when one connects.' : 'Sent to the agent',
+    );
   }
 
   /** Stop: what Koppler started is stopped and its temporary changes are undone. */
@@ -345,7 +368,7 @@ class Runs {
       confirm: () => {
         const text =
           'Stop and revert this stack using the koppler-run skill: stop every process the agent started (apps, tunnels, background tasks; leave anything started from an IDE or by me) and revert every temporary code change (do-not-commit edits and added launch profiles). Report what was stopped and reverted.';
-        void this.#deliver(
+        void this.deliver(
           text,
           { tag: 'koppler-stop', data: { action: 'stop', id: newRunId() } },
           'Stopping and reverting',

@@ -791,6 +791,11 @@ class Board {
     this.canRedo = false;
   }
 
+  /** Takes the board as it is now as the current step, without a step to undo. */
+  adopt(): void {
+    if (!this.live) this.#now = this.content();
+  }
+
   #step(from: string[], to: string[]): void {
     const back = from.pop();
     if (back === undefined) return;
