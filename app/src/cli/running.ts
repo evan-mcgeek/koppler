@@ -54,7 +54,9 @@ export async function canvas(args: string[]): Promise<void> {
   for (let tries = 0; tries < 40 && !fs.existsSync(urlFile); tries++) await sleep(250);
   if (!fs.existsSync(urlFile)) fail('the canvas did not start; see koppler logs canvas');
   // The address carries the page's access token, so it goes to the browser and is not printed.
-  const url = fs.readFileSync(urlFile, 'utf8').trim() + (args.includes('--pick') ? '#pick' : '');
+  const board = flagValue(args, '--board');
+  const hash = args.includes('--pick') ? '#pick' : board ? `#board=${encodeURIComponent(board)}` : '';
+  const url = fs.readFileSync(urlFile, 'utf8').trim() + hash;
   if (args.includes('--no-open') || process.platform !== 'darwin') {
     console.log(`The canvas runs on port ${new URL(url).port}; its address is in ${urlFile}`);
     return;
