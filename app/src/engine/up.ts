@@ -10,6 +10,7 @@ import { fail, Failure } from '../failure.ts';
 import { of as kindOf } from '../core/kinds.ts';
 import type { BoardNode, Edge } from '../core/plan.ts';
 import { aliasReady, planSteps, planTunnels, type TunnelNeed } from '../core/ports.ts';
+import { signInOf, type SignIn } from '../core/sign-in.ts';
 import type { Prereq } from '../core/stack.ts';
 import { readClones, readData, readStack, type Clone, type Registry } from '../data.ts';
 import { TEMP } from '../paths.ts';
@@ -490,16 +491,40 @@ async function carryOut(stack: Registry, args: string[]): Promise<void> {
     fail(
       `${waiting.map(id => nameOf(stack, id)).join(', ')}: started by a command from the stack that the user has not allowed yet, or that changed since. They review it in their own terminal: ${APPROVE}`,
     );
-  // An app that reads its settings from AWS crashes at start on an expired sign-in, with an error of its own.
-  const signIns = new Map<string, string[]>();
+  // An app started on a sign-in that has expired crashes with an error of its own: said here instead, before
+  // anything starts. A sign-in of the stack's own is checked by its command, which the user must have allowed.
+  const signIns = new Map<string, { signIn: SignIn; apps: string[] }>();
   for (const id of ids)
-    for (const { sso } of prereqsOf(stack, id, env))
-      if (sso) signIns.set(sso, [...(signIns.get(sso) ?? []), nameOf(stack, id)]);
-  const expired = [...signIns].filter(([profile]) => isDone({ sso: profile }) === false);
-  if (expired.length)
+    for (const need of prereqsOf(stack, id, env)) {
+      const signIn = signInOf(stack, need);
+      if (signIn)
+        signIns.set(signIn.id, { signIn, apps: [...(signIns.get(signIn.id)?.apps ?? []), nameOf(stack, id)] });
+    }
+  const mayRun = approved(stack.source ?? '', stack);
+  const own = [...signIns.values()].filter(({ signIn }) => 'shell' in signIn.check);
+  if (own.length && !mayRun)
     fail(
-      `Sign in to AWS first: ${expired.map(([, apps]) => apps.join(', ')).join(', ')} ${expired.flatMap(([, apps]) => apps).length === 1 ? 'reads its' : 'read their'} settings from AWS at start, and the sign-in has expired. In your own terminal:\n${expired.map(([profile]) => `  aws sso login --profile ${profile}`).join('\n')}\nthen run again`,
+      `${own.flatMap(one => one.apps).join(', ')}: the sign-in is checked by a command from the stack that the user has not allowed yet, or that changed since. They review it in their own terminal: ${APPROVE}`,
     );
+  const holds = ({ check }: SignIn) =>
+    isDone('shell' in check ? { shell: check.shell } : { sso: check.argv.at(-1) ?? '' }, { approved: mayRun });
+  const expired = [...signIns.values()].filter(({ signIn }) => holds(signIn) === false);
+  if (expired.length) {
+    const apps = [...new Set(expired.flatMap(one => one.apps))];
+    fail(
+      `Sign in first: ${apps.join(', ')} ${apps.length === 1 ? 'needs' : 'need'} ${expired.map(one => one.signIn.what).join(' and ')} at start, and the sign-in has expired. In your own terminal:\n${expired.map(one => `  ${one.signIn.login}`).join('\n')}\nthen run again`,
+    );
+  }
+  // What a sign-in of the stack's gives its apps is passed to them at start.
+  const given = Object.fromEntries(
+    ids.map(id => [
+      id,
+      Object.assign(
+        {},
+        ...prereqsOf(stack, id, env).map(need => (need.signIn ? signInOf(stack, need)?.env : {})),
+      ) as Record<string, string>,
+    ]),
+  );
   const up: Up = {
     stack,
     clones: readClones(),
@@ -511,7 +536,7 @@ async function carryOut(stack: Registry, args: string[]): Promise<void> {
     left: [],
     skip: new Set(),
     waits: new Set(),
-    setEnv: {},
+    setEnv: Object.fromEntries(Object.entries(given).filter(([, env]) => Object.keys(env).length)),
     logFile: path.join(TEMP, 'actions.json'),
     step: progressOf(board, env),
   };

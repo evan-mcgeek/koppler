@@ -40,6 +40,8 @@ const Prereq = z.looseObject(
     connectsAs: host.optional(),
     hosts: host.optional(),
     sso: matching(NAME, 'an AWS profile name').optional(),
+    /** A sign-in of the stack's own, by its name under `signIns`. */
+    signIn: matching(NAME, 'the name of a sign-in').optional(),
   },
   { error: 'an object: a tunnel, a sign-in or another need' },
 );
@@ -153,6 +155,18 @@ const isCheck = (value: unknown): value is { name: string; run: string } => {
 };
 const Check = z.custom<{ name: string; run: string }>(isCheck, CHECK);
 const CHECKS = 'a list of at most 50 checks';
+const COMMAND = 'a command, as text of at most 2000 characters';
+const command = z.string({ error: COMMAND }).min(1, COMMAND).max(2000, COMMAND);
+/** A sign-in the stack declares: how to tell it holds, how to sign in, and the settings it gives the app. */
+const SignIn = z.looseObject(
+  {
+    what: z.string().optional(),
+    check: command,
+    login: command,
+    env: z.record(setting, z.string({ error: 'text' }), { error: 'an object of settings' }).optional(),
+  },
+  { error: 'an object with check and login' },
+);
 const PRESET_VERSION_NEEDED = `required (the current preset format is ${String(PRESET_VERSION)})`;
 const Preset = z.looseObject(
   {
@@ -194,6 +208,7 @@ export const StackSchema = z.looseObject(
     kinds: z.record(z.string(), Kind, { error: 'an object keyed by kind id' }).optional(),
     queues: z.record(z.string(), Queue, { error: 'an object keyed by queue id' }).optional(),
     checks: z.array(Check, { error: CHECKS }).max(50, CHECKS).optional(),
+    signIns: z.record(z.string(), SignIn, { error: 'an object keyed by sign-in name' }).optional(),
     presets: z.array(Preset, { error: 'a list' }).optional(),
   },
   { error: 'a stack is an object with envs and apps' },
@@ -278,6 +293,28 @@ function presetProblems(index: number, preset: Loose, stack: Loose): string[] {
   return problems;
 }
 
+/** Every sign-in an app names must be one the stack declares. */
+function signInProblems(stack: Loose): string[] {
+  const declared = new Set(entries(stack['signIns']).map(([name]) => name));
+  const problems: string[] = [];
+  for (const [id, app] of entries(stack['apps'])) {
+    if (!isObject(app)) continue;
+    const lists: [string, unknown][] = [
+      [`apps.${id}.prereqs`, app['prereqs']],
+      ...entries(app['envs']).map(([env, own]): [string, unknown] => [
+        `apps.${id}.envs.${env}.prereqs`,
+        isObject(own) ? own['prereqs'] : undefined,
+      ]),
+    ];
+    for (const [at, prereqs] of lists)
+      for (const [index, prereq] of list(prereqs).entries()) {
+        const name = isObject(prereq) ? prereq['signIn'] : undefined;
+        if (typeof name === 'string' && !declared.has(name))
+          problems.push(`${at}[${String(index)}].signIn: no sign-in called ${name} under signIns`);
+      }
+  }
+  return problems;
+}
 /** What the parts of a stack refer to in each other: the schema checks each part's shape, this checks they fit. */
 function crossProblems(stack: Loose): string[] {
   const envs = isEnvList(stack['envs']) ? stack['envs'] : [];
@@ -298,6 +335,9 @@ function crossProblems(stack: Loose): string[] {
   }
   for (const [index, preset] of list(stack['presets']).entries())
     if (isObject(preset)) problems.push(...presetProblems(index, preset, stack));
+  for (const [name] of entries(stack['signIns']))
+    if (!NAME.test(name)) problems.push(`signIns.${name}: a name of letters, digits, dots, dashes and underscores`);
+  problems.push(...signInProblems(stack));
   return problems;
 }
 

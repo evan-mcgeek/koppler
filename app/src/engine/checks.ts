@@ -9,6 +9,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { of as kindOf, register } from '../core/kinds.ts';
+import { isSignIn, signInOf, type DeclaredSignIn } from '../core/sign-in.ts';
 import { readData } from '../data.ts';
 import { TEMP } from '../paths.ts';
 
@@ -16,6 +17,7 @@ import { TEMP } from '../paths.ts';
 interface LoosePrereq {
   [key: string]: unknown;
   sso?: string | undefined;
+  signIn?: string | undefined;
   tunnel?: string | undefined;
   hosts?: string | undefined;
   what?: string | undefined;
@@ -42,6 +44,7 @@ export interface LooseStack {
   kinds?: Record<string, { start?: unknown; stop?: unknown } | null> | undefined;
   install?: Record<string, unknown> | undefined;
   checks?: unknown;
+  signIns?: Record<string, DeclaredSignIn | undefined> | undefined;
 }
 type MaybeStack = LooseStack | null | undefined;
 
@@ -113,7 +116,8 @@ export function checksFor(stack: MaybeStack): Check[] {
     // Every environment's prerequisites: an AWS sign-in uses the aws program, a command is started by its first word.
     const prereqs = [...(app.prereqs ?? []), ...Object.values(app.envs ?? {}).flatMap(env => env?.prereqs ?? [])];
     for (const prereq of prereqs) {
-      if (prereq?.sso) tool('aws', app.name ?? 'an app', stack?.install?.['aws']);
+      const signIn = signInOf(stack, prereq);
+      if (signIn?.tool) tool(signIn.tool, app.name ?? 'an app', stack?.install?.[signIn.tool]);
       const first = text(prereq?.cmd).trim().split(/\s+/)[0];
       if (first) tool(first, prereq?.what ?? app.name ?? 'an app', stack?.install?.[first]);
     }
@@ -158,7 +162,8 @@ export function envGaps(stack: MaybeStack, only?: string): Gap[] {
       const name = app.name ?? id;
       // Tunnels, sign-ins and hosts entries belong to one environment: each kind the first one has must be in this
       // one's own list too.
-      const has = (kind: 'tunnel' | 'sso' | 'hosts') => (own.prereqs ?? []).some(prereq => prereq?.[kind]);
+      const has = (kind: 'tunnel' | 'hosts') => (own.prereqs ?? []).some(prereq => prereq?.[kind]);
+      const signsIn = (own.prereqs ?? []).some(isSignIn);
       const gap = (kind: Gap['kind'], what: string | undefined, detail: string) =>
         gaps.push({ app: id, env, kind, name: what, detail });
       for (const prereq of app.prereqs ?? []) {
@@ -168,8 +173,13 @@ export function envGaps(stack: MaybeStack, only?: string): Gap[] {
             prereq.what ?? prereq.tunnel,
             `No ${label} tunnel for ${name}'s ${prereq.what ?? 'database'} (${from} uses ${prereq.tunnel})`,
           );
-        if (prereq?.sso && !has('sso'))
-          gap('sign-in', prereq.sso, `No ${label} sign-in for ${name} (${from} uses the AWS profile ${prereq.sso})`);
+        const signIn = signInOf(stack, prereq);
+        if (signIn && !signsIn)
+          gap(
+            'sign-in',
+            prereq?.sso ?? prereq?.signIn,
+            `No ${label} sign-in for ${name} (${from} uses ${prereq?.sso ? `the AWS profile ${prereq.sso}` : signIn.what})`,
+          );
         if (prereq?.hosts && !has('hosts'))
           gap('hosts', prereq.hosts, `No ${label} hosts entry for ${name} (${from} uses ${prereq.hosts})`);
       }
@@ -200,6 +210,8 @@ export function stackCommands(stack: MaybeStack): Command[] {
     if (typeof run === 'string' && run) out.push({ what, name, run });
   };
   for (const check of checksFor(stack)) if (!check.safe) add('check', check.name, check.run);
+  // Only the check: Koppler runs it. The login is shown for the user to run themselves.
+  for (const [name, signIn] of Object.entries(stack?.signIns ?? {})) add('sign-in check', name, signIn?.check);
   for (const [id, kind] of Object.entries(stack?.kinds ?? {})) {
     add('start of every', `${id} app`, kind?.start);
     add('stop of every', `${id} app`, kind?.stop);

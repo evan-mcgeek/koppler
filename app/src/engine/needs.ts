@@ -6,12 +6,14 @@ import path from 'node:path';
 import { fail as exit } from '../failure.ts';
 import { isProtected } from '../core/plan.ts';
 import { planSteps, planTunnels, tunnelKind } from '../core/ports.ts';
+import { isSignIn, signInOf, type DeclaredSignIn } from '../core/sign-in.ts';
 import { readClones, readData, readStack } from '../data.ts';
 import { APPROVE, approved, checksFor, envGaps, stackCommands, startsFromStack } from './checks.ts';
 
 /** A prerequisite as the stack states it; a tunnel is Koppler's own job and gives the user no step. */
 interface Need {
   sso?: string | undefined;
+  signIn?: string | undefined;
   hosts?: string | undefined;
   tunnel?: string | undefined;
   port?: number | undefined;
@@ -32,6 +34,8 @@ interface SecretNeed {
 /** How to tell a step is done. */
 interface Check {
   sso?: string;
+  /** A command of the stack's that succeeds while a sign-in holds. */
+  shell?: string;
   hosts?: string;
   devCerts?: true;
   /** The store and the name in it. */
@@ -106,18 +110,23 @@ export function stepsFor(
     secrets?: SecretNeed[] | undefined;
     skill?: string;
     repo?: string | undefined;
+    /** The sign-ins the stack declares. */
+    signIns?: Record<string, DeclaredSignIn | undefined> | undefined;
   } = {},
 ): Step[] {
   const steps: Step[] = [];
   for (const need of prereqs) {
-    if (need.sso)
+    const signIn = signInOf({ signIns: context.signIns }, need);
+    if (signIn)
       steps.push({
-        id: `sso:${need.sso}`,
-        title: `Sign in to AWS (${need.sso})`,
-        why: `${appName} reads its settings from AWS when it starts.`,
-        command: `aws sso login --profile ${need.sso}`,
+        id: signIn.id,
+        title: `Sign in to ${signIn.what}`,
+        why: need.sso
+          ? `${appName} reads its settings from AWS when it starts.`
+          : `${appName} needs it when it starts.`,
+        command: signIn.login,
         where: 'anywhere',
-        check: { sso: need.sso },
+        check: 'shell' in signIn.check ? { shell: signIn.check.shell } : { sso: need.sso ?? '' },
         browser: true,
       });
     if (need.hosts)
@@ -195,9 +204,11 @@ const inHosts = (file: string, host: string) => {
 /** Live checks: true when done, false when not, null when it cannot be told. */
 export function isDone(
   check: Check,
-  world: { hostsFile?: string; skill?: string; checks?: { name: string; run: string }[] } = {},
+  world: { hostsFile?: string; skill?: string; checks?: { name: string; run: string }[]; approved?: boolean } = {},
 ): boolean | null {
   if (check.sso) return run('aws', ['sts', 'get-caller-identity', '--profile', check.sso]).ok;
+  // The stack wrote it: it runs only once the user approved the stack's commands.
+  if (check.shell) return world.approved ? run('sh', ['-c', check.shell], 20000).ok : null;
   if (check.hosts) return inHosts(world.hostsFile ?? '/etc/hosts', check.hosts);
   if (check.devCerts) return run('dotnet', ['dev-certs', 'https', '--check', '--trust']).ok;
   if (check.secret) {
@@ -309,7 +320,7 @@ export function needs(
     // Only the first environment's list is borrowed; an environment's own list is its own, even when it misses a kind.
     const prereqs =
       borrowed.has(id) && !app?.envs?.[env]?.prereqs
-        ? all.filter(need => !need.tunnel && !need.sso && !need.hosts)
+        ? all.filter(need => !need.tunnel && !isSignIn(need) && !need.hosts)
         : all;
     return {
       name: nameOf(id),
@@ -328,6 +339,7 @@ export function needs(
       secrets: app.secrets,
       skill,
       repo: clones[id]?.path,
+      signIns: stack.signIns,
     };
     for (const step of stepsFor(app.name, app.prereqs, context)) {
       const seen = byId.get(step.id);
@@ -407,8 +419,9 @@ export function needs(
     });
   // In the order they can be done: what the stack is missing, then sign-ins (a secret's fetch needs them), then the
   // rest, secrets last.
-  const rank = (step: Step) => (step.gap ? 0 : step.check.sso ? 1 : step.id.startsWith('secret:') ? 3 : 2);
-  const world = { skill, checks: mayRun ? own : [] };
+  const rank = (step: Step) =>
+    step.gap ? 0 : step.check.sso || step.check.shell ? 1 : step.id.startsWith('secret:') ? 3 : 2;
+  const world = { skill, checks: mayRun ? own : [], approved: mayRun };
   const steps = [...byId.values()]
     .sort((a, b) => rank(a) - rank(b))
     .map((step): Shown => {
