@@ -147,7 +147,9 @@ export const test = base.extend<{
   page: async ({ page, canvas, start }, use) => {
     const errors: string[] = [];
     page.on('pageerror', e => errors.push(String(e)));
-    await page.goto(canvas.url + start);
+    // Spike: KOPPLER_TRY switches Svelte Flow extras on for every test.
+    const extra = process.env['KOPPLER_TRY'] && !start.includes('?') ? `?try=${process.env['KOPPLER_TRY']}` : '';
+    await page.goto(canvas.url + start + extra);
     await use(page);
     expect(errors, 'no script errors on the page').toEqual([]);
   },

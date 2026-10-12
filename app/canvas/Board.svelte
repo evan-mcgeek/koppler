@@ -3,6 +3,7 @@
     Background,
     BackgroundVariant,
     ConnectionMode,
+    MiniMap,
     SelectionMode,
     Panel,
     SvelteFlow,
@@ -22,6 +23,7 @@
   import { live } from './live.svelte.ts';
   import { probes, type Job, type Probe } from './probes.svelte.ts';
   import { theme } from './theme.svelte.ts';
+  import { tries } from './tries.ts';
 
   const flow = useSvelteFlow();
   board.toFlow = at => flow.screenToFlowPosition(at, { snapToGrid: false });
@@ -51,6 +53,29 @@
       .sort((a, b) => (a.at === b.at ? a.index - b.index : a.at > b.at ? -1 : 1))
       .slice(0, 6),
   );
+  // Spike: tunnel and queue cards handed to the library as children of the app that leads them, so it moves them
+  // with the app. The board itself keeps their places as it always did, from the board's corner.
+  const leaders = () => new Map(board.nodes.flatMap(app => board.ledBy(app.id).map(key => [key, app.id] as const)));
+  const asChildren = (): InfraNode[] => {
+    const lead = leaders();
+    const at = new Map(board.nodes.map(node => [node.id, node.position]));
+    return board.infra.map(card => {
+      const parent = lead.get(card.id);
+      const from = parent ? at.get(parent) : undefined;
+      return parent && from
+        ? { ...card, parentId: parent, position: { x: card.position.x - from.x, y: card.position.y - from.y } }
+        : card;
+    });
+  };
+  const asOwn = (all: (CardNode | InfraNode)[]): (CardNode | InfraNode)[] => {
+    const at = new Map(all.filter(node => node.type === 'app').map(node => [node.id, node.position]));
+    return all.map(node => {
+      const from = node.parentId ? at.get(node.parentId) : undefined;
+      if (!from) return node;
+      const { parentId: _parent, ...own } = node;
+      return { ...own, position: { x: node.position.x + from.x, y: node.position.y + from.y } } as InfraNode;
+    });
+  };
   /** Where a socket was pressed, to tell a click in place from a slide. */
   let pressedAt = { x: 0, y: 0 };
   // Whenever what runs or what is cabled changes, cables whose apps both answer are tested.
@@ -222,8 +247,9 @@
 >
   <SvelteFlow
     bind:nodes={
-      () => [...board.nodes, ...board.infra],
-      (all: (CardNode | InfraNode)[]) => {
+      () => (tries.has('children') ? [...board.nodes, ...asChildren()] : [...board.nodes, ...board.infra]),
+      (given: (CardNode | InfraNode)[]) => {
+        const all = tries.has('children') ? asOwn(given) : given;
         // An app the library moved (a drag, the arrow keys) takes its tunnel cards along, in the same step.
         const was = new Map(board.nodes.map(node => [node.id, node.position]));
         const tall = new Map(board.nodes.map(node => [node.id, node.measured?.height]));
@@ -238,7 +264,7 @@
             nudged = true;
           }
           const from = was.get(id);
-          if (from && (from.x !== position.x || from.y !== position.y))
+          if (!tries.has('children') && from && (from.x !== position.x || from.y !== position.y))
             infra = board.followed(id, { x: position.x - from.x, y: position.y - from.y }, infra);
         }
         board.nodes = apps;
@@ -254,6 +280,8 @@
     deleteKey={board.live ? null : ['Backspace', 'Delete']}
     nodesDraggable={!board.live}
     nodeDragThreshold={4}
+    {...tries.has('snap') ? { snapGrid: [24, 24] as [number, number] } : {}}
+    onlyRenderVisibleElements={tries.has('visible')}
     nodeClickDistance={4}
     panOnScroll
     panOnScrollSpeed={1}
@@ -368,6 +396,19 @@
         >
       </div>
     </Panel>
+    {#if tries.has('minimap')}
+      <MiniMap
+        position="top-right"
+        pannable
+        zoomable
+        width={180}
+        height={120}
+        nodeBorderRadius={6}
+        nodeColor={node => (node.type === 'app' ? 'var(--cable)' : 'var(--line)')}
+        bgColor="var(--panel)"
+        maskColor="color-mix(in oklab, var(--desk) 70%, transparent)"
+      />
+    {/if}
     <!-- Under the cards: the links from each app to its tunnels. -->
     <ViewportPortal target="back">
       <svg class="links" aria-hidden="true">

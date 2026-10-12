@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { Handle, Position, useViewport, type NodeProps } from '@xyflow/svelte';
+  import { Handle, NodeToolbar, Position, useViewport, type NodeProps } from '@xyflow/svelte';
+  import { tries } from './tries.ts';
   import type { Side } from '../src/core/arrange.ts';
   import { board, type CardNode } from './board.svelte.ts';
   import { live, progress } from './live.svelte.ts';
@@ -89,6 +90,15 @@
   };
 </script>
 
+{#if tries.has('toolbar')}
+  <NodeToolbar position={Position.Top} align="end" offset={6}>
+    <div class="bar">
+      {#if live.hasLog(id)}<button type="button" onclick={() => logs.open(id)}>Show log</button>{/if}
+      <button type="button" onclick={() => runs.start()}>Run</button>
+      <button type="button" class="bad" onclick={() => board.remove(id)}>Remove</button>
+    </div>
+  </NodeToolbar>
+{/if}
 <article
   class="card kind-{data.kind}"
   class:selected
@@ -436,6 +446,30 @@
 </article>
 
 <style>
+  .bar {
+    display: flex;
+    gap: 2px;
+    padding: 3px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--surface);
+    box-shadow: var(--lift);
+  }
+  .bar button {
+    padding: 4px 9px;
+    border: 0;
+    border-radius: 5px;
+    background: none;
+    color: var(--ink);
+    font: 600 12px var(--sans);
+    cursor: pointer;
+  }
+  .bar button:hover {
+    background: color-mix(in oklab, var(--ink) 8%, transparent);
+  }
+  .bar .bad {
+    color: var(--bad);
+  }
   .card {
     position: relative;
     width: max-content;

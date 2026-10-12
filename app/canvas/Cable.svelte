@@ -1,10 +1,12 @@
 <script lang="ts">
-  import type { EdgeProps } from '@xyflow/svelte';
+  import { EdgeToolbar, type EdgeProps } from '@xyflow/svelte';
+  import { probes } from './probes.svelte.ts';
+  import { tries } from './tries.ts';
   import { cablePath, SIDES, throughPath } from '../src/core/cables.ts';
   import { board, type CableData } from './board.svelte.ts';
   import { live } from './live.svelte.ts';
 
-  const { id, source, target, data: given }: EdgeProps = $props();
+  const { id, source, target, data: given, selected }: EdgeProps = $props();
   const data = $derived(given as CableData | undefined);
   const index = $derived(board.edges.findIndex(edge => edge.id === id));
   const a = $derived(board.endPoint(index, 'from'));
@@ -24,15 +26,26 @@
   });
   const name = (app: string) => board.apps.find(one => one.id === app)?.name ?? app;
   /** The middle of the cable, where the mark to unplug it shows: measured on a path of that shape. */
-  const middle = $derived.by(() => {
-    if (!path) return '';
+  const mid = $derived.by(() => {
+    if (!path) return { x: 0, y: 0 };
     const probe = document.createElementNS('http://www.w3.org/2000/svg', 'path');
     probe.setAttribute('d', path);
     const at = probe.getPointAtLength(probe.getTotalLength() / 2);
-    return `translate(${String(at.x)} ${String(at.y)})`;
+    return { x: at.x, y: at.y };
   });
+  const middle = $derived(path ? `translate(${String(mid.x)} ${String(mid.y)})` : '');
 </script>
 
+{#if path && tries.has('toolbar')}
+  <EdgeToolbar x={mid.x} y={mid.y - 14} alignY="bottom" isVisible={!!selected}>
+    <div class="bar">
+      <button type="button" onclick={() => void probes.test({ key: id, payload: { from: source, to: target } })}
+        >Test</button
+      >
+      <button type="button" class="bad" onclick={() => board.cut(source, target)}>Unplug</button>
+    </div>
+  </EdgeToolbar>
+{/if}
 {#if path}
   <!-- One group, so that the title in it is the SVG one: a cable that starts with <title> is taken for HTML. -->
   <g
@@ -54,6 +67,27 @@
 {/if}
 
 <style>
+  .bar {
+    display: flex;
+    gap: 2px;
+    padding: 3px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--surface);
+    box-shadow: var(--lift);
+  }
+  .bar button {
+    padding: 4px 9px;
+    border: 0;
+    border-radius: 5px;
+    background: none;
+    color: var(--ink);
+    font: 600 12px var(--sans);
+    cursor: pointer;
+  }
+  .bar .bad {
+    color: var(--bad);
+  }
   path {
     fill: none;
     stroke-linecap: round;
