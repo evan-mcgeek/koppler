@@ -26,6 +26,22 @@ interface AppStatus {
   /** The last lines of its log. */
   logTail?: string | null;
 }
+/** A run or a Stop as the history keeps it, or a note of something that stopped outside one. */
+export interface Run {
+  id?: string;
+  at?: string;
+  env?: string;
+  mode?: string;
+  kind?: string;
+  state?: string;
+  reason?: string;
+  nodes?: Record<string, Record<string, unknown>>;
+  edges?: { from: string; to: string }[];
+  plan?: Partial<Record<'starts' | 'restarts' | 'stops' | 'keeps', { id: string; why?: string[] }[]>>;
+  changes?: { app: string; title: string; file?: string; fresh?: boolean; removed?: string[]; added?: string[] }[];
+  note?: string;
+  stopped?: string[];
+}
 interface Status {
   apps?: Record<string, AppStatus | undefined>;
   /** Tunnel ports, and whether something listens on each. */
@@ -38,7 +54,11 @@ interface Status {
   running?: string[];
   runningEnvs?: Record<string, string | undefined>;
   /** The last runs, oldest first. */
-  runs?: { state?: string; kind?: string; changes?: { app: string; title: string; file?: string }[] }[];
+  runs?: Run[];
+  /** What stopped outside a run: apps stopped from the menu, the canvas closed. */
+  notes?: Run[];
+  /** When the canvas server started. */
+  startedAt?: string;
   /** Whether an agent session takes what the canvas sends: listening, busy or none. */
   agent?: { state?: string };
   /** Requests no agent session has taken yet. */
