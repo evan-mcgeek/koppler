@@ -100,6 +100,16 @@ interface Status {
   /** For a stack linked from GitHub: what this copy has that the shared one does not, and a pull request already open. */
   linked?: { url?: string; changes: string[]; pr?: string } | null;
   /** What the stack needs on this machine, as the last check found it. */
+  /** Remembered code changes per app, with how each did on this Mac. */
+  recipes?: Record<
+    string,
+    {
+      why: string;
+      file: string;
+      when?: { always?: boolean; env?: string; calls?: string };
+      here: { at: string; ok: boolean } | null;
+    }[]
+  >;
   checks?:
     | { name: string; state: string; detail?: string; for?: string[]; app?: string; env?: string; kind?: string }[]
     | null;

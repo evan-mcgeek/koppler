@@ -4,6 +4,7 @@
   import Agent from './Agent.svelte';
   import Board from './Board.svelte';
   import Credentials from './Credentials.svelte';
+  import Checklist from './Checklist.svelte';
   import Findings from './Findings.svelte';
   import Health from './Health.svelte';
   import Help from './Help.svelte';
@@ -318,6 +319,7 @@
 <Setup bind:this={dialogs.setup} />
 <Repos bind:this={dialogs.repos} />
 <Findings bind:this={dialogs.findings} />
+<Checklist bind:this={dialogs.checklist} />
 <dialog bind:this={noting} class="noting" aria-labelledby="noting-title" onclose={() => (note = '')}>
   <form
     method="dialog"

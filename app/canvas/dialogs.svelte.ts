@@ -2,5 +2,6 @@
 export const dialogs = $state<{
   setup?: { open: (pane?: 'start' | 'join' | 'new') => void };
   repos?: { open: () => Promise<void> };
+  checklist?: { open: () => Promise<void> };
   findings?: { open: (how?: { afterAdding?: boolean }) => Promise<void> };
 }>({});

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import ReviewControls from './ReviewControls.svelte';
   import { runs } from './run.svelte.ts';
 
   let dialog: HTMLDialogElement | undefined = $state();
@@ -22,7 +23,10 @@
     <p class="sub">{review.sub}</p>
     <div class="body">
       {#each review.notices as notice (notice.text)}
-        <p class="notice" class:prod={notice.kind === 'prod'}>{notice.text}</p>
+        <p class="notice" class:prod={notice.kind === 'prod'}>
+          {notice.text}
+          {#if notice.act}<button class="mini" type="button" onclick={notice.act.run}>{notice.act.label}</button>{/if}
+        </p>
       {/each}
       {#each review.groups as group (group.label)}
         <ul class="lines">
@@ -32,7 +36,14 @@
               {#each group.items as item (item.name)}
                 <span class:off={item.off}>
                   {item.name}
-                  {#each item.notes as note (note.text)}<small class={note.kind}>{note.text}</small>{/each}
+                  {#if item.act}
+                    <button class="mini" type="button" title={item.act.title} onclick={item.act.run}
+                      >{item.act.label}</button
+                    >
+                  {/if}
+                  {#each item.notes as note (note.text)}<small class={note.kind} title={note.title}>{note.text}</small
+                    >{/each}
+                  {#if item.id}<ReviewControls id={item.id} />{/if}
                 </span>
               {/each}
             </span>
@@ -150,6 +161,16 @@
     display: grid;
     grid-template-columns: minmax(0, 1fr);
     gap: 6px;
+  }
+  .mini {
+    margin-left: 8px;
+    padding: 1px 8px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: none;
+    color: var(--ink);
+    font: 600 12px var(--sans);
+    cursor: pointer;
   }
   small {
     display: block;
