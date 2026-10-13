@@ -15,7 +15,7 @@ test('the log keeps clicks, choices and messages with the board, and no typed te
   };
   const card = page.locator('.svelte-flow__node[data-id="orders"]');
   // The test server runs from the source folder, where the log is always on.
-  await page.getByRole('button', { name: 'Settings' }).click();
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
   const log = page.getByRole('switch', { name: 'Debug log' });
   await expect(log).toBeChecked();
   await expect(log).toBeDisabled();
@@ -38,7 +38,7 @@ test('the log keeps clicks, choices and messages with the board, and no typed te
   expect(entries.at(-1)?.board).toMatchObject({ apps: 1, cables: 0, view: 'edit', env: 'qa' });
 
   // Clearing empties it, and says so.
-  await page.getByRole('button', { name: 'Settings' }).click();
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await page.locator('#settings').getByRole('button', { name: 'Clear' }).click();
   await expect(page.getByRole('status')).toContainText('Debug log cleared');
 });
