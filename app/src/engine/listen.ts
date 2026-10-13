@@ -50,6 +50,19 @@ const newSession = () => crypto.randomBytes(4).toString('hex');
 const REPLACED =
   'Another session is connected to the canvas now, or this one was disconnected. This one no longer gets Sends.';
 
+/** Ends the agent's work on what it took, when that was no run (a fill request, an answer): true when it was working. */
+export function finishTaken(): boolean {
+  const file = path.join(process.env['KOPPLER_TEMP'] || TEMP, 'listener.json');
+  try {
+    const { busy, ...rest } = JSON.parse(fs.readFileSync(file, 'utf8')) as Listener;
+    if (!busy) return false;
+    fs.writeFileSync(file, JSON.stringify(rest) + '\n', { mode: 0o600 });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function listen(argv: string[]): void {
   const temp = process.env['KOPPLER_TEMP'] || TEMP;
   const inbox = path.join(temp, 'prompts.jsonl');

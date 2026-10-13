@@ -11,6 +11,10 @@
     ],
     busy: ['Agent working', 'The connected agent is working on a request; the next one waits for it.'],
     question: ['Agent needs you', 'The agent asked something about your run. Click to answer.'],
+    quiet: [
+      'Agent quiet',
+      'It took a request and has neither finished it nor listened again since. If its session is done, run /koppler-run connect there; press ↻ for the steps.',
+    ],
     none: [
       'No agent listening',
       'Runs work without one. Notes, checklists and fix requests wait until an agent connects; press ↻ to see how.',
@@ -21,7 +25,15 @@
   let how = $state<HTMLButtonElement>();
   let pop = $state<HTMLDivElement>();
   let open = $state(false);
-  const listening = $derived(live.status?.agent?.state ?? 'none');
+  const QUIET_AFTER = 10 * 60 * 1000;
+  // How long it has been at what it took; the status comes every second and a half, so this keeps up.
+  const minutes = $derived.by(() => {
+    const took = Date.parse(live.status?.agent?.busy ?? '');
+    return Number.isNaN(took) || !live.status ? 0 : Math.floor((Date.now() - took) / 60000);
+  });
+  const working = $derived(live.status?.agent?.state ?? 'none');
+  // Working this long without a word or a listener, it has most likely stopped: say so, and how to reconnect.
+  const listening = $derived(working === 'busy' && minutes * 60000 >= QUIET_AFTER ? 'quiet' : working);
   const agent = $derived(inbox.question ? 'question' : listening);
   const [name, about] = $derived(ABOUT[agent] ?? ABOUT['none'] ?? ['', '']);
   const queued = $derived(live.status?.queued ?? 0);
@@ -29,8 +41,12 @@
   // No agent is fine: runs work without one. It only warns when something waits for an agent.
   const tone = $derived(agent === 'none' && !queued ? 'off' : agent);
   const label = $derived(
-    ({ listening: 'Agent', busy: 'Agent working', none: queued ? name : 'No agent' }[agent] ?? name) +
-      (waiting ? `, ${String(queued)} waiting` : ''),
+    ({
+      listening: 'Agent',
+      busy: minutes ? `Agent working, ${String(minutes)} min` : 'Agent working',
+      quiet: `Agent quiet, ${String(minutes)} min`,
+      none: queued ? name : 'No agent',
+    }[agent] ?? name) + (waiting ? `, ${String(queued)} waiting` : ''),
   );
   const title = $derived(
     `${name}. ${about}${waiting ? ` ${String(queued)} ${queued === 1 ? 'request waits' : 'requests wait'} for it; only the newest run or Stop is handed over.` : ''}`,
@@ -43,7 +59,7 @@
   };
   // An agent connected while the steps were open: they are no longer needed.
   $effect(() => {
-    if (listening !== 'none' && open) pop?.hidePopover();
+    if ((listening === 'listening' || listening === 'busy') && open) pop?.hidePopover();
   });
 </script>
 
@@ -58,7 +74,7 @@
   >
     <span class="dot" aria-hidden="true"></span><span class="words">{label}</span>
   </button>
-  {#if listening === 'none'}
+  {#if listening === 'none' || listening === 'quiet'}
     <button
       bind:this={how}
       class="how"
@@ -127,6 +143,12 @@
     background: color-mix(in oklab, var(--warn) 12%, transparent);
     color: var(--ink);
     font-weight: 600;
+  }
+  .agent[data-state='quiet'] {
+    color: var(--warn);
+  }
+  [data-state='quiet'] .dot {
+    background: var(--warn);
   }
   [data-state='question'] .dot {
     background: var(--warn);

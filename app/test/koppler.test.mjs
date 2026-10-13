@@ -371,3 +371,25 @@ const [crashy, upA, upB, tunA, tunB, runA, runB, agentA, agentB, leftA, leftB] =
   fs.rmSync(dir, { recursive: true });
   console.log('board edit ok');
 }
+
+// A request that was no run (filling in settings, an answer) is finished with history done: the agent is no longer at it.
+{
+  const { spawnSync } = await import('node:child_process');
+  const fs = await import('node:fs'), os = await import('node:os'), path = await import('node:path'), { fileURLToPath } = await import('node:url');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-took-'));
+  const env = { ...process.env, KOPPLER_STATE: dir, KOPPLER_TEMP: dir, KOPPLER_CONFIG_DIR: dir };
+  const entry = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'dist', 'koppler.mjs');
+  const koppler = (...args) => { const r = spawnSync('node', [entry, ...args], { encoding: 'utf8', env }); return { out: (r.stdout + r.stderr).trim(), code: r.status }; };
+  const listener = path.join(dir, 'listener.json');
+  fs.writeFileSync(listener, JSON.stringify({ pid: null, since: '2026-01-01T00:00:00.000Z', busy: new Date().toISOString(), session: 'abcd1234' }));
+  const done = koppler('history', 'done');
+  assert.equal(done.code, 0, done.out);
+  assert.match(done.out, /The request is finished/);
+  const after = JSON.parse(fs.readFileSync(listener, 'utf8'));
+  assert.equal(after.busy, undefined);
+  assert.equal(after.session, 'abcd1234');
+  // Nothing taken and no run waiting: said so.
+  assert.match(koppler('history', 'done').out, /no run is waiting to be applied/);
+  fs.rmSync(dir, { recursive: true });
+  console.log('finish taken ok');
+}

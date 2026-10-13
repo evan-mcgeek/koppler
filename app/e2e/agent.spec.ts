@@ -38,4 +38,16 @@ test('with no agent the bar says so and shows how to connect one; a connected ag
 
   status = { apps: {}, agent: { state: 'busy' }, queued: 1 };
   await expect(chip).toHaveText('Agent working, 1 waiting');
+  const ago = (minutes: number) => new Date(Date.now() - minutes * 60000).toISOString();
+  status = { apps: {}, agent: { state: 'busy', busy: ago(3) } };
+  await expect(chip).toHaveText('Agent working, 3 min');
+
+  // Working long with no word and no listener: most likely it stopped, and the bar says how to reconnect.
+  status = { apps: {}, agent: { state: 'busy', busy: ago(14) } };
+  await expect(chip).toHaveText('Agent quiet, 14 min');
+  await expect(chip).toHaveAttribute('data-state', 'quiet');
+  await expect(chip).toHaveAttribute('title', /run \/koppler-run connect there/);
+  await how.click();
+  await expect(steps).toBeVisible();
+  await page.screenshot({ path: 'test-results/next-agent-quiet.png' });
 });
