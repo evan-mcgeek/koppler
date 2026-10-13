@@ -223,7 +223,7 @@ test('in a narrow window the side pane folds by itself and the top bar drops its
   await expect(pane).toBeVisible();
 
   // A bar too full for its words keeps every control, without them.
-  const stop = page.getByTitle('Stop what the agent started and revert all temporary code changes');
+  const stop = page.getByRole('button', { name: 'Stop', exact: true });
   await expect(stop).toHaveText('Stop');
   await page.setViewportSize({ width: 620, height: 720 });
   await expect(stop.locator('.words')).toBeHidden();

@@ -243,7 +243,11 @@
       <button
         class="stop"
         type="button"
-        title="Stop what the agent started and revert all temporary code changes"
+        aria-label="Stop"
+        disabled={!runs.started.length}
+        title={runs.started.length
+          ? 'Stop what the agent started and revert all temporary code changes'
+          : 'Nothing is running'}
         onclick={() => {
           runs.stop();
         }}
@@ -265,6 +269,16 @@
             off: !runs.started.length,
             run: () => {
               runs.stopApps();
+            },
+          },
+          {
+            label: 'Revert temporary changes',
+            about: runs.left.length
+              ? 'Undoes what the last run left: branches back, temporary edits gone'
+              : 'Nothing to revert',
+            off: !runs.left.length,
+            run: () => {
+              runs.stop();
             },
           },
           {
@@ -478,7 +492,12 @@
     background: none;
     color: var(--prod);
   }
-  .stop:hover {
+  .stop:disabled {
+    border-color: var(--line);
+    color: var(--muted);
+    cursor: not-allowed;
+  }
+  .stop:not(:disabled):hover {
     background: color-mix(in oklab, var(--prod) 12%, transparent);
   }
   .stop rect {

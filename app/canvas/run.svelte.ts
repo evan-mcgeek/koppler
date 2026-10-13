@@ -474,6 +474,11 @@ class Runs {
   get started(): string[] {
     return (live.status?.running ?? []).filter(one => one !== 'canvas');
   }
+  /** The temporary changes the last run left, until a Stop reverts them. */
+  get left() {
+    const last = [...(live.status?.runs ?? [])].reverse().find(one => one.state === 'done' || one.state === 'failed');
+    return last && last.kind !== 'stop' ? (last.changes ?? []) : [];
+  }
 
   /** The stack being switched to from this page, until the page reloads with it. */
   switching = $state<string | null>(null);
@@ -722,10 +727,8 @@ class Runs {
   /** Stop: what Koppler started is stopped and its temporary changes are undone. */
   stop(): void {
     const steps = this.#plan({ env: board.env, nodes: {}, edges: [] });
-    const started = (live.status?.running ?? []).filter(one => one !== 'canvas');
+    const { started, left } = this;
     const others = started.filter(one => !board.apps.some(app => app.id === one));
-    const last = [...(live.status?.runs ?? [])].reverse().find(one => one.state === 'done' || one.state === 'failed');
-    const left = last && last.kind !== 'stop' ? (last.changes ?? []) : [];
     const running = started.length > 0;
     this.review = {
       title: running ? 'Stop and revert' : 'Revert temporary changes',
