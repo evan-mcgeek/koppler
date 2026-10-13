@@ -2,8 +2,7 @@
 
 ## Golden rule: nobody edits JSON by hand
 
-No user should ever need to open a Koppler JSON file: not `stack.json`, not the state files, not a board.
-Every change a user needs has a `koppler` command and a control on the canvas.
-A change that would need a hand edit is a missing feature: build the command and the control first.
-Agents use the command too wherever one exists.
-Where an agent still writes a fact into `stack.json` itself (how an app runs, its ports, its prerequisites), that is a gap to close with a command, not a pattern to copy.
+Nobody writes a Koppler JSON file directly: not `stack.json`, not the state files, not a board.
+That holds for users and for agents alike, with no exceptions.
+Every change goes through a `koppler` command, and every change that is the user's to make also has a control on the canvas.
+A change with no command yet is a missing feature: build the command (and the control) first, then make the change with it.
