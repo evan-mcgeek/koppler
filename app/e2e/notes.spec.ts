@@ -36,14 +36,25 @@ test('an app on the board that is still called in the deployed environment is sa
   await expect(notes(page)).toHaveCount(0);
 });
 
-test('apps that are not cloned are said, with a button to look for clones again', async ({ page }) => {
+test('an app that is not cloned is named, with its clone command to copy and a way to look again', async ({
+  page,
+  context,
+}) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
   const asked: string[] = [];
   await page.route('**/rescan?*', async route => {
     asked.push(route.request().url());
     await route.fulfill({ status: 500, json: { error: 'The scan did not finish.' } });
   });
-  await expect(page.getByRole('complementary')).toContainText('1 app is not cloned in');
-  await page.getByRole('button', { name: 'Look for clones again' }).click();
+  const note = page.getByRole('note', { name: 'Not cloned' });
+  await expect(note).toContainText('Catalog API is not cloned on this Mac, so it cannot run here.');
+  await note.getByRole('button', { name: 'Copy clone command' }).click();
+  await expect(note.getByRole('button', { name: 'Copied' })).toBeVisible();
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(
+    'git clone git@github.com:acme/catalog-api.git',
+  );
+  await page.getByRole('complementary').screenshot({ path: 'test-results/next-not-cloned.png' });
+  await note.getByRole('button', { name: 'Look again' }).click();
   await expect(page.getByRole('alert')).toContainText('The scan did not finish.');
   expect(asked).toHaveLength(1);
 });
