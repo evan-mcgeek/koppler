@@ -154,7 +154,10 @@ test('switching an app to a local library, or back, restarts it and says which',
 test('a board keeps only what it understands', () => {
   const read = board({
     env: 'qa',
-    nodes: { api: { note: { not: 'text' }, tunnels: false, queues: true, libraries: ['b', 'a'] }, web: { queues: false } },
+    nodes: {
+      api: { note: { not: 'text' }, tunnels: false, queues: true, libraries: ['b', 'a'] },
+      web: { queues: false },
+    },
     edges: [{ from: 'api', to: 'web' }, { from: 'api', to: 'constructor' }, null],
     queues: { thumbs: 'local', other: 'deployed' },
   });
