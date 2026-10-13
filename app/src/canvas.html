@@ -97,6 +97,7 @@
   .board-tools .btn[aria-pressed="true"] { background: color-mix(in oklab, var(--ink) 9%, transparent); }
   .board-tools .sep { width: 1px; height: 18px; margin: 0 4px; background: var(--line); }
   .board-tools #clear:hover { color: var(--bad); }
+  #save-note code { display: block; margin: 6px 0; padding: 5px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--paper); color: var(--ink); overflow-wrap: anywhere; }
   .zoom { display: flex; }
   .zoom .btn { padding: 5px 10px; }
   .zoom #zoom-reset { width: 62px; padding-inline: 0; font-variant-numeric: tabular-nums; }
@@ -2847,13 +2848,18 @@ function focusOn(id) {
   for (const t of boardPlan()) if (t.apps.includes(id)) near.add(tunnelKey(t));
   for (const n of near) world.querySelector(`.node[data-id="${CSS.escape(n)}"], .tunnel[data-id="${CSS.escape(n)}"]`)?.classList.add('near');
 }
+let unfocus = 0;
 world.addEventListener('pointerover', e => {
   const card = e.target.closest?.('.node');
   if (board.classList.contains('panning') || board.classList.contains('wiring') || e.buttons) return;
   const id = card?.dataset.id ?? null;
-  if (id !== (board.dataset.focus ?? null)) { if (id) board.dataset.focus = id; else delete board.dataset.focus; focusOn(id); }
+  cancelAnimationFrame(unfocus);
+  if (id === (board.dataset.focus ?? null)) return;
+  // Leaving a card waits a frame: a redraw swaps the card under the pointer, which reads as leaving it and coming back.
+  if (!id) { unfocus = requestAnimationFrame(() => { delete board.dataset.focus; focusOn(null); }); return; }
+  board.dataset.focus = id; focusOn(id);
 });
-board.addEventListener('pointerleave', () => { delete board.dataset.focus; focusOn(null); });
+board.addEventListener('pointerleave', () => { cancelAnimationFrame(unfocus); delete board.dataset.focus; focusOn(null); });
 
 // Selection: Shift-drag on empty board draws an area; Shift-click adds or removes a card. Dragging any selected card moves them all.
 const selected = new Set();
@@ -3457,7 +3463,7 @@ function paintSaveNote() {
   if (live && status.restart) {
     if (note.dataset.restart === status.restart) return;
     note.dataset.restart = status.restart;
-    note.innerHTML = 'The canvas server runs older code, so some buttons fail until it restarts. In your terminal: <button class="btn" type="button">Copy restart command</button>';
+    note.innerHTML = `The canvas server runs older code, so some buttons fail until it restarts. Run this in your terminal: <code>${esc(status.restart)}</code><button class="btn" type="button" aria-label="Copy restart command">Copy</button>`;
     note.querySelector('button').onclick = () => copyWithToast(status.restart, 'Restart command copied', 'Copy is blocked here. Restart it with koppler stop canvas, then koppler run canvas.');
     return;
   }
