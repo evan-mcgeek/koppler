@@ -161,3 +161,69 @@ export function check(input: unknown, stack: StackFacts): Checked {
   if (preset['source']) opened.source = preset['source'];
   return { preset: opened, notes };
 }
+
+/** A change made to a board from the terminal: apps on and off it, cables, and an app's branch or note. */
+export interface BoardEdit {
+  add?: string[];
+  remove?: string[];
+  cable?: Edge[];
+  uncable?: Edge[];
+  branch?: Record<string, string>;
+  /** An empty note takes the note off. */
+  note?: Record<string, string>;
+}
+
+const isPoint = (value: unknown): value is { x: number; y: number } =>
+  isObject(value) && typeof value['x'] === 'number' && typeof value['y'] === 'number';
+const same = (a: Edge) => (b: Edge) => a.from === b.from && a.to === b.to;
+
+/** The board with the edit made. What it does not touch stays as it was, card places too; new cards go in a column to the right. */
+export function editPreset(preset: StoredPreset, edit: BoardEdit): StoredPreset {
+  const gone = new Set(edit.remove ?? []);
+  const kept = <T>(all: Record<string, T>) => Object.fromEntries(Object.entries(all).filter(([id]) => !gone.has(id)));
+  const nodes = kept(preset.nodes);
+  const layout = isObject(preset['layout']) ? preset['layout'] : undefined;
+  const at = kept(isObject(layout?.['nodes']) ? layout['nodes'] : {});
+  const placed = Object.values(at).filter(isPoint);
+  let y = Math.min(...placed.map(point => point.y));
+  for (const id of edit.add ?? []) {
+    if (nodes[id]) continue;
+    nodes[id] = { run: 'cli' };
+    if (!placed.length) continue;
+    at[id] = { x: Math.max(...placed.map(point => point.x)) + 340, y };
+    y += 240;
+  }
+  for (const [id, branch] of Object.entries(edit.branch ?? {})) if (nodes[id]) nodes[id] = { ...nodes[id], branch };
+  for (const [id, note] of Object.entries(edit.note ?? {})) {
+    const { note: _, ...rest } = nodes[id] ?? {};
+    if (nodes[id]) nodes[id] = note.trim() ? { ...rest, note } : rest;
+  }
+  const edges = preset.edges
+    .filter(isEdge)
+    .filter(edge => !gone.has(edge.from) && !gone.has(edge.to) && !(edit.uncable ?? []).some(same(edge)));
+  for (const edge of edit.cable ?? []) if (!edges.some(same(edge))) edges.push({ from: edge.from, to: edge.to });
+  if (!layout) return { ...preset, nodes, edges };
+  const wired = new Set(edges.map(edge => `${edge.from}>${edge.to}`));
+  const sides = Object.fromEntries(
+    Object.entries(isObject(layout['sides']) ? layout['sides'] : {}).filter(([key]) => wired.has(key)),
+  );
+  return { ...preset, nodes, edges, layout: { ...layout, nodes: at, sides } };
+}
+
+/** The edit in words, e.g. "added Orders; cabled Web to Orders". */
+export function describeEdit(edit: BoardEdit, name: (id: string) => string = id => id): string {
+  const list = (ids: string[] = []) => ids.map(name).join(', ');
+  const cables = (edges: Edge[] = []) => edges.map(edge => `${name(edge.from)} to ${name(edge.to)}`).join(', ');
+  return [
+    edit.add?.length && `added ${list(edit.add)}`,
+    edit.remove?.length && `removed ${list(edit.remove)}`,
+    edit.cable?.length && `cabled ${cables(edit.cable)}`,
+    edit.uncable?.length && `took the cable off ${cables(edit.uncable)}`,
+    ...Object.entries(edit.branch ?? {}).map(([id, branch]) => `${name(id)} on ${branch}`),
+    ...Object.entries(edit.note ?? {}).map(([id, note]) =>
+      note.trim() ? `a note on ${name(id)}` : `no note on ${name(id)}`,
+    ),
+  ]
+    .filter(Boolean)
+    .join('; ');
+}

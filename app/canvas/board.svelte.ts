@@ -6,7 +6,15 @@ import { endOffsets, orderSlots, sidePoint, SIDES, type Box, type Cable } from '
 import { of as kindOf } from '../src/core/kinds.ts';
 import { isProtected, LOCAL_QUEUE_TYPES, queuesOf } from '../src/core/plan.ts';
 import { planTunnels, tunnelKind, type Tunnel } from '../src/core/ports.ts';
-import { check, migrate, VERSION as PRESET_VERSION, type StackFacts, type StoredPreset } from '../src/core/presets.ts';
+import {
+  check,
+  editPreset,
+  migrate,
+  VERSION as PRESET_VERSION,
+  type BoardEdit,
+  type StackFacts,
+  type StoredPreset,
+} from '../src/core/presets.ts';
 import type { Registry } from '../src/data.ts';
 import type { Loaded, SavedBoard } from './data.ts';
 import { toasts } from './toast.svelte.ts';
@@ -1410,6 +1418,29 @@ class Board {
   remove(id: string): void {
     this.nodes = this.nodes.filter(node => node.id !== id);
     this.edges = this.edges.filter(edge => edge.source !== id && edge.target !== id);
+  }
+
+  /** A change made from the terminal: on the board on screen as if made here, on another board where it is kept. Gives whether anything changed. */
+  edit(name: string, change: BoardEdit): boolean {
+    if (this.name !== name) {
+      const stored = this.own.find(one => one.name === name) ?? this.team.find(one => one.name === name);
+      if (!stored) return false;
+      const changed = { ...editPreset(stored, change), name };
+      if (JSON.stringify(changed) === JSON.stringify(stored)) return false;
+      const mine = this.own.some(one => one.name === name);
+      this.own = mine ? this.own.map(one => (one.name === name ? changed : one)) : [...this.own, changed];
+      return true;
+    }
+    const before = this.content();
+    const on = (id: string) => this.nodes.some(node => node.id === id);
+    for (const id of change.remove ?? []) this.remove(id);
+    for (const id of change.add ?? []) this.add(id);
+    for (const [id, branch] of Object.entries(change.branch ?? {})) this.set(id, { branch });
+    for (const [id, note] of Object.entries(change.note ?? {})) this.set(id, { note });
+    for (const { from, to } of change.uncable ?? []) this.cut(from, to);
+    for (const { from, to } of change.cable ?? [])
+      if (on(from) && on(to) && !this.edges.some(edge => edge.id === `${from}>${to}`)) this.connect(from, to);
+    return this.content() !== before;
   }
 
   #arranged = { key: '', version: 0 };

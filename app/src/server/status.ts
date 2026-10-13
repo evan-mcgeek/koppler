@@ -7,6 +7,7 @@ import { of as kindOf } from '../core/kinds.ts';
 import { readStack } from '../data.ts';
 import { linkedStatus } from '../engine/linked.ts';
 import { listenerPid } from '../engine/listen.ts';
+import { boardEdits } from '../engine/boards.ts';
 import { readMessages } from '../engine/messages.ts';
 import { recipesFor } from '../engine/recipes.ts';
 import { live, notes, runningEnvs, runningNames, runs } from '../engine/runs.ts';
@@ -230,6 +231,7 @@ async function snapshot(serving: boolean): Promise<Status> {
   status['linked'] = inUse ? linkedStatus(inUse) : null;
   status['live'] = live();
   status['messages'] = readMessages();
+  status['boardEdits'] = boardEdits();
   status['agent'] = agentState();
   // Sends, Stops and answers no session has taken yet.
   status['waiting'] = waiting();

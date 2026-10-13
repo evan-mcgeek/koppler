@@ -44,6 +44,7 @@ You can run these yourself too; the agent uses them to do its part.
 | `koppler switch <app> <branch> [--set-aside \| --take-along]` | Switch a clone to the board's branch; `--back` undoes it |
 | `koppler recipes [app] \| --remember <app> --why "..." \| --apply <app...>` | Remembered code changes: list them, keep the last edit, apply the matching ones |
 | `koppler listen take \| as <id> \| stop` | Wait for requests from the canvas; one agent session at a time |
+| `koppler board edit "<name>" [--add <app,...>] [--remove <app,...>] [--cable <caller>:<callee>]... [--uncable <caller>:<callee>]... [--branch <app>=<branch>]... [--note <app>="<note>"]...` | Change a board, even one open on the canvas: the canvas shows the change and keeps it; cards it does not touch stay put |
 | `koppler say` | Show a question or result on the canvas, with choices to press |
 
 ## Conventions

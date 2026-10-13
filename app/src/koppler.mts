@@ -17,6 +17,7 @@ import { discoverCommand } from './engine/discover.ts';
 import { down } from './engine/down.ts';
 import { investigate } from './engine/investigate.ts';
 import { discardChanges, linkStack, linkedStatus, proposeChanges, updateStack } from './engine/linked.ts';
+import { boardCommand } from './engine/boards.ts';
 import { listen } from './engine/listen.ts';
 import { sayCommand } from './engine/messages.ts';
 import { sh } from './engine/processes.ts';
@@ -473,6 +474,22 @@ const COMMANDS: Command[] = [
     about: 'wait for Sends from the canvas (one agent session at a time)',
     run: listen,
     example: 'koppler listen take',
+  },
+  {
+    name: 'board',
+    who: 'agent',
+    args: 'edit "<name>" [--add <app,...>] [--remove <app,...>] [--cable <caller>:<callee>]... [--uncable <caller>:<callee>]... [--branch <app>=<branch>]... [--note <app>="<note>"]...',
+    forms: [
+      [
+        'edit "<name>" [--add <app,...>] [--remove <app,...>]',
+        'put apps on a board or take them off; the cards already there keep their places',
+      ],
+      ['edit "<name>" [--cable <caller>:<callee>]... [--uncable <caller>:<callee>]...', 'add or take off cables'],
+      ['edit "<name>" [--branch <app>=<branch>]... [--note <app>="<note>"]...', "set an app's branch or note"],
+    ],
+    about: 'change a board, even one open on the canvas, which shows the change',
+    run: boardCommand,
+    example: 'koppler board edit "Checkout" --add orders-api --cable web:orders-api',
   },
   {
     name: 'say',

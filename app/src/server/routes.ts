@@ -5,6 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { readStack, writeData } from '../data.ts';
 import { applyFindings, current as currentFindingsStack, discover } from '../engine/discover.ts';
+import { editDone } from '../engine/boards.ts';
 import { discardChanges, linkStack, proposeChanges, updateStack } from '../engine/linked.ts';
 import { listenerPid } from '../engine/listen.ts';
 import { appendAnswer, appendMessage, clearMessages, readMessages, refusal } from '../engine/messages.ts';
@@ -163,6 +164,10 @@ export const ROUTES: Record<string, Route> = {
     const layout = sanitizeLayout(body);
     if (!layout) return { status: 400 };
     writeData('state', layout);
+    return { status: 204 };
+  },
+  '/board-edit-done': body => {
+    editDone(body['id']);
     return { status: 204 };
   },
   '/prompt': prompted,
