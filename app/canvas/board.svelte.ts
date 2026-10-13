@@ -43,6 +43,8 @@ export interface CardData extends Record<string, unknown> {
   libraries?: string[];
 }
 export type Changes = 'set-aside' | 'take-along';
+/** Below this zoom a card is drawn in its short form. */
+export const FAR_ZOOM = 0.6;
 /** A stack on this machine. */
 export interface KnownStack {
   dir: string;

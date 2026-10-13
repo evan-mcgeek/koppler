@@ -29,7 +29,8 @@
   .outside.selected,
   :global(.svelte-flow__node:focus-visible) .outside {
     outline: 2px solid var(--cable);
-    outline-offset: 3px;
+    /* On the border itself: one frame, not a ring around a frame. */
+    outline-offset: -1px;
   }
   .what {
     font-weight: 600;

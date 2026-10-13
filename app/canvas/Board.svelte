@@ -17,7 +17,7 @@
   import Outside from './Outside.svelte';
   import Queue from './Queue.svelte';
   import Tunnel from './Tunnel.svelte';
-  import { board, type CardNode, type InfraNode } from './board.svelte.ts';
+  import { board, FAR_ZOOM, type CardNode, type InfraNode } from './board.svelte.ts';
   import { ago, openBoard } from './boards.ts';
   import { live } from './live.svelte.ts';
   import { probes, type Job, type Probe } from './probes.svelte.ts';
@@ -175,13 +175,22 @@
           key: `${from}>${to}`,
           d: cablePath(start, sides[0], end, sides[1]),
           start,
-          head: `translate(${String(end.x + x * 10)} ${String(end.y + y * 10)}) rotate(${String((Math.atan2(-y, -x) * 180) / Math.PI)})`,
+          // No socket sits at this end: the tip touches the card's edge.
+          head: `translate(${String(end.x + x * 2)} ${String(end.y + y * 2)}) rotate(${String((Math.atan2(-y, -x) * 180) / Math.PI)})`,
           kind: queue ? (board.queues[queue] === 'local' ? 'msg local' : 'msg') : 'ext',
         },
       ];
     }),
   );
-  const arrange = () => {
+  const frame = () => new Promise(requestAnimationFrame);
+  const arrange = async () => {
+    // Zoomed out, cards are drawn in their short form, and the fit that follows may change the zoom and so the form.
+    // They are always placed by their full size: the board comes in close first, so that is what is measured.
+    if (viewport.current.zoom < FAR_ZOOM) {
+      await flow.setZoom(1, { duration: 0 });
+      await frame();
+      await frame();
+    }
     board.arrange();
     // The cards move first; the view follows once they are placed.
     requestAnimationFrame(() => void flow.fitView(FIT));
@@ -191,7 +200,7 @@
     const how = board.opened;
     if (!how || !board.nodes.every(node => node.measured?.width)) return;
     board.opened = null;
-    if (how === 'arrange') arrange();
+    if (how === 'arrange') void arrange();
     else requestAnimationFrame(() => void flow.fitView(FIT));
   });
 </script>
@@ -348,7 +357,7 @@
           </svg>
         </button>
         <span class="sep" aria-hidden="true"></span>
-        <button title="Arrange cards by who calls whom, callers on top" onclick={arrange}>Arrange</button>
+        <button title="Arrange cards by who calls whom, callers on top" onclick={() => void arrange()}>Arrange</button>
         <button title="Zoom to fit all apps (F)" onclick={() => void flow.fitView(FIT)}>Fit</button>
         <span class="sep" aria-hidden="true"></span>
         <div class="zoom" role="group" aria-label="Zoom">

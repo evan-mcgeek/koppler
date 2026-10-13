@@ -49,7 +49,8 @@
   .tunnel.selected,
   :global(.svelte-flow__node:focus-visible) .tunnel {
     outline: 2px solid var(--cable);
-    outline-offset: 3px;
+    /* On the border itself: one frame, not a ring around a frame. */
+    outline-offset: -1px;
   }
   .live {
     align-self: center;
