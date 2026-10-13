@@ -172,6 +172,11 @@ const [crashy, upA, upB, tunA, tunB, runA, runB, agentA, agentB, leftA, leftB] =
   assert.match(fs.readFileSync(path.join(dir, 'logs', 'a.log'), 'utf8'), new RegExp(`B_URL=http://localhost:${runB}\\b`));
   assert.match(fs.readFileSync(path.join(dir, 'history.jsonl'), 'utf8'), /"event":"done"/);
   assert.deepEqual(Object.keys(JSON.parse(fs.readFileSync(path.join(dir, 'live.json'), 'utf8')).nodes).sort(), ['a', 'b']);
+  // What happened since the last Stop is gathered on demand, for a bug report: the run, and its files on this Mac.
+  const session = koppler('history', '--session');
+  assert.equal(session.code, 0, session.out);
+  assert.match(session.out, /1 runs: 1 done\./);
+  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(dir, 'sessions', 'current', 'runs.json'), 'utf8')).map(run => run.id), ['run000010']);
   koppler('stop', '--all', '--yes');
 }
 // From the terminal or chat: every up is recorded as a run, added to what already runs, with its cables wired.

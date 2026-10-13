@@ -449,6 +449,14 @@ async function gatherSession(stop: Run): Promise<void> {
   }
 }
 
+/** `koppler history --session`: what happened since the last finished Stop, gathered for the agent to read. */
+export async function sessionCommand(): Promise<void> {
+  const { collectSession } = await import('./session.ts');
+  const dir = collectSession({ temp: temp(), logsDir: path.join(stateDir(), 'logs'), runs: runs() });
+  console.log(fs.readFileSync(path.join(dir, 'summary.md'), 'utf8').trimEnd());
+  console.log(`\nThe files are in ${dir}; they stay on this Mac.`);
+}
+
 /** `koppler history --done [<id>] [--failed <why>]`: the run ended, and the live state becomes what really runs from it. */
 export async function appliedCommand(args: string[]): Promise<void> {
   const failAt = args.indexOf('--failed');

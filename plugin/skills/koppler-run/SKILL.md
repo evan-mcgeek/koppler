@@ -1,6 +1,6 @@
 ---
 name: koppler-run
-description: Use when the user wants to connect this Claude Code session to the Koppler canvas ("/koppler-run connect", "disconnect"), or wants to run several apps or services of their stack locally, wired to each other, while the rest keeps calling a deployed environment, or says "koppler", "local stack", "run koppler with the X board", "run X locally against local Y", "point X at my local Y", or submits a graph from the Koppler canvas. In auto mode it applies the config changes and starts logins, tunnels and apps itself; in manual mode it hands over a per-app checklist. Not for deploying, debugging deployed services, or fetching secrets.
+description: Use when the user wants to connect this Claude Code session to the Koppler canvas ("/koppler-run connect", "disconnect"), wants to report what went wrong with Koppler ("/koppler-run feedback"), or wants to run several apps or services of their stack locally, wired to each other, while the rest keeps calling a deployed environment, or says "koppler", "local stack", "run koppler with the X board", "run X locally against local Y", "point X at my local Y", or submits a graph from the Koppler canvas. In auto mode it applies the config changes and starts logins, tunnels and apps itself; in manual mode it hands over a per-app checklist. Not for deploying, debugging deployed services, or fetching secrets.
 ---
 
 # Koppler
@@ -45,6 +45,17 @@ Koppler is a separate app that works without an agent; this skill drives it. It 
 - When the user raises a concern about the canvas ("this looked wrong", "it did X"), read `<state>/debug.jsonl` first: with Settings > Debug log on, it holds every click, change, shortcut, message and page error, each with a summary of the board. If it is empty, ask them to turn it on and repeat what happened.
 - **Report every Koppler bug as a GitHub issue.** When something is wrong with Koppler itself (the command, the canvas, the engine, this skill or its docs), file it on `evan-mcgeek/koppler` with a reproduction, scrubbed logs (`koppler status --debug`) and a possible fix, after the user agrees to the draft. Never work around one silently. See `references/reporting-bugs.md`.
 - Private findings and open questions go in `<state>/NOTES.md` (dated, one per line); facts about the apps go in `stack.json`.
+
+## Feedback
+
+When invoked with `feedback` (or the user asks to report what went wrong with Koppler):
+1. Gather the session: `koppler history --session` prints what happened since the last finished Stop (failed and left-over runs, page errors, messages the user saw, buttons clicked over and over, error lines in app logs) and says where the files are. Add `koppler status --debug` and what you yourself hit in this session: a command that failed, a step you worked around, an instruction here that was wrong or missing.
+2. Keep only problems with Koppler itself. What belongs to the user's own apps or to the stack's facts is left out: say so in one line and offer to fix `stack.json` as usual.
+3. Show a table, one row per problem: what went wrong, the evidence (the file and line, or the message), and whether it is reported already (`gh issue list -R evan-mcgeek/koppler --state all --search "<a few words>"`). Ask which rows to report.
+4. For each row the user picks, write one issue as `references/reporting-bugs.md` says, from scrubbed text only, and show it in full before it is filed. An existing issue gets a comment instead. Without `gh` or a GitHub login, give a prefilled link: `https://github.com/evan-mcgeek/koppler/issues/new?title=<title>&body=<body>`, both URL-encoded.
+5. Reply with the links, and what the user can do until each is fixed.
+
+The gathered files stay on the user's Mac: they have secrets masked but still name the user's apps. Nothing from them goes into an issue as is; an issue never holds a secret value or anything that names the user, their company or their stack.
 
 ## Session review (while Koppler itself is worked on)
 

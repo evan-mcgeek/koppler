@@ -47,6 +47,15 @@ test('a session is gathered after a full Stop, with what went wrong at a glance'
     fs.readFileSync(path.join(out, 'logs/api.log'), 'utf8'),
     /postgres:\/\/\*\*\*:\*\*\*@db\/orders refused/,
   );
+  // Without a Stop, what is still going on is gathered: everything after the last finished Stop.
+  const more = [...runs, { id: 'r9', at: '2026-01-01T11:00:00Z', kind: 'run', state: 'failed', reason: 'sign-in' }];
+  const now = collectSession({ temp: dir, logsDir: logs, runs: more });
+  assert.equal(path.basename(now), 'current');
+  assert.deepEqual(
+    JSON.parse(fs.readFileSync(path.join(now, 'runs.json'), 'utf8')).map((r: any) => r.id),
+    ['r9'],
+  );
+  assert.match(fs.readFileSync(path.join(now, 'summary.md'), 'utf8'), /Failed run r9: sign-in/);
   const summary = fs.readFileSync(path.join(out, 'summary.md'), 'utf8');
   assert.deepEqual(
     JSON.parse(fs.readFileSync(path.join(out, 'runs.json'), 'utf8')).map((r: any) => r.id),
