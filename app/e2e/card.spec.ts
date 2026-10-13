@@ -142,9 +142,7 @@ test.describe('a clone with uncommitted changes', () => {
     await expect(orders.getByLabel('Branch')).toHaveValue('fix/not-fetched-yet');
     await expect(choice.getByRole('radio', { name: 'Take along' })).toBeChecked();
     await page.getByRole('button', { name: 'Run', exact: true }).click();
-    await expect(page.getByRole('dialog')).toContainText(
-      'Your 3 uncommitted changes on main: taken along, back on Stop',
-    );
+    await expect(page.getByRole('dialog').getByLabel('3 uncommitted on main')).toHaveValue('take-along');
   });
 });
 

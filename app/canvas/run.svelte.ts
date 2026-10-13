@@ -45,6 +45,8 @@ const several = (count: number, one: string) => `${String(count)} ${one}${count 
 class Runs {
   /** The review on screen, waiting to be confirmed. */
   review = $state.raw<Review | null>(null);
+  /** The apps the user chose to run with no cable, in the review: it stops asking. */
+  onItsOwn = $state<Record<string, true>>({});
 
   /** What the board asks for, as the agent and the plan read it; with `restart`, only what runs, with that card's settings and cables from the board. */
   graph(restart?: string) {
@@ -242,17 +244,7 @@ class Runs {
           ? []
           : [{ text: node.data.branch || app.current || 'current branch', kind: 'host' as const }]),
         ...(app.dirty && onCurrent ? [{ text: `With your ${changes}`, kind: 'flag' as const }] : []),
-        ...(board.uncabled(id)
-          ? [{ text: 'Not cabled to any app here: it runs on its own', kind: 'flag' as const }]
-          : []),
-        ...(app.dirty && !onCurrent
-          ? [
-              {
-                text: `Your ${changes} on ${app.current}: ${node.data.changes === 'take-along' ? 'taken along' : 'set aside'}, back on Stop`,
-                kind: 'flag' as const,
-              },
-            ]
-          : []),
+
         // The remembered code changes this run applies: for this environment, or for a cable the app has here.
         ...(live.status?.recipes?.[id] ?? [])
           .filter(
