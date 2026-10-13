@@ -10,7 +10,7 @@
     onpick,
   }: {
     value: string;
-    /** The branch the clone is on: what an empty field means. */
+    /** The branch the clone is on, shown when no other is picked; empty when it is not known. */
     current: string;
     branches: string[];
     /** Its name for a screen reader and the debug log: the list is not part of it. */
@@ -57,8 +57,12 @@
     open = false;
     list?.hidePopover();
   };
+  // The branch the clone is on is kept as no choice at all, so the card follows the clone.
   const keep = (name: string) => {
-    if (name.trim() !== value) onpick(name.trim());
+    const typed = name.trim();
+    if (!typed && input) input.value = current;
+    if (typed === (value || current)) return;
+    onpick(typed === current ? '' : typed);
   };
   const pick = (name: string) => {
     if (input) input.value = name;
@@ -102,9 +106,9 @@
   aria-activedescendant={open && shown.length ? `${id}-${String(active)}` : undefined}
   autocomplete="off"
   spellcheck="false"
-  placeholder={current}
+  placeholder="current branch"
   {title}
-  {value}
+  value={value || current}
   onclick={show}
   onblur={ev => {
     keep(ev.currentTarget.value);

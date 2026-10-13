@@ -234,3 +234,29 @@ test.describe('cards stacked in a column', () => {
     expect(await top('payments')).toBe(under);
   });
 });
+
+test.describe('a card on the branch its clone is on', () => {
+  test.use({
+    board: {
+      env: 'qa',
+      mode: 'auto',
+      zoom: 1,
+      pan: { x: 120, y: 80 },
+      nodes: { orders: { x: 0, y: 0, run: 'cli', branch: '' } },
+      edges: [],
+    },
+  });
+
+  test("shows that branch's name as its value, and picking it again keeps following the clone", async ({ page }) => {
+    const field = card(page, 'orders').getByLabel('Branch');
+    await expect(field).toHaveValue('main');
+    await field.click();
+    await field.blur();
+    await field.fill('feature/checkout');
+    await field.press('Enter');
+    await expect(field).toHaveValue('feature/checkout');
+    await field.fill('');
+    await field.blur();
+    await expect(field).toHaveValue('main');
+  });
+});
