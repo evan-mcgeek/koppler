@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Cog from './Cog.svelte';
   import Command from './Command.svelte';
   import { SvelteFlowProvider } from '@xyflow/svelte';
   import { tick, untrack } from 'svelte';
@@ -16,6 +17,7 @@
   import Menu from './Menu.svelte';
   import Rail from './Rail.svelte';
   import AddOutside from './AddOutside.svelte';
+  import SettingsPanel from './SettingsPanel.svelte';
   import Repos from './Repos.svelte';
   import Review from './Review.svelte';
   import { runs } from './run.svelte.ts';
@@ -257,6 +259,15 @@
   <span class="title">Koppler</span>
   {#if board.stack}
     <StackPicker />
+    <button
+      class="side-toggle gear"
+      type="button"
+      aria-label="Stack settings"
+      title="Stack settings: its environments, apps, queues, sign-ins and team boards"
+      onclick={() => void dialogs.settings?.open({ title: `${board.stack} settings`, path: '' })}
+    >
+      <Cog size={16} />
+    </button>
     <span class="env" class:prod={board.protected}>{board.env.toUpperCase()}</span>
   {/if}
   <span class="spacer"></span>
@@ -359,6 +370,7 @@
 <Setup bind:this={dialogs.setup} />
 <Repos bind:this={dialogs.repos} />
 <AddOutside bind:this={dialogs.outside} />
+<SettingsPanel bind:this={dialogs.settings} />
 <Findings bind:this={dialogs.findings} />
 <Checklist bind:this={dialogs.checklist} />
 <dialog bind:this={noting} class="noting" aria-labelledby="noting-title" onclose={() => (note = '')}>
@@ -584,6 +596,9 @@
     fill: none;
     stroke: currentColor;
     stroke-width: 1.4;
+  }
+  .gear {
+    margin: 0 0 0 -8px;
   }
   .side-toggle[aria-expanded='true'] path {
     stroke-width: 2.6;

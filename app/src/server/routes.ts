@@ -19,6 +19,7 @@ import {
   currentStack,
   forgetStacks,
   removeApp,
+  refreshRegistry,
   saveStack,
   stackSource,
   useStack,
@@ -216,8 +217,11 @@ export const ROUTES: Record<string, Route> = {
   '/stack-edit': body => {
     const at = typeof body['path'] === 'string' ? body['path'] : '';
     const result = editStack(at, body['unset'] === true ? undefined : [body['value']]);
+    if (result.error !== undefined) return { status: 400, body: result };
+    // One field: the registry is copied again on the spot, without a full sync.
+    refreshRegistry();
     forgetStacks();
-    return refused(result) ?? reload('The stack changed, but reloading it failed: run koppler sync', result);
+    return { status: 200, body: result };
   },
   // The canvas's lock on a field: the person's own click, so it locks and unlocks.
   '/stack-lock': body => {

@@ -93,6 +93,8 @@ interface Status {
   agent?: { state?: string };
   /** Changes made to boards from the terminal that this page has not made on its copy yet. */
   boardEdits?: { id: string; board: string; edit: BoardEdit }[];
+  /** The stack's fields locked on this Mac, as paths. */
+  locks?: string[];
   /** What the agent said: questions, results and failures, oldest first. */
   messages?: Message[];
   /** The requests no agent session has taken yet, oldest first, and how many they are. */

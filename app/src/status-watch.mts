@@ -8,6 +8,8 @@ import http from 'node:http';
 import type { AddressInfo } from 'node:net';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import * as z from 'zod';
+import { StackSchema } from './core/stack.ts';
 import { readData, type DataName } from './data.ts';
 import { CODE, LOGS, STATE, TEMP } from './paths.ts';
 import { tail } from './server/logs.ts';
@@ -113,6 +115,13 @@ function servePage(what: string, url: URL, res: Response): void {
     const text = tail(file, 2 * 1024 * 1024, 2000);
     const headers = { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' };
     res.writeHead(text === null ? 404 : 200, headers).end(text ?? '');
+    return;
+  }
+  // The shape of a stack, for the settings panels: every field they show comes from it.
+  if (what === 'data/stack-schema.json') {
+    res
+      .writeHead(200, JSON_HEADERS)
+      .end(JSON.stringify(z.toJSONSchema(StackSchema, { unrepresentable: 'any', io: 'input' })));
     return;
   }
   if (what === 'data/status.json') {

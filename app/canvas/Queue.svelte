@@ -1,6 +1,8 @@
 <script lang="ts">
+  import Cog from './Cog.svelte';
   import type { NodeProps } from '@xyflow/svelte';
   import { board, type QueueNode } from './board.svelte.ts';
+  import { dialogs } from './dialogs.svelte.ts';
 
   const { data, selected }: NodeProps<QueueNode> = $props();
   const env = $derived(board.env.toUpperCase());
@@ -9,6 +11,15 @@
 <div class="queue" class:local={data.local} class:selected title={data.about.join('\n')}>
   <span class="what">{data.name}</span>
   <span class="kind">{data.kind}</span>
+  <button
+    class="hide nodrag"
+    type="button"
+    aria-label="Settings for {data.name}"
+    title="Settings: the queue's name and its queue on each environment"
+    onclick={() => void dialogs.settings?.open({ title: data.name, path: `queues.${data.queue}` })}
+  >
+    <Cog size={13} />
+  </button>
   <button
     class="hide nodrag"
     type="button"
@@ -52,7 +63,7 @@
 <style>
   .queue {
     display: grid;
-    grid-template-columns: 1fr auto auto;
+    grid-template-columns: 1fr auto auto auto;
     column-gap: 8px;
     row-gap: 3px;
     align-items: baseline;

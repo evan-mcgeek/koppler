@@ -499,6 +499,14 @@ export function saveStack(source: string, before: unknown, next: unknown): { err
   return null;
 }
 
+/** Copies the stack file in use to the canvas's registry again, keeping what the last sync found: a quick reload after one field changed. */
+export function refreshRegistry(): void {
+  const source = stackSource();
+  const registry = readData('registry');
+  const stack = source ? readJson<StackFile>(source) : null;
+  if (source && registry && stack) writeData('registry', { ...stack, source, found: registry['found'] });
+}
+
 /** What the stack in use holds at a path (the whole stack without one). */
 export function readStackAt(
   pathText = '',

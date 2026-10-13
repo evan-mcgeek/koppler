@@ -30,28 +30,36 @@ const PORT = 'a port number from 1 to 65535';
 /** Something an app needs before it can run: a tunnel, a sign-in, a hosts entry. */
 const Prereq = z.looseObject(
   {
-    tunnel: host.optional(),
+    tunnel: host.optional().describe('The host the tunnel reaches, such as a database'),
     // A number: it reaches the page, shell commands and the port probe.
-    port: z.number({ error: PORT }).int(PORT).min(1, PORT).max(65535, PORT).optional(),
+    port: z
+      .number({ error: PORT })
+      .int(PORT)
+      .min(1, PORT)
+      .max(65535, PORT)
+      .optional()
+      .describe('The local port it opens'),
     /** The app's setting that holds the tunnel's address. */
-    env: setting.optional(),
-    what: z.string().optional(),
+    env: setting.optional().describe("The app's setting that holds the tunnel's address"),
+    what: z.string().optional().describe('What it is, in words: Database (Postgres)'),
     /** The name the app dials, when that is not the tunnel's host. */
-    connectsAs: host.optional(),
-    hosts: host.optional(),
-    sso: matching(NAME, 'an AWS profile name').optional(),
+    connectsAs: host.optional().describe('The name the app dials, when that is not the host'),
+    hosts: host.optional().describe('A name to point at this Mac in /etc/hosts'),
+    sso: matching(NAME, 'an AWS profile name').optional().describe('The AWS profile to be signed in with'),
     /** The AWS account that profile must be signed in to. */
-    account: matching(/^\d{12}$/, 'a 12-digit AWS account id').optional(),
+    account: matching(/^\d{12}$/, 'a 12-digit AWS account id')
+      .optional()
+      .describe('The AWS account that profile must be in'),
     /** A sign-in of the stack's own, by its name under `signIns`. */
-    signIn: matching(NAME, 'the name of a sign-in').optional(),
+    signIn: matching(NAME, 'the name of a sign-in').optional().describe('A sign-in of the stack, by its name'),
   },
   { error: 'an object: a tunnel, a sign-in or another need' },
 );
 const Secret = z.looseObject(
   {
     /** The setting the stored value is given to the app as. */
-    env: setting.optional(),
-    type: z.string().optional(),
+    env: setting.optional().describe('The setting the stored value is given to the app as'),
+    type: z.string().optional().describe('postgres, mysql or redis, so it can be tested'),
   },
   { error: 'an object' },
 );
@@ -94,17 +102,20 @@ const EnvOverlay = z.looseObject(
 );
 const App = z.looseObject(
   {
-    name: required,
-    kind: required,
+    name: required.describe('Its name on the canvas'),
+    kind: required.describe('What it is built with: dotnet, node, web, flutter, lambda, other'),
     /** Its repo: owner/repo, or host/path/to/repo. An outside system has none. */
-    slug: matching(SLUG, 'owner/repo, or host/path/to/repo').optional(),
+    slug: matching(SLUG, 'owner/repo, or host/path/to/repo').optional().describe('Its repo: owner/repo'),
     /** Set for a system that is never run locally (a SaaS), to what it is. */
-    outside: z.union([z.string(), z.boolean()]).optional(),
+    outside: z
+      .union([z.string(), z.boolean()])
+      .optional()
+      .describe('Set for a system that never runs here, to what it is'),
     /** Where it answers when it runs on this machine. */
-    url: z.string().optional(),
-    deployedUrl: z.string().optional(),
+    url: z.string().optional().describe('Where it answers when it runs on this Mac'),
+    deployedUrl: z.string().optional().describe('Where the deployed one answers'),
     /** The shell command that starts it, run in its clone. */
-    start: start.optional(),
+    start: start.optional().describe('The shell command that starts it, run in its repo'),
     /** When it is ready: a GET of this path on its `url` answers, with this status when one is given. */
     ready: z
       .looseObject(
@@ -115,33 +126,70 @@ const App = z.looseObject(
         },
         { error: 'an object with a path' },
       )
-      .optional(),
-    prereqs: z.array(Prereq, { error: 'a list' }).optional(),
-    secrets: z.array(Secret, { error: 'a list' }).optional(),
-    consumes: z.record(z.string(), Call, { error: 'an object' }).optional(),
-    publishes: z.record(z.string(), z.unknown(), { error: 'an object' }).optional(),
-    reads: z.record(z.string(), z.unknown(), { error: 'an object' }).optional(),
-    envs: z.record(z.string(), EnvOverlay, { error: 'an object' }).optional(),
-    localChanges: z.array(LocalChange, { error: LOCAL_CHANGE }).optional(),
+      .optional()
+      .describe('When it is ready: this path answers on its url, with this status'),
+    prereqs: z
+      .array(Prereq, { error: 'a list' })
+      .optional()
+      .describe('What it needs first: tunnels, sign-ins, hosts entries'),
+    secrets: z
+      .array(Secret, { error: 'a list' })
+      .optional()
+      .describe('The secrets it needs, by name; values stay in your keychain'),
+    consumes: z
+      .record(z.string(), Call, { error: 'an object' })
+      .optional()
+      .describe('The apps it calls, and how it finds each'),
+    publishes: z.record(z.string(), z.unknown(), { error: 'an object' }).optional().describe('The queues it sends to'),
+    reads: z.record(z.string(), z.unknown(), { error: 'an object' }).optional().describe('The queues it reads from'),
+    envs: z
+      .record(z.string(), EnvOverlay, { error: 'an object' })
+      .optional()
+      .describe('What differs on another environment; a list given here replaces the one above'),
+    localChanges: z
+      .array(LocalChange, { error: LOCAL_CHANGE })
+      .optional()
+      .describe('Code changes made for a local run and undone on Stop'),
     /** .NET: the project to run, its launch settings file, and the profile to start from. */
-    project: z.string().optional(),
-    launchSettings: z.string().optional(),
-    baseProfile: z.string().optional(),
+    project: z.string().optional().describe('.NET: the project to run'),
+    launchSettings: z.string().optional().describe('.NET: its launch settings file'),
+    baseProfile: z.string().optional().describe('.NET: the launch profile to start from'),
     /** Node and web: the package.json script, when it is not `dev` or `start`. */
-    script: z.string().optional(),
+    script: z.string().optional().describe('Node and web: the package.json script, when not dev or start'),
     flutter: z
-      .looseObject({ fvm: z.boolean().optional(), flavor: z.boolean().optional(), defineFile: z.string().optional() })
-      .optional(),
-    mobile: z.looseObject({ iosBundleId: z.string().optional(), androidPackage: z.string().optional() }).optional(),
-    lambda: z.looseObject({ handler: z.string().optional(), runtime: z.string().optional() }).optional(),
+      .looseObject({
+        fvm: z.boolean().optional(),
+        flavor: z.boolean().optional(),
+        defineFile: z.string().optional(),
+      })
+      .optional()
+      .describe('Flutter: fvm, flavor, the --dart-define file'),
+    mobile: z
+      .looseObject({
+        iosBundleId: z.string().optional(),
+        androidPackage: z.string().optional(),
+      })
+      .optional()
+      .describe('The app ids on iOS and Android'),
+    lambda: z
+      .looseObject({
+        handler: z.string().optional(),
+        runtime: z.string().optional(),
+      })
+      .optional()
+      .describe('Lambda: handler and runtime'),
     sam: z
       .looseObject({
         template: z.string().optional(),
         envs: z.record(z.string(), z.union([z.string(), z.array(z.string())])).optional(),
       })
-      .optional(),
+      .optional()
+      .describe('SAM: template, and the stack per environment'),
     /** The setting (or settings) that lists the browser origins this API allows. */
-    cors: z.looseObject({ env: z.union([z.string(), z.array(z.string())]).optional() }).optional(),
+    cors: z
+      .looseObject({ env: z.union([z.string(), z.array(z.string())]).optional() })
+      .optional()
+      .describe('The setting that lists the browser origins it allows'),
   },
   { error: 'an object' },
 );
