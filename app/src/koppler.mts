@@ -24,7 +24,7 @@ import { queryCommand } from './engine/query.ts';
 import { recipesCommand } from './engine/recipes.ts';
 import { findCommand } from './engine/research.ts';
 import { run } from './engine/run.ts';
-import { appliedCommand, historyCommand, planCommand, runningNames } from './engine/runs.ts';
+import { appliedCommand, historyCommand, planCommand, runningNames, sessionCommand } from './engine/runs.ts';
 import {
   addApps,
   candidateRepos,
@@ -181,6 +181,10 @@ function plan(args: string[]): void {
 
 /** A run's history; --done marks one finished, which makes its board what runs. */
 async function history(args: string[]): Promise<void> {
+  if (args.includes('--session')) {
+    await sessionCommand();
+    return;
+  }
   if (!args.includes('--done')) {
     historyCommand(args);
     return;
@@ -332,8 +336,8 @@ const COMMANDS: Command[] = [
   {
     name: 'history',
     who: 'you',
-    args: '[--json] | --done [<id>] [--failed "<why>"]',
-    about: 'recent Sends and Stops; --done marks a run finished',
+    args: '[--json] | --session | --done [<id>] [--failed "<why>"]',
+    about: 'recent Sends and Stops; --session gathers what happened since the last Stop; --done marks a run finished',
     run: history,
     example: 'koppler history',
   },

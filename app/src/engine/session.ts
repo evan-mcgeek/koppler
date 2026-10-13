@@ -45,7 +45,7 @@ const indented = (text: string) =>
     .map(line => `  ${line.trim()}`)
     .join('\n');
 
-/** Gathers the session in a folder and returns it. The session is every run after the previous finished Stop, up to and with this one. */
+/** Gathers the session in a folder and returns it. The session is every run after the previous finished Stop, up to and with this one, or up to now. */
 export function collectSession({
   temp,
   logsDir,
@@ -54,16 +54,19 @@ export function collectSession({
 }: {
   temp: string;
   logsDir: string;
-  stop: { id: string };
+  /** The Stop that ended it; without one, the session still going on is gathered, into `current`. */
+  stop?: { id: string } | undefined;
   runs: SessionRun[];
 }): string {
-  const at = runs.findIndex(run => run.id === stop.id);
-  const before = runs.slice(0, at).findLastIndex(run => run.kind === 'stop' && run.state === 'done');
+  const at = stop ? runs.findIndex(run => run.id === stop.id) : runs.length - 1;
+  const before = runs.slice(0, stop ? at : at + 1).findLastIndex(run => run.kind === 'stop' && run.state === 'done');
   const session = runs.slice(before + 1, at + 1);
   const from = session[0]?.at ?? '';
   const to = new Date().toISOString();
   const inRange = (entry: Entry) => (entry.at ?? '') >= from && (entry.at ?? '') <= to;
-  const dir = path.join(temp, 'sessions', stop.id);
+  const dir = path.join(temp, 'sessions', stop?.id ?? 'current');
+  // What is going on is gathered afresh each time: nothing of an earlier look stays behind.
+  if (!stop) fs.rmSync(dir, { recursive: true, force: true });
   fs.mkdirSync(path.join(dir, 'logs'), { recursive: true });
   const write = (name: string, body: string) => {
     fs.writeFileSync(path.join(dir, name), body, { mode: 0o600 });
