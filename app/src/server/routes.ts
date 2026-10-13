@@ -20,6 +20,7 @@ import {
   forgetStacks,
   removeApp,
   refreshRegistry,
+  replaceStack,
   saveStack,
   stackSource,
   useStack,
@@ -222,6 +223,14 @@ export const ROUTES: Record<string, Route> = {
     refreshRegistry();
     forgetStacks();
     return { status: 200, body: result };
+  },
+  // A settings panel's Save: the whole edited stack, checked and written at once, or refused with each problem.
+  '/stack-save': body => {
+    const result = replaceStack(body['stack']);
+    if (result.error !== undefined) return { status: 400, body: result };
+    refreshRegistry();
+    forgetStacks();
+    return { status: 200, body: { ok: true } };
   },
   // The canvas's lock on a field: the person's own click, so it locks and unlocks.
   '/stack-lock': body => {

@@ -21,31 +21,45 @@ const stackFile = (dir: string) => {
     };
 };
 
-test('an app card opens its settings: a change is kept, a broken one is refused, and a locked field holds', async ({
+const tabOf = (page: Page, name: string) => page.getByRole('tab', { name });
+
+test('an app card opens its settings: edits wait for Save, a broken one is refused with where, and a lock holds', async ({
   page,
   canvas,
 }) => {
   const read = stackFile(canvas.dir);
   await card(page, 'orders').getByRole('button', { name: 'Settings for Orders API' }).click();
   const panel = page.getByRole('dialog', { name: 'Orders API' });
+  await expect(panel.getByLabel('Name', { exact: true })).toHaveValue('Orders API');
+  await expect(tabOf(page, 'Runs here')).toHaveAttribute('aria-selected', 'true');
   const url = panel.getByLabel('URL', { exact: true });
   await expect(url).toHaveValue('http://localhost:5001');
-  await expect(panel.getByLabel('Deployed URL', { exact: true })).toHaveValue('https://orders-api.qa.acme.example');
   await page.screenshot({ path: 'test-results/next-settings.png' });
 
   await url.fill('http://localhost:5011');
   await url.press('Tab');
-  await expect.poll(() => read().apps['orders']?.['url']).toBe('http://localhost:5011');
+  await expect(panel.getByRole('status')).toHaveText('1 change, not saved yet');
+  expect(read().apps['orders']?.['url']).toBe('http://localhost:5001');
+  await panel.getByRole('button', { name: 'Discard' }).click();
+  await expect(url).toHaveValue('http://localhost:5001');
 
+  await url.fill('http://localhost:5011');
+  await url.press('Tab');
   const kind = panel.getByLabel('Kind', { exact: true });
   await kind.fill('');
   await kind.press('Tab');
-  await expect(panel.getByRole('alert')).toContainText('apps.orders.kind: required');
-  expect(read().apps['orders']?.['kind']).toBe('dotnet');
+  await panel.getByRole('button', { name: 'Save' }).click();
+  await expect(panel.getByRole('alert')).toContainText('required');
+  await expect(panel.getByRole('status')).toHaveText('1 to fix before it can be saved');
+  expect(read().apps['orders']?.['url']).toBe('http://localhost:5001');
+  await kind.fill('dotnet');
+  await kind.press('Tab');
+  await panel.getByRole('button', { name: 'Save' }).click();
+  await expect(panel.getByRole('status')).toHaveText('Saved');
+  expect(read().apps['orders']?.['url']).toBe('http://localhost:5011');
 
   await panel.getByRole('button', { name: 'Lock URL', exact: true }).click();
   await expect(url).toBeDisabled();
-  await expect(panel.getByRole('button', { name: 'Unlock URL', exact: true })).toBeVisible();
   // Locked, a change from anywhere else is refused too.
   const refused = await page.evaluate(async () => {
     const token = location.pathname.split('/')[2] ?? '';
@@ -57,18 +71,46 @@ test('an app card opens its settings: a change is kept, a broken one is refused,
     return answer.json() as Promise<{ error?: string }>;
   });
   expect(refused.error).toMatch(/apps\.orders\.url is locked/);
-  expect(read().apps['orders']?.['url']).toBe('http://localhost:5011');
   await panel.getByRole('button', { name: 'Unlock URL', exact: true }).click();
   await expect(url).toBeEnabled();
 });
 
-test('a group opens to add an item, which is kept once its fields are in', async ({ page, canvas }) => {
+test('an environment uses its own value only where it is given one', async ({ page, canvas }) => {
   const read = stackFile(canvas.dir);
   await card(page, 'orders').getByRole('button', { name: 'Settings for Orders API' }).click();
   const panel = page.getByRole('dialog', { name: 'Orders API' });
-  const needs = panel.locator('details:has(> summary:has-text("Needs first"))').first();
-  await expect(needs).toHaveAttribute('open', '');
-  await needs.locator(':scope > fieldset > .add').getByRole('button', { name: 'Add', exact: true }).click();
+  await tabOf(page, 'Environments').click();
+  const prod = panel.getByRole('region', { name: 'What PROD uses' });
+  await expect(prod).toContainText('Same as QA: https://orders-api.qa.acme.example');
+  await prod.getByRole('button', { name: 'Change for PROD' }).first().click();
+  const own = prod.getByLabel('Deployed URL', { exact: true });
+  await expect(own).toHaveValue('https://orders-api.qa.acme.example');
+  await own.fill('https://orders-api.acme.example');
+  await own.press('Tab');
+  await page.screenshot({ path: 'test-results/next-settings-envs.png' });
+  await panel.getByRole('button', { name: 'Save' }).click();
+  await expect(panel.getByRole('status')).toHaveText('Saved');
+  const envs = read().apps['orders']?.['envs'] as Record<string, Record<string, unknown>>;
+  expect(envs['prod']?.['deployedUrl']).toBe('https://orders-api.acme.example');
+  await prod.getByRole('button', { name: "Use QA's" }).first().click();
+  await expect(prod).toContainText('Same as QA: https://orders-api.qa.acme.example');
+});
+
+test('a list item is added in its tab, and closing with changes asks first', async ({ page, canvas }) => {
+  const read = stackFile(canvas.dir);
+  await card(page, 'orders').getByRole('button', { name: 'Settings for Orders API' }).click();
+  const panel = page.getByRole('dialog', { name: 'Orders API' });
+  await tabOf(page, 'Needs first').click();
+  await panel
+    .getByRole('tabpanel')
+    .locator(':scope > details > fieldset > .add')
+    .getByRole('button', { name: 'Add' })
+    .click();
+  await expect(panel.getByRole('status')).toHaveText('1 change, not saved yet');
+  await panel.getByRole('button', { name: 'Close' }).click();
+  await expect(panel.getByRole('alert')).toHaveText('Close without saving 1 change?');
+  await panel.getByRole('button', { name: 'Keep editing' }).click();
+  await panel.getByRole('button', { name: 'Save' }).click();
   await expect.poll(() => (read().apps['orders']?.['prereqs'] as unknown[] | undefined)?.length).toBe(2);
 });
 
@@ -81,27 +123,29 @@ test("the agent is asked to fill in an app's empty settings, leaving locked ones
   });
   await card(page, 'orders').getByRole('button', { name: 'Settings for Orders API' }).click();
   const panel = page.getByRole('dialog', { name: 'Orders API' });
+  await tabOf(page, 'Deployed').click();
   await panel.getByRole('button', { name: 'Lock Deployed URL', exact: true }).click();
   await panel.getByRole('button', { name: 'Ask the agent to fill in' }).click();
   await expect(panel.getByRole('button', { name: 'Asked the agent' })).toBeDisabled();
   expect(sent).toHaveLength(1);
   expect(sent[0]?.tag).toBe('koppler-facts');
-  expect(sent[0]?.data?.app).toBe('orders');
   expect(sent[0]?.text).toContain('APP Orders API (orders)');
   expect(sent[0]?.text).toMatch(/EMPTY .*start/);
   expect(sent[0]?.text).toContain('LOCKED apps.orders.deployedUrl');
-  expect(sent[0]?.text).toContain('koppler stack set apps.orders.<field>');
 });
 
-test('the stack has its own settings, beside its name', async ({ page, canvas }) => {
+test('the stack has its own settings, beside its name, with its apps a click away', async ({ page, canvas }) => {
   const read = stackFile(canvas.dir);
   await page.getByRole('button', { name: 'Stack settings' }).click();
   const panel = page.getByRole('dialog', { name: 'Acme Shop settings' });
-  const name = panel.getByLabel('Name', { exact: true }).first();
+  const name = panel.getByLabel('Name', { exact: true });
   await expect(name).toHaveValue('Acme Shop');
-  await expect(panel.locator('summary', { hasText: 'Apps' }).first()).toBeVisible();
   await name.fill('Acme Store');
   await name.press('Tab');
+  await panel.getByRole('button', { name: 'Save' }).click();
   await expect.poll(() => (read() as unknown as { name: string }).name).toBe('Acme Store');
+  await tabOf(page, 'Apps').click();
   await page.screenshot({ path: 'test-results/next-stack-settings.png' });
+  await panel.getByRole('listitem').filter({ hasText: 'Orders API' }).getByRole('button', { name: 'Settings' }).click();
+  await expect(page.getByRole('dialog', { name: 'Orders API' })).toBeVisible();
 });

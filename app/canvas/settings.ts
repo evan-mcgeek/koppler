@@ -19,6 +19,8 @@ export interface Ctx {
   lock: (path: string, on: boolean) => void;
   /** The keys a table can take, when they come from the stack (apps, environments, queues); null for any. */
   keys: (path: string) => string[] | null;
+  /** What the last Save found wrong right here, if anything. */
+  problem?: (path: string) => string | undefined;
 }
 
 export type Kind = 'text' | 'number' | 'switch' | 'choice' | 'group' | 'table' | 'list' | 'json';
@@ -107,3 +109,100 @@ export function label(key: string, top = false): string {
 /** Locked here, or inside a group that is. */
 export const lockedBy = (locks: string[], path: string) =>
   locks.some(lock => path === lock || path.startsWith(`${lock}.`) || path.startsWith(`${lock}[`));
+
+/** A tab of a settings panel: the fields it holds, by key, and how it is shown. */
+export interface Tab {
+  name: string;
+  keys: string[];
+  /** A view of its own: what each environment uses, or the stack's apps. */
+  view?: 'envs' | 'apps';
+}
+/** An app's settings: what it is, above the tabs; then how it runs here, where it is deployed, and the rest. */
+export const APP_HEAD = ['name', 'kind', 'slug'];
+/** The fields for how one kind of app starts; an app is shown its own kind's, the others are a click away. */
+export const BY_KIND: Record<string, string[]> = {
+  dotnet: ['project', 'launchSettings', 'baseProfile'],
+  node: ['script'],
+  web: ['script'],
+  flutter: ['flutter', 'mobile'],
+  lambda: ['lambda', 'sam'],
+};
+export const KIND_FIELDS = [...new Set(Object.values(BY_KIND).flat())];
+export const APP_TABS: Tab[] = [
+  {
+    name: 'Runs here',
+    keys: [
+      'start',
+      'url',
+      'ready',
+      'project',
+      'launchSettings',
+      'baseProfile',
+      'script',
+      'flutter',
+      'mobile',
+      'lambda',
+      'sam',
+      'localChanges',
+    ],
+  },
+  { name: 'Deployed', keys: ['deployedUrl', 'cors', 'outside'] },
+  { name: 'Calls', keys: ['consumes', 'publishes', 'reads'] },
+  { name: 'Needs first', keys: ['prereqs'] },
+  { name: 'Secrets', keys: ['secrets'] },
+  { name: 'Environments', keys: ['envs'], view: 'envs' },
+];
+/** An outside system never runs here: only where it is, what it calls, and per environment. */
+export const OUTSIDE_TABS: Tab[] = [
+  { name: 'Deployed', keys: ['outside', 'deployedUrl'] },
+  { name: 'Calls', keys: ['consumes'] },
+  { name: 'Environments', keys: ['envs'], view: 'envs' },
+];
+export const STACK_HEAD = ['name'];
+export const STACK_TABS: Tab[] = [
+  { name: 'Environments', keys: ['envs', 'protected', 'envAliases'] },
+  { name: 'Apps', keys: ['apps'], view: 'apps' },
+  { name: 'Queues', keys: ['queues'] },
+  { name: 'Sign-ins', keys: ['signIns'] },
+  { name: 'Checks', keys: ['checks'] },
+  { name: 'Kinds', keys: ['kinds'] },
+  { name: 'Team boards', keys: ['presets'] },
+];
+/** The fields an environment of an app most often uses its own value for; any other can be added. */
+export const ENV_FIELDS = ['deployedUrl', 'start', 'prereqs', 'secrets'];
+
+/** Problems the stack check found, by the place each is about: "apps.orders.kind: required". */
+export function problemsByPath(problems: string[]): Map<string, string> {
+  const found = new Map<string, string>();
+  for (const problem of problems) {
+    const at = problem.indexOf(': ');
+    if (at > 0) found.set(problem.slice(0, at), problem.slice(at + 2));
+  }
+  return found;
+}
+/** Whether a place is this path or lies inside it. */
+export const within = (place: string, path: string) =>
+  !path || place === path || place.startsWith(`${path}.`) || place.startsWith(`${path}[`);
+
+/** A value in a few words, for what an environment takes from the first one. */
+export function summary(value: unknown): string {
+  if (value === undefined) return 'not set';
+  if (typeof value === 'string') return value;
+  if (Array.isArray(value))
+    return value.length ? value.map((item, at) => itemName(item, `#${String(at + 1)}`)).join(', ') : 'none';
+  if (typeof value === 'object' && value !== null) return Object.keys(value).join(', ') || 'empty';
+  return JSON.stringify(value);
+}
+
+/** How many fields differ between two stacks: each value that changed, was added or was taken out counts once. */
+export function changes(a: unknown, b: unknown): number {
+  const isTree = (one: unknown) => typeof one === 'object' && one !== null;
+  if (!isTree(a) || !isTree(b) || Array.isArray(a) !== Array.isArray(b))
+    return JSON.stringify(a) === JSON.stringify(b) ? 0 : 1;
+  const left = a as Record<string, unknown>;
+  const right = b as Record<string, unknown>;
+  return [...new Set([...Object.keys(left), ...Object.keys(right)])].reduce(
+    (sum, key) => sum + changes(left[key], right[key]),
+    0,
+  );
+}
