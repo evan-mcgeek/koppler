@@ -110,6 +110,8 @@ export function runRecord(prompt: Prompt | null | undefined): RunRecord | null {
         ...(node.platform && { platform: text(node.platform, 16) }),
         ...(node.note && { note: text(node.note, 4000) }),
         ...(node.tunnels === false && { tunnels: false }),
+        ...(node.queues === false && { queues: false }),
+        ...(node.restart && { restart: true }),
         ...(['set-aside', 'take-along'].includes(node.changes ?? '') && { changes: node.changes }),
         ...(node.libraries?.length && {
           libraries: node.libraries.filter(library => LIBRARY.test(library)).slice(0, 20),

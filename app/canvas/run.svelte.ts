@@ -165,8 +165,15 @@ class Runs {
    * Run: the review of what the board asks for, sent when confirmed. With a note it goes to the agent first; as a
    * checklist the agent changes nothing and lists the steps.
    */
-  start({ note, manual = false }: { note?: string; manual?: boolean } = {}): void {
-    const graph = { ...this.graph(), mode: manual ? 'manual' : 'auto', ...(note && { note }) };
+  start({ note, manual = false, restart }: { note?: string; manual?: boolean; restart?: string } = {}): void {
+    const asked = this.graph();
+    const graph = {
+      ...asked,
+      // One app asked to start again: it keeps its cables and settings, as the rest keeps running.
+      nodes: asked.nodes.map(node => (node.id === restart ? { ...node, restart: true as const } : node)),
+      mode: manual ? 'manual' : 'auto',
+      ...(note && { note }),
+    };
     if (!graph.nodes.length) {
       toasts.show('Add at least one app first', 'warning');
       return;

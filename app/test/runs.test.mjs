@@ -15,6 +15,8 @@ assert.deepEqual(rec, { id: 'run0001', at: '2026-01-01T00:00:01Z', kind: 'run', 
 assert.equal(runRecord({ tag: 'koppler', data: { nodes: [] } }), null);
 // The card's choices koppler up acts on are kept: tunnels off, how uncommitted changes move, queues run locally.
 assert.deepEqual(runRecord(send('run0009', [{ id: 'api', run: 'cli', tunnels: false, changes: 'take-along' }, { id: 'web', run: 'cli', tunnels: true, changes: 'rm -rf' }], [], { queues: { thumbs: 'local', other: 'deployed', 'bad id': 'local' } })).nodes, { api: { branch: '', run: 'cli', tunnels: false, changes: 'take-along' }, web: { branch: '', run: 'cli' } });
+// An app that keeps the deployed queues, or was asked to restart, is stored as such: the engine reads the stored run.
+assert.deepEqual(runRecord(send('run0009', [{ id: 'api', run: 'cli', queues: false, restart: true }, { id: 'web', run: 'cli', queues: 'no', restart: 'yes' }], [])).nodes, { api: { branch: '', run: 'cli', queues: false, restart: true }, web: { branch: '', run: 'cli' } });
 assert.deepEqual(runRecord(send('run0009', [], [], { queues: { thumbs: 'local', other: 'deployed', 'bad id': 'local' } })).queues, { thumbs: 'local' });
 assert.deepEqual(runRecord({ tag: 'koppler-stop', at: 't', data: { id: 'stop0001', action: 'stop' } }), { id: 'stop0001', at: 't', kind: 'stop', env: null, mode: null, nodes: {}, edges: [], plan: { starts: [], restarts: [], stops: [], keeps: [] } });
 

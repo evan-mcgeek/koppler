@@ -124,6 +124,18 @@
             ><rect class="fill" x="4" y="4" width="8" height="8" rx="1.5" /></svg
           >
         </button>
+        <button
+          type="button"
+          aria-label="Restart {data.name}"
+          title="Restart this app; the rest keeps running"
+          onclick={() => {
+            runs.start({ restart: id });
+          }}
+        >
+          <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"
+            ><path d="M12.5 8a4.5 4.5 0 1 1-1.6-3.4" /><path d="M11.2 2v2.8H8.4" /></svg
+          >
+        </button>
       {:else}
         <button
           type="button"

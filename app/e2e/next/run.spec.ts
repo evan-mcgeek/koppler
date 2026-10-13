@@ -182,3 +182,22 @@ test('a card has a play icon to run its app alone, and a stop icon while it runs
   await expect(page.getByRole('button', { name: 'Board: Web Shop alone' })).toBeVisible();
   await expect(review(page).getByRole('button', { name: /Back to/ })).toBeVisible();
 });
+
+test('a running card has a restart icon: only that app restarts, shown in the review first', async ({ page }) => {
+  const node = { branch: 'main', run: 'cli', note: 'use the test account' };
+  const live = {
+    env: 'qa',
+    nodes: { web: { branch: 'main', run: 'cli' }, orders: node },
+    edges: [{ from: 'web', to: 'orders' }],
+  };
+  await page.route('**/data/status.json', route =>
+    route.fulfill({ json: { apps: {}, live, running: ['orders', 'web', 'canvas'] } }),
+  );
+  const card = page.locator('.svelte-flow__node-app[data-id="orders"]');
+  await card.getByRole('button', { name: 'Restart Orders API' }).click();
+  await expect(review(page)).toContainText('you asked to restart it');
+  const restarts = review(page).locator('li', { has: page.locator('[data-verb="restarts"]') });
+  await expect(restarts).toContainText('Orders API');
+  await expect(restarts).not.toContainText('Web Shop');
+  await page.screenshot({ path: 'test-results/next-card-restart.png' });
+});
