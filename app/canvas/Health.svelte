@@ -61,7 +61,7 @@
     aria-expanded={open}
     popovertarget={id}
   >
-    <span class="dot" aria-hidden="true"></span>{chip.label}
+    <span class="dot" aria-hidden="true"></span><span class="words">{chip.label}</span>
   </button>
   <p class="sr" aria-live="polite">Board: {chip.label}</p>
   <div

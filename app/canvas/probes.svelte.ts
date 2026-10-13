@@ -38,7 +38,16 @@ class Probes {
   #tried = new Set<string>();
 
   async test({ key, payload }: Pick<Job, 'key' | 'payload'>, auto = false): Promise<void> {
-    if (this.results[key]?.state === 'busy') return;
+    if (this.results[key]?.state === 'busy' && this.results[key].text !== 'Starting') return;
+    // An app whose process is up but does not answer yet is starting: its test waits for it instead of failing.
+    const target = 'node' in payload ? payload.node : 'to' in payload ? payload.to : null;
+    if (target && live.sent(target) && live.status?.running?.includes(target) && !live.up(target)) {
+      const name = board.apps.find(app => app.id === target)?.name ?? target;
+      const detail = `${name} is starting. Koppler checks again once it answers.`;
+      this.results[key] = { state: 'busy', text: 'Starting', detail };
+      if (!auto) toasts.show(detail);
+      return;
+    }
     this.results[key] = { state: 'busy' };
     const token = location.pathname.split('/')[2] ?? '';
     const out = await fetch(`/cable-test?token=${encodeURIComponent(token)}`, {

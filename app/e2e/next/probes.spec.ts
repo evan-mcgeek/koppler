@@ -74,6 +74,23 @@ test('a cable is tested once both its apps answer, and again on a click at its s
     await page.getByRole('alert').getByRole('button', { name: 'Dismiss' }).click();
     // The cable to the app that does not answer waits: a light, not tested yet.
     await expect(light('orders>payments')).toHaveAttribute('data-state', 'idle');
+    // Its process is up without answering yet: a test by hand says it is starting, and waits.
+    await page.route('**/data/status.json', async route => {
+      const answer = await route.fetch();
+      const status = (await answer.json()) as Record<string, unknown>;
+      await route.fulfill({ json: { ...status, running: ['web', 'orders', 'payments'] } });
+    });
+    const waits = page.getByRole('button', { name: 'Test that local Payments API answers Orders API' });
+    await expect(page.getByRole('button', { name: 'Stop Payments API' })).toBeVisible();
+    await expect(async () => {
+      await waits.focus();
+      await page.keyboard.press('Enter');
+      await expect(
+        page.getByText('Payments API is starting. Koppler checks again once it answers.', { exact: true }),
+      ).toBeVisible({ timeout: 1000 });
+    }).toPass();
+    await expect(light('orders>payments')).toHaveAttribute('data-state', 'busy');
+    await page.getByRole('button', { name: 'Dismiss' }).click();
     await page.screenshot({ path: 'test-results/next-probe-ok.png' });
 
     await socket('web>orders').click();

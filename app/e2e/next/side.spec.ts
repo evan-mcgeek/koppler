@@ -203,3 +203,32 @@ test('an app runs alone on a board of its own, with the board before one click b
   await expect(page.locator('.svelte-flow__node-app')).toHaveCount(2);
   await expect(page.locator('.svelte-flow__edge')).toHaveCount(1);
 });
+
+test('in a narrow window the side pane folds by itself and the top bar drops its words', async ({ page }) => {
+  const pane = page.getByRole('complementary');
+  const rail = page.getByRole('navigation', { name: 'Side pane, folded' });
+  await expect(pane).toBeVisible();
+  await page.setViewportSize({ width: 900, height: 720 });
+  await expect(rail).toBeVisible();
+  // The rail's board button opens the pane on the board picker.
+  await rail.getByRole('button', { name: /Board and environment/ }).click();
+  await expect(page.getByRole('button', { name: /^Board:/ })).toBeFocused();
+  await page.getByRole('button', { name: 'Hide the side pane' }).click();
+  // Folded by hand, it stays folded when the window grows; folded by the window, it comes back.
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await expect(rail).toBeVisible();
+  await page.getByRole('button', { name: 'Show the side pane' }).click();
+  await page.setViewportSize({ width: 900, height: 720 });
+  await expect(rail).toBeVisible();
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await expect(pane).toBeVisible();
+
+  // A bar too full for its words keeps every control, without them.
+  const stop = page.getByTitle('Stop what the agent started and revert all temporary code changes');
+  await expect(stop).toHaveText('Stop');
+  await page.setViewportSize({ width: 620, height: 720 });
+  await expect(stop.locator('.words')).toBeHidden();
+  await expect(stop).toBeVisible();
+  await expect(page.getByRole('button', { name: 'More ways to run' })).toBeInViewport({ ratio: 1 });
+  await page.screenshot({ path: 'test-results/next-narrow.png' });
+});

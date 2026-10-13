@@ -4,7 +4,7 @@
   import { board } from './board.svelte.ts';
   import { live } from './live.svelte.ts';
 
-  const { open }: { open: () => void } = $props();
+  const { open }: { open: (at?: 'board') => void } = $props();
   const needs = $derived((live.status?.checks ?? []).some(check => check.state !== 'ok'));
 </script>
 
@@ -13,7 +13,9 @@
     type="button"
     title="Board and environment"
     aria-label="Board and environment: {board.env.toUpperCase()}"
-    onclick={open}
+    onclick={() => {
+      open('board');
+    }}
   >
     <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
       <rect x="2" y="2.5" width="12" height="11" rx="2" /><path d="M2 6h12" />
@@ -24,7 +26,9 @@
     type="button"
     title="Apps: on the board, and the rest of the stack"
     aria-label="Apps: {board.nodes.length} of {board.apps.length} on the board"
-    onclick={open}
+    onclick={() => {
+      open();
+    }}
   >
     <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
       <path d="M2.5 4.5l1.2 1.2 2-2.2M2.5 9.5l1.2 1.2 2-2.2M8.5 4.8h5M8.5 9.8h5" /><path d="M3 13.5h10" opacity=".5" />
@@ -38,7 +42,9 @@
         type="button"
         title="This stack needs something on this Mac"
         aria-label="This stack needs something on this Mac"
-        onclick={open}>!</button
+        onclick={() => {
+          open();
+        }}>!</button
       >
     {/if}
     <Settings />

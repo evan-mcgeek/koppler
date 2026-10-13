@@ -140,7 +140,9 @@
   /** What a light says when the pointer rests on it. */
   const about = (probe: Probe | undefined, what: string) =>
     probe?.state === 'busy'
-      ? 'Testing…'
+      ? probe.detail
+        ? `${probe.text ?? ''}. ${probe.detail}`
+        : 'Testing…'
       : probe?.detail
         ? `${probe.text ?? ''}. ${probe.detail} Click to test again.`
         : `Not tested yet. Click to test that ${what}.`;
@@ -436,7 +438,13 @@
     </ViewportPortal>
     <!-- Above every card, a picked one too: each cable's two ends, which the pointer can grab, and the cable being drawn. -->
     <ViewportPortal target="front" style="position: absolute; z-index: 1001">
-      <svg class="ends" class:reordering={!!board.grabbed} class:still={board.live} aria-hidden="true">
+      <svg
+        class="ends"
+        class:reordering={!!board.grabbed}
+        class:still={board.live}
+        role="group"
+        aria-label="Cable ends"
+      >
         {#each board.edges as edge, index (edge.id)}
           {@const a = board.endPoint(index, 'from')}
           {@const b = board.endPoint(index, 'to')}
@@ -457,8 +465,17 @@
             />
             {@const tested = live.sent(edge.source) && live.sent(edge.target)}
             {@const probe = probes.results[edge.id]}
+            <!-- Tested, the socket is a button for the keyboard too. -->
+            <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
             <circle
-              role="presentation"
+              role={tested ? 'button' : 'presentation'}
+              tabindex={tested ? 0 : undefined}
+              aria-label={tested ? `Test that local ${name(edge.target)} answers ${name(edge.source)}` : undefined}
+              onkeydown={ev => {
+                if (!tested || (ev.key !== 'Enter' && ev.key !== ' ')) return;
+                ev.preventDefault();
+                void probes.test({ key: edge.id, payload: { from: edge.source, to: edge.target } });
+              }}
               class="socket nodrag nopan"
               class:tested
               data-cable={edge.id}
@@ -492,7 +509,14 @@
           {#if live.sent(link.from)}
             {@const probe = probes.results[link.key]}
             <circle
-              role="presentation"
+              role="button"
+              tabindex="0"
+              aria-label="Test that {name(link.from)} reaches its {link.what.toLowerCase()} through the tunnel"
+              onkeydown={ev => {
+                if (ev.key !== 'Enter' && ev.key !== ' ') return;
+                ev.preventDefault();
+                void probes.test(link);
+              }}
               class="socket tested press nodrag nopan"
               data-link={link.key}
               cx={link.end.x}
@@ -725,6 +749,11 @@
   }
   .socket.press {
     cursor: pointer;
+  }
+  .socket:focus-visible {
+    outline: none;
+    stroke: var(--cable);
+    stroke-width: 3;
   }
   .socket.grabbed {
     r: 10px;
