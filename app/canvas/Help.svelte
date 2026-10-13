@@ -26,6 +26,8 @@
   <dl>
     <dt><kbd>F</kbd></dt>
     <dd>Fit the whole board in view</dd>
+    <dt><kbd>P</kbd>, <kbd>Esc</kbd> to stop</dt>
+    <dd>Present: the board alone, full screen</dd>
     <dt><kbd>E</kbd> / <kbd>L</kbd></dt>
     <dd>Edit view / Live view</dd>
     <dt><kbd>V</kbd> / <kbd>H</kbd>, hold <kbd>Space</kbd></dt>

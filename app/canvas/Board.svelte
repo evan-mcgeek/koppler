@@ -108,6 +108,8 @@
       if (ev.shiftKey) board.redo();
       else board.undo();
     } else if (key === 'f') void fit();
+    else if (key === 'p') void present();
+    else if (key === 'escape' && board.present) void present();
     else if (key === 'e') board.goEdit();
     else if (key === 'l') board.goLive();
     else if (ev.key === 'v' || ev.key === 'V') tool = 'select';
@@ -209,6 +211,27 @@
   $effect(() => {
     board.brief = viewport.current.zoom < FAR_ZOOM || board.live;
   });
+  // The board alone, full screen where the browser allows it, fitted once the rest of the page has gone.
+  // Full screen follows the board, one change at a time; the browser's word about a change made here is not news.
+  let syncing = false;
+  const present = async () => {
+    board.present = !board.present;
+    if (!syncing) {
+      syncing = true;
+      board.entering = true;
+      while (board.present !== !!document.fullscreenElement) {
+        const want = board.present;
+        await (want ? document.documentElement.requestFullscreen() : document.exitFullscreen()).catch(() => undefined);
+        // No full screen here (or refused): the board is shown alone all the same.
+        if (want !== !!document.fullscreenElement) break;
+      }
+      board.entering = false;
+      syncing = false;
+    }
+    await frame();
+    await frame();
+    await fit();
+  };
   // Fitted in full when the whole board fits that close; else zoomed out, where the cards are short and closed up.
   // The view is worked out here and set once: a fit the flow queues runs again each time the cards change form.
   const fit = async (duration = FIT.duration) => {
@@ -481,17 +504,33 @@
         </div>
         <span class="sep" aria-hidden="true"></span>
         <button
-          class="clear"
-          title="Remove every card from this board. Undo brings them back."
-          onclick={() => {
-            board.clear();
-          }}>Clear</button
+          class="tool"
+          type="button"
+          aria-label={board.present ? 'Stop presenting' : 'Present'}
+          title={board.present ? 'Stop presenting (Esc)' : 'Present: the board alone, full screen (P)'}
+          aria-pressed={board.present}
+          onclick={() => void present()}
         >
+          <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true" class="line">
+            {#if board.present}
+              <path d="M6 2.5v3.5H2.5M10 2.5v3.5h3.5M6 13.5V10H2.5M10 13.5V10h3.5" />
+            {:else}
+              <path d="M2.5 6V2.5H6M10 2.5h3.5V6M2.5 10v3.5H6M13.5 10v3.5H10" />
+            {/if}
+          </svg>
+        </button>
+        {#if !board.present}<button
+            class="clear"
+            title="Remove every card from this board. Undo brings them back."
+            onclick={() => {
+              board.clear();
+            }}>Clear</button
+          >{/if}
       </div>
     </Panel>
     <!-- The whole board at a glance; dragging in it moves the view, scrolling on it zooms. -->
     <MiniMap
-      position="top-right"
+      position="bottom-right"
       pannable
       zoomable
       width={168}
@@ -726,8 +765,9 @@
     color: var(--muted);
     font-size: 12px;
   }
+  /* Over the toolbar, with the other ways to move the view. */
   .area :global(.svelte-flow__minimap) {
-    margin: 12px;
+    margin: 0 15px 66px 0;
     overflow: hidden;
     border: 1px solid var(--line);
     border-radius: 10px;
