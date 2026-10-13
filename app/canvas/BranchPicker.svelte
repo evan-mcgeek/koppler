@@ -47,7 +47,7 @@
     if (open || !input) return;
     before = input.value;
     query = '';
-    active = 0;
+    active = Math.max(0, shown.indexOf(value || current));
     open = true;
     input.select();
     list?.showPopover();
