@@ -79,7 +79,7 @@ export function wireInfo(
   // A stack may pin an address per simulator or emulator; a phone always gets the worked-out one.
   const pinned =
     typeof call.value === 'string' ? call.value : phone || !device ? undefined : call.value?.[device.platform];
-  const value = pinned ?? address.url;
+  const value = pinned ?? (call.path ? address.url.replace(/\/$/, '') + call.path : address.url);
 
   // A browser front end also needs the API to allow its origin (CORS), and no https page calling an http API. Each
   // browser caller of the same API gets a number, for settings written as `Origins__{n}`.

@@ -62,6 +62,11 @@ const Call = z.looseObject(
     key: z.string().optional(),
     /** An address to use instead of the worked-out one: one for all, or one per platform (ios, android). */
     value: z.union([z.string(), z.record(z.string(), z.string())]).optional(),
+    /** The route the caller's setting holds after the callee's address, kept when the call goes local. */
+    path: z
+      .string()
+      .regex(/^\/[^\s?#]*$/, { error: 'a path that starts with / (no query)' })
+      .optional(),
     deployed: z.string().optional(),
     found: z.string().optional(),
     note: z.string().optional(),
