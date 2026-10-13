@@ -90,7 +90,8 @@ interface Status {
   /** When the canvas server started. */
   startedAt?: string;
   /** Whether an agent session takes what the canvas sends: listening, busy or none. */
-  agent?: { state?: string };
+  /** `busy`: when it took what it works on. */
+  agent?: { state?: string; busy?: string };
   /** Changes made to boards from the terminal that this page has not made on its copy yet. */
   boardEdits?: { id: string; board: string; edit: BoardEdit }[];
   /** The stack's fields locked on this Mac, as paths. */
