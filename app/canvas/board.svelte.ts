@@ -215,6 +215,14 @@ class Board {
   /** The queues run locally instead of the deployed ones, and the queues taken off the board. */
   queues = $state.raw<Record<string, 'local'>>({});
   hiddenQueues = $state.raw<Record<string, true>>({});
+  /** The outside systems put on the board by hand: shown even when none of their apps is. */
+  pinned = $state.raw<string[]>([]);
+  pin(id: string): void {
+    if (!this.pinned.includes(id)) this.pinned = [...this.pinned, id];
+  }
+  unpin(id: string): void {
+    this.pinned = this.pinned.filter(one => one !== id);
+  }
   infraBoxes = $derived(
     new Map<string, Box>(
       this.infra.map(({ id, position, measured }) => [
@@ -530,9 +538,12 @@ class Board {
         },
       };
     });
-    const linked = [...new Set(this.flows.flatMap(flow => [flow.from, flow.to]))].filter(key =>
-      key.startsWith('outside:'),
-    );
+    const linked = [
+      ...new Set([
+        ...this.flows.flatMap(flow => [flow.from, flow.to]),
+        ...this.pinned.filter(id => this.#outside(id)).map(id => `outside:${id}`),
+      ]),
+    ].filter(key => key.startsWith('outside:'));
     const outside = linked.map((id): OutsideNode => {
       const app = this.#registry?.apps[id.slice(8)];
       const kept = before.get(id);
@@ -905,6 +916,7 @@ class Board {
       infra: this.infra.map(({ id, position }) => ({ id, position })),
       queues: this.queues,
       hiddenQueues: this.hiddenQueues,
+      pinned: this.pinned,
       edges: this.edges.map(({ id, source, target, type, data }) => ({ id, source, target, type, data })),
     });
   }
@@ -940,15 +952,17 @@ class Board {
   }
   /** Puts back a board held as text: its cards, cables and the cards beside them. */
   #apply(back: string): void {
-    const { name, nodes, edges, infra, queues, hiddenQueues } = JSON.parse(back) as {
+    const { name, nodes, edges, infra, queues, hiddenQueues, pinned } = JSON.parse(back) as {
       name: string | null;
       nodes: CardNode[];
       edges: CableEdge[];
       infra: { id: string; position: Point }[];
       queues: Record<string, 'local'>;
       hiddenQueues: Record<string, true>;
+      pinned: string[];
     };
     this.name = name;
+    this.pinned = pinned;
     this.nodes = nodes;
     this.edges = edges;
     this.queues = queues;
@@ -1011,6 +1025,7 @@ class Board {
         ]),
       ),
       edges: this.edges.map(({ source, target }) => ({ from: source, to: target })),
+      ...(this.pinned.length && { outside: this.pinned }),
     };
   }
   /** Where the cards sit and which sides the cables use, kept with a board so it opens as it was left. */
@@ -1173,6 +1188,7 @@ class Board {
     this.edges = [];
     this.queues = {};
     this.hiddenQueues = {};
+    this.pinned = [];
   }
   /**
    * Opens one of the boards, as this stack can run it now. Gives what had to change to fit, or why it cannot open;
@@ -1209,6 +1225,9 @@ class Board {
     this.name = preset.name;
     this.queues = {};
     this.hiddenQueues = {};
+    this.pinned = Array.isArray(given['outside'])
+      ? (given['outside'] as unknown[]).filter((id): id is string => typeof id === 'string')
+      : [];
     this.infra = this.infra.map(unselected);
     this.nodes = ids.flatMap(id => {
       const app = this.apps.find(one => one.id === id);
@@ -1345,6 +1364,7 @@ class Board {
     this.infra = [];
     this.queues = (saved?.['queues'] ?? {}) as Record<string, 'local'>;
     this.hiddenQueues = (saved?.['hiddenQueues'] ?? {}) as Record<string, true>;
+    this.pinned = (Array.isArray(saved?.['outside']) ? saved['outside'] : []) as string[];
     this.syncInfra((saved?.infra ?? {}) as Record<string, Point | undefined>);
     const { zoom, pan } = saved ?? {};
     this.view = zoom && pan ? { x: pan.x, y: pan.y, zoom } : undefined;
@@ -1391,6 +1411,7 @@ class Board {
       edges: this.edges.map(({ source, target, data }) => ({ from: source, to: target, ...data })),
       queues: this.queues,
       hiddenQueues: this.hiddenQueues,
+      outside: this.pinned.length ? this.pinned : undefined,
       infra: Object.fromEntries(
         this.infra.map(({ id, position }) => [id, { x: Math.round(position.x), y: Math.round(position.y) }]),
       ),

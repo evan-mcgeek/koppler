@@ -23,7 +23,7 @@
   let sort = $state(remembered());
   let search = $state('');
   let copied = $state('');
-  const onBoard = $derived(board.nodes.map(node => node.id));
+  const onBoard = $derived([...board.nodes.map(node => node.id), ...board.pinned]);
   /** An app matches by any part of its name, or by the start of its kind: "pay", ".net", "lam". */
   const matches = (app: StackApp) => {
     const asked = search.trim().toLowerCase();
@@ -150,7 +150,7 @@
               type="button"
               title="Show its card"
               onclick={() => {
-                board.show(app.id);
+                board.show(app.outside ? `outside:${app.id}` : app.id);
               }}
             >
               <span class="name">{app.name}</span>
@@ -167,14 +167,20 @@
               aria-label="Remove {app.name} from the board"
               title="Remove from the board"
               onclick={() => {
-                board.remove(app.id);
+                if (app.outside) board.unpin(app.id);
+                else board.remove(app.id);
               }}
             >
               <svg viewBox="0 0 16 16" width="11" height="11" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" /></svg>
             </button>
           {:else if app.outside}
-            <span class="main" title="Does not run on this Mac: {app.outside}"
-              ><span class="name">{app.name}</span></span
+            <button
+              class="main"
+              type="button"
+              title="Does not run on this Mac: {app.outside}. Click to put its card on the board; it never runs."
+              onclick={() => {
+                board.pin(app.id);
+              }}><span class="name">{app.name}</span></button
             >
             <span class="state">outside</span>
             <button

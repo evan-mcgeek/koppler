@@ -112,6 +112,7 @@
       board.env,
       board.queues,
       board.hiddenQueues,
+      board.pinned,
       board.nodes.map(node => [node.id, node.data.hideTunnels, node.data.showQueues]),
     ]),
   );
