@@ -30,6 +30,7 @@ export interface Preset {
   edges: { from: string; to: string }[];
   source?: string;
   layout?: BoardLayout;
+  outside?: string[];
 }
 /** A prompt from the page, on its way to Koppler or the agent. */
 export interface Prompt {
@@ -109,6 +110,10 @@ function boardLayout(given: unknown): BoardLayout | null {
   };
 }
 
+/** A short list of app ids, such as the outside systems put on a board. */
+const ids = (given: unknown) =>
+  [...new Set(listOf(given).filter((id): id is string => typeof id === 'string' && isId(id)))].slice(0, 50);
+
 export function sanitizePresets(list: unknown): Preset[] {
   return listOf(list)
     .slice(0, 50)
@@ -140,6 +145,7 @@ export function sanitizePresets(list: unknown): Preset[] {
         edges: cables(preset['edges']).map(edge => ({ from: edge['from'] as string, to: edge['to'] as string })),
         ...(typeof source === 'string' && source && { source: text(source, 300) }),
         ...(layout && { layout }),
+        ...(ids(preset['outside']).length && { outside: ids(preset['outside']) }),
       };
     });
 }
@@ -251,6 +257,7 @@ export function sanitizeLayout(input: unknown): Loose | null {
     ...(Object.keys(infra).length && { infra }),
     ...(Object.keys(queues).length && { queues }),
     ...(Object.keys(hiddenQueues).length && { hiddenQueues }),
+    ...(ids(input['outside']).length && { outside: ids(input['outside']) }),
     ...(TIDY.includes(tidy as string) && { tidy }),
     ...(input['scratch'] === true && { scratch: true }),
     ...(presets.length && { presets }),

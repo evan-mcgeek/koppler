@@ -187,3 +187,39 @@ test.describe('an outside system that calls an app on the board', () => {
     );
   });
 });
+
+test.describe('an outside system none of whose apps is on the board', () => {
+  test.use({
+    stack: {
+      ...STACK,
+      apps: {
+        ...STACK.apps,
+        psp: { name: 'Pay Provider', kind: 'other', outside: 'sends webhooks', consumes: { catalog: {} } },
+      },
+    },
+  });
+
+  test('is put on the board from the side panel, kept, and never run', async ({ page, canvas }) => {
+    await expect(outside(page)).toHaveCount(0);
+    await page.getByRole('complementary').getByRole('button', { name: 'Pay Provider', exact: true }).click();
+    await expect(outside(page)).toHaveCount(1);
+    await expect(outside(page)).toContainText('Pay Provider');
+    await expect
+      .poll(async () => {
+        const kept = (await (await page.request.get(`${canvas.url}data/state.json`)).json()) as { outside?: string[] };
+        return kept.outside;
+      })
+      .toEqual(['psp']);
+    await page.reload();
+    await expect(outside(page)).toHaveCount(1);
+
+    await page.getByRole('button', { name: 'Run', exact: true }).click();
+    const review = page.getByRole('dialog').filter({ hasText: 'Run on QA' });
+    await expect(review).toContainText('Orders API');
+    await expect(review).not.toContainText('Pay Provider');
+    await review.getByRole('button', { name: 'Cancel' }).click();
+
+    await page.getByRole('button', { name: 'Remove Pay Provider from the board' }).click();
+    await expect(outside(page)).toHaveCount(0);
+  });
+});
