@@ -288,18 +288,22 @@
       (all: (CardNode | InfraNode)[]) => {
         // An app the library moved (a drag, the arrow keys) takes its tunnel cards along, in the same step.
         const was = new Map(board.nodes.map(node => [node.id, node.position]));
-        const tall = new Map(board.nodes.map(node => [node.id, node.measured?.height]));
-        let nudged = false;
+        const grew: Record<string, { bottom: number; by: number }> = {};
         let infra = all.filter(node => node.type !== 'app');
         let apps = all.filter(node => node.type === 'app');
         const brief = viewport.current.zoom < FAR_ZOOM || board.live;
+        // Until the first status is shown, cards are still filling in: that growth is not theirs to push with.
+        const settled = live.asked;
         for (const { id, measured } of apps) {
           // Grown or shrunk in the same form, it moves the app cards under it too, each with its own tunnel cards.
           // ponytail: only the cards straight under it; a card under one of those, off to the side, stays.
           const last = heights[id];
           const height = measured?.height;
           if (height) heights[id] = { brief, height };
-          const by = last?.brief === brief && height ? height - last.height : 0;
+          // Its own tunnel cards follow any change of height; the app cards under it only one in the same form.
+          if (settled && last && height && height !== last.height)
+            grew[id] = { bottom: last.height, by: height - last.height };
+          const by = settled && last?.brief === brief && height ? height - last.height : 0;
           const box = board.boxes.get(id);
           if (by && box) {
             const under = (other: Box | undefined) =>
@@ -311,16 +315,12 @@
                 ? { ...node, position: { x: node.position.x, y: node.position.y + by } }
                 : node,
             );
-            nudged = true;
           }
         }
-        for (const { id, position, measured } of apps) {
+        for (const { id, position } of apps) {
           // A card that grows or shrinks (its steps open, a note) moves the cards stacked under it by as much.
-          const [before, now] = [tall.get(id), measured?.height];
-          if (before && now && before !== now) {
-            infra = board.pushed(id, position.y + before, now - before, infra);
-            nudged = true;
-          }
+          const grown = grew[id];
+          if (grown) infra = board.pushed(id, position.y + grown.bottom, grown.by, infra);
           const from = was.get(id);
           if (from && (from.x !== position.x || from.y !== position.y))
             infra = board.followed(id, { x: position.x - from.x, y: position.y - from.y }, infra);
@@ -328,7 +328,7 @@
         board.nodes = apps;
         board.infra = infra;
         // Moved by a card's change of size, not by anyone: no step of its own to undo.
-        if (nudged) board.adopt();
+        if (Object.keys(grew).length) board.adopt();
       }
     }
     bind:edges={board.edges}

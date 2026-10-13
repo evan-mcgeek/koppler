@@ -127,6 +127,8 @@ interface Status {
 
 class Live {
   status = $state.raw<Status | null>(null);
+  /** The first ask is answered, or failed, and the cards are drawn with it. */
+  asked = $state(false);
   #timer: ReturnType<typeof setInterval> | undefined;
 
   /** Asks for the status now and every second and a half, while the page is in view. */
@@ -143,6 +145,8 @@ class Live {
         // The server is away: the last status stays until it answers again.
       }
       asking = false;
+      // ponytail: two frames for the cards to be measured with it; a slower first paint pushes once.
+      if (!this.asked) requestAnimationFrame(() => requestAnimationFrame(() => (this.asked = true)));
     };
     void ask();
     clearInterval(this.#timer);

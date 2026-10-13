@@ -26,6 +26,7 @@ test('apps of the run in progress show whether they answer, with their steps; th
   canvas,
 }) => {
   // Before anything runs: no dots, dashed cables.
+  await page.waitForResponse(answer => answer.url().includes('data/status.json'));
   await expect(card(page, 'orders')).toBeVisible();
   await expect(page.locator('.svelte-flow__edge g.idle')).toHaveCount(2);
   await expect(card(page, 'orders').getByRole('img')).toHaveCount(0);
