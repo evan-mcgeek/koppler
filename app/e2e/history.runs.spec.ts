@@ -1,7 +1,5 @@
 // The new canvas's History: every run and Stop with how it ended, and a way to put a run's board back.
-import { test, expect } from '../canvas.ts';
-
-test.use({ start: 'next/' });
+import { test, expect } from './canvas.ts';
 
 test('runs are listed newest first with their plan and code changes, and a board is put back from one', async ({
   page,

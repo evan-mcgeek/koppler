@@ -89,7 +89,7 @@ class Debug {
   async read(): Promise<string> {
     this.flush();
     await new Promise(done => setTimeout(done, 300));
-    const text = await fetch(`../temp/debug.jsonl?${String(Date.now())}`)
+    const text = await fetch(`temp/debug.jsonl?${String(Date.now())}`)
       .then(answer => (answer.ok ? answer.text() : ''))
       .catch(() => '');
     return text.trim().split('\n').slice(-300).join('\n');

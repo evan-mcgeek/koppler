@@ -2,7 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Page } from '@playwright/test';
-import { test, expect, nextEdit } from '../canvas.ts';
+import { test, expect, nextEdit } from './canvas.ts';
 
 const at = (x: number, y: number) => ({ x, y, run: 'cli', branch: 'main' });
 const sent = (temp: string) => {
@@ -12,7 +12,6 @@ const sent = (temp: string) => {
 };
 const notes = (page: Page) => page.getByRole('group', { name: 'About this board' }).getByRole('note');
 test.use({
-  start: 'next/',
   uncloned: ['catalog'],
   board: { env: 'qa', mode: 'auto', nodes: { web: at(0, 0), orders: at(420, 0), payments: at(840, 0) }, edges: [] },
 });

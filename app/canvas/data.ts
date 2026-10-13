@@ -40,7 +40,7 @@ export interface Loaded {
 
 async function ask<T>(name: string): Promise<T | null> {
   try {
-    const answer = await fetch(`../data/${name}.json`);
+    const answer = await fetch(`data/${name}.json`);
     return answer.ok ? ((await answer.json()) as T) : null;
   } catch {
     return null;

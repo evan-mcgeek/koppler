@@ -32,7 +32,7 @@ Not a backend tool for working inside a shared cluster (mirrord, Telepresence, S
 
 ## Capabilities and Constraints
 
-- Single-file vanilla HTML, CSS and JS (`canvas.html`), served locally by `status-watch.mjs`; no frameworks or build step.
+- The canvas is a Svelte 5 page with Svelte Flow, built by Vite from `app/canvas/` and served locally by `status-watch.mjs`.
 - Light, dark and system themes.
 - Agent and harness agnostic wording.
 - PROD is a dangerous mode and must always look different from QA.

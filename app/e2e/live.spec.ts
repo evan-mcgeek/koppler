@@ -3,12 +3,11 @@ import fs from 'node:fs';
 import net, { type AddressInfo } from 'node:net';
 import path from 'node:path';
 import type { Page } from '@playwright/test';
-import { test, expect } from '../canvas.ts';
+import { test, expect } from './canvas.ts';
 
 const card = (page: Page, id: string) => page.locator(`.svelte-flow__node[data-id="${id}"]`);
 const at = (x: number, y: number) => ({ x, y, run: 'cli', branch: 'main' });
 test.use({
-  start: 'next/',
   board: {
     env: 'qa',
     mode: 'auto',

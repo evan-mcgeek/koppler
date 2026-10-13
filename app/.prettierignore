@@ -10,7 +10,6 @@ src/fonts/
 .impeccable/
 
 # Still in its first form.
-src/canvas.html
 src/lambda-secrets-proxy.go
 test/*.mjs
 bin/

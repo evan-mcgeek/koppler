@@ -56,7 +56,7 @@ export async function canvas(args: string[]): Promise<void> {
   // The address carries the page's access token, so it goes to the browser and is not printed.
   const board = flagValue(args, '--board');
   const hash = args.includes('--pick') ? '#pick' : board ? `#board=${encodeURIComponent(board)}` : '';
-  const url = `${fs.readFileSync(urlFile, 'utf8').trim()}next/${hash}`;
+  const url = fs.readFileSync(urlFile, 'utf8').trim() + hash;
   if (args.includes('--no-open') || process.platform !== 'darwin') {
     console.log(`The canvas runs on port ${new URL(url).port}; its address is in ${urlFile}`);
     return;

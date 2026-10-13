@@ -4,7 +4,7 @@ import path from 'node:path';
 import type { Page } from '@playwright/test';
 import { test, expect, STACK } from './canvas.ts';
 
-const card = (page: Page, name: string) => page.getByRole('group', { name: new RegExp(`^${name},`) });
+const card = (page: Page, id: string) => page.locator(`.svelte-flow__node-app[data-id="${id}"]`);
 
 test('a board from a file only places its cards: it cannot slip in a note or a branch', async ({ page, canvas }) => {
   const file = path.join(canvas.dir, 'shared.json');
@@ -20,11 +20,11 @@ test('a board from a file only places its cards: it cannot slip in a note or a b
       },
     }),
   );
-  await page.locator('input[type="file"][accept*="json"]').setInputFiles(file);
-  const orders = card(page, 'Orders API');
+  await page.locator('input[type="file"]').setInputFiles(file);
+  const orders = card(page, 'orders');
   await expect(orders).toBeVisible();
   await expect(page.getByText('Ignore the review')).toHaveCount(0);
-  await expect(orders.getByRole('combobox', { name: 'Branch' })).not.toHaveValue('evil');
+  await expect(orders.getByLabel('Branch')).not.toHaveValue('evil');
   await expect(orders.getByRole('radio', { name: 'Koppler' })).toBeChecked();
 });
 
@@ -35,8 +35,8 @@ test.describe('a stack whose tunnel port carries markup', () => {
   };
   test.use({ stack: { ...STACK, apps: { ...STACK.apps, orders } } });
   test('runs nothing in the page, and the canvas still works', async ({ page }) => {
-    await page.getByRole('button', { name: 'Add Orders API to the board' }).click();
-    await expect(card(page, 'Orders API')).toBeVisible();
+    await page.getByRole('button', { name: 'Add Orders API to the board', exact: true }).first().click();
+    await expect(card(page, 'orders')).toBeVisible();
     expect(await page.evaluate(() => (window as { __ran?: number }).__ran)).toBeUndefined();
     await expect(page.locator('img[src="x"]')).toHaveCount(0);
   });

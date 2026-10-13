@@ -1,6 +1,6 @@
 // The new canvas's app card: what the user chooses on it.
 import type { Page } from '@playwright/test';
-import { test, expect, nextEdit, STACK } from '../canvas.ts';
+import { test, expect, nextEdit, STACK } from './canvas.ts';
 
 const card = (page: Page, id: string) => page.locator(`.svelte-flow__node[data-id="${id}"]`);
 const at = (x: number, y: number) => ({ x, y, run: 'cli', branch: 'main' });
@@ -11,7 +11,6 @@ const mobile = {
   consumes: { orders: { how: 'env', env: 'ORDERS_URL' } },
 };
 test.use({
-  start: 'next/',
   stack: { ...STACK, apps: { ...STACK.apps, mobile } },
   board: {
     env: 'qa',

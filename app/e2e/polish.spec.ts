@@ -1,6 +1,6 @@
 // The new canvas's frame and messages: refused cables, the protected environment, the empty board, the sheets.
 import type { Page } from '@playwright/test';
-import { test, expect, STACK } from '../canvas.ts';
+import { test, expect, STACK } from './canvas.ts';
 
 const card = (page: Page, id: string) => page.locator(`.svelte-flow__node[data-id="${id}"]`);
 const cable = (page: Page, id: string) => page.locator(`.svelte-flow__edge[data-id="${id}"]`);
@@ -22,7 +22,6 @@ const dragCable = async (page: Page, from: string, to: string) => {
   await page.mouse.move(onto.x, onto.y, { steps: 8 });
 };
 test.use({
-  start: 'next/',
   stack: { ...STACK, protected: ['prod'] },
   board: {
     env: 'qa',

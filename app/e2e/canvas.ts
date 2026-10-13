@@ -89,7 +89,7 @@ export const test = base.extend<{
   uncloned: [[], { option: true }],
   dirty: [[], { option: true }],
   libraries: [{}, { option: true }],
-  // The page under the canvas address to open: today's canvas, or `next/` for the new one.
+  // What follows the canvas address when it is opened, such as a board named in its hash.
   start: ['', { option: true }],
   canvas: async ({ stack, board, uncloned, dirty, libraries }, use) => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-e2e-')),

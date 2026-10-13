@@ -1,6 +1,6 @@
 // The new canvas's tunnel cards: the databases and caches the board's apps reach, beside the app that leads them.
 import type { Page } from '@playwright/test';
-import { test, expect, nextEdit } from '../canvas.ts';
+import { test, expect, nextEdit } from './canvas.ts';
 
 const card = (page: Page, id: string) => page.locator(`.svelte-flow__node[data-id="${id}"]`);
 const tunnels = (page: Page) => page.locator('.svelte-flow__node-tunnel');
@@ -8,7 +8,6 @@ const saved = (page: Page) =>
   page.waitForResponse(r => r.url().includes('/state?') && r.request().method() === 'POST' && r.ok());
 const at = (x: number, y: number) => ({ x, y, run: 'cli', branch: 'main' });
 test.use({
-  start: 'next/',
   board: {
     env: 'qa',
     mode: 'auto',

@@ -30,23 +30,22 @@ try {
   assert.equal(got.headers['x-content-type-options'], 'nosniff');
   // The page asks no other site for anything.
   assert.doesNotMatch(got.body.toString(), /(href|src)="https?:\/\//);
-  assert.equal((await call('GET', `${page.pathname}fonts/fonts.css`)).headers['content-type'], 'text/css; charset=utf-8');
-  assert.equal((await call('GET', `${page.pathname}fonts/SchibstedGrotesk-latin.woff2`)).headers['content-type'], 'font/woff2');
-  assert.equal((await call('GET', `${page.pathname}fonts/JetBrainsMono-OFL.txt`)).status, 404);
+  assert.equal(got.headers['content-type'], 'text/html; charset=utf-8');
+  // No inline script is allowed: the page's own files only.
+  assert.match(got.headers['content-security-policy'], /script-src 'self';/);
   assert.equal((await call('GET', `/s/${'0'.repeat(48)}/`)).status, 404);
 
-  // The new canvas: its page and the files that page names, and nothing else from its folder.
-  const next = await call('GET', `${page.pathname}next/`);
-  assert.equal(next.status, 200);
-  assert.equal(next.headers['content-type'], 'text/html; charset=utf-8');
-  assert.doesNotMatch(next.body.toString(), /(href|src)="https?:\/\//);
-  const script = /assets\/[\w.-]+\.js/.exec(next.body.toString())[0];
-  assert.equal((await call('GET', `${page.pathname}next/${script}`)).headers['content-type'], 'text/javascript; charset=utf-8');
-  // Asked for without its closing slash, it is sent on to the address with it.
-  const bare = await call('GET', `${page.pathname}next`);
-  assert.equal(bare.status, 308);
-  assert.equal(bare.headers.location, 'next/');
-  for (const not of ['next/index.html', 'next/assets/', 'next/assets/..%2Findex.html', 'next/assets/%2e%2e/index.html', 'data/secrets.json', 'data/state.json'])
+  // The page and the files it names, and nothing else from its folder.
+  const script = /assets\/[\w.-]+\.js/.exec(got.body.toString())[0];
+  assert.equal((await call('GET', page.pathname + script)).headers['content-type'], 'text/javascript; charset=utf-8');
+  assert.equal((await call('GET', `${page.pathname}theme.js`)).status, 200);
+  // Where the canvas was while it was built beside the page it replaced: sent on to its address.
+  for (const [old, to] of [['next', './'], ['next/', '../']]) {
+    const moved = await call('GET', page.pathname + old);
+    assert.equal(moved.status, 308);
+    assert.equal(moved.headers.location, to);
+  }
+  for (const not of ['index.html', 'page/index.html', 'assets/', 'assets/..%2Findex.html', 'assets/%2e%2e/index.html', 'canvas.html', 'fonts/fonts.css', 'temp/registry.js', 'data/secrets.json', 'data/state.json'])
     assert.equal((await call('GET', page.pathname + not)).status, 404, not);
 
   // Another site's name pointed at this machine, or a request another site makes, is refused.

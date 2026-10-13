@@ -244,7 +244,7 @@ async function snapshot(serving: boolean): Promise<Status> {
   // The page works out the server's addresses from its own, so the token is in no file but its own.
   if (serving) status['server'] = true;
   try {
-    status['pageVersion'] = fs.statSync(path.join(CODE, 'canvas.html')).mtimeMs;
+    status['pageVersion'] = fs.statSync(path.join(CODE, 'page', 'index.html')).mtimeMs;
   } catch {
     // The page is gone: nothing to reload.
   }

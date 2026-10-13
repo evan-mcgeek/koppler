@@ -1,10 +1,9 @@
 // The new canvas's debug log: what happens on the page is kept for tracing a problem, never what is typed.
 import fs from 'node:fs';
 import path from 'node:path';
-import { test, expect } from '../canvas.ts';
+import { test, expect } from './canvas.ts';
 
 test.use({
-  start: 'next/',
   board: { env: 'qa', mode: 'auto', nodes: { orders: { x: 0, y: 0, run: 'cli', branch: 'main' } }, edges: [] },
 });
 

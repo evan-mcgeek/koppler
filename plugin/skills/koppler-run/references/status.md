@@ -39,7 +39,6 @@ node <app>/dist/status-watch.mjs --once                                # publish
 Every 1.5 seconds it writes `<state>/status.js` from `<state>/status.json`, adding `listening` (a TCP connect to the port) and `logTail` (last 80 lines).
 Log lines are masked for passwords, tokens, JWTs, AWS keys and credentials inside addresses before they reach the page, `koppler logs`, a failed start's output or a run handed to the agent.
 The files in the logs folder are not masked: read a log with `koppler logs <name>`, never the file itself.
-Writes under `<state>/` do not reload the Lavish page.
 Started through `koppler`, it keeps running across agent sessions; record it in the action log as `canvas`.
 
 ## Where logs come from
@@ -56,8 +55,8 @@ Both write `~/.local/state/koppler/logs/<app>.log` (private to the user) and res
 
 ## Layout autosave
 
-Inside Lavish the page cannot store anything (its sandbox blocks local storage, cookies and IndexedDB), so a full browser reload would bring back only the last layout that was sent.
-While `status-watch.mjs` runs, it also listens on `127.0.0.1` (port 4747 or `KOPPLER_PORT`; the token is kept in `~/.local/state/koppler/canvas-token`, so the page address survives restarts) and handles:
+The board is kept by the canvas server as the user changes it, so a reload brings it back.
+While `status-watch.mjs` runs, it listens on `127.0.0.1` (port 4747 or `KOPPLER_PORT`; the token is kept in `~/.local/state/koppler/canvas-token`, so the page address survives restarts) and handles:
 
 | Request | What it does |
 |---|---|

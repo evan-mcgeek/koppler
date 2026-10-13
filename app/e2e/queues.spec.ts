@@ -1,6 +1,6 @@
 // The new canvas's queue cards, outside systems and the apps a card still calls in the deployed environment.
 import type { Page } from '@playwright/test';
-import { test, expect, STACK } from '../canvas.ts';
+import { test, expect, STACK } from './canvas.ts';
 
 const card = (page: Page, id: string) => page.locator(`.svelte-flow__node[data-id="${id}"]`);
 const queue = (page: Page) => page.locator('.svelte-flow__node-queue');
@@ -32,7 +32,6 @@ const stack = {
   },
 };
 test.use({
-  start: 'next/',
   stack,
   board: {
     env: 'qa',

@@ -79,12 +79,8 @@ On that prompt:
 
 ## 1. Canvas
 
-Two ways to open it; ask which the user wants the first time, default Lavish:
-
-- **Lavish** (has a Conversation panel for annotations and replies):
-  `npx -y lavish-axi <app>/dist/canvas.html`, then `npx -y lavish-axi poll <app>/dist/canvas.html` (run_in_background; wait for the notification).
-- **Standalone** (canvas only, full window): `koppler canvas` (starts it when needed and opens it; the address stays the same across restarts), then `koppler listen --as <id>` (run_in_background; it exits with the prompts as JSON lines; start it again after each).
-  Replies go to the chat only.
+Open it with `koppler canvas` (starts it when needed and opens it; the address stays the same across restarts), then `koppler listen --as <id>` (run_in_background; it exits with the prompts as JSON lines; start it again after each).
+The user answers on the canvas (its inbox) or in the chat.
 
 **Nothing happens that the user has not seen and confirmed.** Before a run or a Stop leaves the canvas, a review lists what it will start, restart, stop and revert, and keep running, compared with what is running now; the confirmed plan comes with the prompt (`data.plan`, `PLAN` lines in the text).
 - A prompt's `waited` is how many minutes it sat in the queue before you got it; only the newest run or Stop is handed over, older ones are already marked replaced. Over 5 minutes, tell the user what it is and how old it is, and ask before applying it.
@@ -104,7 +100,6 @@ A `koppler-fix` prompt comes from the canvas's Flow check: `data.failures` lists
 `run` is `cli` or `ide`; a mobile app node with `run: cli` also carries `platform`: `ios` (simulator), `android` (emulator) or `phone` (a connected phone on the same Wi-Fi; its callees run with `--lan`). With `ide` the device is picked in the IDE, so ask which one before wiring the mobile app.
 Apps not cloned are greyed out; `koppler sync` prints the clone command. Ask before cloning.
 Boards: the canvas always shows one board, saved as the user changes it; the selector switches between the user's boards and the team boards (the stack's `presets`). A team board the user changes becomes their own copy. When the user asks for a usual setup, suggest the matching board.
-In Lavish, mirror replies there: `npx -y lavish-axi poll <app>/dist/canvas.html --agent-reply-file <reply.md>` (background), so the user can answer in the page.
 
 ## 4. Run or checklist
 
