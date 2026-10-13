@@ -385,6 +385,14 @@ class Board {
           .filter(app => this.#outside(app))
           .map(app => ({ from: id, to: `outside:${app}` })),
       ),
+      // An outside system that calls the apps on the board: a webhook, say.
+      ...Object.entries(this.#registry?.apps ?? {}).flatMap(([id, app]) =>
+        this.#outside(id)
+          ? Object.keys(app.consumes ?? {})
+              .filter(to => this.nodes.some(node => node.id === to))
+              .map(to => ({ from: `outside:${id}`, to }))
+          : [],
+      ),
     ];
   });
   /** The side of an app its tunnel and queue cards stack on: the first one its cables do not use. */
@@ -544,6 +552,9 @@ class Board {
           about: [
             `${app?.name ?? id.slice(8)} does not run on this Mac${why}. Koppler cannot check calls to it.`,
             host ? `The ${env} board uses ${address}.` : '',
+            ...this.flows
+              .filter(flow => flow.from === id)
+              .map(flow => `It sends to the deployed ${name(flow.to)}, not to your local one.`),
           ].filter(Boolean),
         },
       };

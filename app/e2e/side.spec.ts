@@ -231,3 +231,40 @@ test('in a narrow window the side pane folds by itself and the top bar drops its
   await expect(page.getByRole('button', { name: 'More ways to run' })).toBeInViewport({ ratio: 1 });
   await page.screenshot({ path: 'test-results/next-narrow.png' });
 });
+
+test('an outside system is added to the stack with the apps that call it', async ({ page }) => {
+  const asked: unknown[] = [];
+  await page.route('**/apps-outside?*', async route => {
+    asked.push(route.request().postDataJSON());
+    await route.fulfill(
+      asked.length === 1 ? { json: { error: 'The stack already has Stripe.' } } : { json: { added: 'stripe' } },
+    );
+  });
+  await page.getByRole('button', { name: 'Add outside system…' }).click();
+  const add = page.getByRole('dialog', { name: 'Add an outside system' });
+  await add.getByLabel('Name').fill('Stripe');
+  await add.getByLabel('Address').fill('https://api.stripe.com');
+  await add.getByRole('button', { name: 'Add' }).click();
+  await expect(add.getByRole('alert')).toHaveText(
+    'Pick the apps that call Stripe, or that it calls: its card shows next to them.',
+  );
+  await add.getByRole('checkbox', { name: 'Orders API calls it' }).check();
+  await add.getByRole('checkbox', { name: 'Web Shop gets its calls' }).check();
+  await page.screenshot({ path: 'test-results/next-add-outside.png' });
+  await add.getByRole('button', { name: 'Add' }).click();
+  await expect(add.getByRole('alert')).toHaveText('The stack already has Stripe.');
+  await add.getByLabel('What it is').fill('Payment provider');
+  await add.getByRole('button', { name: 'Add' }).click();
+  await expect
+    .poll(() => asked)
+    .toEqual([
+      { name: 'Stripe', url: 'https://api.stripe.com', why: '', calledBy: ['orders'], sendsTo: ['web'] },
+      {
+        name: 'Stripe',
+        url: 'https://api.stripe.com',
+        why: 'Payment provider',
+        calledBy: ['orders'],
+        sendsTo: ['web'],
+      },
+    ]);
+});

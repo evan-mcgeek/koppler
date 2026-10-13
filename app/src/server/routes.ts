@@ -10,7 +10,7 @@ import { discardChanges, linkStack, proposeChanges, updateStack } from '../engin
 import { listenerPid } from '../engine/listen.ts';
 import { appendAnswer, appendMessage, clearMessages, readMessages, refusal } from '../engine/messages.ts';
 import { appendNote, appendRun, runRecord, type RunRecord } from '../engine/runs.ts';
-import { addApps, createStack, currentStack, forgetStacks, removeApp, useStack } from '../engine/sync.ts';
+import { addApps, addOutside, createStack, currentStack, forgetStacks, removeApp, useStack } from '../engine/sync.ts';
 import { CODE, TEMP } from '../paths.ts';
 import { redact } from '../scrub.ts';
 import { cableTest } from './cable-test.ts';
@@ -198,6 +198,14 @@ export const ROUTES: Record<string, Route> = {
     if (result.error !== undefined || !result.added.length)
       return { status: 400, body: { error: result.error ?? 'Pick at least one repo that is not in the stack yet.' } };
     return reload('The apps were added, but the stack could not be loaded again. Run koppler sync.', result);
+  },
+  '/apps-outside': body => {
+    const result = addOutside(body);
+    forgetStacks();
+    return (
+      refused(result) ??
+      reload('The outside system was added, but the stack could not be loaded again. Run koppler sync.', result)
+    );
   },
   '/apps-remove': body => {
     const result = isApp(body['id']) ? removeApp(body['id']) : { error: 'No app given' };

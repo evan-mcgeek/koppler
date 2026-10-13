@@ -252,7 +252,10 @@
         <p class="empty">{board.apps.length ? 'No app matches.' : 'No apps in this stack yet.'}</p>
       {/each}
     </div>
-    <button class="add-repos" type="button" onclick={() => void dialogs.repos?.open()}>Add repos…</button>
+    <div class="adds">
+      <button class="add-repos" type="button" onclick={() => void dialogs.repos?.open()}>Add repos…</button>
+      <button class="add-repos" type="button" onclick={() => dialogs.outside?.open()}>Add outside system…</button>
+    </div>
     <p class="note" role="status">{copied}</p>
     <Summary />
   </section>
@@ -489,6 +492,11 @@
   .act.alone .fill {
     fill: currentColor;
     stroke: none;
+  }
+  .adds {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 12px;
   }
   .add-repos {
     margin: 4px 0 0 4px;

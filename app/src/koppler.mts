@@ -28,6 +28,7 @@ import { run } from './engine/run.ts';
 import { appliedCommand, historyCommand, planCommand, runningNames, sessionCommand } from './engine/runs.ts';
 import {
   addApps,
+  addOutside,
   candidateRepos,
   createStack,
   init as initStack,
@@ -206,6 +207,23 @@ function recipes(args: string[]): void {
 
 /** Apps join the stack from their clones: a repo name or slug from `koppler sync`, or a folder. */
 function add(args: string[]): void {
+  const outside = flagValue(args, '--outside');
+  if (outside !== undefined) {
+    const values = (flag: string) => args.filter((_, at) => args[at - 1] === flag);
+    const added = addOutside({
+      name: outside,
+      url: flagValue(args, '--url'),
+      why: flagValue(args, '--why'),
+      calledBy: values('--called-by').flatMap(value => value.split(',').map(id => id.trim())),
+      sendsTo: values('--sends-to').flatMap(value => value.split(',').map(id => id.trim())),
+    });
+    if (added.error !== undefined) fail(added.error);
+    console.log(
+      `Added ${outside} (${added.added}) as an outside system; its card shows next to the apps that call it.`,
+    );
+    sync([]);
+    return;
+  }
   const wanted = positional(args);
   if (!wanted.length) fail('usage: koppler add <repo or folder>...  (koppler add --list shows the repos you can add)');
   const configDir = process.env['KOPPLER_CONFIG_DIR'] || path.join(os.homedir(), '.config', 'koppler');
@@ -399,8 +417,15 @@ const COMMANDS: Command[] = [
   {
     name: 'add',
     who: 'agent',
-    args: '<repo or folder>...',
-    about: 'add apps to the stack from their clones',
+    args: '<repo or folder>... | --outside "<name>" [--called-by <app,...>] [--sends-to <app,...>] [--url <address>] [--why "<why>"]',
+    forms: [
+      ['<repo or folder>...', 'add apps to the stack from their clones'],
+      [
+        '--outside "<name>" [--called-by <app,...>] [--sends-to <app,...>] [--url <address>] [--why "<why>"]',
+        'add a system that never runs here: called by the apps, or sending to them (a webhook)',
+      ],
+    ],
+    about: 'add apps from their clones, or an outside system they call',
     run: add,
     example: 'koppler add acme/orders-api',
   },

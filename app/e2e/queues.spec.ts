@@ -165,3 +165,25 @@ test('a queue card is joined to its own app on whichever side of the app it is m
   await moveTo(right + 80, app.y + 40);
   expect(Math.abs(((await start())[0] ?? 0) - right)).toBeLessThanOrEqual(1);
 });
+
+test.describe('an outside system that calls an app on the board', () => {
+  test.use({
+    stack: {
+      ...STACK,
+      apps: {
+        ...STACK.apps,
+        psp: { name: 'Pay Provider', kind: 'other', outside: 'sends webhooks', consumes: { orders: {} } },
+      },
+    },
+  });
+
+  test('shows beside it, linked from the outside card, and says its calls go to the deployed app', async ({ page }) => {
+    await expect(outside(page)).toHaveCount(1);
+    await expect(outside(page)).toContainText('Pay Provider');
+    await expect(page.locator('.links .flow.ext')).toHaveCount(1);
+    await expect(outside(page).locator('.outside')).toHaveAttribute(
+      'title',
+      /It sends to the deployed Orders API, not to your local one\./,
+    );
+  });
+});
