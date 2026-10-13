@@ -242,6 +242,9 @@ class Runs {
           ? []
           : [{ text: node.data.branch || app.current || 'current branch', kind: 'host' as const }]),
         ...(app.dirty && onCurrent ? [{ text: `With your ${changes}`, kind: 'flag' as const }] : []),
+        ...(board.uncabled(id)
+          ? [{ text: 'Not cabled to any app here: it runs on its own', kind: 'flag' as const }]
+          : []),
         ...(app.dirty && !onCurrent
           ? [
               {
