@@ -196,7 +196,7 @@
         Branch
         <BranchPicker
           value={data.branch}
-          {current}
+          current={app?.current ?? ''}
           branches={app?.branches ?? []}
           title={app?.dirty && !board.switchesOver(id) ? `Runs with your ${uncommitted}` : undefined}
           onpick={(branch: string) => {

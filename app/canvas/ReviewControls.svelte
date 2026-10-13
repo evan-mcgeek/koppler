@@ -67,10 +67,10 @@
         Branch
         <BranchPicker
           value={data.branch}
-          current={app.current || 'current branch'}
+          current={app.current}
           branches={app.branches}
           onpick={(branch: string) => {
-            set({ branch: branch === app.current ? '' : branch });
+            set({ branch });
           }}
         />
       </label>
