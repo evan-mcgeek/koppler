@@ -110,14 +110,32 @@
     {/if}
     <span class="name" title={data.name}>{data.name}</span>
     <span class="kind">{data.kindLabel}</span>
-    <button
-      class="remove nodrag"
-      type="button"
-      aria-label="Remove {data.name}"
-      onclick={() => {
-        board.remove(id);
-      }}>×</button
-    >
+    <!-- What can be done with the card, as icons in its corner. -->
+    <span class="tools nodrag">
+      {#if live.hasLog(id)}
+        <button
+          type="button"
+          aria-label="Show log"
+          title="Show log"
+          onclick={() => {
+            logs.open(id);
+          }}
+        >
+          <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><path d="M3 4h10M3 8h10M3 12h6" /></svg>
+        </button>
+      {/if}
+      <button
+        class="remove"
+        type="button"
+        aria-label="Remove {data.name}"
+        title="Take off the board"
+        onclick={() => {
+          board.remove(id);
+        }}
+      >
+        <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" /></svg>
+      </button>
+    </span>
   </header>
   {#if brief}
     <p class="glance">
@@ -372,28 +390,17 @@
       </ul>
     {/if}
   {/if}
-  {#if live.hasLog(id) || failed}
+  {#if failed}
     <div class="acts nodrag">
-      {#if live.hasLog(id)}
-        <button
-          class="act"
-          type="button"
-          onclick={() => {
-            logs.open(id);
-          }}>Show log</button
-        >
-      {/if}
-      {#if failed}
-        <!-- The failure goes to the agent with the app and step; it says what it would change and asks before it acts. -->
-        <button
-          class="act fix"
-          type="button"
-          disabled={asked}
-          onclick={async () => {
-            asked = await runs.askToFix(id, `${failed.label}${failed.detail ? `: ${failed.detail}` : ''}`);
-          }}>{asked ? 'Sent to the agent' : 'Ask the agent to fix'}</button
-        >
-      {/if}
+      <!-- The failure goes to the agent with the app and step; it says what it would change and asks before it acts. -->
+      <button
+        class="act fix"
+        type="button"
+        disabled={asked}
+        onclick={async () => {
+          asked = await runs.askToFix(id, `${failed.label}${failed.detail ? `: ${failed.detail}` : ''}`);
+        }}>{asked ? 'Sent to the agent' : 'Ask the agent to fix'}</button
+      >
     </div>
   {/if}
   {#if calls.length}
@@ -504,7 +511,13 @@
   .short .name {
     font-size: 22px;
   }
-  .remove {
+  .tools {
+    display: flex;
+    gap: 1px;
+  }
+  .tools button {
+    display: grid;
+    place-items: center;
     width: 26px;
     height: 26px;
     padding: 0;
@@ -512,13 +525,22 @@
     border-radius: 6px;
     background: none;
     color: var(--muted);
-    font-size: 16px;
-    line-height: 1;
     cursor: pointer;
   }
-  .remove:hover {
+  .tools button:hover,
+  .tools button:focus-visible {
     background: color-mix(in oklab, var(--ink) 8%, transparent);
     color: var(--ink);
+  }
+  .tools .remove:hover {
+    color: var(--bad);
+  }
+  .tools svg {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
   }
   .body {
     display: grid;

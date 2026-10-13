@@ -143,3 +143,19 @@ test.describe('an app that depends on a library cloned here', () => {
     await expect(page.getByRole('dialog')).toContainText('Uses your local @acme/kit');
   });
 });
+
+test('the board has an overview that moves the view, and no mark of the library', async ({ page }) => {
+  const map = page.getByRole('img', { name: 'Overview of the board' });
+  await expect(map).toBeVisible();
+  await page.screenshot({ path: 'test-results/next-overview.png' });
+  const view = () => page.locator('.svelte-flow__viewport').getAttribute('style');
+  const before = await view();
+  const box = await map.boundingBox();
+  if (!box) throw new Error('no overview');
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width / 2 + 30, box.y + box.height / 2 + 20, { steps: 5 });
+  await page.mouse.up();
+  expect(await view()).not.toBe(before);
+  await expect(page.locator('.svelte-flow__attribution')).toHaveCount(0);
+});
