@@ -2,7 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Page } from '@playwright/test';
-import { test, expect, STACK } from './canvas.ts';
+import { test, expect, STACK, actions } from './canvas.ts';
 
 const card = (page: Page, id: string) => page.locator(`.svelte-flow__node[data-id="${id}"]`);
 const at = (x: number, y: number) => ({ x, y, run: 'cli', branch: 'main' });
@@ -28,7 +28,7 @@ test('an app card opens its settings: edits wait for Save, a broken one is refus
   canvas,
 }) => {
   const read = stackFile(canvas.dir);
-  await card(page, 'orders').getByRole('button', { name: 'Settings for Orders API' }).click();
+  await (await actions(page, 'orders')).getByRole('button', { name: 'Settings for Orders API' }).click();
   const panel = page.getByRole('dialog', { name: 'Orders API' });
   await expect(panel.getByLabel('Name', { exact: true })).toHaveValue('Orders API');
   await expect(tabOf(page, 'Runs here')).toHaveAttribute('aria-selected', 'true');
@@ -77,7 +77,7 @@ test('an app card opens its settings: edits wait for Save, a broken one is refus
 
 test('an environment uses its own value only where it is given one', async ({ page, canvas }) => {
   const read = stackFile(canvas.dir);
-  await card(page, 'orders').getByRole('button', { name: 'Settings for Orders API' }).click();
+  await (await actions(page, 'orders')).getByRole('button', { name: 'Settings for Orders API' }).click();
   const panel = page.getByRole('dialog', { name: 'Orders API' });
   await tabOf(page, 'Environments').click();
   const prod = panel.getByRole('region', { name: 'What PROD uses' });
@@ -98,7 +98,7 @@ test('an environment uses its own value only where it is given one', async ({ pa
 
 test('a list item is added in its tab, and closing with changes asks first', async ({ page, canvas }) => {
   const read = stackFile(canvas.dir);
-  await card(page, 'orders').getByRole('button', { name: 'Settings for Orders API' }).click();
+  await (await actions(page, 'orders')).getByRole('button', { name: 'Settings for Orders API' }).click();
   const panel = page.getByRole('dialog', { name: 'Orders API' });
   await tabOf(page, 'Needs first').click();
   await panel
@@ -121,7 +121,7 @@ test("the agent is asked to fill in an app's empty settings, leaving locked ones
     sent.push(route.request().postDataJSON() as (typeof sent)[number]);
     await route.fulfill({ json: { ok: true } });
   });
-  await card(page, 'orders').getByRole('button', { name: 'Settings for Orders API' }).click();
+  await (await actions(page, 'orders')).getByRole('button', { name: 'Settings for Orders API' }).click();
   const panel = page.getByRole('dialog', { name: 'Orders API' });
   await tabOf(page, 'Deployed').click();
   await panel.getByRole('button', { name: 'Lock Deployed URL', exact: true }).click();

@@ -1,6 +1,6 @@
 // The new canvas's board shortcuts: undo and redo, Clear, Fit, and the keyboard on cards.
 import type { Page } from '@playwright/test';
-import { test, expect, nextEdit } from './canvas.ts';
+import { test, expect, nextEdit, actions } from './canvas.ts';
 
 const card = (page: Page, id: string) => page.locator(`.svelte-flow__node[data-id="${id}"]`);
 const cards = (page: Page) => page.locator('.svelte-flow__node-app');
@@ -23,7 +23,7 @@ test('a removed card comes back with its cable on undo, and goes again on redo',
   await expect(cards(page)).toHaveCount(3);
   await expect(undo).toBeDisabled();
   await nextEdit(page);
-  await card(page, 'web').getByRole('button', { name: 'Remove Web Shop' }).click();
+  await (await actions(page, 'web')).getByRole('button', { name: 'Remove Web Shop' }).click();
   await expect(cards(page)).toHaveCount(2);
   await expect(cables(page)).toHaveCount(0);
   await undo.click();

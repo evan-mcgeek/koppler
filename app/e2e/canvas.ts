@@ -155,3 +155,8 @@ export const test = base.extend<{
 // A person's pace between two edits: the board takes edits less than 0.7 seconds apart as one step to undo.
 export const nextEdit = (page: Page) => page.waitForTimeout(800);
 export { expect };
+/** A card's action bar, shown while the card is pointed at. */
+export const actions = async (page: Page, id: string) => {
+  await page.locator(`.svelte-flow__node[data-id="${id}"] header`).hover();
+  return page.locator(`.tools[data-card="${id}"]`);
+};

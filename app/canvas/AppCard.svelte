@@ -2,7 +2,7 @@
   import Cog from './Cog.svelte';
   import Command from './Command.svelte';
   import BranchPicker from './BranchPicker.svelte';
-  import { Handle, Position, useViewport, type NodeProps } from '@xyflow/svelte';
+  import { Handle, NodeToolbar, Position, useViewport, type NodeProps } from '@xyflow/svelte';
   import type { Side } from '../src/core/arrange.ts';
   import { board, FAR_ZOOM, type CardNode } from './board.svelte.ts';
   import { live, progress } from './live.svelte.ts';
@@ -10,7 +10,18 @@
   import { runs } from './run.svelte.ts';
   import { dialogs } from './dialogs.svelte.ts';
 
-  const { id, data, selected }: NodeProps<CardNode> = $props();
+  const { id, data, selected, dragging }: NodeProps<CardNode> = $props();
+  // The action bar shows while the card or the bar is pointed at, and stays a moment as the pointer crosses the gap.
+  let hovered = $state(false);
+  let leaving: ReturnType<typeof setTimeout> | undefined;
+  const show = () => {
+    clearTimeout(leaving);
+    hovered = true;
+  };
+  const hide = () => {
+    leaving = setTimeout(() => (hovered = false), 250);
+  };
+  const bar = $derived(hovered || selected);
   const SIDES: Side[] = ['top', 'right', 'bottom', 'left'];
   const CHANGES = [
     ['set-aside', 'Set aside', 'Kept aside while it runs the other branch, back on Stop'],
@@ -92,6 +103,90 @@
   };
 </script>
 
+<!-- What can be done with the card, in a bar above it while it is pointed at or picked: the title keeps its room. -->
+<NodeToolbar isVisible={bar && !dragging} position={Position.Top} align="end" offset={6}>
+  <span
+    class="tools nodrag"
+    data-card={id}
+    class:reading={board.live}
+    role="toolbar"
+    tabindex="-1"
+    aria-label="{data.name} actions"
+    onpointerenter={show}
+    onpointerleave={hide}
+  >
+    {#if runs.started.includes(id)}
+      <button
+        class="stop"
+        type="button"
+        aria-label="Stop {data.name}"
+        title="Stop this app; its changes stay"
+        onclick={() => void runs.stopApp(id)}
+      >
+        <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"
+          ><rect class="fill" x="4" y="4" width="8" height="8" rx="1.5" /></svg
+        >
+      </button>
+      <button
+        type="button"
+        aria-label="Restart {data.name}"
+        title="Restart this app; the rest keeps running"
+        onclick={() => {
+          runs.start({ restart: id });
+        }}
+      >
+        <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"
+          ><path d="M12.5 8a4.5 4.5 0 1 1-1.6-3.4" /><path d="M11.2 2v2.8H8.4" /></svg
+        >
+      </button>
+    {:else}
+      <button
+        type="button"
+        aria-label="Run {data.name} alone"
+        title="Run alone: just this app and its tunnels, on a board of its own"
+        onclick={() => {
+          runs.alone(id);
+        }}
+      >
+        <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"
+          ><path class="fill" d="M5 3.2v9.6l7.8-4.8z" /></svg
+        >
+      </button>
+    {/if}
+    {#if live.hasLog(id)}
+      <button
+        type="button"
+        aria-label="Show log"
+        title="Show log"
+        onclick={() => {
+          logs.open(id);
+        }}
+      >
+        <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><path d="M3 4h10M3 8h10M3 12h6" /></svg>
+      </button>
+    {/if}
+    <button
+      type="button"
+      aria-label="Settings for {data.name}"
+      title="Settings: every fact the stack has about it"
+      onclick={() => void dialogs.settings?.open({ title: data.name, path: `apps.${id}` })}
+    >
+      <Cog size={15} />
+    </button>
+    <button
+      class="remove"
+      type="button"
+      aria-label="Remove {data.name}"
+      title="Take off the board"
+      onclick={() => {
+        board.remove(id);
+      }}
+    >
+      <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" /></svg>
+    </button>
+  </span>
+</NodeToolbar>
+
 <article
   class="card kind-{data.kind}"
   class:selected
@@ -102,6 +197,8 @@
   class:drop-bad={board.drop?.id === id && !board.drop.ok}
   class:wiring={!!board.draft}
   bind:offsetWidth={width}
+  onpointerenter={show}
+  onpointerleave={hide}
   style:width={brief && fullWidth ? `${String(fullWidth)}px` : undefined}
 >
   <header>
@@ -116,78 +213,6 @@
     {/if}
     <span class="name" title={data.name}>{data.name}</span>
     <span class="kind">{data.kindLabel}</span>
-    <!-- What can be done with the card, as icons in its corner. -->
-    <span class="tools nodrag">
-      {#if runs.started.includes(id)}
-        <button
-          class="stop"
-          type="button"
-          aria-label="Stop {data.name}"
-          title="Stop this app; its changes stay"
-          onclick={() => void runs.stopApp(id)}
-        >
-          <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"
-            ><rect class="fill" x="4" y="4" width="8" height="8" rx="1.5" /></svg
-          >
-        </button>
-        <button
-          type="button"
-          aria-label="Restart {data.name}"
-          title="Restart this app; the rest keeps running"
-          onclick={() => {
-            runs.start({ restart: id });
-          }}
-        >
-          <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"
-            ><path d="M12.5 8a4.5 4.5 0 1 1-1.6-3.4" /><path d="M11.2 2v2.8H8.4" /></svg
-          >
-        </button>
-      {:else}
-        <button
-          type="button"
-          aria-label="Run {data.name} alone"
-          title="Run alone: just this app and its tunnels, on a board of its own"
-          onclick={() => {
-            runs.alone(id);
-          }}
-        >
-          <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"
-            ><path class="fill" d="M5 3.2v9.6l7.8-4.8z" /></svg
-          >
-        </button>
-      {/if}
-      {#if live.hasLog(id)}
-        <button
-          type="button"
-          aria-label="Show log"
-          title="Show log"
-          onclick={() => {
-            logs.open(id);
-          }}
-        >
-          <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><path d="M3 4h10M3 8h10M3 12h6" /></svg>
-        </button>
-      {/if}
-      <button
-        type="button"
-        aria-label="Settings for {data.name}"
-        title="Settings: every fact the stack has about it"
-        onclick={() => void dialogs.settings?.open({ title: data.name, path: `apps.${id}` })}
-      >
-        <Cog size={15} />
-      </button>
-      <button
-        class="remove"
-        type="button"
-        aria-label="Remove {data.name}"
-        title="Take off the board"
-        onclick={() => {
-          board.remove(id);
-        }}
-      >
-        <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" /></svg>
-      </button>
-    </span>
   </header>
   {#if brief}
     <p class="glance">
@@ -558,6 +583,14 @@
   .tools {
     display: flex;
     gap: 1px;
+    padding: 3px;
+    border: 1px solid var(--line);
+    border-radius: 9px;
+    background: var(--panel);
+    box-shadow: var(--lift);
+  }
+  .tools.reading .remove {
+    display: none;
   }
   .tools button {
     display: grid;
@@ -973,8 +1006,7 @@
   .short header {
     min-height: 60px;
   }
-  .short :is(.remove, .port),
-  .far .tools {
+  .short .port {
     display: none;
   }
   .short .progress {

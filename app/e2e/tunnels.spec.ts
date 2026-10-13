@@ -1,6 +1,6 @@
 // The new canvas's tunnel cards: the databases and caches the board's apps reach, beside the app that leads them.
 import type { Page } from '@playwright/test';
-import { test, expect, nextEdit } from './canvas.ts';
+import { test, expect, nextEdit, actions } from './canvas.ts';
 
 const card = (page: Page, id: string) => page.locator(`.svelte-flow__node[data-id="${id}"]`);
 const tunnels = (page: Page) => page.locator('.svelte-flow__node-tunnel');
@@ -105,7 +105,7 @@ test('removing the app takes its tunnel card along, and Delete does not remove a
   await tunnels(page).first().click();
   await page.keyboard.press('Delete');
   await expect(tunnels(page)).toHaveCount(1);
-  await card(page, 'orders').getByRole('button', { name: 'Remove Orders API' }).click();
+  await (await actions(page, 'orders')).getByRole('button', { name: 'Remove Orders API' }).click();
   await expect(tunnels(page)).toHaveCount(0);
 });
 

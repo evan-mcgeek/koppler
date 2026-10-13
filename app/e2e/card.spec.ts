@@ -1,6 +1,6 @@
 // The new canvas's app card: what the user chooses on it.
 import type { Page } from '@playwright/test';
-import { test, expect, nextEdit, STACK } from './canvas.ts';
+import { test, expect, nextEdit, STACK, actions } from './canvas.ts';
 
 const card = (page: Page, id: string) => page.locator(`.svelte-flow__node[data-id="${id}"]`);
 const at = (x: number, y: number) => ({ x, y, run: 'cli', branch: 'main' });
@@ -83,7 +83,7 @@ test('a note for the agent is written on the card, and the card is removed from 
   await expect(note).toHaveValue('run with the new pricing flag on');
   await expect(card(page, 'catalog').getByRole('button', { name: 'Add a note for the agent' })).toHaveCount(0);
 
-  await card(page, 'payments').getByRole('button', { name: 'Remove Payments API' }).click();
+  await (await actions(page, 'payments')).getByRole('button', { name: 'Remove Payments API' }).click();
   await expect(card(page, 'payments')).toHaveCount(0);
   await expect(page.locator('.svelte-flow__edge')).toHaveCount(0);
 });

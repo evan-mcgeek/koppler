@@ -1,5 +1,5 @@
 // What is drawn over what: a card on top hides the cable ends of the card under it, and a group pick leaves no box.
-import { test, expect } from './canvas.ts';
+import { test, expect, actions } from './canvas.ts';
 
 const at = (x: number, y: number) => ({ x, y, run: 'cli', branch: 'main' });
 test.use({
@@ -36,6 +36,6 @@ test('a group picked by dragging an area shows no box around it', async ({ page 
   await expect(page.locator('.svelte-flow__node-app.selected')).not.toHaveCount(0);
   await expect(page.locator('.svelte-flow__selection')).toBeHidden();
   // The cards under where the box was still take a click.
-  await page.getByRole('button', { name: 'Run Payments API alone' }).click();
+  await (await actions(page, 'payments')).getByRole('button', { name: 'Run Payments API alone' }).click();
   await expect(page.getByRole('dialog').filter({ hasText: 'Run on QA' })).toBeVisible();
 });

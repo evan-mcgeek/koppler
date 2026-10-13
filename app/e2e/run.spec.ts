@@ -2,7 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Page } from '@playwright/test';
-import { test, expect, nextEdit, STACK } from './canvas.ts';
+import { test, expect, nextEdit, STACK, actions } from './canvas.ts';
 
 const at = (x: number, y: number) => ({ x, y, run: 'cli', branch: 'main' });
 const review = (page: Page) => page.getByRole('dialog');
@@ -202,7 +202,6 @@ test('Stop has a menu: stop the apps and keep the changes, or shut Koppler down'
 });
 
 test('a card has a play icon to run its app alone, and a stop icon while it runs', async ({ page }) => {
-  const card = page.locator('.svelte-flow__node-app[data-id="orders"]');
   // Running, as the server would report it: the card offers Stop, and only that app is stopped.
   await page.route('**/data/status.json', route =>
     route.fulfill({ json: { apps: { orders: { listening: true } }, running: ['orders', 'canvas'] } }),
@@ -212,14 +211,13 @@ test('a card has a play icon to run its app alone, and a stop icon while it runs
     asked.push(route.request().postDataJSON());
     await route.fulfill({ json: { stopped: ['orders'] } });
   });
-  await card.getByRole('button', { name: 'Stop Orders API' }).click();
+  await (await actions(page, 'orders')).getByRole('button', { name: 'Stop Orders API' }).click();
   await expect(page.getByText('Stopped Orders API. Its changes stay until you revert.')).toBeVisible();
   expect(asked).toEqual([{ app: 'orders' }]);
   await page.screenshot({ path: 'test-results/next-card-icons.png' });
 
   // Not running: play goes straight to the review of that app alone.
-  const web = page.locator('.svelte-flow__node-app[data-id="web"]');
-  await web.getByRole('button', { name: 'Run Web Shop alone' }).click();
+  await (await actions(page, 'web')).getByRole('button', { name: 'Run Web Shop alone' }).click();
   await expect(page.getByRole('button', { name: 'Board: Web Shop alone' })).toBeVisible();
   await expect(review(page).getByRole('button', { name: /Back to/ })).toBeVisible();
 });
@@ -234,8 +232,7 @@ test('a running card has a restart icon: only that app restarts, shown in the re
   await page.route('**/data/status.json', route =>
     route.fulfill({ json: { apps: {}, live, running: ['orders', 'web', 'canvas'] } }),
   );
-  const card = page.locator('.svelte-flow__node-app[data-id="orders"]');
-  await card.getByRole('button', { name: 'Restart Orders API' }).click();
+  await (await actions(page, 'orders')).getByRole('button', { name: 'Restart Orders API' }).click();
   await expect(review(page)).toContainText('you asked to restart it');
   const restarts = review(page).locator('li', { has: page.locator('[data-verb="restarts"]') });
   await expect(restarts).toContainText('Orders API');
@@ -252,10 +249,7 @@ test('restarting a card leaves the cards that were never started alone', async (
   await page.route('**/data/status.json', route =>
     route.fulfill({ json: { apps: {}, live, running: ['orders', 'canvas'] } }),
   );
-  await page
-    .locator('.svelte-flow__node-app[data-id="orders"]')
-    .getByRole('button', { name: 'Restart Orders API' })
-    .click();
+  await (await actions(page, 'orders')).getByRole('button', { name: 'Restart Orders API' }).click();
   await expect(review(page)).toContainText('you asked to restart it');
   await expect(review(page)).not.toContainText('Web Shop');
   await review(page).getByRole('button', { name: 'Run', exact: true }).click();
@@ -344,7 +338,7 @@ test('what stands in the way of a protected run opens a checklist of what to do 
 test('shortcuts leave the board alone while the review is open', async ({ page }) => {
   const cards = page.locator('.svelte-flow__node-app');
   await nextEdit(page);
-  await page.locator('.svelte-flow__node-app[data-id="web"]').getByRole('button', { name: 'Remove Web Shop' }).click();
+  await (await actions(page, 'web')).getByRole('button', { name: 'Remove Web Shop' }).click();
   await expect(cards).toHaveCount(1);
   await page.getByRole('button', { name: 'Run', exact: true }).click();
   await expect(review(page)).toBeVisible();
