@@ -351,17 +351,24 @@ test('shortcuts leave the board alone while the review is open', async ({ page }
   await expect(cards).toHaveCount(2);
 });
 
-test('an app cabled to nothing on the board is flagged in the review, and connected from there', async ({ page }) => {
+test('an app cabled to nothing on the board is flagged in the review, and cabled or kept on its own from there', async ({
+  page,
+}) => {
   await page.getByRole('complementary').getByRole('button', { name: 'Catalog API', exact: true }).click();
   await page.getByRole('button', { name: 'Run', exact: true }).click();
-  const starts = review(page).locator('li', { has: page.locator('[data-verb="starts"]') });
-  await expect(starts).toContainText('Not cabled to any app here: it runs on its own');
-  const connect = starts.getByLabel('Connect');
-  await expect(connect).toHaveValue('');
-  await expect(connect.locator('optgroup[label="Called by"] option')).toHaveText(['Web Shop', 'Orders API']);
+  const alone = review(page).getByRole('group', { name: 'Catalog API is not cabled' });
+  await expect(alone).toContainText('Not cabled to any app here');
+  await expect(alone.getByRole('button')).toHaveText(['Web Shop calls it', 'Orders API calls it', 'Run it on its own']);
   await page.screenshot({ path: 'test-results/next-review-alone.png' });
-  await connect.selectOption({ label: 'Web Shop' });
+  await alone.getByRole('button', { name: 'Web Shop calls it' }).click();
   await expect(page.locator('.svelte-flow__edge[data-id="web>catalog"]')).toHaveCount(1);
-  await expect(review(page)).not.toContainText('Not cabled');
-  await expect(review(page).getByLabel('Connect')).toHaveCount(0);
+  await expect(alone).toHaveCount(0);
+
+  await review(page).getByRole('button', { name: 'Cancel' }).click();
+  await page.locator('.svelte-flow__edge[data-id="web>catalog"]').click();
+  await page.keyboard.press('Backspace');
+  await page.getByRole('button', { name: 'Run', exact: true }).click();
+  await alone.getByRole('button', { name: 'Run it on its own' }).click();
+  await expect(alone).toHaveCount(0);
+  await expect(page.locator('.svelte-flow__edge[data-id="web>catalog"]')).toHaveCount(0);
 });

@@ -18,6 +18,10 @@
         )
       : [],
   );
+  const wire = (from: string, to: string) => {
+    board.connect(from, to);
+    runs.again();
+  };
   const set = (change: Parameters<typeof board.set>[1]) => {
     board.set(id, change);
     runs.again();
@@ -25,6 +29,38 @@
 </script>
 
 {#if app && data}
+  {#if (calls.length || callers.length) && !runs.onItsOwn[id]}
+    <!-- An app no cable reaches is usually one left out by mistake: the cables it can have are one press away. -->
+    <span class="alone" role="group" aria-label="{app.name} is not cabled">
+      <span>Not cabled to any app here, so nothing local calls it and it calls only deployed apps.</span>
+      <span class="picks">
+        {#each callers.slice(0, 3) as other (other.id)}
+          <button
+            type="button"
+            class="cable"
+            onclick={() => {
+              wire(other.id, id);
+            }}>{other.name} calls it</button
+          >
+        {/each}
+        {#each calls.slice(0, 3) as other (other.id)}
+          <button
+            type="button"
+            class="cable"
+            onclick={() => {
+              wire(id, other.id);
+            }}>It calls {other.name}</button
+          >
+        {/each}
+        <button
+          type="button"
+          onclick={() => {
+            runs.onItsOwn[id] = true;
+          }}>Run it on its own</button
+        >
+      </span>
+    </span>
+  {/if}
   <span class="controls">
     {#if app.branches.length}
       <label class="branch">
@@ -39,42 +75,16 @@
         />
       </label>
     {/if}
-    {#if calls.length || callers.length}
-      <label>
-        Connect
-        <select
-          value=""
-          onchange={ev => {
-            const [what, other] = [ev.currentTarget.value[0], ev.currentTarget.value.slice(1)];
-            if (what === '>') board.connect(id, other);
-            else if (what === '<') board.connect(other, id);
-            runs.again();
-          }}
-        >
-          <option value="">Run it on its own</option>
-          {#if calls.length}
-            <optgroup label="Call a local app">
-              {#each calls as other (other.id)}<option value=">{other.id}">{other.name}</option>{/each}
-            </optgroup>
-          {/if}
-          {#if callers.length}
-            <optgroup label="Called by">
-              {#each callers as other (other.id)}<option value="<{other.id}">{other.name}</option>{/each}
-            </optgroup>
-          {/if}
-        </select>
-      </label>
-    {/if}
     {#if board.switchesOver(id)}
       <label>
-        {app.dirty} uncommitted
+        {app.dirty} uncommitted on {app.current}
         <select
           value={data.changes ?? 'set-aside'}
           onchange={ev => {
             set({ changes: ev.currentTarget.value === 'take-along' ? 'take-along' : 'set-aside' });
           }}
         >
-          <option value="set-aside">Set aside</option>
+          <option value="set-aside">Set aside until Stop</option>
           <option value="take-along">Take along</option>
         </select>
       </label>
@@ -110,6 +120,38 @@
 {/if}
 
 <style>
+  .alone {
+    display: grid;
+    gap: 8px;
+    margin: 6px 0 2px;
+    padding: 10px 12px;
+    border: 1px solid color-mix(in oklab, var(--warn) 45%, transparent);
+    border-radius: 8px;
+    background: color-mix(in oklab, var(--warn) 10%, transparent);
+    color: var(--warn);
+    font: 600 12px/1.4 var(--sans);
+  }
+  .picks {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .picks button {
+    padding: 3px 10px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: var(--paper);
+    color: var(--ink);
+    font: 600 12px var(--sans);
+    cursor: pointer;
+  }
+  .picks .cable {
+    border-color: var(--cable);
+    color: var(--cable);
+  }
+  .picks button:hover {
+    background: color-mix(in oklab, var(--ink) 7%, var(--paper));
+  }
   .controls {
     display: flex;
     flex-wrap: wrap;
