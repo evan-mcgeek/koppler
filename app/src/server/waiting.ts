@@ -50,7 +50,7 @@ function describe(tag: string, data: Loose): string {
     case 'koppler-fix':
       return `Fix ${failures.map(one => text(one.connection)).join(', ') || 'what the Flow check found'}`;
     case 'koppler-facts':
-      return `Find the ${env} facts the stack misses`;
+      return data['app'] ? `Fill in ${name(data['app'])}'s settings` : `Find the ${env} facts the stack misses`;
     case 'koppler-reply':
       return 'Your answer to a question';
     case 'koppler-review':

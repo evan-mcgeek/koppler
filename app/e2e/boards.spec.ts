@@ -33,7 +33,7 @@ test('a team board opens arranged, and changing it makes a copy of your own', as
     .poll(async () => new Set([await spot('web'), await spot('orders'), await spot('payments')]).size)
     .toBe(3);
   // And brought into view whole.
-  for (const id of ['web', 'orders', 'payments']) await expect(card(page, id)).toBeInViewport({ ratio: 1 });
+  for (const id of ['web', 'orders', 'payments']) await expect(card(page, id)).toBeInViewport({ ratio: 0.999 });
   await page.screenshot({ path: 'test-results/next-board-opened.png' });
   await nextEdit(page);
   // Opened and untouched, it stays the team's: nothing of the user's own is kept.

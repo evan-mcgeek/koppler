@@ -424,6 +424,26 @@ class Runs {
     );
   }
 
+  /** Asks the agent to fill in an app's settings from its repo: it proposes, waits for a yes, and leaves locked ones alone. */
+  askFill(id: string, empty: string[], locked: string[]): Promise<boolean> {
+    const text = [
+      "Fill in this app's settings in the stack from its repo, using the koppler-run skill.",
+      `APP ${name(id)} (${id})`,
+      `EMPTY ${empty.join(', ') || 'none'}`,
+      `LOCKED ${locked.join(', ') || 'none'} (never change these)`,
+      "Read the app's repo (launch settings, package files, infrastructure, README) to find each fact; leave a field empty when it does not apply. Never read or print a secret value.",
+      'Propose what you would set, and why, wait for the user to confirm, then make each change with koppler stack set apps.' +
+        id +
+        '.<field>; never write stack.json.',
+    ].join('\n');
+    const waiting = (live.status?.agent?.state ?? 'none') === 'none';
+    return this.deliver(
+      text,
+      { tag: 'koppler-facts', data: { env: board.env, app: id, gaps: empty } },
+      waiting ? 'Saved. The agent gets it when one connects.' : 'Sent to the agent',
+    );
+  }
+
   /** Asks the agent to find out why an app failed to start; it says what it would change and asks before acting. */
   askToFix(id: string, step: string): Promise<boolean> {
     const env = board.env.toUpperCase();

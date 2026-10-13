@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Cog from './Cog.svelte';
   import Command from './Command.svelte';
   import BranchPicker from './BranchPicker.svelte';
   import { Handle, Position, useViewport, type NodeProps } from '@xyflow/svelte';
@@ -7,6 +8,7 @@
   import { live, progress } from './live.svelte.ts';
   import { logs } from './logs.svelte.ts';
   import { runs } from './run.svelte.ts';
+  import { dialogs } from './dialogs.svelte.ts';
 
   const { id, data, selected }: NodeProps<CardNode> = $props();
   const SIDES: Side[] = ['top', 'right', 'bottom', 'left'];
@@ -166,6 +168,14 @@
           <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><path d="M3 4h10M3 8h10M3 12h6" /></svg>
         </button>
       {/if}
+      <button
+        type="button"
+        aria-label="Settings for {data.name}"
+        title="Settings: every fact the stack has about it"
+        onclick={() => void dialogs.settings?.open({ title: data.name, path: `apps.${id}` })}
+      >
+        <Cog size={15} />
+      </button>
       <button
         class="remove"
         type="button"
