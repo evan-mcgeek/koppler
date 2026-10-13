@@ -539,7 +539,7 @@ class Board {
       const own = this.env === this.envs[0] ? undefined : app?.envs?.[this.env]?.deployedUrl;
       const address = typeof own === 'string' ? own : (app?.deployedUrl ?? '');
       const host = URL.canParse(address) ? new URL(address).hostname : '';
-      const why = typeof app?.outside === 'string' ? `: ${app.outside}` : '';
+      const why = typeof app?.outside === 'string' ? `: ${app.outside.replace(/\.+$/, '')}` : '';
       return {
         ...(kept as OutsideNode | undefined),
         id,
