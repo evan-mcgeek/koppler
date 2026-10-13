@@ -29,7 +29,7 @@
   const tunnels = $derived(board.tunnelsOf(id));
   const queues = $derived(board.queuesOf(id));
   const hiddenQueues = $derived(queues.filter(queue => board.hiddenQueues[queue]));
-  const noQueues = $derived(queues.length > 0 && !!data.hideQueues);
+  const noQueues = $derived(queues.length > 0 && !data.showQueues);
   const calls = $derived(board.deployedCalls(id));
   /** "Acme Web Portal" reads as "Web Portal" on an Acme card. */
   const short = (name: string) => {
@@ -300,7 +300,7 @@
                   aria-label="Show {data.name}'s queues"
                   checked={!noQueues}
                   onchange={ev => {
-                    board.set(id, { hideQueues: !ev.currentTarget.checked });
+                    board.set(id, { showQueues: ev.currentTarget.checked });
                   }}
                 /><span class="track" aria-hidden="true"></span>{noQueues ? 'Off' : 'On'}
               </label>

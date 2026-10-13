@@ -20,7 +20,7 @@ interface PresetNode {
   branch?: string;
   note?: string;
   tunnels?: false;
-  queues?: false;
+  queues?: true;
 }
 /** A board: a name, apps with how they run, cables between them, and where an opened one came from. */
 export interface Preset {
@@ -132,7 +132,7 @@ export function sanitizePresets(list: unknown): Preset[] {
                 ...(!!node['branch'] && { branch: text(node['branch']) }),
                 ...note(node['note']),
                 ...(node['tunnels'] === false && { tunnels: false as const }),
-                ...(node['queues'] === false && { queues: false as const }),
+                ...(node['queues'] === true && { queues: true as const }),
               },
             ];
           }),
@@ -189,7 +189,7 @@ export function sanitizeLayout(input: unknown): Loose | null {
       ...(!!node['platform'] && { platform: text(node['platform'], 16) }),
       ...note(node['note']),
       ...(node['hideTunnels'] === true && { hideTunnels: true }),
-      ...(node['hideQueues'] === true && { hideQueues: true }),
+      ...(node['showQueues'] === true && { showQueues: true }),
       ...(['set-aside', 'take-along'].includes(changes as string) && { changes }),
       ...(libraries.length > 0 && { libraries }),
     };

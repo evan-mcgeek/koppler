@@ -7,7 +7,7 @@ const queue = (page: Page) => page.locator('.svelte-flow__node-queue');
 const outside = (page: Page) => page.locator('.svelte-flow__node-outside');
 const saved = (page: Page) =>
   page.waitForResponse(r => r.url().includes('/state?') && r.request().method() === 'POST' && r.ok());
-const at = (x: number, y: number) => ({ x, y, run: 'cli', branch: 'main' });
+const at = (x: number, y: number) => ({ x, y, run: 'cli', branch: 'main', showQueues: true });
 const { orders, payments } = STACK.apps;
 const stack = {
   ...STACK,
@@ -97,10 +97,10 @@ test("a queue is hidden from its card; an app's Queues switch takes only that ap
   await expect(ofOrders).not.toBeChecked();
   await expect(queue(page)).toHaveCount(1);
   const state = (await (await page.request.get(`${canvas.url}data/state.json`)).json()) as {
-    nodes: Record<string, { hideQueues?: boolean }>;
+    nodes: Record<string, { showQueues?: boolean }>;
   };
-  expect(state.nodes['orders']?.hideQueues).toBe(true);
-  expect(state.nodes['payments']?.hideQueues).toBeUndefined();
+  expect(state.nodes['orders']?.showQueues).toBeUndefined();
+  expect(state.nodes['payments']?.showQueues).toBe(true);
 
   // With both off the shared queue leaves the board; either one brings it back.
   await ofPayments.uncheck();
@@ -108,6 +108,19 @@ test("a queue is hidden from its card; an app's Queues switch takes only that ap
   await ofOrders.check();
   await expect(queue(page)).toHaveCount(2);
   await expect(page.locator('.links .flow.msg')).toHaveCount(2);
+});
+
+test.describe('a card nobody switched', () => {
+  test.use({
+    board: { env: 'qa', mode: 'auto', nodes: { orders: { x: 0, y: 0, run: 'cli', branch: 'main' } }, edges: [] },
+  });
+  test('is off its queues: they stay deployed and off the board until it is switched on', async ({ page }) => {
+    const on = card(page, 'orders').getByRole('switch', { name: "Show Orders API's queues" });
+    await expect(on).not.toBeChecked();
+    await expect(queue(page)).toHaveCount(0);
+    await on.check();
+    await expect(queue(page)).toHaveCount(2);
+  });
 });
 
 test('a card lists the apps it still calls in the deployed environment, and a click runs one locally too', async ({

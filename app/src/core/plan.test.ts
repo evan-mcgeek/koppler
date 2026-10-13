@@ -125,7 +125,7 @@ test('a queue moving to local restarts only the apps on it', () => {
   const stack = { apps: { api: { publishes: { thumbs: {} } }, worker: { reads: { thumbs: {} } }, web: {} } };
   const withQueues = (queues: Record<string, string>): BoardInput => ({
     env: 'qa',
-    nodes: { api: { run: 'cli' }, worker: { run: 'cli' }, web: { run: 'cli' } },
+    nodes: { api: { run: 'cli', queues: true }, worker: { run: 'cli', queues: true }, web: { run: 'cli' } },
     edges: [],
     queues,
   });
@@ -154,12 +154,12 @@ test('switching an app to a local library, or back, restarts it and says which',
 test('a board keeps only what it understands', () => {
   const read = board({
     env: 'qa',
-    nodes: { api: { note: { not: 'text' }, tunnels: false, queues: false, libraries: ['b', 'a'] }, web: null },
+    nodes: { api: { note: { not: 'text' }, tunnels: false, queues: true, libraries: ['b', 'a'] }, web: { queues: false } },
     edges: [{ from: 'api', to: 'web' }, { from: 'api', to: 'constructor' }, null],
     queues: { thumbs: 'local', other: 'deployed' },
   });
   expect(read.nodes).toEqual({
-    api: { branch: '', run: 'cli', tunnels: false, queues: false, libraries: ['a', 'b'] },
+    api: { branch: '', run: 'cli', tunnels: false, queues: true, libraries: ['a', 'b'] },
     web: { branch: '', run: 'cli' },
   });
   expect(read.edges).toEqual([{ from: 'api', to: 'web' }]);
@@ -174,14 +174,14 @@ test('protected environments come from the stack, or are every one but the first
   expect(isProtected({ envs: ['qa', 'prd'] }, 'prd')).toBe(true);
 });
 
-test('an app that keeps the deployed queues does not restart when its queue goes local for the others', () => {
+test('an app not switched onto its queues does not restart when its queue goes local for the others', () => {
   const on = (queues: Record<string, string>, nodes: NonNullable<BoardInput['nodes']>): BoardInput => ({
     env: 'qa',
     nodes,
     edges: [],
     queues,
   });
-  const both = { pub: { run: 'cli' as const }, sub: { run: 'cli' as const, queues: false } };
+  const both = { pub: { run: 'cli' as const, queues: true }, sub: { run: 'cli' as const } };
   const options = { running: () => true, queuesOf: () => ['orders'] };
   const moved = plan(on({}, both), on({ orders: 'local' }, both), options);
   expect(moved.restarts.map(step => step.id)).toEqual(['pub']);
@@ -189,7 +189,7 @@ test('an app that keeps the deployed queues does not restart when its queue goes
   // Taking the choice back while the queue is local moves it over.
   const back = plan(
     on({ orders: 'local' }, both),
-    on({ orders: 'local' }, { ...both, sub: { run: 'cli' as const } }),
+    on({ orders: 'local' }, { ...both, sub: { run: 'cli' as const, queues: true } }),
     options,
   );
   expect(back.restarts.find(step => step.id === 'sub')?.why).toEqual(['it moves to the local orders queue']);

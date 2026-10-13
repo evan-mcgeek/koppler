@@ -109,7 +109,7 @@
       board.env,
       board.queues,
       board.hiddenQueues,
-      board.nodes.map(node => [node.id, node.data.hideTunnels, node.data.hideQueues]),
+      board.nodes.map(node => [node.id, node.data.hideTunnels, node.data.showQueues]),
     ]),
   );
   $effect(() => {

@@ -10,8 +10,8 @@ export interface BoardNode {
   platform?: string;
   note?: string;
   tunnels?: false;
-  /** It keeps the deployed queues, even one the board runs locally for other apps. */
-  queues?: false;
+  /** It is on its queues: a queue the board runs locally is the local one for it too. Off by default. */
+  queues?: true;
   changes?: string;
   libraries?: string[];
   /** Asked to start again, though nothing about it changed. */
@@ -86,7 +86,7 @@ const nodeOf = (n: NodeInput | null): BoardNode => ({
   ...(n?.platform && { platform: n.platform }),
   ...(text(n?.note) && { note: text(n?.note) }),
   ...(n?.tunnels === false && { tunnels: false as const }),
-  ...(n?.queues === false && { queues: false as const }),
+  ...(n?.queues === true && { queues: true as const }),
   ...(text(n?.changes) && { changes: text(n?.changes) }),
   ...(Array.isArray(n?.libraries) && n.libraries.length > 0 && { libraries: n.libraries.map(String).sort() }),
   ...(n?.restart === true && { restart: true as const }),
@@ -145,7 +145,7 @@ function reasonsToRestart(
   for (const l of had.filter(x => !has.includes(x))) why.push(`it goes back to the published ${l}`);
   // An app on a queue that moves between local and deployed starts again with the other queue's address. An app
   // that keeps the deployed queues is on the deployed one whatever the board runs locally.
-  const onLocal = (side: Board, node: BoardNode, q: string) => node.queues !== false && Object.hasOwn(side.queues, q);
+  const onLocal = (side: Board, node: BoardNode, q: string) => node.queues === true && Object.hasOwn(side.queues, q);
   for (const q of o.queuesOf?.(id) ?? [])
     if (onLocal(live, now, q) !== onLocal(want, next, q))
       why.push(`it moves to the ${onLocal(want, next, q) ? 'local' : 'deployed'} ${q} queue`);

@@ -104,12 +104,12 @@ try {
   assert.deepEqual(cards.web.libraries, ['acme-ui', '@acme/kit']);
   assert.equal('libraries' in cards.orders, false);
   // A card's own "no queues" choice is kept, on the board and in a saved board; anything but that exact choice is not.
-  const noQueues = JSON.stringify({ nodes: { web: { x: 0, y: 0, hideQueues: true }, orders: { x: 0, y: 0, hideQueues: 'yes' } }, edges: [], env: 'qa', mode: 'auto', presets: [{ name: 'Q', version: 1, nodes: { web: { run: 'cli', queues: false }, orders: { run: 'cli', queues: true } }, edges: [] }] });
+  const noQueues = JSON.stringify({ nodes: { web: { x: 0, y: 0, showQueues: true }, orders: { x: 0, y: 0, showQueues: 'yes' } }, edges: [], env: 'qa', mode: 'auto', presets: [{ name: 'Q', version: 1, nodes: { web: { run: 'cli', queues: true }, orders: { run: 'cli', queues: false } }, edges: [] }] });
   assert.equal((await call('POST', save, json, noQueues)).status, 204);
   const quiet = JSON.parse((await call('GET', `${page.pathname}data/state.json`)).body.toString());
-  assert.equal(quiet.nodes.web.hideQueues, true);
-  assert.equal('hideQueues' in quiet.nodes.orders, false);
-  assert.deepEqual(quiet.presets[0].nodes, { web: { run: 'cli', queues: false }, orders: { run: 'cli' } });
+  assert.equal(quiet.nodes.web.showQueues, true);
+  assert.equal('showQueues' in quiet.nodes.orders, false);
+  assert.deepEqual(quiet.presets[0].nodes, { web: { run: 'cli', queues: true }, orders: { run: 'cli' } });
   // Queue choices and the places of queue and outside cards are kept; anything else under those names is not.
   const withQueues = JSON.stringify({ nodes: {}, edges: [], env: 'qa', mode: 'auto', queues: { orders: 'local', mail: 'deployed', 'Bad Id': 'local' }, hiddenQueues: { audit: true, mail: false }, infra: { 'queue:orders': { x: 1, y: 2 }, 'outside:billing': { x: 3, y: 4 }, 'tunnel:db.example:5432': { x: 5, y: 6 }, 'queue:Bad Id': { x: 7, y: 8 }, other: { x: 9, y: 9 } } });
   assert.equal((await call('POST', save, json, withQueues)).status, 204);
