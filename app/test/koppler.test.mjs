@@ -26,6 +26,16 @@ const [crashy, upA, upB, tunA, tunB, runA, runB, agentA, agentB, leftA, leftB] =
   assert.match(koppler('run', 'stubborn', '--', 'sh', '-c', '(trap "" TERM; exec sleep 31339) & wait'), /started stubborn/);
   assert.match(koppler('stop', 'stubborn'), /stubborn: stopped \(killed after 8s\)/);
   assert.equal(spawnSync('pgrep', ['-f', 'sleep 31339']).status, 1);
+  // With a readiness path, "started" waits for it: the port answers first, while /health still says 503.
+  const [slow] = await freePorts(1);
+  const server = wait => `const t = Date.now(); require('http').createServer((q, r) => { r.statusCode = Date.now() - t < ${wait} ? 503 : 200; r.end(); }).listen(${slow});`;
+  assert.match(koppler('run', 'slow', '--port', String(slow), '--ready', '/health', '--', 'node', '-e', server(2500)), /waiting for slow to be ready at \/health…[\s\S]*started slow/);
+  assert.match(koppler('stop', 'slow'), /slow: stopped/);
+  // One that never gets ready is not reported as started, and says what it answers.
+  env.KOPPLER_START_WAIT = '3';
+  assert.match(koppler('run', 'slow', '--port', String(slow), '--ready', '/health', '--', 'node', '-e', server(600000)), /slow is running \(pid \d+\) but is not ready: it answers 503 at \/health after 3s/);
+  delete env.KOPPLER_START_WAIT;
+  assert.match(koppler('stop', 'slow'), /slow: stopped/);
   fs.rmSync(dir, { recursive: true });
   console.log('handover ok');
 }

@@ -103,6 +103,17 @@ const App = z.looseObject(
     deployedUrl: z.string().optional(),
     /** The shell command that starts it, run in its clone. */
     start: start.optional(),
+    /** When it is ready: a GET of this path on its `url` answers, with this status when one is given. */
+    ready: z
+      .looseObject(
+        {
+          path: z.string().regex(/^\/\S*$/, { error: 'a path that starts with /' }),
+          status: z.int().min(100).max(599).optional(),
+          timeout: z.number().positive().optional(),
+        },
+        { error: 'an object with a path' },
+      )
+      .optional(),
     prereqs: z.array(Prereq, { error: 'a list' }).optional(),
     secrets: z.array(Secret, { error: 'a list' }).optional(),
     consumes: z.record(z.string(), Call, { error: 'an object' }).optional(),

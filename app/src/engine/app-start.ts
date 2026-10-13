@@ -13,7 +13,7 @@ import { repoFiles } from './investigate.ts';
 import { readJson } from '../json-files.ts';
 import { BIN, CODE } from '../paths.ts';
 import { resolveDevice, type RunDevice } from './devices.ts';
-import { sh, type RunOptions } from './processes.ts';
+import { sh, type Ready, type RunOptions } from './processes.ts';
 
 // Koppler's own folder, where its runners (Lambda, SAM) are.
 
@@ -25,6 +25,7 @@ export interface AppStart {
   onStop: string[][] | undefined;
   device: RunDevice | undefined;
   env: string;
+  ready?: Ready;
 }
 
 /** An app as an environment has it: what the stack says for that environment laid over the app. */
@@ -162,5 +163,14 @@ export function appStart(id: string, options: RunOptions): AppStart | null {
     onStop: start.onStop,
     device,
     env,
+    // On its own address, so an https app is asked over https.
+    ...(app.ready &&
+      app.url && {
+        ready: {
+          url: new URL(app.ready.path, app.url).toString(),
+          status: app.ready.status,
+          timeout: app.ready.timeout,
+        },
+      }),
   };
 }
