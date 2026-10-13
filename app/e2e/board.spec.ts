@@ -291,3 +291,30 @@ test.describe('a board taller than the window', () => {
     expect(await width()).toBe(wide);
   });
 });
+
+test('cards still move after a system shortcut swallowed the key-ups of Cmd and Shift', async ({ page }) => {
+  for (const keys of [['Meta', 'Shift'], ['Shift'], ['Meta']]) {
+    // The keys go down, the system takes over (a screenshot), and the page never hears them come up.
+    await page.evaluate(down => {
+      for (const key of down)
+        document.body.dispatchEvent(
+          new KeyboardEvent('keydown', {
+            key,
+            metaKey: down.includes('Meta'),
+            shiftKey: key === 'Shift',
+            bubbles: true,
+          }),
+        );
+    }, keys);
+    for (const id of ['web', 'orders', 'web']) {
+      const from = (await middle(card(page, id))).box;
+      await page.mouse.move(from.x + 100, from.y + 20);
+      await page.mouse.down();
+      await page.mouse.move(from.x + 100, from.y + 60, { steps: 6 });
+      await page.mouse.up();
+      await expect
+        .poll(async () => (await middle(card(page, id))).box.y, { message: `${keys.join('+')}: ${id}` })
+        .toBeGreaterThan(from.y + 30);
+    }
+  }
+});

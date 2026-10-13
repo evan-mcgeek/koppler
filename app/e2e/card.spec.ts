@@ -24,10 +24,31 @@ test.use({
 
 test("a card offers the clone's branches, who starts it, and for a mobile app its platform", async ({ page }) => {
   const branch = card(page, 'orders').getByLabel('Branch');
-  await expect(card(page, 'orders').locator('datalist option')).toHaveCount(2);
-  await branch.fill('feature/checkout');
-  await branch.blur();
+  // The field opens a list of the clone's branches, with the one it is on marked; typing filters it.
+  const options = page.getByRole('listbox').locator('.name');
+  await branch.click();
+  await expect(options).toHaveText(['main', 'feature/checkout']);
+  await expect(page.getByRole('option', { name: 'main' })).toContainText('current');
+  await page.screenshot({
+    path: '/private/tmp/claude-501/-Users-ivan-yanowsky-development-projects-koppler-refactor-app/2a98c5cd-14c0-4af0-bf1f-d51d26a1f8e3/scratchpad/picker.png',
+  });
+  await branch.pressSequentially('check');
+  await expect(options).toHaveText(['feature/checkout']);
+  await branch.press('Enter');
   await expect(branch).toHaveValue('feature/checkout');
+  await expect(page.getByRole('listbox')).toBeHidden();
+  // Escape leaves the branch as it was; a name the clone does not list is kept when the field is left.
+  await branch.click();
+  await branch.pressSequentially('zzz');
+  await expect(page.getByRole('listbox')).toContainText('No branch matches. Enter keeps "zzz".');
+  await branch.press('Escape');
+  await expect(branch).toHaveValue('feature/checkout');
+  await branch.click();
+  await options.filter({ hasText: 'main' }).click();
+  await expect(branch).toHaveValue('main');
+  await branch.fill('not/pushed-yet');
+  await branch.blur();
+  await expect(branch).toHaveValue('not/pushed-yet');
 
   await expect(card(page, 'mobile').getByLabel('Platform')).toHaveValue('ios');
   await card(page, 'mobile').getByLabel('Platform').selectOption('android');

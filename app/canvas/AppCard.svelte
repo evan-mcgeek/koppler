@@ -1,4 +1,5 @@
 <script lang="ts">
+  import BranchPicker from './BranchPicker.svelte';
   import { Handle, Position, useViewport, type NodeProps } from '@xyflow/svelte';
   import type { Side } from '../src/core/arrange.ts';
   import { board, FAR_ZOOM, type CardNode } from './board.svelte.ts';
@@ -190,22 +191,15 @@
     <div class="body" onmousedowncapture={hold} onclick={release}>
       <label class="field">
         Branch
-        <!-- The clone's branches are offered as it is typed in; a name they do not list is kept too. -->
-        <input
-          class="mono"
-          list="branches-{id}"
-          autocomplete="off"
-          spellcheck="false"
-          placeholder={current}
-          title={app?.dirty && !board.switchesOver(id) ? `Runs with your ${uncommitted}` : undefined}
+        <BranchPicker
           value={data.branch}
-          onchange={ev => {
-            board.set(id, { branch: ev.currentTarget.value.trim() });
+          {current}
+          branches={app?.branches ?? []}
+          title={app?.dirty && !board.switchesOver(id) ? `Runs with your ${uncommitted}` : undefined}
+          onpick={(branch: string) => {
+            board.set(id, { branch });
           }}
         />
-        <datalist id="branches-{id}">
-          {#each app?.branches ?? [] as branch (branch)}<option value={branch}></option>{/each}
-        </datalist>
       </label>
       {#if board.switchesOver(id)}
         <div
@@ -616,20 +610,6 @@
     border-bottom: 1.5px solid var(--muted);
     transform: translateY(-70%) rotate(45deg);
     pointer-events: none;
-  }
-  .field > input {
-    width: 100%;
-    height: 30px;
-    padding: 0 8px;
-    border: 1px solid var(--line);
-    border-radius: 6px;
-    background: var(--paper);
-    color: var(--ink);
-    font: 12px var(--mono);
-    text-overflow: ellipsis;
-  }
-  .field > input::placeholder {
-    color: var(--muted);
   }
   select {
     width: 100%;

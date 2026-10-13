@@ -125,6 +125,18 @@ try {
   assert.equal(scan.status, 500);
   assert.match(JSON.parse(scan.body.toString()).error, /\S/);
   assert.equal((await call('POST', '/rescan?token=wrong', json, '{}')).status, 404);
+  // A run Koppler could not start says why on the canvas; no agent has to be listening. Here no stack is loaded.
+  {
+    const run = { tag: 'koppler', text: 'Run on QA: Orders', data: { id: 'refused1', env: 'qa', mode: 'auto', nodes: [{ id: 'orders', run: 'cli' }], edges: [] } };
+    assert.equal((await call('POST', `/prompt?token=${token}`, json, JSON.stringify(run))).status, 204);
+    const shown = () => JSON.parse(status().slice(status().indexOf('{'), status().lastIndexOf('}') + 1)).messages ?? [];
+    await until('the refusal on the canvas', () => shown().length > 0);
+    const [refusal] = shown();
+    assert.equal(refusal.kind, 'failure');
+    assert.equal(refusal.run, 'refused1');
+    assert.equal(refusal.from, 'koppler');
+    assert.match(refusal.summary, /no stack loaded/);
+  }
   console.log('server tests ok');
   // A card's Stop: only the app it names is stopped, by the name Koppler gave its process; the rest keeps running.
   {

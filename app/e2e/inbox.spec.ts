@@ -106,3 +106,26 @@ test('what was sent while no agent listened is listed in the panel, and can be d
   const left = fs.readFileSync(queue, 'utf8').split('\n').filter(Boolean);
   expect(left.map(line => (JSON.parse(line) as { tag: string }).tag)).toEqual(['koppler-stop']);
 });
+
+test('what Koppler could not start opens the panel by itself, with the command to run', async ({ page }) => {
+  const panel = page.getByRole('dialog', { name: 'Messages from the agent' });
+  let messages: object[] = [];
+  await page.route('**/data/status.json', route => route.fulfill({ json: { apps: {}, messages } }));
+  await expect(page.locator('header .agent')).toHaveText('No agent');
+  await expect(panel).toHaveCount(0);
+  messages = [
+    {
+      id: 'k1',
+      kind: 'failure',
+      from: 'koppler',
+      at: new Date().toISOString(),
+      run: 'run12345',
+      title: 'Koppler could not finish this run',
+      summary: 'Sign in first: Web Shop needs AWS (acme-dev) at start.',
+      sections: [{ title: '', items: [], commands: ['aws sso login --profile acme-dev'] }],
+    },
+  ];
+  await expect(panel).toContainText('Sign in first: Web Shop needs AWS (acme-dev) at start.');
+  await expect(panel.locator('.cmd code')).toHaveText('aws sso login --profile acme-dev');
+  await expect(panel.getByRole('button', { name: 'Copy' })).toBeVisible();
+});

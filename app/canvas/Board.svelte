@@ -80,6 +80,21 @@
       'M5 8V3.6a1 1 0 0 1 2 0V7.5M7 7V2.8a1 1 0 0 1 2 0V7M9 7.2V3.6a1 1 0 0 1 2 0V8.5M11 8V5.6a1 1 0 0 1 2 0V9.5c0 2.6-1.8 4.5-4.4 4.5H8c-1.5 0-2.5-.6-3.4-1.8L2.8 9.8a1 1 0 0 1 1.6-1.1L5 9.4',
     ],
   ] as const;
+  // A key the system takes over mid-press (a screenshot shortcut) never sends its key-up, and the board would keep
+  // selecting instead of moving cards: the mouse says which keys are really held.
+  const FLAGS = { Shift: 'shiftKey', Meta: 'metaKey', Control: 'ctrlKey', Alt: 'altKey' } as const;
+  const held = { Shift: false, Meta: false, Control: false, Alt: false };
+  const hold = (ev: KeyboardEvent) => {
+    if (!(ev.key in FLAGS)) return;
+    held[ev.key as keyof typeof FLAGS] = ev.type === 'keydown';
+  };
+  const release = (ev: PointerEvent) => {
+    const keys = Object.keys(FLAGS) as (keyof typeof FLAGS)[];
+    if (keys.every(key => !held[key] || ev[FLAGS[key]])) return;
+    for (const key of keys) held[key] = false;
+    // What the library does when the window loses focus: every key it tracks is let go.
+    window.dispatchEvent(new Event('blur'));
+  };
   const shortcut = (ev: KeyboardEvent) => {
     if (ev.altKey || (ev.target as Element).closest('input, select, textarea')) return;
     // A dialog or a menu over the board has the keyboard to itself.
@@ -236,7 +251,14 @@
   });
 </script>
 
-<svelte:window onkeydown={shortcut} />
+<svelte:window
+  onkeydown={(ev: KeyboardEvent) => {
+    hold(ev);
+    shortcut(ev);
+  }}
+  onkeyup={hold}
+  onpointermovecapture={release}
+/>
 
 <!-- A card reached with Tab is the picked one: the arrow keys move it straight away. -->
 <div
