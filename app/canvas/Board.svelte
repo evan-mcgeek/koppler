@@ -33,7 +33,7 @@
   board.area = () => area?.getBoundingClientRect() ?? new DOMRect();
   // Brings a card to the middle of the board, at the zoom the board is at, and picks it.
   board.show = id => {
-    board.nodes = board.nodes.map(node => ({ ...node, selected: node.id === id }));
+    board.pick(id);
     const zoom = flow.getZoom();
     void flow.fitView({ nodes: [{ id }], minZoom: zoom, maxZoom: zoom, duration: 200 });
   };
@@ -278,8 +278,7 @@
     const id = (ev.target as Element).matches('.svelte-flow__node')
       ? (ev.target as Element).getAttribute('data-id')
       : null;
-    if (id && !board.nodes.find(node => node.id === id)?.selected)
-      board.nodes = board.nodes.map(node => ({ ...node, selected: node.id === id }));
+    if (id && ![...board.nodes, ...board.infra].find(node => node.id === id)?.selected) board.pick(id);
   }}
 >
   <SvelteFlow
