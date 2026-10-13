@@ -439,7 +439,11 @@ async function gatherSession(stop: Run): Promise<void> {
   try {
     const { isDev, collectSession } = await import('./session.ts');
     if (!isDev()) return;
-    const dir = collectSession({ temp: temp(), logsDir: path.join(stateDir(), 'logs'), stop, runs: runs() });
+    const { dir, quiet } = collectSession({ temp: temp(), logsDir: path.join(stateDir(), 'logs'), stop, runs: runs() });
+    if (quiet) {
+      console.log(`Session gathered in ${dir}; nothing went wrong, so no review is queued.`);
+      return;
+    }
     const review = `The session ended with a full Stop. Review it using the koppler-run skill: read ${dir}/summary.md and the files next to it, find every problem the user ran into, fix them in Koppler, verify each fix, and report.`;
     const prompt = { tag: 'koppler-review', at: stamp(), text: review, data: { dir } };
     fs.appendFileSync(path.join(temp(), 'prompts.jsonl'), JSON.stringify(prompt) + '\n', { mode: 0o600 });
@@ -452,7 +456,7 @@ async function gatherSession(stop: Run): Promise<void> {
 /** `koppler history --session`: what happened since the last finished Stop, gathered for the agent to read. */
 export async function sessionCommand(): Promise<void> {
   const { collectSession } = await import('./session.ts');
-  const dir = collectSession({ temp: temp(), logsDir: path.join(stateDir(), 'logs'), runs: runs() });
+  const { dir } = collectSession({ temp: temp(), logsDir: path.join(stateDir(), 'logs'), runs: runs() });
   console.log(fs.readFileSync(path.join(dir, 'summary.md'), 'utf8').trimEnd());
   console.log(`\nThe files are in ${dir}; they stay on this Mac.`);
 }

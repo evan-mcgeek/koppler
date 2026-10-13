@@ -57,7 +57,7 @@ export function collectSession({
   /** The Stop that ended it; without one, the session still going on is gathered, into `current`. */
   stop?: { id: string } | undefined;
   runs: SessionRun[];
-}): string {
+}): { dir: string; quiet: boolean } {
   const at = stop ? runs.findIndex(run => run.id === stop.id) : runs.length - 1;
   const before = runs.slice(0, stop ? at : at + 1).findLastIndex(run => run.kind === 'stop' && run.state === 'done');
   const session = runs.slice(before + 1, at + 1);
@@ -145,7 +145,8 @@ export function collectSession({
       : 'No error-like lines in app logs.',
   ];
   write('summary.md', summary.join('\n') + '\n');
-  return dir;
+  const quiet = ![failed, left, pageErrors, questions, repeats, logProblems].some(list => list.length);
+  return { dir, quiet };
 }
 
 /** The previous log of an app is kept before a new run starts, so a session keeps every run's output (rolling, 5 MB). */
