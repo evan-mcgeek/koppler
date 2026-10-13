@@ -2,6 +2,7 @@
 // request the agent or Koppler gets once it is confirmed. The plan itself is core/plan.
 import { describe, plan, type Plan } from '../src/core/plan.ts';
 import { board } from './board.svelte.ts';
+import { openBoard } from './boards.ts';
 import { post, save } from './data.ts';
 import { live } from './live.svelte.ts';
 import { toasts } from './toast.svelte.ts';
@@ -560,6 +561,30 @@ class Runs {
         });
       },
     };
+  }
+
+  /** Run alone: one app and its tunnels on a board of its own, straight to the review, which leads back. */
+  alone(id: string): void {
+    const before = board.alone(id);
+    this.start();
+    if (!before || !this.review) return;
+    this.review = {
+      ...this.review,
+      back: {
+        label: `Back to ${before.name}`,
+        run: () => {
+          openBoard(before);
+        },
+      },
+    };
+  }
+
+  /** Stops one app; its branch and code changes stay. */
+  async stopApp(id: string): Promise<void> {
+    const done = await post<{ stopped: string[] }>('stop-apps', { app: id });
+    if ('stopped' in done && done.stopped.length)
+      toasts.show(`Stopped ${name(id)}. Its changes stay until you revert.`);
+    else toasts.show(`Could not stop ${name(id)}.`, 'warning');
   }
 
   /** Stops the agent's listener and the canvas server; what runs keeps running. */

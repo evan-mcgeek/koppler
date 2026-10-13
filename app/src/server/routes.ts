@@ -253,8 +253,10 @@ export const ROUTES: Record<string, Route> = {
   '/debug-log': body => ({ status: 200, body: appendDebugLog(body['entries']) }),
   '/debug-clear': () => ({ status: 200, body: clearDebugLog() }),
   // Stop apps, keep changes: everything Koppler runs except this canvas; branches and code changes stay for a later Revert.
-  '/stop-apps': async () => {
-    const { failed, out } = await koppler(['stop', '--apps', '--yes'], 60000);
+  // With an app, only that one.
+  '/stop-apps': async body => {
+    const app = body['app'];
+    const { failed, out } = await koppler(typeof app === 'string' ? ['stop', app] : ['stop', '--apps', '--yes'], 60000);
     const stopped = out
       .trim()
       .split('\n')
