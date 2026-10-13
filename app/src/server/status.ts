@@ -251,7 +251,7 @@ async function snapshot(serving: boolean): Promise<Status> {
   status['startedAt'] = STARTED_AT;
   if (DEV) status['dev'] = true;
   status['start'] = 'koppler canvas';
-  if (codeVersion() > STARTED_CODE) status['restart'] = 'koppler stop canvas && koppler canvas';
+  if (codeVersion() > STARTED_CODE) status['restart'] = 'koppler canvas stop && koppler canvas start';
   return status;
 }
 

@@ -8,7 +8,7 @@ Apps and tunnels that `koppler` starts run detached, so they keep running after 
 | Command | What it does |
 |---|---|
 | `koppler init [--new "<name>" --envs qa,prod]` | Find your repos and the stack, or start a new stack and pick its apps |
-| `koppler canvas [--board "<name>"] [--stop]` | Start the canvas if needed and open it in your browser, on a board when one is named |
+| `koppler canvas [start] [--board "<name>"] \| stop` | Start the canvas if needed and open it in your browser, on a board when one is named; `stop` stops it |
 | `koppler use [stack] [--boards]` | List the stacks on this machine (`*` marks the one in use), switch to one, or list its boards |
 | `koppler link <url> \| --update \| --discard \| --pr` | Use a stack shared on GitHub; then bring in its changes, drop yours, or open a pull request with yours |
 | `koppler doctor [app...] [--env <env>]` | Can it run here: the tools your stack needs, then what you still have to do for these apps |

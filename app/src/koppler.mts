@@ -272,10 +272,10 @@ const COMMANDS: Command[] = [
   {
     name: 'canvas',
     who: 'you',
-    args: '[--board "<name>"] [--stop] [--no-open]',
-    about: 'start the canvas if needed and open it, on a board when one is named',
+    args: '[start] [--board "<name>"] [--no-open] | stop',
+    about: 'start the canvas if needed and open it, on a board when one is named; stop stops it',
     run: canvas,
-    example: 'koppler canvas',
+    example: 'koppler canvas stop && koppler canvas start',
   },
   {
     name: 'use',
