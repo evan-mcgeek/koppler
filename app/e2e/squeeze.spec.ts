@@ -56,3 +56,38 @@ test.describe('in full', () => {
       .toBe('number');
   });
 });
+
+test.describe('in Live', () => {
+  test.use({
+    board: {
+      env: 'qa',
+      mode: 'auto',
+      zoom: 1,
+      pan: { x: 120, y: 80 },
+      nodes: { web: at(0, 0), orders: at(0, 500), payments: at(500, 500), catalog: at(0, 1000) },
+      edges: [
+        { from: 'web', to: 'orders', fromSide: 'bottom', toSide: 'top' },
+        { from: 'orders', to: 'payments', fromSide: 'right', toSide: 'left' },
+        { from: 'orders', to: 'catalog', fromSide: 'bottom', toSide: 'top' },
+      ],
+    },
+  });
+
+  test('Arrange leaves room between the cards', async ({ page }) => {
+    await expect(card(page, 'catalog')).toBeVisible();
+    await page.getByRole('radio', { name: 'Live' }).check();
+    await page.getByRole('button', { name: 'Arrange' }).click();
+    await page.waitForTimeout(800);
+    const boxes = await Promise.all(['web', 'orders', 'payments', 'catalog'].map(id => box(page, id)));
+    for (const [i, a] of boxes.entries())
+      for (const b of boxes.slice(i + 1))
+        expect(
+          a.x + a.width + 20 <= b.x ||
+            b.x + b.width + 20 <= a.x ||
+            a.y + a.height + 20 <= b.y ||
+            b.y + b.height + 20 <= a.y,
+          `${JSON.stringify(a)} and ${JSON.stringify(b)} touch`,
+        ).toBe(true);
+    await page.screenshot({ path: 'test-results/next-live-arranged.png' });
+  });
+});

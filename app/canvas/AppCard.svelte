@@ -537,7 +537,12 @@
     text-wrap: balance;
     overflow-wrap: break-word;
   }
+  /* A word is never broken: what follows the name goes to the next line instead. */
+  .short header {
+    flex-wrap: wrap;
+  }
   .short .name {
+    min-width: min-content;
     font-size: 22px;
   }
   .tools {

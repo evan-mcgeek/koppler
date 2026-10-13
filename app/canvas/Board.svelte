@@ -270,25 +270,28 @@
   };
   // Each card's last height and the form it was measured in: a change of form is not the card growing.
   const heights: Record<string, { brief: string; height: number } | undefined> = {};
-  // Each card's size in full: zoomed out it is drawn, and so measured, in its short form.
-  const full: Record<string, { w: number; h: number; live: boolean } | undefined> = {};
+  // Each card's size in full, as Edit draws it close up: the board is laid out for that, in Live too.
+  const full: Record<string, { w: number; h: number } | undefined> = {};
   $effect(() => {
-    if (viewport.current.zoom < FAR_ZOOM) return;
-    for (const [id, { w, h }] of board.boxes) full[id] = { w, h, live: board.live };
-    if (board.live) return;
+    if (viewport.current.zoom < FAR_ZOOM || board.live) return;
+    for (const [id, { w, h }] of board.boxes) full[id] = { w, h };
     const heights = Object.fromEntries([...board.boxes].map(([id, box]) => [id, Math.round(box.h)]));
     if (Object.entries(heights).some(([id, h]) => board.fullHeights[id] !== h))
       untrack(() => (board.fullHeights = { ...board.fullHeights, ...heights }));
   });
   const arrange = async () => {
-    // Cards are placed by their full size, so pressing again changes nothing, whatever the zoom.
-    // Only a card never seen in full brings the board in close first, to be measured.
-    if (viewport.current.zoom < FAR_ZOOM && !board.nodes.every(node => full[node.id]?.live === board.live)) {
+    // Cards are placed by their full size, so pressing again changes nothing, whatever the zoom or the view.
+    // In Edit, a card never seen in full brings the board in close first, to be measured.
+    if (!board.live && viewport.current.zoom < FAR_ZOOM && !board.nodes.every(node => full[node.id])) {
       await flow.setZoom(1, { duration: 0 });
       await frame();
       await frame();
     }
-    const size = (id: string) => full[id] ?? board.boxes.get(id) ?? { w: 260, h: 160 };
+    // Short cards keep their full width; their full height is the one kept with the board.
+    const size = (id: string) => {
+      const box = board.boxes.get(id) ?? { w: 260, h: 160 };
+      return full[id] ?? { w: box.w, h: board.fullHeights[id] ?? box.h };
+    };
     board.arrange(size);
     // The cards move first; the view follows once they are placed.
     requestAnimationFrame(() => void fit());
