@@ -1,12 +1,12 @@
 <script lang="ts">
   // A card's choices, inside the review: what an app starts with can be changed without leaving it.
+  import BranchPicker from './BranchPicker.svelte';
   import { board } from './board.svelte.ts';
   import { runs } from './run.svelte.ts';
 
   const { id }: { id: string } = $props();
   const app = $derived(board.apps.find(one => one.id === id));
   const data = $derived(board.nodes.find(node => node.id === id)?.data);
-  const branches = $derived([...new Set([app?.current ?? '', ...(app?.branches ?? [])].filter(Boolean))]);
   const set = (change: Parameters<typeof board.set>[1]) => {
     board.set(id, change);
     runs.again();
@@ -15,19 +15,17 @@
 
 {#if app && data}
   <span class="controls">
-    {#if branches.length > 1}
-      <label>
+    {#if app.branches.length}
+      <label class="branch">
         Branch
-        <select
-          value={data.branch || app.current}
-          onchange={ev => {
-            set({ branch: ev.currentTarget.value === app.current ? '' : ev.currentTarget.value });
+        <BranchPicker
+          value={data.branch}
+          current={app.current || 'current branch'}
+          branches={app.branches}
+          onpick={(branch: string) => {
+            set({ branch: branch === app.current ? '' : branch });
           }}
-        >
-          {#each branches as branch (branch)}
-            <option value={branch}>{branch}{branch === app.current ? ' (current)' : ''}</option>
-          {/each}
-        </select>
+        />
       </label>
     {/if}
     {#if board.switchesOver(id)}
@@ -87,6 +85,9 @@
     gap: 6px;
     color: var(--muted);
     font: 12px var(--sans);
+  }
+  .branch {
+    width: 260px;
   }
   select {
     max-width: 180px;
