@@ -3,6 +3,7 @@
     Background,
     BackgroundVariant,
     ConnectionMode,
+    MiniMap,
     SelectionMode,
     Panel,
     SvelteFlow,
@@ -274,7 +275,7 @@
     }}
     colorMode={theme.now}
     minZoom={0.2}
-    attributionPosition="bottom-left"
+    proOptions={{ hideAttribution: true }}
     {...start}
     onmoveend={(_event, viewport) => {
       if (!board.live) board.view = viewport;
@@ -377,6 +378,22 @@
         >
       </div>
     </Panel>
+    <!-- The whole board at a glance; dragging in it moves the view, scrolling on it zooms. -->
+    <MiniMap
+      position="top-right"
+      pannable
+      zoomable
+      width={168}
+      height={112}
+      ariaLabel="Overview of the board"
+      nodeBorderRadius={8}
+      nodeStrokeWidth={0}
+      nodeColor={node => (node.type === 'app' ? 'color-mix(in oklab, var(--cable) 60%, var(--panel))' : 'var(--line)')}
+      bgColor="var(--panel)"
+      maskColor="color-mix(in oklab, var(--desk) 72%, transparent)"
+      maskStrokeColor="var(--line)"
+      maskStrokeWidth={1}
+    />
     <!-- Under the cards: the links from each app to its tunnels. -->
     <ViewportPortal target="back">
       <svg class="links" aria-hidden="true">
@@ -575,6 +592,14 @@
   .empty .meta {
     color: var(--muted);
     font-size: 12px;
+  }
+  .area :global(.svelte-flow__minimap) {
+    margin: 12px;
+    overflow: hidden;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--panel);
+    box-shadow: var(--lift);
   }
   .links {
     position: absolute;
