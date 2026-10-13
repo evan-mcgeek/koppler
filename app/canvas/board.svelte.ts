@@ -172,6 +172,8 @@ export const cable = (from: string, to: string, data: CableData): CableEdge => (
   data,
 });
 
+const unselected = <T extends { selected?: boolean }>(one: T): T => (one.selected ? { ...one, selected: false } : one);
+
 class Board {
   /** The stack's name and the environment the board runs against; empty until the board is opened. */
   stack = $state('');
@@ -1143,6 +1145,7 @@ class Board {
     this.name = preset.name;
     this.queues = {};
     this.hiddenQueues = {};
+    this.infra = this.infra.map(unselected);
     this.nodes = ids.flatMap(id => {
       const app = this.apps.find(one => one.id === id);
       const node = preset.nodes[id];
@@ -1330,7 +1333,7 @@ class Board {
     if (!app || app.outside || !app.cloned || this.nodes.some(node => node.id === id)) return;
     if (dropped) {
       const at = this.toFlow(dropped);
-      this.nodes = [...this.nodes, this.#card(app, { x: at.x - PLACE.w / 2, y: at.y - 22 })];
+      this.#addOnly(this.#card(app, { x: at.x - PLACE.w / 2, y: at.y - 22 }));
       return;
     }
     const view = this.area();
@@ -1349,7 +1352,13 @@ class Board {
     for (let y = from.y + 40; !spot && y + PLACE.h <= to.y; y += 40)
       for (let x = from.x + 40; !spot && x + PLACE.w <= to.x; x += 40) if (free(x, y)) spot = { x, y };
     const step = this.nodes.length * 32;
-    this.nodes = [...this.nodes, this.#card(app, spot ?? { x: from.x + 48 + step, y: from.y + 48 + step })];
+    this.#addOnly(this.#card(app, spot ?? { x: from.x + 48 + step, y: from.y + 48 + step }));
+  }
+  /** A card joins the board as the only one selected, so what was selected before is not dragged along with it. */
+  #addOnly(card: CardNode): void {
+    this.infra = this.infra.map(unselected);
+    this.edges = this.edges.map(unselected);
+    this.nodes = [...this.nodes.map(unselected), { ...card, selected: true }];
   }
 
   /** Changes what the user chose on a card. */
