@@ -19,26 +19,11 @@ const PORT = Number(process.env['KOPPLER_PORT']) || 4747;
 const INTERVAL_MS = 1500;
 const JSON_HEADERS = { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' };
 
-const FONTS = fs.readdirSync(path.join(CODE, 'fonts')).filter(file => /\.(woff2|css)$/.test(file));
 /** The files the page may load, by the path it asks for; `temp/` ones come from the run folder. */
 const PAGE_FILES: Record<string, string> = {
-  '': 'canvas.html',
-  ...Object.fromEntries(
-    ['ports', 'kinds', 'presets', 'plan', 'logfmt', 'arrange', 'cables'].map(name => [
-      `page/${name}.js`,
-      `page/${name}.js`,
-    ]),
-  ),
-  'temp/status.js': 'temp/status.js',
+  '': 'page/index.html',
+  'theme.js': 'page/theme.js',
   'temp/debug.jsonl': 'temp/debug.jsonl',
-  ...Object.fromEntries(FONTS.map(file => [`fonts/${file}`, `fonts/${file}`])),
-};
-/** The page still takes its data as scripts; each is made from the JSON run file when asked for. */
-const PAGE_DATA: Record<string, { name: DataName; global: string }> = {
-  'temp/registry.js': { name: 'registry', global: 'REGISTRY' },
-  'temp/local.js': { name: 'local', global: 'LOCAL' },
-  'temp/repos.js': { name: 'repos', global: 'REPOS' },
-  'temp/state.js': { name: 'state', global: 'SAVED_STATE' },
 };
 const CONTENT_TYPES: Record<string, string> = {
   html: 'text/html; charset=utf-8',
@@ -49,7 +34,7 @@ const CONTENT_TYPES: Record<string, string> = {
 // The page loads and calls nothing but this server, and no other page can frame it or learn its address.
 const SECURITY_HEADERS = {
   'content-security-policy':
-    "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; frame-ancestors 'none'; base-uri 'none'; form-action 'none'",
+    "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; frame-ancestors 'none'; base-uri 'none'; form-action 'none'",
   'referrer-policy': 'no-referrer',
   'x-content-type-options': 'nosniff',
   'x-frame-options': 'DENY',
@@ -106,9 +91,8 @@ function readBody(req: Request, res: Response, onBody: (body: unknown) => void):
 }
 
 const DATA_FILE = /^data\/(registry|local|repos|state)\.json$/;
-/** The new canvas, built into its own folder: its page and the files that page names. */
-const nextFile = (what: string) =>
-  what === 'next/' ? 'next/index.html' : /^next\/assets\/[\w-][\w.-]*$/.test(what) ? what : undefined;
+/** The files the page names: what its build put beside it. */
+const assetFile = (what: string) => (/^assets\/[\w-][\w.-]*$/.test(what) ? `page/${what}` : undefined);
 
 /** What the page loads: its own files, its data as scripts or as JSON, and an app's log. */
 function servePage(what: string, url: URL, res: Response): void {
@@ -131,13 +115,6 @@ function servePage(what: string, url: URL, res: Response): void {
     res.writeHead(text === null ? 404 : 200, headers).end(text ?? '');
     return;
   }
-  const data = Object.hasOwn(PAGE_DATA, what) ? PAGE_DATA[what] : undefined;
-  if (data) {
-    const value = readData(data.name);
-    const headers = { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'no-store' };
-    res.writeHead(value ? 200 : 404, headers).end(value ? `window.${data.global} = ${JSON.stringify(value)};\n` : '');
-    return;
-  }
   if (what === 'data/status.json') {
     const status = statusJson();
     res.writeHead(status ? 200 : 404, JSON_HEADERS).end(status ?? 'null');
@@ -149,12 +126,12 @@ function servePage(what: string, url: URL, res: Response): void {
     res.writeHead(value ? 200 : 404, JSON_HEADERS).end(JSON.stringify(value));
     return;
   }
-  // Without its closing slash the new canvas would look for its files one folder up.
-  if (what === 'next') {
-    res.writeHead(308, { location: 'next/' }).end();
+  // Where the canvas was while it was built beside the page it replaced.
+  if (what === 'next' || what === 'next/') {
+    res.writeHead(308, { location: what === 'next' ? './' : '../' }).end();
     return;
   }
-  const file = Object.hasOwn(PAGE_FILES, what) ? PAGE_FILES[what] : nextFile(what);
+  const file = Object.hasOwn(PAGE_FILES, what) ? PAGE_FILES[what] : assetFile(what);
   if (!file) {
     res.writeHead(404).end();
     return;

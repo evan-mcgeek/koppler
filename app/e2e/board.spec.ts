@@ -1,6 +1,6 @@
 // The new canvas (canvas/, on Svelte Flow), served beside today's and driven the way a person does.
 import type { Locator, Page } from '@playwright/test';
-import { test, expect } from '../canvas.ts';
+import { test, expect } from './canvas.ts';
 
 const card = (page: Page, id: string) => page.locator(`.svelte-flow__node[data-id="${id}"]`);
 const cable = (page: Page, id: string) => page.locator(`.svelte-flow__edge[data-id="${id}"]`);
@@ -14,7 +14,6 @@ const middle = async (of: Locator) => {
 
 const at = (x: number, y: number) => ({ x, y, run: 'cli', branch: 'main' });
 test.use({
-  start: 'next/',
   board: {
     env: 'qa',
     mode: 'auto',
@@ -210,14 +209,15 @@ test("a lone cable's plug sits in the middle of its port's ring", async ({ page 
   expect(Math.abs((plug[1] ?? 0) - (ring[1] ?? 9))).toBeLessThan(0.6);
 });
 
-test.describe('asked for without its closing slash', () => {
-  test.use({ start: 'next' });
+for (const old of ['next', 'next/'])
+  test.describe(`asked for at ${old}, where it was while it was built`, () => {
+    test.use({ start: old });
 
-  test('the new canvas still opens, at its own address', async ({ page }) => {
-    await expect(card(page, 'web')).toBeVisible();
-    expect(new URL(page.url()).pathname).toMatch(/\/next\/$/);
+    test('the canvas opens at its own address', async ({ page }) => {
+      await expect(card(page, 'web')).toBeVisible();
+      expect(new URL(page.url()).pathname).not.toContain('next');
+    });
   });
-});
 
 test.describe('a board taller than the window', () => {
   // Five apps in a chain: fitted to the window, the cards are small enough to switch to their short form.

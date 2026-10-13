@@ -1,6 +1,6 @@
 // The new canvas keeps the board: what is changed on it comes back after a reload, from the server's copy.
 import type { Page } from '@playwright/test';
-import { test, expect } from '../canvas.ts';
+import { test, expect } from './canvas.ts';
 
 const card = (page: Page, id: string) => page.locator(`.svelte-flow__node[data-id="${id}"]`);
 const saved = (page: Page) =>
@@ -18,7 +18,7 @@ const board = {
   presets: [{ name: 'Checkout', version: 1, nodes: { web: { run: 'cli' } }, edges: [] }],
   infra: { 'tunnel:db.qa.acme.example:5432': { x: 40, y: 400 } },
 };
-test.use({ start: 'next/', board });
+test.use({ board });
 
 test('the board opens where it was left, and a moved view is kept', async ({ page }) => {
   await expect(card(page, 'web')).toBeVisible();

@@ -1,7 +1,7 @@
 // The new canvas with no stack yet, and what the stack menu offers beyond switching: setting one up, a linked
 // stack's updates and changes, and what the repos say.
 import type { Page } from '@playwright/test';
-import { test, expect, STACK } from '../canvas.ts';
+import { test, expect, STACK } from './canvas.ts';
 
 const posts = async (page: Page, route: string, answer: object = { ok: true }) => {
   const asked: unknown[] = [];
@@ -24,7 +24,6 @@ test.describe('with no stack yet', () => {
     },
   ];
   test.use({
-    start: 'next/',
     stack: { name: '', envs: ['dev'], apps: {}, setup: true, stacks: found } as unknown as typeof STACK,
   });
 
@@ -67,8 +66,6 @@ test.describe('with no stack yet', () => {
 });
 
 test.describe('a stack linked from GitHub', () => {
-  test.use({ start: 'next/' });
-
   test('offers its updates and unshared changes, and what the repos say is reviewed before it is kept', async ({
     page,
   }) => {

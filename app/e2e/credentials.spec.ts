@@ -1,10 +1,9 @@
 // The new canvas's Credentials: what the apps on the board need stored, set and tested without ever being shown.
 // The server's side is stood in for here: no real store is touched.
-import { test, expect } from '../canvas.ts';
+import { test, expect } from './canvas.ts';
 
 const at = (x: number, y: number) => ({ x, y, run: 'cli', branch: 'main' });
 test.use({
-  start: 'next/',
   board: { env: 'qa', mode: 'auto', nodes: { web: at(0, 0), orders: at(420, 0) }, edges: [] },
 });
 

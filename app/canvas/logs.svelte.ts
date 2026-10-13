@@ -53,7 +53,7 @@ class Logs {
     const id = this.active;
     if (!id || Date.now() - (this.#at[id] ?? 0) < 2000) return;
     this.#at[id] = Date.now();
-    void fetch(`../log?app=${encodeURIComponent(id)}`, { cache: 'no-store' })
+    void fetch(`log?app=${encodeURIComponent(id)}`, { cache: 'no-store' })
       .then(answer => (answer.ok ? answer.text() : null))
       .then(text => {
         if (text !== null && text !== this.full[id]) this.full = { ...this.full, [id]: text };

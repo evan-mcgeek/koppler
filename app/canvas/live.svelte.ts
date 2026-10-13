@@ -132,7 +132,7 @@ class Live {
     const ask = async () => {
       if (document.hidden) return;
       try {
-        const answer = await fetch('../data/status.json');
+        const answer = await fetch('data/status.json');
         if (answer.ok) this.status = (await answer.json()) as Status;
       } catch {
         // The server is away: the last status stays until it answers again.

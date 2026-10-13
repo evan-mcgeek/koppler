@@ -1,6 +1,6 @@
 // The new canvas's two views: Edit sets the board up, Live shows it as it runs, in the same places.
 import type { Page } from '@playwright/test';
-import { test, expect } from '../canvas.ts';
+import { test, expect } from './canvas.ts';
 
 const card = (page: Page, id: string) => page.locator(`.svelte-flow__node[data-id="${id}"]`);
 const at = (x: number, y: number) => ({ x, y, run: 'cli', branch: 'main' });
@@ -9,7 +9,6 @@ const corner = async (page: Page, id: string) => {
   return [Math.round(box?.x ?? 0), Math.round(box?.y ?? 0)];
 };
 test.use({
-  start: 'next/',
   board: {
     env: 'qa',
     mode: 'auto',

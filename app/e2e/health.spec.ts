@@ -2,11 +2,10 @@
 import fs from 'node:fs';
 import net, { type AddressInfo } from 'node:net';
 import path from 'node:path';
-import { test, expect } from '../canvas.ts';
+import { test, expect } from './canvas.ts';
 
 const at = (x: number, y: number) => ({ x, y, run: 'cli', branch: 'main' });
 test.use({
-  start: 'next/',
   board: {
     env: 'qa',
     mode: 'auto',

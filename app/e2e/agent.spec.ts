@@ -1,8 +1,7 @@
 // The new canvas says whether an agent session listens, and how to connect one.
-import { test, expect } from '../canvas.ts';
+import { test, expect } from './canvas.ts';
 
 test.use({
-  start: 'next/',
   board: { env: 'qa', mode: 'auto', nodes: { web: { x: 0, y: 0, run: 'cli', branch: 'main' } }, edges: [] },
 });
 

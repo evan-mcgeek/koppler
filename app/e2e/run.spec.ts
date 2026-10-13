@@ -2,7 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Page } from '@playwright/test';
-import { test, expect, STACK } from '../canvas.ts';
+import { test, expect, nextEdit, STACK } from './canvas.ts';
 
 const at = (x: number, y: number) => ({ x, y, run: 'cli', branch: 'main' });
 const review = (page: Page) => page.getByRole('dialog');
@@ -13,7 +13,6 @@ const sent = (temp: string) => {
   return lines.map(line => JSON.parse(line) as { tag: string; text: string; data: Record<string, unknown> });
 };
 test.use({
-  start: 'next/',
   stack: { ...STACK, protected: ['prod'] },
   board: {
     env: 'qa',
@@ -277,4 +276,22 @@ test('what stands in the way of a protected run opens a checklist of what to do 
   await page.screenshot({ path: 'test-results/next-checklist.png' });
   await list.getByRole('button', { name: 'Done' }).click();
   await expect(list).toBeHidden();
+});
+
+test('shortcuts leave the board alone while the review is open', async ({ page }) => {
+  const cards = page.locator('.svelte-flow__node-app');
+  await nextEdit(page);
+  await page.locator('.svelte-flow__node-app[data-id="web"]').getByRole('button', { name: 'Remove Web Shop' }).click();
+  await expect(cards).toHaveCount(1);
+  await page.getByRole('button', { name: 'Run', exact: true }).click();
+  await expect(review(page)).toBeVisible();
+  await page.keyboard.press('ControlOrMeta+z');
+  await page.keyboard.press('l');
+  await review(page).getByRole('button', { name: 'Cancel' }).click();
+  await expect(cards).toHaveCount(1);
+  await expect(page.getByRole('radio', { name: 'Edit' })).toBeChecked();
+  // Once it is closed, undo works again.
+  await expect(review(page)).toBeHidden();
+  await page.keyboard.press('ControlOrMeta+z');
+  await expect(cards).toHaveCount(2);
 });

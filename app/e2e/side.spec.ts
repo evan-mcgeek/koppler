@@ -2,12 +2,11 @@
 import type { Page } from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
-import { test, expect, nextEdit } from '../canvas.ts';
+import { test, expect, nextEdit } from './canvas.ts';
 
 const card = (page: Page, id: string) => page.locator(`.svelte-flow__node[data-id="${id}"]`);
 const rows = (page: Page) => page.getByRole('complementary').getByRole('listitem');
 test.use({
-  start: 'next/',
   uncloned: ['payments'],
   board: {
     env: 'qa',

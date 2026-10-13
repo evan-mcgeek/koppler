@@ -1,10 +1,9 @@
 // The new canvas's agent inbox: questions the agent asks about a run, answered from the page, and what it finished.
 import fs from 'node:fs';
 import path from 'node:path';
-import { test, expect } from '../canvas.ts';
+import { test, expect } from './canvas.ts';
 
 test.use({
-  start: 'next/',
   board: { env: 'qa', mode: 'auto', nodes: { web: { x: 0, y: 0, run: 'cli', branch: 'main' } }, edges: [] },
 });
 
