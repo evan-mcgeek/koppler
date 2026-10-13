@@ -124,16 +124,16 @@ async function link(args: string[]): Promise<void> {
   }
   const dir = readStack()?.source?.replace(/\/stack\.json$/, '') ?? fail('no stack in use');
   const linked = linkedStatus(dir) ?? fail(NOT_LINKED);
-  if (args.includes('--update')) {
+  if (args[0] === 'update') {
     const updated = await updateStack(dir);
     if (updated.error !== undefined) fail(updated.error);
     console.log(updated.message);
     sync([]);
-  } else if (args.includes('--discard')) {
+  } else if (args[0] === 'discard') {
     discardChanges(dir);
     console.log('Your changes are discarded; the copy matches the shared stack again.');
     sync([]);
-  } else if (args.includes('--pr')) {
+  } else if (args[0] === 'pr') {
     const proposed = await proposeChanges(dir);
     if (proposed.error !== undefined) fail(proposed.error);
     console.log(`Pull request: ${proposed.url}`);
@@ -179,16 +179,17 @@ function plan(args: string[]): void {
   else planCommand(args);
 }
 
-/** A run's history; --done marks one finished, which makes its board what runs. */
-async function history(args: string[]): Promise<void> {
-  if (args.includes('--session')) {
+/** A run's history; done marks one finished, which makes its board what runs. */
+async function history([sub, ...rest]: string[]): Promise<void> {
+  if (sub === 'session') {
     await sessionCommand();
     return;
   }
-  if (!args.includes('--done')) {
-    historyCommand(args);
+  if (sub !== 'done') {
+    historyCommand([sub, ...rest].filter(arg => arg !== undefined));
     return;
   }
+  const args = rest;
   const [id] = positional(args, ['--failed']);
   // Without a reason the flag still goes along, so the command asks for one.
   const failed = args.includes('--failed') ? ['--failed', flagValue(args, '--failed')] : [];
@@ -258,6 +259,8 @@ interface Command {
   about: string;
   run: (args: string[]) => unknown;
   example: string;
+  /** Each way to call it, with what that does: shown by its --help. */
+  forms?: [string, string][];
 }
 /** Every command: what it takes, what it does, and one example. People's commands come first in the help. */
 const COMMANDS: Command[] = [
@@ -276,6 +279,10 @@ const COMMANDS: Command[] = [
     about: 'start the canvas if needed and open it, on a board when one is named; stop stops it',
     run: canvas,
     example: 'koppler canvas stop && koppler canvas start',
+    forms: [
+      ['[start] [--board "<name>"] [--no-open]', 'start it if needed and open it in the browser, on that board'],
+      ['stop', 'stop the canvas; apps and tunnels keep running'],
+    ],
   },
   {
     name: 'use',
@@ -288,10 +295,17 @@ const COMMANDS: Command[] = [
   {
     name: 'link',
     who: 'you',
-    args: '<GitHub link to a stack.json> | --update | --discard | --pr',
+    args: '[<GitHub link to a stack.json> | update | discard | pr]',
     about: 'use a stack shared on GitHub; then bring in its changes, drop yours, or propose yours',
     run: link,
     example: 'koppler link https://github.com/acme/stacks/blob/main/shop/stack.json',
+    forms: [
+      ['<GitHub link to a stack.json>', 'use that stack: a local copy you can change'],
+      ['', 'where the copy came from, and your changes not in the shared stack yet'],
+      ['update', "bring in the shared stack's changes"],
+      ['discard', 'drop your changes; the copy matches the shared stack again'],
+      ['pr', 'open a pull request with your changes'],
+    ],
   },
   {
     name: 'doctor',
@@ -308,6 +322,12 @@ const COMMANDS: Command[] = [
     about: 'store and manage secrets; values never show',
     run: secret,
     example: 'koppler secret set orders-api@prod DB_URL',
+    forms: [
+      ['set <app>[@<env>] <NAME> [--stdin]', 'store a secret, typed hidden or read from stdin'],
+      ['list <app>[@<env>]', 'which secrets are stored, never their values'],
+      ['remove <app>[@<env>] <NAME>', 'delete a stored secret'],
+      ['psql <app>[@<env>]', "open psql with the app's stored connection"],
+    ],
   },
   {
     name: 'status',
@@ -329,6 +349,10 @@ const COMMANDS: Command[] = [
     name: 'stop',
     who: 'you',
     args: '<name...> | --all [--yes]',
+    forms: [
+      ['<name...>', 'stop these processes (koppler status lists them)'],
+      ['--all [--yes]', 'stop every app and tunnel, after asking; not the canvas'],
+    ],
     about:
       'stop by name, or --all every app and tunnel; changes stay (down reverts them, canvas stop stops the canvas)',
     run: stop,
@@ -337,8 +361,13 @@ const COMMANDS: Command[] = [
   {
     name: 'history',
     who: 'you',
-    args: '[--json] | --session | --done [<id>] [--failed "<why>"]',
-    about: 'recent Sends and Stops; --session gathers what happened since the last Stop; --done marks a run finished',
+    args: '[--json] | session | done [<id>] [--failed "<why>"]',
+    about: 'recent Sends and Stops; session gathers what happened since the last Stop; done marks a run finished',
+    forms: [
+      ['[--json]', 'recent runs and Stops and how each ended'],
+      ['session', 'gather what happened since the last Stop, for a bug report'],
+      ['done [<id>] [--failed "<why>"]', 'mark a run finished, or failed and why (the agent does this)'],
+    ],
     run: history,
     example: 'koppler history',
   },
@@ -435,10 +464,15 @@ const COMMANDS: Command[] = [
   {
     name: 'listen',
     who: 'agent',
-    args: '--take | --as <id> | --stop',
+    args: 'take | as <id> | stop',
+    forms: [
+      ['take', 'connect this session, taking over from any other; prints its id'],
+      ['as <id>', 'listen again as that session'],
+      ['stop', 'disconnect whichever session listens'],
+    ],
     about: 'wait for Sends from the canvas (one agent session at a time)',
     run: listen,
-    example: 'koppler listen --take',
+    example: 'koppler listen take',
   },
   {
     name: 'say',
@@ -454,7 +488,10 @@ const named = (name: string | undefined) => COMMANDS.find(command => command.nam
 function help(command?: Command): void {
   if (command) {
     const about = command.about.charAt(0).toUpperCase() + command.about.slice(1);
-    console.log(`usage: koppler ${command.name} ${command.args}\n\n${about}.\n\nExample:\n  ${command.example}`);
+    const width = Math.max(0, ...(command.forms ?? []).map(([form]) => form.length)) + 2;
+    const forms = (command.forms ?? []).map(([form, what]) => `  koppler ${command.name} ${form.padEnd(width)}${what}`);
+    const usage = forms.length ? `usage:\n${forms.join('\n')}` : `usage: koppler ${command.name} ${command.args}`;
+    console.log(`${usage}\n\n${about}.\n\nExample:\n  ${command.example}`);
     return;
   }
   const width = Math.max(...COMMANDS.map(one => one.name.length)) + 2;

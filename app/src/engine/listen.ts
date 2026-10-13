@@ -1,14 +1,13 @@
 // Waits for Send/Stop prompts from the standalone canvas, prints them as JSON lines and consumes them.
 // While it waits, temp/listener.json says an agent session is connected, so the canvas can show it.
-// Usage: koppler listen --take       connect this session: takes over from any other, and prints this session's id first
-//        koppler listen --as <id>    listen again as that session; refused once another session has taken over, or after a disconnect
-//        koppler listen --stop       stop whichever session is listening (disconnect); only --take connects again
+// Usage: koppler listen take       connect this session: takes over from any other, and prints this session's id first
+//        koppler listen as <id>    listen again as that session; refused once another session has taken over, or after a disconnect
+//        koppler listen stop       stop whichever session is listening (disconnect); only take connects again
 // Run it in the background; it exits once prompts arrive.
 import { execFileSync } from 'node:child_process';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { flagValue } from '../cli/output.ts';
 import { TEMP } from '../paths.ts';
 import { pickPrompts } from './runs.ts';
 
@@ -88,7 +87,7 @@ export function listen(argv: string[]): void {
     }
   }
 
-  if (argv.includes('--stop')) {
+  if (argv[0] === 'stop') {
     const was = locked(() => {
       const current = read();
       const other = listenerPid(current);
@@ -106,8 +105,8 @@ export function listen(argv: string[]): void {
   }
   // One session listens at a time, so a Send never lands in a session the user is not looking at. A session listening
   // again names itself, so one the user has moved away from cannot take the connection back.
-  const as = flagValue(argv, '--as');
-  const takeOver = argv.includes('--take');
+  const as = argv[0] === 'as' ? argv[1] : undefined;
+  const takeOver = argv[0] === 'take';
   const joined = locked((): { refused: string } | { refused?: undefined; since: string; session: string } => {
     const current = read();
     const running = listenerPid(current);
@@ -135,7 +134,7 @@ export function listen(argv: string[]): void {
     process.exit(3);
   }
   const { since, session } = joined;
-  if (takeOver) console.log(`connected as session ${session}; listen again with: koppler listen --as ${session}`);
+  if (takeOver) console.log(`connected as session ${session}; listen again with: koppler listen as ${session}`);
   const release = () => {
     locked(() => {
       if (read()?.pid === process.pid) fs.rmSync(listener, { force: true });

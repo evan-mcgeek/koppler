@@ -499,7 +499,7 @@ class Runs {
       prod: true,
       blocked: false,
       confirm: () => {
-        const text = `Stop and revert this stack using the koppler-run skill (stop every process the agent started, revert every temporary code change), then switch Koppler to the stack "${to.name}": koppler history --done <this run's id>, then koppler use "${to.dir}". Report what was stopped and reverted.`;
+        const text = `Stop and revert this stack using the koppler-run skill (stop every process the agent started, revert every temporary code change), then switch Koppler to the stack "${to.name}": koppler history done <this run's id>, then koppler use "${to.dir}". Report what was stopped and reverted.`;
         void this.deliver(
           text,
           { tag: 'koppler-stop', data: { action: 'stop', id: newRunId(), switchTo: to.dir } },

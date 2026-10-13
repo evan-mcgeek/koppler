@@ -1,7 +1,7 @@
 // Runs: every Send and Stop from the canvas is kept as a record (what was asked, the plan the user confirmed, how it ended),
 // and the board last applied is kept as the live state the next plan is compared with. Names only, never secret values.
 // Usage: koppler plan [--json]                      what the newest unapplied Send will do, checked against what is running
-//        koppler history --done [<id>] [--failed <why>]    the agent finished (or gave up on) a run
+//        koppler history done [<id>] [--failed <why>]    the agent finished (or gave up on) a run
 //        koppler history                            recent runs and how they ended
 import fs from 'node:fs';
 import path from 'node:path';
@@ -453,7 +453,7 @@ async function gatherSession(stop: Run): Promise<void> {
   }
 }
 
-/** `koppler history --session`: what happened since the last finished Stop, gathered for the agent to read. */
+/** `koppler history session`: what happened since the last finished Stop, gathered for the agent to read. */
 export async function sessionCommand(): Promise<void> {
   const { collectSession } = await import('./session.ts');
   const { dir } = collectSession({ temp: temp(), logsDir: path.join(stateDir(), 'logs'), runs: runs() });
@@ -461,7 +461,7 @@ export async function sessionCommand(): Promise<void> {
   console.log(`\nThe files are in ${dir}; they stay on this Mac.`);
 }
 
-/** `koppler history --done [<id>] [--failed <why>]`: the run ended, and the live state becomes what really runs from it. */
+/** `koppler history done [<id>] [--failed <why>]`: the run ended, and the live state becomes what really runs from it. */
 export async function appliedCommand(args: string[]): Promise<void> {
   const failAt = args.indexOf('--failed');
   const failed = failAt >= 0;
@@ -472,7 +472,7 @@ export async function appliedCommand(args: string[]): Promise<void> {
     ? all.find(one => one.id === given)
     : all.findLast(one => one.state === 'waiting' || one.state === 'applying');
   if (!run) fail(given ? `no run ${given} in the history` : 'no run is waiting to be applied');
-  if (failed && !reason) fail('say why: koppler history --done --failed "<what went wrong>"');
+  if (failed && !reason) fail('say why: koppler history done --failed "<what went wrong>"');
   const changes = changesAfter(run, all);
   // How each remembered change did on this Mac, and when; private, never in the shared stack.
   try {
