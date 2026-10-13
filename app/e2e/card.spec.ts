@@ -215,4 +215,24 @@ test.describe('cards stacked in a column', () => {
     await expect.poll(tall).toBe(before);
     await expect.poll(() => top('payments')).toBe(under);
   });
+
+  test('a card that fills in as the status arrives leaves the card under it where it was', async ({ page }) => {
+    const top = async (id: string) => Math.round((await card(page, id).boundingBox())?.y ?? 0);
+    const steps = [
+      { label: 'Branch', state: 'done' },
+      { label: 'Start', state: 'done' },
+    ];
+    const status = { live: { env: 'qa', nodes: { web: {} } }, apps: { web: { listening: true, steps } } };
+    let late = true;
+    await page.route('**/data/status.json', async route => {
+      if (late) await new Promise(done => setTimeout(done, 800));
+      await route.fulfill({ json: status });
+    });
+    await page.reload();
+    await expect(card(page, 'payments')).toBeVisible();
+    const under = await top('payments');
+    await expect(card(page, 'web').locator('i[data-state]').first()).toBeAttached();
+    late = false;
+    expect(await top('payments')).toBe(under);
+  });
 });
