@@ -16,6 +16,56 @@
   const text = $derived(active ? logs.text(active) : '');
   const rows = $derived(logs.raw ? [] : parseLog(text));
   let body: HTMLElement | undefined = $state();
+  let pane: HTMLElement | undefined = $state();
+  // The pane's height as a share of the room it has, remembered; none until it is first changed.
+  const KEY = 'koppler-logs-height';
+  const kept = () => {
+    try {
+      return Number(localStorage.getItem(KEY)) || 0;
+    } catch {
+      return 0;
+    }
+  };
+  let share = $state(kept());
+  let dragging = $state(false);
+  const room = () => pane?.parentElement?.getBoundingClientRect().height ?? 0;
+  const setHeight = (px: number) => {
+    if (!room()) return;
+    share = Math.min(Math.max(px, 120), room() - 60) / room();
+    try {
+      localStorage.setItem(KEY, String(share));
+    } catch {
+      // Not kept; the pane still has the size.
+    }
+  };
+  const height = () => pane?.getBoundingClientRect().height ?? 0;
+  const big = $derived(share > 0.6);
+  const toggleSize = () => {
+    setHeight(room() * (big ? 0.38 : 0.85));
+  };
+  const drag = (ev: PointerEvent) => {
+    ev.preventDefault();
+    const start = ev.clientY;
+    const from = height();
+    dragging = true;
+    const move = (now: PointerEvent) => {
+      setHeight(from + start - now.clientY);
+    };
+    addEventListener('pointermove', move);
+    addEventListener(
+      'pointerup',
+      () => {
+        removeEventListener('pointermove', move);
+        dragging = false;
+      },
+      { once: true },
+    );
+  };
+  const step = (ev: KeyboardEvent) => {
+    if (ev.key !== 'ArrowUp' && ev.key !== 'ArrowDown') return;
+    ev.preventDefault();
+    setHeight(height() + (ev.key === 'ArrowUp' ? 40 : -40));
+  };
   let shown: string | null = null;
   // The open tab is read again as the status comes in.
   $effect(() => {
@@ -36,7 +86,25 @@
 </script>
 
 {#if active}
-  <section class="logs" aria-label="App log">
+  <section
+    class="logs"
+    class:dragging
+    aria-label="App log"
+    bind:this={pane}
+    style:height={share ? `${String(share * 100)}%` : undefined}
+  >
+    <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
+    <div
+      class="grip"
+      role="separator"
+      aria-orientation="horizontal"
+      aria-label="Resize the log"
+      tabindex="0"
+      title="Drag to resize. Double-click to switch between big and small."
+      onpointerdown={drag}
+      ondblclick={toggleSize}
+      onkeydown={step}
+    ></div>
     <header>
       <div class="tabs" role="tablist">
         {#each logs.tabs as id (id)}
@@ -77,6 +145,7 @@
         title="Show the log exactly as the app wrote it"
         onclick={() => (logs.raw = !logs.raw)}>Raw</button
       >
+      <button type="button" onclick={toggleSize}>{big ? 'Shrink' : 'Expand'}</button>
       <button
         type="button"
         onclick={() => {
@@ -118,9 +187,39 @@
     flex-direction: column;
     height: 38%;
     min-height: 120px;
+    max-height: calc(100% - 60px);
     border-top: 1px solid var(--line);
     background: var(--surface);
     color: var(--ink);
+  }
+  .grip {
+    position: absolute;
+    z-index: 2;
+    top: -4px;
+    right: 0;
+    left: 0;
+    height: 8px;
+    cursor: ns-resize;
+  }
+  .grip::after {
+    position: absolute;
+    top: 2px;
+    left: 50%;
+    width: 36px;
+    height: 4px;
+    margin-left: -18px;
+    border-radius: 2px;
+    background: var(--line);
+    content: '';
+  }
+  .grip:hover::after,
+  .grip:focus-visible::after,
+  .dragging .grip::after {
+    background: var(--cable);
+  }
+  .dragging {
+    cursor: ns-resize;
+    user-select: none;
   }
   header {
     display: flex;
