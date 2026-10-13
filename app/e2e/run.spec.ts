@@ -120,9 +120,17 @@ test('Stop lists every change the last run left, two on one app on its one line'
   await expect(lines.first()).toContainText('Temporary edit (appsettings.json)');
 });
 
-test('Run is off on an empty board', async ({ page }) => {
+test('Clear asks first, and Run is off on an empty board', async ({ page }) => {
+  const cards = page.locator('.svelte-flow__node-app');
   await page.getByRole('button', { name: 'Clear' }).click();
+  const ask = page.getByRole('dialog').filter({ hasText: 'Undo brings them back.' });
+  await expect(ask).toContainText('all 2 apps');
+  await ask.getByRole('button', { name: 'Cancel' }).click();
+  await expect(cards).toHaveCount(2);
+  await page.getByRole('button', { name: 'Clear' }).click();
+  await page.getByRole('button', { name: 'Clear board' }).click();
   await expect(page.getByRole('button', { name: 'Run', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Clear' })).toBeDisabled();
 });
 
 test('Run has a menu: with a note for this run, or as a checklist', async ({ page, canvas }) => {
