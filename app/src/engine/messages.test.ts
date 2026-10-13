@@ -106,6 +106,12 @@ test('messages are cut to known fields, answered, and cleared without losing an 
     const byId = Object.fromEntries(readMessages(100, history).map(x => [x.id, x.answered]));
     assert.deepEqual(byId[old.id], { at: 't2', via: 'replaced' });
     assert.equal(byId[current.id], undefined);
+    // What Koppler could not do in the old run is closed too; an agent's result about it is not.
+    const refused = appendMessage(refusal('run000001', 'run', 'koppler: Sign in first'));
+    const result = appendMessage({ kind: 'result', title: 'Done', run: 'run000001' });
+    const closed = Object.fromEntries(readMessages(100, history).map(x => [x.id, x.answered]));
+    assert.deepEqual(closed[refused.id], { at: 't2', via: 'replaced' });
+    assert.equal(closed[result.id], undefined);
     appendAnswer(current.id, { via: 'dismissed' });
     assert.equal(readMessages(100, history).find(x => x.id === current.id)!.answered!.via, 'dismissed');
   }

@@ -17,6 +17,8 @@ class Inbox {
   #cleared = $state(false);
   #seen = new Set<string>();
   #ready = false;
+  /** The message from Koppler that opened the panel by itself. */
+  #refused = '';
 
   /** Newest first. */
   get messages(): Message[] {
@@ -38,14 +40,22 @@ class Inbox {
       this.#seen.add(one.id);
       if (!this.#ready) continue;
       // What Koppler could not do itself needs the user, like a question: the panel opens on it.
-      if ((one.kind === 'question' && !one.answered) || one.from === 'koppler') this.open = true;
-      else
+      if (one.kind === 'question' && !one.answered) this.open = true;
+      else if (one.from === 'koppler' && !one.answered) {
+        this.open = true;
+        this.#refused = one.id;
+      } else
         toasts.show(`Agent: ${one.title}`, one.kind === 'failure' ? 'warning' : 'message', {
           label: 'Open',
           run: () => (this.open = true),
         });
     }
     this.#ready = true;
+    // The panel opened on what Koppler could not start: another run was sent, so it closes again.
+    if (this.#refused && this.messages.find(one => one.id === this.#refused)?.answered) {
+      this.#refused = '';
+      if (!this.question) this.open = false;
+    }
     // The server's list no longer has what was cleared here.
     if (this.#cleared && !(live.status.messages ?? []).some(one => !(one.kind === 'question' && !one.answered)))
       this.#cleared = false;

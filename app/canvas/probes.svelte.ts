@@ -36,6 +36,8 @@ class Probes {
   /** The last result per cable and tunnel link, kept until the page reloads or one of its apps stops answering. */
   results = $state<Record<string, Probe>>({});
   #tried = new Set<string>();
+  /** Tests held back while their app starts, each with the app it waits for. */
+  #starting = new Map<string, { target: string; payload: Payload }>();
 
   async test({ key, payload }: Pick<Job, 'key' | 'payload'>, auto = false): Promise<void> {
     if (this.results[key]?.state === 'busy' && this.results[key].text !== 'Starting') return;
@@ -45,6 +47,7 @@ class Probes {
       const name = board.apps.find(app => app.id === target)?.name ?? target;
       const detail = `${name} is starting. Koppler checks again once it answers.`;
       this.results[key] = { state: 'busy', text: 'Starting', detail };
+      this.#starting.set(key, { target, payload });
       if (!auto) toasts.show(detail);
       return;
     }
@@ -67,8 +70,15 @@ class Probes {
     this.results = Object.fromEntries(Object.entries(this.results).filter(([key]) => !keys.includes(key)));
   }
 
-  /** Tests each one once when its apps answer, and forgets its result when one of them stops. */
+  /** Tests each one once when its apps answer, and forgets its result when one of them stops. Called on each status. */
   follow(jobs: Job[]): void {
+    // A test that waited for its app: run once the app answers, or once its process is gone and the test can say so.
+    const running = live.status?.running ?? [];
+    for (const [key, { target, payload }] of this.#starting) {
+      if (running.includes(target) && !live.up(target)) continue;
+      this.#starting.delete(key);
+      if (this.results[key]?.text === 'Starting') void this.test({ key, payload }, true);
+    }
     for (const job of jobs) {
       const ready = job.apps.every(app => live.sent(app) && live.up(app));
       if (!ready) {
