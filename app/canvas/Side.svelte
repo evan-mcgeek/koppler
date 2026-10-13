@@ -52,7 +52,26 @@
     }
   };
   const roots = $derived(board.roots.map(root => root.replace(/^\/Users\/[^/]+/, '~')).join(', '));
-  const notCloned = $derived(board.apps.filter(app => !app.cloned && !app.outside).length);
+  const notCloned = $derived(board.apps.filter(app => !app.cloned && !app.outside));
+  const missing = $derived(
+    notCloned.length > 3
+      ? `${notCloned
+          .slice(0, 2)
+          .map(app => app.name)
+          .join(', ')} and ${String(notCloned.length - 2)} more`
+      : new Intl.ListFormat('en', { type: 'conjunction' }).format(notCloned.map(app => app.name)),
+  );
+  let copiedAll = $state(false);
+  const copyClones = async () => {
+    const commands = notCloned.map(cloneCommand).join('\n');
+    try {
+      await navigator.clipboard.writeText(commands);
+      copiedAll = true;
+      setTimeout(() => (copiedAll = false), 2000);
+    } catch {
+      copied = `Copy is blocked here: ${commands}`;
+    }
+  };
   let scanning = $state(false);
   const rescan = async () => {
     scanning = true;
@@ -269,11 +288,22 @@
         <Command command={live.status.restart} label="Copy restart command" />
       </div>
     {/if}
-    {#if notCloned}
-      <p class="warn">
-        {notCloned === 1 ? '1 app is' : `${String(notCloned)} apps are`} not cloned in {roots}.
-        <button type="button" disabled={scanning} onclick={() => void rescan()}>Look for clones again</button>
-      </p>
+    {#if notCloned.length}
+      <div class="clone" role="note" aria-label="Not cloned">
+        <p>
+          {missing}
+          {notCloned.length === 1 ? 'is' : 'are'} not cloned on this Mac, so {notCloned.length === 1 ? 'it' : 'they'} cannot
+          run here. Koppler looks for clones in {roots}.
+        </p>
+        <span class="acts">
+          <button class="do" type="button" onclick={() => void copyClones()}>
+            {copiedAll ? 'Copied' : notCloned.length === 1 ? 'Copy clone command' : 'Copy clone commands'}
+          </button>
+          <button type="button" disabled={scanning} onclick={() => void rescan()}>
+            {scanning ? 'Looking…' : 'Look again'}
+          </button>
+        </span>
+      </div>
     {/if}
     <Needs />
     <Settings />
@@ -567,6 +597,42 @@
   }
   footer .warn :global(.cmd) {
     margin-top: 6px;
+  }
+  .clone {
+    display: grid;
+    min-width: 0;
+    gap: 8px;
+    padding: 8px 10px;
+    border: 1px solid color-mix(in oklab, var(--warn) 45%, transparent);
+    border-radius: 8px;
+    background: color-mix(in oklab, var(--warn) 8%, var(--surface));
+    font: 12.5px/1.45 var(--sans);
+  }
+  .clone p {
+    margin: 0;
+    overflow-wrap: anywhere;
+  }
+  .clone .acts {
+    display: flex;
+    gap: 6px;
+  }
+  .clone button {
+    padding: 4px 10px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: none;
+    color: var(--ink);
+    font: 600 12px var(--sans);
+    cursor: pointer;
+  }
+  .clone .do {
+    border-color: transparent;
+    background: var(--cable);
+    color: var(--on-accent);
+  }
+  .clone button:disabled {
+    opacity: 0.6;
+    cursor: default;
   }
   .note:empty {
     display: none;
