@@ -46,9 +46,11 @@ class Runs {
   /** The review on screen, waiting to be confirmed. */
   review = $state.raw<Review | null>(null);
 
-  /** What the board asks for, as the agent and the plan read it. */
-  graph() {
-    const nodes = board.nodes.map(({ id, data }) => {
+  /** What the board asks for, as the agent and the plan read it; with `restart`, only what runs, with that card's settings and cables from the board. */
+  graph(restart?: string) {
+    const was = live.status?.live;
+    const keep = (id: string) => !restart || id === restart || Object.hasOwn(was?.nodes ?? {}, id);
+    const mine = board.nodes.map(({ id, data }) => {
       const app = board.apps.find(one => one.id === id);
       return {
         id,
@@ -62,15 +64,35 @@ class Runs {
         ...(board.localLibraries(id).length > 0 && { libraries: board.localLibraries(id) }),
       };
     });
-    const edges = board.edges.map(({ source, target }) => ({ from: source, to: target }));
+    const asked = board.edges.map(({ source, target }) => ({ from: source, to: target }));
+    // The rest stays as it runs: their settings and cables as last applied.
+    const nodes = restart
+      ? mine.flatMap(node =>
+          node.id === restart
+            ? [node]
+            : keep(node.id)
+              ? [{ ...(was?.nodes?.[node.id] as typeof node), id: node.id }]
+              : [],
+        )
+      : mine;
+    const edges = restart
+      ? [
+          ...(Array.isArray(was?.edges) ? (was.edges as { from: string; to: string }[]) : []).filter(
+            edge => edge.from !== restart && keep(edge.to),
+          ),
+          ...asked.filter(edge => edge.from === restart && keep(edge.to)),
+        ]
+      : asked;
     const deployed = nodes.flatMap(({ id }) =>
       (board.apps.find(app => app.id === id)?.calls ?? [])
         .filter(to => !edges.some(edge => edge.from === id && edge.to === to))
         .map(to => ({ from: id, to })),
     );
-    const queues = Object.fromEntries(
-      board.infra.flatMap(card => (card.type === 'queue' && card.data.local ? [[card.data.queue, 'local']] : [])),
-    );
+    const queues = restart
+      ? Object.fromEntries(Object.entries(was?.queues ?? {}).filter(([, where]) => where === 'local'))
+      : Object.fromEntries(
+          board.infra.flatMap(card => (card.type === 'queue' && card.data.local ? [[card.data.queue, 'local']] : [])),
+        );
     return { env: board.env, mode: 'auto', nodes, edges, deployed, ...(Object.keys(queues).length && { queues }) };
   }
 
@@ -179,7 +201,7 @@ class Runs {
 
   start({ note, manual = false, restart }: { note?: string; manual?: boolean; restart?: string } = {}): void {
     this.#asked = { manual, ...(note && { note }), ...(restart && { restart }) };
-    const asked = this.graph();
+    const asked = this.graph(restart);
     const graph = {
       ...asked,
       // One app asked to start again: it keeps its cables and settings, as the rest keeps running.

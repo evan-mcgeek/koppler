@@ -201,6 +201,27 @@ test('a running card has a restart icon: only that app restarts, shown in the re
   await page.screenshot({ path: 'test-results/next-card-restart.png' });
 });
 
+test('restarting a card leaves the cards that were never started alone', async ({ page, canvas }) => {
+  const live = {
+    env: 'qa',
+    nodes: { orders: { branch: 'main', run: 'cli', note: 'use the test account' } },
+    edges: [],
+  };
+  await page.route('**/data/status.json', route =>
+    route.fulfill({ json: { apps: {}, live, running: ['orders', 'canvas'] } }),
+  );
+  await page
+    .locator('.svelte-flow__node-app[data-id="orders"]')
+    .getByRole('button', { name: 'Restart Orders API' })
+    .click();
+  await expect(review(page)).toContainText('you asked to restart it');
+  await expect(review(page)).not.toContainText('Web Shop');
+  await review(page).getByRole('button', { name: 'Run', exact: true }).click();
+  await expect.poll(() => sent(canvas.temp).length).toBe(1);
+  const [run] = sent(canvas.temp);
+  expect(run?.data).toMatchObject({ nodes: [{ id: 'orders', restart: true }], edges: [] });
+});
+
 test('the review lists remembered changes, and a card is changed or a call run locally from inside it', async ({
   page,
 }) => {
