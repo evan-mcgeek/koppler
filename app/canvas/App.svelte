@@ -1,6 +1,6 @@
 <script lang="ts">
   import { SvelteFlowProvider } from '@xyflow/svelte';
-  import { untrack } from 'svelte';
+  import { tick, untrack } from 'svelte';
   import Agent from './Agent.svelte';
   import Board from './Board.svelte';
   import Credentials from './Credentials.svelte';
@@ -146,13 +146,59 @@
     }
   };
   let side = $state(remembered());
+  // In a narrow window the pane folds by itself, and opens again when the window grows; a fold chosen by hand stays.
+  let autoFolded = false;
+  $effect(() => {
+    const tight = matchMedia('(max-width: 1100px)');
+    const follow = () => {
+      untrack(() => {
+        if (tight.matches && side) [autoFolded, side] = [true, false];
+        else if (!tight.matches && !side && autoFolded) [autoFolded, side] = [false, true];
+      });
+    };
+    follow();
+    tight.addEventListener('change', follow);
+    return () => {
+      tight.removeEventListener('change', follow);
+    };
+  });
+  // A full top bar drops its words: nothing moves out of it.
+  let bar: HTMLElement | undefined = $state();
+  const fitBar = () => {
+    if (!bar) return;
+    bar.classList.remove('compact');
+    bar.classList.toggle('compact', bar.scrollWidth > bar.clientWidth + 1);
+  };
+  $effect(() => {
+    if (!bar) return;
+    const watch = new ResizeObserver(fitBar);
+    watch.observe(bar);
+    return () => {
+      watch.disconnect();
+    };
+  });
+  // What the bar says changes its width too.
+  $effect(() => {
+    const said = `${board.stack}${live.status?.running?.join() ?? ''}`;
+    requestAnimationFrame(() => {
+      if (said) fitBar();
+    });
+  });
   const toggleSide = () => {
+    autoFolded = false;
     side = !side;
     try {
       localStorage.setItem('koppler-side', side ? 'open' : 'hidden');
     } catch {
       // Not remembered where the browser keeps nothing.
     }
+  };
+  // From the folded rail: its board button lands on the board picker.
+  const openSide = async (at?: 'board') => {
+    toggleSide();
+    if (!at) return;
+    await tick();
+    document.querySelector<HTMLElement>('aside button[aria-label^="Board:"]')?.focus();
   };
 </script>
 
@@ -167,7 +213,7 @@
   ondrop={dropped}
 />
 
-<header class:protected={board.protected}>
+<header class:protected={board.protected} bind:this={bar}>
   <button
     class="side-toggle"
     type="button"
@@ -203,7 +249,7 @@
         <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"
           ><rect x="3" y="3" width="10" height="10" rx="1.5" /></svg
         >
-        Stop
+        <span class="words">Stop</span>
       </button>
       <Menu
         label="More ways to stop"
@@ -307,7 +353,7 @@
   <main inert={!!loading}>
     {#await opened then found}
       {#if found}
-        {#if side}<Side />{:else}<Rail open={toggleSide} />{/if}
+        {#if side}<Side />{:else}<Rail open={openSide} />{/if}
         <div class="stage">
           <div class="board">
             <SvelteFlowProvider>
@@ -335,6 +381,13 @@
     border-bottom: 1px solid var(--line);
     background: var(--panel);
     color: var(--ink);
+  }
+  /* Still too full without its words, it takes a second row. */
+  header:global(.compact) {
+    flex-wrap: wrap;
+  }
+  header:global(.compact) :global(.words) {
+    display: none;
   }
   header.protected {
     border-bottom: 3px solid var(--prod);

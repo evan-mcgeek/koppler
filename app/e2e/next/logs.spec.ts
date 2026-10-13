@@ -52,6 +52,36 @@ test("a card's log opens in a tab, read and laid out, raw on request, and cleare
   await expect(pane).toHaveCount(0);
 });
 
+test('the log pane is resized by its grip, by the keyboard and by Expand, and keeps its size', async ({
+  page,
+  canvas,
+}) => {
+  const logs = path.join(canvas.dir, 'state', 'logs');
+  fs.mkdirSync(logs, { recursive: true });
+  fs.writeFileSync(path.join(logs, 'orders.log'), 'one\ntwo\n');
+  fs.writeFileSync(path.join(canvas.temp, 'status.json'), JSON.stringify({ apps: { orders: { port: 1 } } }));
+  await card(page, 'orders').getByRole('button', { name: 'Show log' }).click();
+  const pane = page.getByRole('region', { name: 'App log' });
+  const tall = async () => Math.round((await pane.boundingBox())?.height ?? 0);
+  const grip = page.getByRole('separator', { name: 'Resize the log' });
+  const at = await grip.boundingBox();
+  const before = await tall();
+  await page.mouse.move((at?.x ?? 0) + 200, (at?.y ?? 0) + 4);
+  await page.mouse.down();
+  await page.mouse.move((at?.x ?? 0) + 200, (at?.y ?? 0) - 96, { steps: 5 });
+  await page.mouse.up();
+  expect(await tall()).toBe(before + 100);
+  await grip.press('ArrowDown');
+  expect(await tall()).toBe(before + 60);
+  await pane.getByRole('button', { name: 'Expand' }).click();
+  await expect(pane.getByRole('button', { name: 'Shrink' })).toBeVisible();
+  const big = await tall();
+  expect(big).toBeGreaterThan(before + 200);
+  await page.reload();
+  await card(page, 'orders').getByRole('button', { name: 'Show log' }).click();
+  expect(await tall()).toBe(big);
+});
+
 test('a failed start offers to ask the agent, which gets the app and the step', async ({ page, canvas }) => {
   const write = (name: string, value: unknown) => {
     fs.writeFileSync(path.join(canvas.temp, `${name}.json`), JSON.stringify(value));
