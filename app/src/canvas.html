@@ -99,7 +99,7 @@
   .board-tools #clear:hover { color: var(--bad); }
   .zoom { display: flex; }
   .zoom .btn { padding: 5px 10px; }
-  .zoom #zoom-reset { min-width: 56px; font-variant-numeric: tabular-nums; }
+  .zoom #zoom-reset { width: 62px; padding-inline: 0; font-variant-numeric: tabular-nums; }
   .btn.primary:hover { background: color-mix(in oklab, var(--cable) 85%, var(--ink)); }
   .prod-banner { display: none; padding: 6px 16px; background: color-mix(in oklab, var(--prod) 14%, var(--panel)); color: var(--prod-ink); font-weight: 600; font-size: 13px; }
   body[data-protected] .prod-banner { display: block; }
@@ -1777,9 +1777,6 @@ document.getElementById('tidy').onclick = () => {
   // Cards and tunnels settle (make room, tunnels tucked under) before the final fit, so the fit sees where they end up.
   snugTunnels(); makeRoom(); fit();
   arranged.key = layoutKey();
-  const b = document.getElementById('tidy');
-  b.textContent = count > 1 ? `Arrange ${arranged.version % count + 1}/${count}` : 'Arrange';
-  clearTimeout(arranged.timer); arranged.timer = setTimeout(() => { b.textContent = 'Arrange'; }, 2500);
 };
 
 // Boards: the stack's team boards and your own. The board on screen is always one of yours, saved as it changes.
