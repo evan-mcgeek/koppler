@@ -126,6 +126,24 @@ try {
   assert.match(JSON.parse(scan.body.toString()).error, /\S/);
   assert.equal((await call('POST', '/rescan?token=wrong', json, '{}')).status, 404);
   console.log('server tests ok');
+  // A card's Stop: only the app it names is stopped, by the name Koppler gave its process; the rest keeps running.
+  {
+    const { spawnSync } = await import('node:child_process');
+    const koppler = (...args) => spawnSync(process.execPath, [path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'dist', 'koppler.mjs'), ...args], { encoding: 'utf8', env });
+    try {
+      for (const name of ['orders', 'web']) assert.match(koppler('run', name, '--', 'sleep', '60').stdout, new RegExp(`started ${name}`));
+      const stopOne = await call('POST', `/stop-apps?token=${token}`, json, JSON.stringify({ app: 'orders' }));
+      assert.equal(stopOne.status, 200);
+      assert.deepEqual(JSON.parse(stopOne.body.toString()), { stopped: ['orders'] });
+      const left = koppler('status').stdout;
+      assert.match(left, /web\s+running/);
+      assert.doesNotMatch(left, /orders\s+running/);
+      // A name that is not one of Koppler's processes stops nothing.
+      const none = await call('POST', `/stop-apps?token=${token}`, json, JSON.stringify({ app: '../web' }));
+      assert.deepEqual(JSON.parse(none.body.toString()), { stopped: [] });
+      assert.match(koppler('status').stdout, /web\s+running/);
+    } finally { koppler('stop', '--all', '--yes'); }
+  }
 } finally {
   server.kill();
   fs.rmSync(dir, { recursive: true, force: true });
