@@ -1,7 +1,7 @@
 // The board: cards and cables as Svelte Flow holds them, and the socket behaviour on top (drawing a cable through
 // waypoints, sliding an end along its side). The geometry is core/cables and core/arrange, unchanged.
 import type { Edge, Node } from '@xyflow/svelte';
-import { arrange, sidesFor, type Point, type Side } from '../src/core/arrange.ts';
+import { arrange, sidesFor, squeeze, type Point, type Side } from '../src/core/arrange.ts';
 import { endOffsets, orderSlots, sidePoint, SIDES, type Box, type Cable } from '../src/core/cables.ts';
 import { of as kindOf } from '../src/core/kinds.ts';
 import { isProtected, LOCAL_QUEUE_TYPES, queuesOf } from '../src/core/plan.ts';
@@ -210,13 +210,6 @@ class Board {
   zoom: () => number = () => 1;
 
   cables = $derived<Cable[]>(this.edges.map(edge => ({ from: edge.source, to: edge.target, ...edge.data })));
-  boxes = $derived(
-    new Map<string, Box>(
-      this.nodes.flatMap(({ id, position, measured }) =>
-        measured?.width && measured.height ? [[id, { ...position, w: measured.width, h: measured.height }]] : [],
-      ),
-    ),
-  );
   /** Tunnel cards, kept apart from the app cards: the flow shows both. */
   infra = $state.raw<InfraNode[]>([]);
   /** The queues run locally instead of the deployed ones, and the queues taken off the board. */
@@ -226,8 +219,52 @@ class Board {
     new Map<string, Box>(
       this.infra.map(({ id, position, measured }) => [
         id,
-        { ...position, w: measured?.width ?? TUNNEL.w, h: measured?.height ?? TUNNEL.h },
+        { ...this.shown(position), w: measured?.width ?? TUNNEL.w, h: measured?.height ?? TUNNEL.h },
       ]),
+    ),
+  );
+  /** Zoomed out or in Live the cards are short: the empty bands their full form needs are squeezed, on screen only. */
+  brief = $state(false);
+  /** Each card's height in full, as last drawn so: short, the room it needs only then is closed up. */
+  fullHeights = $state.raw<Record<string, number>>({});
+  #squeeze(top: (id: string, at: Point) => number = (_, at) => at.y) {
+    const taken: [number, number][] = [];
+    const needed: [number, number][] = [];
+    for (const { id, position, measured } of [...this.nodes, ...this.infra]) {
+      const height = measured?.height;
+      if (!height) continue;
+      const y = top(id, position);
+      taken.push([y, y + height]);
+      const full = this.fullHeights[id] ?? 0;
+      if (full > height) needed.push([y + height, y + full]);
+    }
+    return squeeze(this.brief ? taken : [], this.brief ? needed : []);
+  }
+  #squeezed = squeeze([], []);
+  /** While a card is dragged the board holds still around it, so it stays under the pointer. */
+  squeezed = $derived.by(() => {
+    if ([...this.nodes, ...this.infra].some(card => card.dragging)) return this.#squeezed;
+    this.#squeezed = this.#squeeze();
+    return this.#squeezed;
+  });
+  /** Where a card kept at this place is drawn, and back. */
+  shown = (at: Point): Point => ({ x: at.x, y: this.squeezed.show(at.y) });
+  stored = (at: Point): Point => ({ x: at.x, y: this.squeezed.back(at.y) });
+  /** Where a card let go at this place is kept: counting the room it now takes there, it stays drawn where it was let go. */
+  dropped(id: string, at: Point): Point {
+    let y = this.squeezed.back(at.y);
+    for (let tries = 0; tries < 4; tries++) y = this.#squeeze((one, kept) => (one === id ? y : kept.y)).back(at.y);
+    return { x: at.x, y };
+  }
+
+  /** The cards as drawn. */
+  boxes = $derived(
+    new Map<string, Box>(
+      this.nodes.flatMap(({ id, position, measured }) =>
+        measured?.width && measured.height
+          ? [[id, { ...this.shown(position), w: measured.width, h: measured.height }]]
+          : [],
+      ),
     ),
   );
   #registry: Registry | undefined;
@@ -1268,6 +1305,11 @@ class Board {
       const at = saved?.nodes?.[app.id];
       return at ? [this.#card(app, { x: at.x, y: at.y }, at)] : [];
     });
+    this.fullHeights = Object.fromEntries(
+      Object.entries(saved?.nodes ?? {}).flatMap(([id, at]) =>
+        typeof at?.['full'] === 'number' && at['full'] > 0 ? [[id, at['full']]] : [],
+      ),
+    );
     const onBoard = new Set(this.nodes.map(({ id }) => id));
     this.edges = (saved?.edges ?? [])
       .filter(({ from, to }) => onBoard.has(from) && onBoard.has(to))
@@ -1322,6 +1364,7 @@ class Board {
               showQueues: showQueues ? true : undefined,
               changes,
               libraries: libraries?.length ? libraries : undefined,
+              full: this.fullHeights[id],
             },
           ],
         ),
@@ -1341,7 +1384,7 @@ class Board {
     if (!app || app.outside || !app.cloned || this.nodes.some(node => node.id === id)) return;
     if (dropped) {
       const at = this.toFlow(dropped);
-      this.#addOnly(this.#card(app, { x: at.x - PLACE.w / 2, y: at.y - 22 }));
+      this.#addOnly(this.#card(app, this.stored({ x: at.x - PLACE.w / 2, y: at.y - 22 })));
       return;
     }
     const view = this.area();
@@ -1360,7 +1403,7 @@ class Board {
     for (let y = from.y + 40; !spot && y + PLACE.h <= to.y; y += 40)
       for (let x = from.x + 40; !spot && x + PLACE.w <= to.x; x += 40) if (free(x, y)) spot = { x, y };
     const step = this.nodes.length * 32;
-    this.#addOnly(this.#card(app, spot ?? { x: from.x + 48 + step, y: from.y + 48 + step }));
+    this.#addOnly(this.#card(app, this.stored(spot ?? { x: from.x + 48 + step, y: from.y + 48 + step })));
   }
   /** Selects this card alone, app or tunnel, so a drag moves only it. */
   pick(id: string): void {
