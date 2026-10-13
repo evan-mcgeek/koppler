@@ -401,7 +401,8 @@ async function startQueues(up: Up, chosen: Record<string, string>): Promise<void
   const local = localQueue.localQueues(
     stack,
     chosen,
-    up.ids.filter(id => !up.skip.has(id)),
+    // An app whose card keeps the deployed queues is not given a local one.
+    up.ids.filter(id => !up.skip.has(id) && up.node(id).queues !== false),
     up.env,
   );
   left.push(...local.left);
