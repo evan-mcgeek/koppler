@@ -41,7 +41,7 @@ export async function stop(args: string[]): Promise<void> {
 
 /** The canvas: started when it is not running, then opened in the browser. */
 export async function canvas(args: string[]): Promise<void> {
-  if (args.includes('--stop')) {
+  if (args[0] === 'stop') {
     await stop(['canvas']);
     return;
   }

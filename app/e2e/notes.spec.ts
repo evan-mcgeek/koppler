@@ -67,7 +67,7 @@ test('what the stack needs on this Mac is listed with its commands, and missing 
     },
   ];
   await page.route('**/data/status.json', route =>
-    route.fulfill({ json: { apps: {}, checks, restart: 'koppler stop canvas && koppler canvas' } }),
+    route.fulfill({ json: { apps: {}, checks, restart: 'koppler canvas stop && koppler canvas start' } }),
   );
   const open = page.getByRole('button', {
     name: '1 missing on this Mac, 1 check waits for your approval, 1 PROD fact missing from the stack',
