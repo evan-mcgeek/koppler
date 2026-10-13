@@ -10,6 +10,7 @@ import path from 'node:path';
 import { KINDS, of as kindOf, register } from '../core/kinds.ts';
 import { validateStack } from '../core/stack.ts';
 import { getAt, parsePath, setAt } from '../core/stack-path.ts';
+import { brokenLock, LOCKED } from './locks.ts';
 import { readData, writeData, type Clone } from '../data.ts';
 import { Failure } from '../failure.ts';
 import { TEMP } from '../paths.ts';
@@ -478,8 +479,24 @@ export function addApps(
     candidate.inStack = id;
     added.push(id);
   }
-  if (added.length) writeJson(source, stack);
+  // ponytail: picks are added to `stack` in place above; the copy taken here is what was there before.
+  if (added.length) {
+    const refused = saveStack(source, readJson(source), stack);
+    if (refused) return refused;
+  }
   return { added };
+}
+
+/** The stack file in use, as edits write it and locks are kept by; null with no stack. */
+export const stackSource = (config: Config = loadConfig()): string | null =>
+  config.stack ? path.join(config.stack, 'stack.json') : null;
+
+/** Writes the stack file, unless the change alters a field the user locked: then it says which, and writes nothing. */
+export function saveStack(source: string, before: unknown, next: unknown): { error: string } | null {
+  const locked = brokenLock(source, before, next);
+  if (locked) return { error: LOCKED(locked) };
+  writeJson(source, next);
+  return null;
 }
 
 /** What the stack in use holds at a path (the whole stack without one). */
@@ -519,10 +536,7 @@ export function editStack(
       return { error: `${pathText}: ${(error as Error).message}` };
     }
     const broken = validateStack(next).filter(problem => !before.has(problem));
-    if (!broken.length) {
-      writeJson(used.source, next);
-      return { path: pathText, value };
-    }
+    if (!broken.length) return saveStack(used.source, used.stack, next) ?? { path: pathText, value };
     first ||= broken.slice(0, 5).join('; ');
   }
   return { error: first };
@@ -574,8 +588,7 @@ export function addOutside(
     const app = apps[caller];
     if (app) app.consumes = { ...app.consumes, [id]: {} };
   }
-  writeJson(source, stack);
-  return { added: id };
+  return saveStack(source, readJson(source), stack) ?? { added: id };
 }
 
 /**
@@ -594,8 +607,7 @@ export function removeApp(
   const name = app.name ?? id;
   const { [id]: removed, ...apps } = stack.apps;
   for (const other of Object.values(apps)) if (other.consumes) other.consumes = dropKey(other.consumes, id);
-  writeJson(source, { ...stack, apps });
-  return { removed: id, name };
+  return saveStack(source, readJson(source), { ...stack, apps }) ?? { removed: id, name };
 }
 function dropKey<T>(from: Record<string, T>, key: string): Record<string, T> {
   const { [key]: dropped, ...rest } = from;

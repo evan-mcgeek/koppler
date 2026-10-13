@@ -8,7 +8,7 @@ import { validateStack } from '../core/stack.ts';
 import { readClones, readStack } from '../data.ts';
 import { draftApp, ENV_TOKEN, readRepo, stackEnv } from './deployed.ts';
 import { localPorts } from './investigate.ts';
-import { grepClone, hostsByApp, missingCalls, urlsInClone } from './sync.ts';
+import { grepClone, hostsByApp, missingCalls, saveStack, urlsInClone } from './sync.ts';
 
 interface AppFile {
   name?: string;
@@ -284,6 +284,7 @@ export function discoverCommand(args: string[]): void {
     findings.map(found => found.id),
   );
   if (applied.error !== undefined) fail(applied.error);
-  fs.writeFileSync(source, JSON.stringify(applied.stack, null, 2) + '\n');
+  const refused = saveStack(source, JSON.parse(fs.readFileSync(source, 'utf8')), applied.stack);
+  if (refused) fail(refused.error);
   console.log(`\nAdded ${String(applied.applied)} to ${source}. Run koppler sync to load them.`);
 }

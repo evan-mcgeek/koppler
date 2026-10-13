@@ -311,3 +311,38 @@ console.log('switch stacks ok');
   assert.equal(read('apps.a.nothing'), undefined);
   fs.rmSync(dir, { recursive: true, force: true });
 }
+
+// A locked field is kept as it is by every change, and only the person unlocks it.
+{
+  const { editStack, removeApp } = await import('../dist/engine/sync.js');
+  const { setLock } = await import('../dist/engine/locks.js');
+  const { spawnSync } = await import('node:child_process');
+  const { fileURLToPath } = await import('node:url');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-lock-'));
+  const was = process.env.KOPPLER_CONFIG_DIR;
+  process.env.KOPPLER_CONFIG_DIR = dir;
+  const file = path.join(dir, 'stack.json');
+  fs.writeFileSync(file, JSON.stringify({ name: 'S', envs: ['qa'], apps: { a: { name: 'A', kind: 'node', slug: 'x/a', url: 'http://localhost:3000' }, b: { name: 'B', kind: 'node', slug: 'x/b' } } }));
+  const opts = { config: { stack: dir } };
+  assert.deepEqual(setLock(file, 'apps.a.url', true), {});
+  const before = fs.readFileSync(file, 'utf8');
+  assert.match(editStack('apps.a.url', ['http://localhost:4000'], opts).error, /apps\.a\.url is locked/);
+  assert.match(editStack('apps.a', [{ name: 'A', kind: 'node', slug: 'x/a' }], opts).error, /apps\.a\.url is locked/);
+  assert.match(removeApp('a', opts).error, /apps\.a\.url is locked/);
+  assert.equal(fs.readFileSync(file, 'utf8'), before);
+  // What the lock does not cover still changes.
+  assert.equal(editStack('apps.a.name', ['Shop'], opts).error, undefined);
+  assert.equal(removeApp('b', opts).error, undefined);
+  // An agent or a script cannot unlock: there is no one at a terminal to say yes, and --yes is not taken.
+  fs.writeFileSync(path.join(dir, 'config.json'), JSON.stringify({ stack: dir }));
+  const entry = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'dist', 'koppler.mjs');
+  const unlock = spawnSync('node', [entry, 'stack', 'unlock', 'apps.a.url', '--yes'], { encoding: 'utf8', env: { ...process.env, KOPPLER_CONFIG_DIR: dir } });
+  assert.notEqual(unlock.status, 0);
+  assert.match(unlock.stdout + unlock.stderr, /stays locked/);
+  assert.match(spawnSync('node', [entry, 'stack', 'locks'], { encoding: 'utf8', env: { ...process.env, KOPPLER_CONFIG_DIR: dir } }).stdout, /apps\.a\.url/);
+  assert.deepEqual(setLock(file, 'apps.a.url', false), {});
+  assert.equal(editStack('apps.a.url', ['http://localhost:4000'], opts).error, undefined);
+  if (was === undefined) delete process.env.KOPPLER_CONFIG_DIR;
+  else process.env.KOPPLER_CONFIG_DIR = was;
+  fs.rmSync(dir, { recursive: true, force: true });
+}

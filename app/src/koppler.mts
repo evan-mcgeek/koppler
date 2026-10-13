@@ -6,7 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { doctor, ports, secret } from './cli/doctor.ts';
-import { flagValue, positional } from './cli/output.ts';
+import { confirm, flagValue, positional } from './cli/output.ts';
 import { fail, Failure } from './failure.ts';
 import { canvas, logs, status, stop } from './cli/running.ts';
 import { readData, readStack } from './data.ts';
@@ -19,6 +19,7 @@ import { investigate } from './engine/investigate.ts';
 import { discardChanges, linkStack, linkedStatus, proposeChanges, updateStack } from './engine/linked.ts';
 import { boardCommand } from './engine/boards.ts';
 import { listen } from './engine/listen.ts';
+import { lockedPaths, setLock } from './engine/locks.ts';
 import { sayCommand } from './engine/messages.ts';
 import { sh } from './engine/processes.ts';
 import { queryCommand } from './engine/query.ts';
@@ -30,6 +31,7 @@ import {
   addApps,
   addOutside,
   editStack,
+  stackSource,
   readStackAt,
   candidateRepos,
   createStack,
@@ -254,7 +256,7 @@ function add(args: string[]): void {
 }
 
 /** One field of the stack in use: read it, set it or take it out, checked against the stack's rules. */
-function stackCommand(args: string[]): void {
+async function stackCommand(args: string[]): Promise<void> {
   const [what, at, ...rest] = args;
   if (what === 'get') {
     const read = readStackAt(at ?? '');
@@ -263,8 +265,25 @@ function stackCommand(args: string[]): void {
     console.log(JSON.stringify(read.value, null, 2));
     return;
   }
+  if (what === 'locks') {
+    const source = stackSource() ?? fail('no stack in use');
+    const locked = lockedPaths(source);
+    console.log(locked.length ? locked.join('\n') : 'No field is locked.');
+    return;
+  }
+  if (what === 'lock' || what === 'unlock') {
+    const source = stackSource() ?? fail('no stack in use');
+    if (!at) fail(`usage: koppler stack ${what} <path>`);
+    // Only the person at the terminal unlocks: an agent or a script cannot answer, and --yes is not taken.
+    if (what === 'unlock' && !(await confirm(`Unlock ${at}, so commands and the agent can change it again?`)))
+      fail(`${at} stays locked; unlocking needs your yes in a terminal, or the lock on the canvas`);
+    const done = setLock(source, at, what === 'lock');
+    if (done.error !== undefined) fail(done.error);
+    console.log(`${what === 'lock' ? 'LOCKED' : 'UNLOCKED'} ${at}`);
+    return;
+  }
   if ((what !== 'set' && what !== 'unset') || !at || (what === 'set' && !rest.length))
-    fail('usage: koppler stack get [<path>] | set <path> <value> | unset <path>');
+    fail('usage: koppler stack get [<path>] | set <path> <value> | unset <path> | lock <path> | unlock <path> | locks');
   const raw = rest.join(' ');
   // Typed in a terminal, 5001 may be a port or a name: whichever keeps the stack valid, JSON first.
   const values = (() => {
@@ -549,11 +568,14 @@ const COMMANDS: Command[] = [
   {
     name: 'stack',
     who: 'agent',
-    args: 'get [<path>] | set <path> <value> | unset <path>',
+    args: 'get [<path>] | set <path> <value> | unset <path> | lock <path> | unlock <path> | locks',
     forms: [
       ['get [<path>]', 'print a field of the stack in use, or the whole stack, as JSON'],
       ['set <path> <value>', 'set a field: text, or JSON for a number, a list or an object; checked before it is kept'],
       ['unset <path>', 'take a field out (an item of a list closes up)'],
+      ['lock <path>', 'keep a field as it is: no command, canvas edit or agent changes it'],
+      ['unlock <path>', 'let it change again; asks you in the terminal, so an agent cannot'],
+      ['locks', 'list the locked fields'],
     ],
     about: 'read and change any field of the stack, the only way to change stack.json',
     run: stackCommand,
