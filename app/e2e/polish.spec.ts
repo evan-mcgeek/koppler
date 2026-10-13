@@ -107,3 +107,21 @@ test('the shortcuts sheet opens with ?, and the theme is picked in Settings and 
   await expect(page.getByRole('radio', { name: 'Dark' })).toBeChecked();
   await page.screenshot({ path: 'test-results/next-dark.png' });
 });
+
+test('the keyboard: Space presses the focused button, and shortcuts stay off under an open menu', async ({ page }) => {
+  // Space is the hand tool on the board only: on a button it presses it.
+  const live = page.getByRole('radio', { name: 'Live' });
+  const percent = page.getByTitle('Reset to 100%');
+  await page.getByRole('button', { name: 'Zoom out' }).focus();
+  const before = await percent.textContent();
+  await page.keyboard.press('Space');
+  await expect(percent).not.toHaveText(before ?? '');
+  // A letter typed while a menu is open is not a shortcut of the board under it.
+  await page.getByRole('button', { name: 'More ways to stop' }).click();
+  await expect(page.getByRole('menu', { name: 'More ways to stop' })).toBeVisible();
+  await page.keyboard.press('l');
+  await expect(live).not.toBeChecked();
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('l');
+  await expect(live).toBeChecked();
+});
