@@ -70,7 +70,7 @@ export interface OpenedNode {
   branch?: string;
   note?: string;
   tunnels?: false;
-  queues?: false;
+  queues?: true;
 }
 export interface OpenedPreset {
   name: string;
@@ -107,7 +107,7 @@ function openNode(id: string, stored: Loose, stack: StackFacts, name: string, no
   }
   if (typeof stored['note'] === 'string' && stored['note'].trim()) node.note = stored['note'];
   if (stored['tunnels'] === false) node.tunnels = false;
-  if (stored['queues'] === false) node.queues = false;
+  if (stored['queues'] === true) node.queues = true;
   return node;
 }
 

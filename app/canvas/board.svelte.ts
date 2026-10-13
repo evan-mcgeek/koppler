@@ -37,8 +37,8 @@ export interface CardData extends Record<string, unknown> {
   note: string;
   /** Runs without its tunnels, when only its API is needed. */
   hideTunnels?: boolean;
-  /** It is taken off its queues: no link to their cards, and it keeps the deployed ones. */
-  hideQueues?: boolean;
+  /** It is on its queues: linked to their cards, each of which can run locally. Off by default: it keeps the deployed ones. */
+  showQueues?: boolean;
   /** What happens to the clone's uncommitted changes when another branch runs; set aside unless chosen. */
   changes?: Changes;
   /** The libraries it runs with the local copy of, by name. */
@@ -262,7 +262,7 @@ class Board {
   }
   #onBoard = $derived(new Set(this.nodes.map(node => node.id)));
   /** The apps on the board that are still on their queues. */
-  #onQueues = $derived(new Set(this.nodes.filter(node => !node.data.hideQueues).map(node => node.id)));
+  #onQueues = $derived(new Set(this.nodes.filter(node => node.data.showQueues).map(node => node.id)));
   #outside(id: string): boolean {
     return !!this.#registry?.apps[id]?.outside;
   }
@@ -940,7 +940,7 @@ class Board {
             ...(data.branch && { branch: data.branch }),
             ...(data.note && { note: data.note }),
             ...(data.hideTunnels && { tunnels: false }),
-            ...(data.hideQueues && this.queuesOf(id).length > 0 && { queues: false }),
+            ...(data.showQueues && this.queuesOf(id).length > 0 && { queues: true }),
           },
         ]),
       ),
@@ -1147,7 +1147,7 @@ class Board {
       const app = this.apps.find(one => one.id === id);
       const node = preset.nodes[id];
       if (!app || !node) return [];
-      const chosen = { ...node, hideTunnels: node.tunnels === false, hideQueues: node.queues === false };
+      const chosen = { ...node, hideTunnels: node.tunnels === false, showQueues: node.queues === true };
       return [this.#card(app, (placed && place(id)) || { x: 0, y: 0 }, chosen)];
     });
     const at = Object.fromEntries(this.nodes.map(({ id, position }) => [id, position]));
@@ -1206,7 +1206,7 @@ class Board {
         kind,
         kindLabel,
         ...(chosen.hideTunnels === true && { hideTunnels: true }),
-        ...(chosen.hideQueues === true && { hideQueues: true }),
+        ...(chosen.showQueues === true && { showQueues: true }),
         ...((chosen.changes === 'take-along' || chosen.changes === 'set-aside') && { changes: chosen.changes }),
         ...(Array.isArray(chosen.libraries) && {
           libraries: chosen.libraries.filter(name => typeof name === 'string'),
@@ -1297,7 +1297,7 @@ class Board {
       ...(this.view && { zoom: this.view.zoom, pan: { x: this.view.x, y: this.view.y } }),
       nodes: Object.fromEntries(
         this.nodes.map(
-          ({ id, position, data: { branch, run, platform, note, hideTunnels, hideQueues, changes, libraries } }) => [
+          ({ id, position, data: { branch, run, platform, note, hideTunnels, showQueues, changes, libraries } }) => [
             id,
             {
               ...before[id],
@@ -1308,7 +1308,7 @@ class Board {
               ...(platform && { platform }),
               note,
               hideTunnels: hideTunnels ? true : undefined,
-              hideQueues: hideQueues ? true : undefined,
+              showQueues: showQueues ? true : undefined,
               changes,
               libraries: libraries?.length ? libraries : undefined,
             },
