@@ -322,3 +322,52 @@ const [crashy, upA, upB, tunA, tunB, runA, runB, agentA, agentB, leftA, leftB] =
   assert.match(help, /^usage:\n {2}koppler listen take +connect this session/);
   assert.match(help, /\n {2}koppler listen stop +disconnect/);
 }
+
+// A board is changed from the terminal: kept at once, queued for an open canvas, and what it does not touch stays.
+{
+  const { spawnSync } = await import('node:child_process');
+  const fs = await import('node:fs'), os = await import('node:os'), path = await import('node:path'), { fileURLToPath } = await import('node:url');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-board-'));
+  const env = { ...process.env, KOPPLER_STATE: dir, KOPPLER_TEMP: dir, KOPPLER_CONFIG_DIR: dir };
+  const entry = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'dist', 'koppler.mjs');
+  const koppler = (...args) => { const r = spawnSync('node', [entry, ...args], { encoding: 'utf8', env }); return { out: (r.stdout + r.stderr).trim(), code: r.status }; };
+  const write = (name, value) => fs.writeFileSync(path.join(dir, `${name}.json`), JSON.stringify(value));
+  const read = name => JSON.parse(fs.readFileSync(path.join(dir, `${name}.json`), 'utf8'));
+  write('registry', { name: 'Acme', envs: ['qa'], apps: { web: { name: 'Web' }, orders: { name: 'Orders' }, pay: { name: 'Pay' }, bank: { name: 'Bank', outside: 'hosted' } }, presets: [{ name: 'Team', nodes: { web: { run: 'cli' } }, edges: [] }] });
+  write('local', { apps: { web: { path: '/w' }, orders: { path: '/o' }, pay: { path: '/p' } } });
+  const mine = { name: 'Shop', version: 1, nodes: { web: { run: 'cli', note: 'old' }, pay: { run: 'ide' } }, edges: [{ from: 'web', to: 'pay' }], layout: { nodes: { web: { x: 0, y: 0 }, pay: { x: 400, y: 100 } }, sides: { 'web>pay': ['right', 'left'] } } };
+  write('state', { preset: 'Shop', presets: [mine], nodes: { web: { x: 0, y: 0 } } });
+
+  const done = koppler('board', 'edit', 'shop', '--add', 'orders', '--remove', 'pay', '--cable', 'web:orders', '--branch', 'web=feature/x', '--note', 'web=');
+  assert.equal(done.code, 0, done.out);
+  assert.match(done.out, /CHANGED Shop: added Orders; removed Pay; cabled Web to Orders; Web on feature\/x; no note on Web/);
+  const [shop] = read('state').presets;
+  assert.deepEqual(shop.nodes, { web: { run: 'cli', branch: 'feature/x' }, orders: { run: 'cli' } });
+  assert.deepEqual(shop.edges, [{ from: 'web', to: 'orders' }]);
+  // The card already there keeps its place; the new one goes to the right of the others.
+  assert.deepEqual(shop.layout.nodes, { web: { x: 0, y: 0 }, orders: { x: 340, y: 0 } });
+  assert.deepEqual(shop.layout.sides, {});
+  assert.deepEqual(read('state').nodes, { web: { x: 0, y: 0 } });
+  const [queued] = read('board-edits').edits;
+  assert.equal(queued.board, 'Shop');
+  assert.deepEqual(queued.edit.add, ['orders']);
+
+  // A team board changed becomes the user's own copy; the team's stays as the stack has it.
+  assert.equal(koppler('board', 'edit', 'Team', '--add', 'orders').code, 0);
+  assert.deepEqual(read('state').presets.map(one => one.name), ['Shop', 'Team']);
+  assert.deepEqual(read('registry').presets[0].nodes, { web: { run: 'cli' } });
+  assert.equal(read('board-edits').edits.length, 2);
+
+  // What cannot be done is refused, and nothing is kept.
+  const before = fs.readFileSync(path.join(dir, 'state.json'), 'utf8');
+  assert.match(koppler('board', 'edit', 'Nope', '--add', 'web').out, /no board called Nope/);
+  assert.match(koppler('board', 'edit', 'Shop', '--add', 'bank').out, /Bank does not run on this Mac/);
+  assert.match(koppler('board', 'edit', 'Shop', '--add', 'ghost').out, /ghost is not an app in the stack/);
+  assert.match(koppler('board', 'edit', 'Shop', '--cable', 'web:pay').out, /pay is not on Shop/);
+  assert.match(koppler('board', 'edit', 'Shop', '--branch', 'web').out, /expected <app>=<value>/);
+  assert.match(koppler('board', 'edit', 'Shop', '--add', 'orders').out, /Nothing to change on Shop/);
+  assert.match(koppler('board', 'Shop').out, /usage: koppler board edit/);
+  assert.equal(fs.readFileSync(path.join(dir, 'state.json'), 'utf8'), before);
+  fs.rmSync(dir, { recursive: true });
+  console.log('board edit ok');
+}

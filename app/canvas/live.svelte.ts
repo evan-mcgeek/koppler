@@ -1,6 +1,7 @@
 // What is running right now: the status the server puts together every second and a half, and what it says about
 // the cards of the board on screen.
 import type { BoardInput } from '../src/core/plan.ts';
+import type { BoardEdit } from '../src/core/presets.ts';
 import { board } from './board.svelte.ts';
 
 export interface Step {
@@ -90,6 +91,8 @@ interface Status {
   startedAt?: string;
   /** Whether an agent session takes what the canvas sends: listening, busy or none. */
   agent?: { state?: string };
+  /** Changes made to boards from the terminal that this page has not made on its copy yet. */
+  boardEdits?: { id: string; board: string; edit: BoardEdit }[];
   /** What the agent said: questions, results and failures, oldest first. */
   messages?: Message[];
   /** The requests no agent session has taken yet, oldest first, and how many they are. */

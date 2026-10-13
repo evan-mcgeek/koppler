@@ -25,8 +25,10 @@
   import { board } from './board.svelte.ts';
   import { openFile } from './boards.ts';
   import { dialogs } from './dialogs.svelte.ts';
-  import { load, save } from './data.ts';
+  import { load, post, save } from './data.ts';
+  import { describeEdit } from '../src/core/presets.ts';
   import { live } from './live.svelte.ts';
+  import { toasts } from './toast.svelte.ts';
 
   // A board file can be dropped anywhere on the page, which shows where it will land.
   let dropping = $state(false);
@@ -120,6 +122,22 @@
   });
   $effect(() => {
     board.settle();
+  });
+  // A board changed from the terminal is changed here too, said, and kept, so this page never saves its older copy
+  // over it. In Live it waits for Edit.
+  const made: Record<string, true> = {};
+  $effect(() => {
+    const edits = live.status?.boardEdits ?? [];
+    if (!board.stack || board.live) return;
+    untrack(() => {
+      for (const one of edits.filter(one => !made[one.id])) {
+        made[one.id] = true;
+        const name = (id: string) => board.apps.find(app => app.id === id)?.name ?? id;
+        if (board.edit(one.board, one.edit))
+          toasts.show(`The agent changed ${one.board}: ${describeEdit(one.edit, name)}.`);
+        void post('board-edit-done', { id: one.id });
+      }
+    });
   });
   $effect(() => {
     if (board.stack) board.record();
