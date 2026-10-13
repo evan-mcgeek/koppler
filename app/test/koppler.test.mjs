@@ -173,7 +173,7 @@ const [crashy, upA, upB, tunA, tunB, runA, runB, agentA, agentB, leftA, leftB] =
   assert.match(fs.readFileSync(path.join(dir, 'history.jsonl'), 'utf8'), /"event":"done"/);
   assert.deepEqual(Object.keys(JSON.parse(fs.readFileSync(path.join(dir, 'live.json'), 'utf8')).nodes).sort(), ['a', 'b']);
   // What happened since the last Stop is gathered on demand, for a bug report: the run, and its files on this Mac.
-  const session = koppler('history', '--session');
+  const session = koppler('history', 'session');
   assert.equal(session.code, 0, session.out);
   assert.match(session.out, /1 runs: 1 done\./);
   assert.deepEqual(JSON.parse(fs.readFileSync(path.join(dir, 'sessions', 'current', 'runs.json'), 'utf8')).map(run => run.id), ['run000010']);
@@ -312,4 +312,13 @@ const [crashy, upA, upB, tunA, tunB, runA, runB, agentA, agentB, leftA, leftB] =
     assert.equal(help.status, 2, name);
     assert.match(help.stderr, /^koppler: usage: no command /, name);
   }
+}
+// A command's help gives each way to call it a line of its own, also asked from a subcommand.
+{
+  const { spawnSync } = await import('node:child_process');
+  const path = await import('node:path'), { fileURLToPath } = await import('node:url');
+  const entry = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'dist', 'koppler.mjs');
+  const help = spawnSync('node', [entry, 'listen', 'stop', '--help'], { encoding: 'utf8' }).stdout;
+  assert.match(help, /^usage:\n {2}koppler listen take +connect this session/);
+  assert.match(help, /\n {2}koppler listen stop +disconnect/);
 }

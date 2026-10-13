@@ -76,7 +76,7 @@ function startRun(prompt: Prompt, record: RunRecord, command: 'up' | 'down'): vo
     }
     // Said on the canvas too: with no agent connected, the prompt below is read by nobody.
     appendMessage(refusal(record.id, record.kind, said));
-    const finish = `koppler history --done ${record.kind === 'stop' ? record.id : ''}`;
+    const finish = `koppler history done ${record.kind === 'stop' ? record.id : ''}`;
     const text = `${prompt.text}\n\nKoppler already did what it could (koppler ${command} --run ${record.id}); finish the rest, then ${finish}:\n${said}`;
     appendLine(PROMPTS, { ...prompt, text, data: { ...prompt.data, koppler: { exit: code, log } } });
   });

@@ -10,7 +10,7 @@ Apps and tunnels that `koppler` starts run detached, so they keep running after 
 | `koppler init [--new "<name>" --envs qa,prod]` | Find your repos and the stack, or start a new stack and pick its apps |
 | `koppler canvas [start] [--board "<name>"] \| stop` | Start the canvas if needed and open it in your browser, on a board when one is named; `stop` stops it |
 | `koppler use [stack] [--boards]` | List the stacks on this machine (`*` marks the one in use), switch to one, or list its boards |
-| `koppler link <url> \| --update \| --discard \| --pr` | Use a stack shared on GitHub; then bring in its changes, drop yours, or open a pull request with yours |
+| `koppler link [<url> \| update \| discard \| pr]` | Use a stack shared on GitHub; then bring in its changes, drop yours, or open a pull request with yours |
 | `koppler doctor [app...] [--env <env>]` | Can it run here: the tools your stack needs, then what you still have to do for these apps |
 | `koppler doctor --secrets [app...]` | Also test that each stored secret works, for example that the database connects |
 | `koppler doctor --flow` | Test every connection of what runs now, like the canvas's Flow check |
@@ -19,7 +19,7 @@ Apps and tunnels that `koppler` starts run detached, so they keep running after 
 | `koppler status [--apps] [--debug [name...]]` | What Koppler runs; `--apps` adds the stack's apps and clones; `--debug` gives versions and scrubbed logs for a bug report |
 | `koppler logs <name> [-f] [-n <lines>]` | Show or follow a log, secrets masked |
 | `koppler stop <name...> \| --all` | Stop by name, or every app and tunnel (asks first); changes stay until `koppler down` |
-| `koppler history [--session] [--done [<id>] [--failed "<why>"]]` | Recent runs and Stops and how they ended; `--session` gathers what happened since the last Stop, for a bug report; `--done` marks a run finished |
+| `koppler history [session \| done [<id>] [--failed "<why>"]]` | Recent runs and Stops and how they ended; `session` gathers what happened since the last Stop, for a bug report; `done` marks a run finished |
 | `koppler query <app> [--env <env>] "<sql>"` | A read-only query with the app's stored connection; on production, in your own terminal only |
 
 ## Used by the agent add-on
@@ -43,7 +43,7 @@ You can run these yourself too; the agent uses them to do its part.
 | `koppler run <name> [--cwd <dir>] [--port <n>] [--bind <address>] [--restart] -- <command...>` | Start any command, detached and logged; it never gets secrets. `--bind` says which local address it listens on, when two share a port |
 | `koppler switch <app> <branch> [--set-aside \| --take-along]` | Switch a clone to the board's branch; `--back` undoes it |
 | `koppler recipes [app] \| --remember <app> --why "..." \| --apply <app...>` | Remembered code changes: list them, keep the last edit, apply the matching ones |
-| `koppler listen --take \| --as <id> \| --stop` | Wait for requests from the canvas; one agent session at a time |
+| `koppler listen take \| as <id> \| stop` | Wait for requests from the canvas; one agent session at a time |
 | `koppler say` | Show a question or result on the canvas, with choices to press |
 
 ## Conventions

@@ -11,7 +11,7 @@ Never work around a Koppler bug silently, and never keep it only in `<state>/NOT
 1. **Reproduce it** the way the user hit it, in the smallest setup that still shows it. If it does not reproduce, say so in the issue and describe exactly what happened instead.
 2. **Find the cause** in Koppler's code or instructions, as far as you can, and a possible fix.
 3. **Look for an existing issue:** `gh issue list -R evan-mcgeek/koppler --state all --search "<a few words>"`. If one matches, add your evidence to it as a comment instead of opening another.
-4. **Gather the logs:** `koppler history --session` sums up what happened since the last finished Stop and keeps the files on this Mac, for you to read.
+4. **Gather the logs:** `koppler history session` sums up what happened since the last finished Stop and keeps the files on this Mac, for you to read.
    For the issue itself, `koppler status --debug [name...]` prints the versions and the recent canvas debug log, latest run log and each named app or tunnel log, scrubbed. Keep only the lines around the problem.
 5. **Read the scrubbed text yourself** before it goes anywhere. The scrubbing replaces secrets, the stack's app, repo, host and queue names, paths, user names, emails, ticket ids, account ids and IPs, but it cannot know every name in the user's own code (class names, project names). Replace anything that still names the user, their company, their apps or their data with a neutral word (Orders API, `acme`).
 6. **Show the user the draft** (title and body) and file it once they agree:

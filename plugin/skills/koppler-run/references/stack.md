@@ -94,9 +94,9 @@ Only ticked findings are written; the agent works out `how` the first time that 
 A stack can be used straight from a link to its `stack.json` on GitHub (`koppler link <url>`, or "Use" next to the link field on the canvas), with no clone.
 Koppler reads it through the user's `gh` login and keeps a copy in `~/.config/koppler/stacks/<owner>-<repo>-<name>/`, with `.source.json` holding the link and the file as last fetched.
 - What Koppler learns goes into the copy and shows as "Changes not shared yet" in the stack menu (`koppler link`).
-- "Check for updates" (`koppler link --update`) brings in GitHub's changes; when both sides changed it refuses rather than lose either.
-- "Open pull request" (`koppler link --pr`) pushes a branch `koppler/<stack>-<id>` with the copy and opens a pull request listing the changes, after the user confirms. Once it is merged, the next update finds the two in line.
-- "Discard my changes" (`koppler link --discard`) puts the copy back to the shared file as last fetched.
+- "Check for updates" (`koppler link update`) brings in GitHub's changes; when both sides changed it refuses rather than lose either.
+- "Open pull request" (`koppler link pr`) pushes a branch `koppler/<stack>-<id>` with the copy and opens a pull request listing the changes, after the user confirms. Once it is merged, the next update finds the two in line.
+- "Discard my changes" (`koppler link discard`) puts the copy back to the shared file as last fetched.
 
 ## Kinds
 

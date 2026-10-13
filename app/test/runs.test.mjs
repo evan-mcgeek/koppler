@@ -44,7 +44,7 @@ add(runRecord(send('run0004', [{ id: 'api', run: 'cli' }, { id: 'web', run: 'cli
 assert.match(koppler('plan'), /START: Orders API, Web, app\n {2}This is what the user confirmed on the canvas\./);
 // Only what really runs is recorded: api runs, the user starts app in the IDE, web never started and is named.
 koppler('run', 'api', '--', 'sleep', '30');
-const done = koppler('history', '--done');
+const done = koppler('history', 'done');
 assert.match(done, /Run run0004: done; live state is now api, app/);
 assert.match(done, /Not running: Web/);
 assert.deepEqual(Object.keys(JSON.parse(fs.readFileSync(path.join(dir, 'live.json'), 'utf8')).nodes), ['api', 'app']);
@@ -55,9 +55,9 @@ const second = send('run0005', [{ id: 'api', run: 'cli' }, { id: 'web', run: 'cl
 second.data.plan = { starts: [{ id: 'web', why: [] }], restarts: [], stops: [], keeps: [{ id: 'api', why: [] }, { id: 'app', why: [] }] };
 add(runRecord(second));
 assert.match(koppler('plan'), /START: Orders API \(it was started before but is not running now\), Web\n {2}KEEP RUNNING: app\n {2}DIFFERS from what the user confirmed/);
-assert.match(koppler('history', '--done', '--failed', 'web would not build'), /failed \(web would not build\)/);
+assert.match(koppler('history', 'done', '--failed', 'web would not build'), /failed \(web would not build\)/);
 add(runRecord({ tag: 'koppler-stop', at: 't', data: { id: 'stop0006' } }));
-assert.match(koppler('history', '--done', 'stop0006'), /Stop stop0006: done; live state is now empty/);
+assert.match(koppler('history', 'done', 'stop0006'), /Stop stop0006: done; live state is now empty/);
 assert.deepEqual(JSON.parse(fs.readFileSync(path.join(dir, 'live.json'), 'utf8')).nodes, {});
 assert.match(koppler('history'), /run0005 .*\[failed: web would not build\]\n.*stop0006 +stop and revert +\[done\]/);
 fs.rmSync(dir, { recursive: true });

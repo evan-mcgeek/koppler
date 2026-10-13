@@ -14,23 +14,23 @@ const gone = child => new Promise(resolve => child.exitCode !== null || child.si
 const start = (...args) => new Promise(resolve => { const p = spawn('node', [koppler, 'listen', ...args], { env }); let out = ''; p.stdout.on('data', d => { out += d; if (out.includes('\n')) resolve({ p, out }); }); setTimeout(() => resolve({ p, out }), 1500); });
 const wait = ms => new Promise(r => setTimeout(r, ms));
 
-const a = await start('--take');
+const a = await start('take');
 const idA = a.out.match(/session (\w+)/)[1];
 assert.equal(listener().session, idA);
-const b = await start('--take');
+const b = await start('take');
 const idB = b.out.match(/session (\w+)/)[1];
 assert.notEqual(idA, idB);
 // A is stopped by B taking over, and B stays the one connected.
 await gone(a.p);
 assert.equal(listener().session, idB);
 // A listens again as itself: refused, B keeps the connection.
-const again = spawnSync('node', [koppler, 'listen', '--as', idA], { env, encoding: 'utf8' });
+const again = spawnSync('node', [koppler, 'listen', 'as', idA], { env, encoding: 'utf8' });
 assert.equal(again.status, 3);
 assert.match(again.stderr, /Another session is connected/);
 assert.equal(listener().session, idB);
 // B listening again as itself is fine.
 b.p.kill(); await gone(b.p);
-const bAgain = spawn('node', [koppler, 'listen', '--as', idB], { env });
+const bAgain = spawn('node', [koppler, 'listen', 'as', idB], { env });
 await until('B listening again', () => listener().pid === bAgain.pid);
 assert.equal(listener().session, idB);
 // A listener releases its connection on its way out, which writes in the folder: wait for it before removing the folder.
@@ -48,18 +48,18 @@ console.log('listen tests ok');
 
   // Prompts a listener took and died before handing over are not lost when the next one starts.
   { const t = fresh(); fs.writeFileSync(t.file('prompts.jsonl.taking'), prompt(1)); fs.writeFileSync(t.file('prompts.jsonl'), prompt(2));
-    const first = run(t, '--take'); assert.match(first.stdout, /run 1/); assert.doesNotMatch(first.stdout, /run 2/);
-    assert.match(run(t, '--take').stdout, /run 2/); }
+    const first = run(t, 'take'); assert.match(first.stdout, /run 1/); assert.doesNotMatch(first.stdout, /run 2/);
+    assert.match(run(t, 'take').stdout, /run 2/); }
 
   // After a disconnect, a session cannot come back by listening again as itself.
-  { const t = fresh(); const a = await begin(t, '--take'), id = a.out.match(/session (\w+)/)[1];
-    assert.match(run(t, '--stop').stdout, /^Disconnected/); await ended(a);
-    const back = run(t, '--as', id); assert.equal(back.status, 3); assert.match(back.stderr, /was disconnected/);
-    assert.match(run(t, '--stop').stdout, /No agent session was connected/);
-    const again = await begin(t, '--take'); assert.match(again.out, /connected as session/); again.p.kill(); await ended(again); }
+  { const t = fresh(); const a = await begin(t, 'take'), id = a.out.match(/session (\w+)/)[1];
+    assert.match(run(t, 'stop').stdout, /^Disconnected/); await ended(a);
+    const back = run(t, 'as', id); assert.equal(back.status, 3); assert.match(back.stderr, /was disconnected/);
+    assert.match(run(t, 'stop').stdout, /No agent session was connected/);
+    const again = await begin(t, 'take'); assert.match(again.out, /connected as session/); again.p.kill(); await ended(again); }
 
   // A session that was replaced without noticing takes no prompts and leaves the new registration alone.
-  { const t = fresh(); const a = await begin(t, '--take');
+  { const t = fresh(); const a = await begin(t, 'take');
     const theirs = { pid: null, since: 't', busy: new Date().toISOString(), session: 'other001' };
     fs.writeFileSync(t.file('listener.json'), JSON.stringify(theirs)); fs.writeFileSync(t.file('prompts.jsonl'), prompt(3));
     await ended(a); assert.equal(a.code, 3); assert.doesNotMatch(a.out, /run 3/);
@@ -69,9 +69,9 @@ console.log('listen tests ok');
   // A pid left in the file that now belongs to something else is not signalled.
   { const t = fresh(); const bystander = spawn('sleep', ['30']);
     fs.writeFileSync(t.file('listener.json'), JSON.stringify({ pid: bystander.pid, started: 'Thu Jan  1 00:00:00 1970', since: 't', session: 'old00001' }));
-    const b = await begin(t, '--take'); assert.match(b.out, /connected as session/);
+    const b = await begin(t, 'take'); assert.match(b.out, /connected as session/);
     // Nothing to wait for but time: a signal sent by mistake would have arrived by now.
-    run(t, '--stop'); await ended(b); await wait(200);
+    run(t, 'stop'); await ended(b); await wait(200);
     assert.equal(bystander.exitCode ?? bystander.signalCode, null); bystander.kill(); }
   console.log('listen cases ok');
 }
