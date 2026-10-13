@@ -134,6 +134,11 @@ test.describe('an app that depends on a library cloned here', () => {
     const kit = orders.getByRole('switch', { name: 'Use the local @acme/kit' });
     await expect(orders.getByRole('switch', { name: 'Use the local acme-ui' })).not.toBeChecked();
     await expect(card(page, 'payments').getByText('Libraries')).toHaveCount(0);
+    // A switch is its track and its name: the empty space to the right of them is not part of it.
+    const row = await kit.boundingBox();
+    const whole = await orders.boundingBox();
+    if (row && whole) await page.mouse.click(whole.x + whole.width - 24, row.y + row.height / 2);
+    await expect(kit).not.toBeChecked();
     await kit.check();
     await orders.screenshot({ path: 'test-results/next-card-libraries.png' });
     await nextEdit(page);

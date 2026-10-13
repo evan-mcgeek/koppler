@@ -677,6 +677,7 @@
   .switch {
     position: relative;
     display: flex;
+    width: fit-content;
     align-items: center;
     gap: 8px;
     min-height: 30px;
