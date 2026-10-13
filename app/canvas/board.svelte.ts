@@ -279,7 +279,7 @@ class Board {
       ),
     ),
   );
-  #registry: Registry | undefined;
+  #registry = $state.raw<Registry | undefined>();
   /** The apps whose new tunnel cards still wait for their real place. */
   unplaced = $state.raw<string[]>([]);
 
@@ -1161,6 +1161,21 @@ class Board {
     return out.error === undefined ? { notes: out.notes, name: first.name } : out;
   }
   /** One of the user's boards as text for the stack's presets: what runs and the cables, without its places. */
+  /** The board as a team board of the stack, placed as it is: the name, the apps and cables, and where they sit. */
+  forTeam(preset: StoredPreset): StoredPreset {
+    const { layout, outside } = preset;
+    return {
+      ...(JSON.parse(this.asShared(preset)) as StoredPreset),
+      ...(layout ? { layout } : {}),
+      ...(outside ? { outside } : {}),
+    };
+  }
+  /** A board just kept among the stack's team boards, shown as one without loading the stack again. */
+  keptForTeam(at: number, preset: StoredPreset): void {
+    const presets = [...((this.#registry?.presets ?? []) as StoredPreset[])];
+    presets[at] = preset;
+    if (this.#registry) this.#registry = { ...this.#registry, presets: presets as Registry['presets'] };
+  }
   asShared(preset: StoredPreset): string {
     const { name, nodes, edges } = preset;
     return JSON.stringify({ name, version: migrate(preset).preset?.version ?? PRESET_VERSION, nodes, edges }, null, 2);

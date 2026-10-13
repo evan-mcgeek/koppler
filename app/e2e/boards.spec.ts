@@ -119,7 +119,7 @@ test('a board of your own is renamed, copied, shared, deleted and restored', asy
 
   await picker(page).click();
   await page.screenshot({ path: 'test-results/next-boards-manage.png' });
-  await boards(page).getByRole('button', { name: 'Share Orders work' }).click();
+  await boards(page).getByRole('button', { name: 'Copy Orders work as JSON' }).click();
   await expect(page.getByRole('status').filter({ hasText: 'Copied' })).toBeVisible();
   const shared = JSON.parse(await page.evaluate(() => navigator.clipboard.readText())) as Record<string, unknown>;
   expect(Object.keys(shared)).toEqual(['name', 'version', 'nodes', 'edges']);
@@ -202,4 +202,36 @@ test('Arrange leaves no card on top of another', async ({ page }) => {
       ).length;
     });
   await expect.poll(overlapping).toBe(0);
+});
+
+test('a board of your own is shared with the team: it joins the stack as a team board', async ({ page, canvas }) => {
+  const fs = await import('node:fs');
+  const path = await import('node:path');
+  const { STACK } = await import('./canvas.ts');
+  fs.mkdirSync(path.join(canvas.dir, 'stack'), { recursive: true });
+  fs.mkdirSync(path.join(canvas.dir, 'config'), { recursive: true });
+  const file = path.join(canvas.dir, 'stack', 'stack.json');
+  fs.writeFileSync(file, JSON.stringify(STACK));
+  fs.writeFileSync(
+    path.join(canvas.dir, 'config', 'config.json'),
+    JSON.stringify({ stack: path.join(canvas.dir, 'stack') }),
+  );
+  await page.getByRole('button', { name: 'Add Web Shop to the board', exact: true }).first().click();
+  await page.getByRole('button', { name: 'Add Orders API to the board', exact: true }).first().click();
+  await expect(picker(page)).toHaveText('Web Shop');
+  await nextEdit(page);
+  await picker(page).click();
+  await boards(page).getByRole('button', { name: 'Share Web Shop with the team' }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'Web Shop is a team board now' })).toContainText(
+    "Commit the stack's repo",
+  );
+  const kept = JSON.parse(fs.readFileSync(file, 'utf8')) as {
+    presets: { name: string; nodes: object; layout?: object }[];
+  };
+  const shared = kept.presets.find(one => one.name === 'Web Shop');
+  expect(Object.keys(shared?.nodes ?? {}).sort()).toEqual(['orders', 'web']);
+  expect(shared?.layout).toBeTruthy();
+  // The menu, still open, lists it with the team's boards.
+  await expect(boards(page).getByText('Team board').first()).toBeVisible();
+  await expect(opens(page).filter({ hasText: 'Web Shop' })).toHaveCount(2);
 });

@@ -4,6 +4,8 @@
   import type { StoredPreset } from '../src/core/presets.ts';
   import { board } from './board.svelte.ts';
   import { ago, openBoard, openFile, openLink } from './boards.ts';
+  import { post } from './data.ts';
+  import { live } from './live.svelte.ts';
   import { runs } from './run.svelte.ts';
   import { toasts } from './toast.svelte.ts';
 
@@ -60,12 +62,28 @@
     if (why) hint = { text: why, warn: true };
     else close();
   };
+  // Shared with the team: kept among the stack's team boards through the same checked edit as any other change.
   const share = async (preset: StoredPreset) => {
+    const at = board.team.findIndex(one => one.name === preset.name);
+    const index = at < 0 ? board.team.length : at;
+    const value = board.forTeam(preset);
+    const said = await post('stack-edit', { path: `presets[${String(index)}]`, value });
+    if ('error' in said) {
+      toasts.show(`Could not share ${preset.name}: ${said.error}`, 'warning');
+      return;
+    }
+    board.keptForTeam(index, value);
+    const reach = live.status?.linked
+      ? 'Open a pull request from the stack menu, so your team gets it.'
+      : "Commit the stack's repo, so your team gets it.";
+    toasts.show(`${preset.name} is a team board now. ${reach}`);
+  };
+  const copy = async (preset: StoredPreset) => {
     const copied = await navigator.clipboard.writeText(board.asShared(preset)).then(
       () => true,
       () => false,
     );
-    if (copied) toasts.show('Copied. Add it to "presets" in stack.json to share it');
+    if (copied) toasts.show('Copied. It opens on another canvas from the board menu, as a file or a link.');
     else toasts.show('Copy is blocked here', 'warning');
   };
   // Deleting asks first and names what goes; the board then waits in Recently deleted.
@@ -149,9 +167,16 @@
           <button
             class="act"
             type="button"
-            aria-label="Share {preset.name}"
-            title="Copy as JSON, to share it in the stack (presets in stack.json)"
+            aria-label="Share {preset.name} with the team"
+            title="Make it a team board of the stack, for everyone who uses it"
             onclick={() => void share(preset)}>Share</button
+          >
+          <button
+            class="act"
+            type="button"
+            aria-label="Copy {preset.name} as JSON"
+            title="Copy as JSON, to send to someone: it opens from the board menu"
+            onclick={() => void copy(preset)}>Copy</button
           >
           <button
             class="act"
