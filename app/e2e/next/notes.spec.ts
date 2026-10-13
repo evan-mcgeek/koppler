@@ -92,5 +92,7 @@ test('what the stack needs on this Mac is listed with its commands, and missing 
   await expect(open).toBeVisible();
   // A server running older code than is on disk says how to restart it.
   await expect(page.getByRole('complementary')).toContainText('The canvas server runs older code');
+  await expect(page.getByRole('complementary').locator('.warn code')).toHaveText(/koppler/);
   await expect(page.getByRole('button', { name: 'Copy restart command' })).toBeVisible();
+  await page.getByRole('complementary').locator('.warn').first().screenshot({ path: 'test-results/next-restart.png' });
 });
