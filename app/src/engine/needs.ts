@@ -34,6 +34,8 @@ interface SecretNeed {
 /** How to tell a step is done. */
 interface Check {
   sso?: string;
+  /** The AWS account that profile must be signed in to. */
+  account?: string;
   /** A command of the stack's that succeeds while a sign-in holds. */
   shell?: string;
   hosts?: string;
@@ -126,7 +128,10 @@ export function stepsFor(
           : `${appName} needs it when it starts.`,
         command: signIn.login,
         where: 'anywhere',
-        check: 'shell' in signIn.check ? { shell: signIn.check.shell } : { sso: need.sso ?? '' },
+        check:
+          'shell' in signIn.check
+            ? { shell: signIn.check.shell }
+            : { sso: need.sso ?? '', ...(signIn.account && { account: signIn.account }) },
         browser: true,
       });
     if (need.hosts)
@@ -206,7 +211,12 @@ export function isDone(
   check: Check,
   world: { hostsFile?: string; skill?: string; checks?: { name: string; run: string }[]; approved?: boolean } = {},
 ): boolean | null {
-  if (check.sso) return run('aws', ['sts', 'get-caller-identity', '--profile', check.sso]).ok;
+  if (check.sso) {
+    const account = ['--query', 'Account', '--output', 'text'];
+    const who = run('aws', ['sts', 'get-caller-identity', '--profile', check.sso, ...account]);
+    // Signed in to another account is not signed in: its settings and secrets would be the wrong ones.
+    return who.ok && (!check.account || who.out.trim() === check.account);
+  }
   // The stack wrote it: it runs only once the user approved the stack's commands.
   if (check.shell) return world.approved ? run('sh', ['-c', check.shell], 20000).ok : null;
   if (check.hosts) return inHosts(world.hostsFile ?? '/etc/hosts', check.hosts);

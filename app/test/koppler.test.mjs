@@ -91,7 +91,7 @@ const [crashy, upA, upB, tunA, tunB, runA, runB, agentA, agentB, leftA, leftB] =
   const koppler = (...args) => { const r = spawnSync('node', [path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'dist', 'koppler.mjs'), ...args], { encoding: 'utf8', env }); return { out: (r.stdout + r.stderr).trim(), code: r.status }; };
   // A stand-in for the AWS command: signed in only while the file it looks for is there.
   fs.mkdirSync(bin);
-  fs.writeFileSync(path.join(bin, 'aws'), `#!/bin/sh\n[ -f "${dir}/signed-in" ] || { echo "Token has expired and refresh failed" >&2; exit 255; }\n`, { mode: 0o755 });
+  fs.writeFileSync(path.join(bin, 'aws'), `#!/bin/sh\n[ -f "${dir}/signed-in" ] || { echo "Token has expired and refresh failed" >&2; exit 255; }\ncat "${dir}/account" 2>/dev/null; exit 0\n`, { mode: 0o755 });
   const [port] = await freePorts(1);
   const stack = { envs: ['qa'], apps: { api: { name: 'Orders API', kind: 'other', start: `echo started > "${dir}/started"; exec python3 -m http.server ${port} --bind 127.0.0.1`, url: `http://localhost:${port}`, prereqs: [{ sso: 'acme-qa' }] } } };
   fs.writeFileSync(path.join(dir, 'registry.json'), JSON.stringify(stack)); allowStack(dir, stack);
@@ -105,6 +105,19 @@ const [crashy, upA, upB, tunA, tunB, runA, runB, agentA, agentB, leftA, leftB] =
   const started = koppler('up', 'api');
   assert.equal(started.code, 0, started.out);
   assert.equal(fs.existsSync(path.join(dir, 'started')), true);
+  koppler('stop', '--all', '--yes');
+  // A sign-in that names its account: signed in to another one is refused like an expired one.
+  stack.apps.api.prereqs = [{ sso: 'acme-qa', account: '222222222222' }];
+  fs.writeFileSync(path.join(dir, 'registry.json'), JSON.stringify(stack)); allowStack(dir, stack);
+  fs.rmSync(path.join(dir, 'started'));
+  fs.writeFileSync(path.join(dir, 'account'), '111111111111\n');
+  const wrong = koppler('up', 'api');
+  assert.equal(wrong.code, 1, wrong.out);
+  assert.match(wrong.out, /Orders API needs AWS \(acme-qa, account 222222222222\) at start, and the sign-in has expired or is on another account/);
+  assert.equal(fs.existsSync(path.join(dir, 'started')), false, 'nothing was started');
+  fs.writeFileSync(path.join(dir, 'account'), '222222222222\n');
+  const right = koppler('up', 'api');
+  assert.equal(right.code, 0, right.out);
   koppler('stop', '--all', '--yes');
   console.log('sign-in before start ok');
 }

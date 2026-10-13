@@ -40,6 +40,8 @@ const Prereq = z.looseObject(
     connectsAs: host.optional(),
     hosts: host.optional(),
     sso: matching(NAME, 'an AWS profile name').optional(),
+    /** The AWS account that profile must be signed in to. */
+    account: matching(/^\d{12}$/, 'a 12-digit AWS account id').optional(),
     /** A sign-in of the stack's own, by its name under `signIns`. */
     signIn: matching(NAME, 'the name of a sign-in').optional(),
   },

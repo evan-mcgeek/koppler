@@ -23,9 +23,12 @@ export interface SignIn {
   env: Record<string, string>;
   /** The program it needs installed. */
   tool: string;
+  /** The AWS account the profile must be signed in to. */
+  account?: string;
 }
 interface Need {
   sso?: string | undefined;
+  account?: string | undefined;
   signIn?: string | undefined;
 }
 
@@ -37,11 +40,12 @@ export function signInOf(
   if (need?.sso)
     return {
       id: `sso:${need.sso}`,
-      what: `AWS (${need.sso})`,
+      what: need.account ? `AWS (${need.sso}, account ${need.account})` : `AWS (${need.sso})`,
       check: { argv: ['aws', 'sts', 'get-caller-identity', '--profile', need.sso] },
       login: `aws sso login --profile ${need.sso}`,
       env: { AWS_PROFILE: need.sso },
       tool: 'aws',
+      ...(need.account && { account: need.account }),
     };
   const declared = need?.signIn ? stack?.signIns?.[need.signIn] : undefined;
   if (!need?.signIn || !declared) return null;
