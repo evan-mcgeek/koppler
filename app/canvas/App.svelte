@@ -73,6 +73,13 @@
     if (loaded) {
       board.open(loaded);
       live.watch();
+      // `koppler canvas --board "<name>"` opens on that board, once: a reload keeps what is opened next.
+      if (location.hash.startsWith('#board=')) {
+        const want = decodeURIComponent(location.hash.slice(7)).toLowerCase();
+        const asked = [...board.own, ...board.team].find(one => one.name.toLowerCase() === want);
+        history.replaceState(null, '', location.pathname + location.search);
+        if (asked && asked.name !== board.name) board.openBoard(asked);
+      }
       // With no stack the page asks for one; with a stack that has no apps yet, for its repos.
       if (board.setup) dialogs.setup?.open();
       else if (!board.apps.length || location.hash === '#pick') {
