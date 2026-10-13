@@ -27,7 +27,7 @@
   const tunnels = $derived(board.tunnelsOf(id));
   const queues = $derived(board.queuesOf(id));
   const hiddenQueues = $derived(queues.filter(queue => board.hiddenQueues[queue]));
-  const noQueues = $derived(queues.length > 0 && !!data.hideQueues);
+  const noQueues = $derived(queues.length > 0 && hiddenQueues.length === queues.length);
   const calls = $derived(board.deployedCalls(id));
   /** "Acme Web Portal" reads as "Web Portal" on an Acme card. */
   const short = (name: string) => {
@@ -167,7 +167,7 @@
     <p class="glance">
       <span title="Branch: {data.branch || current}">{data.branch || current}</span>
       {#if runLabel}<span>{runLabel}</span>{/if}
-      {#if noQueues}<span title="It is taken off its queues and keeps the deployed ones">No queues</span>{/if}
+      {#if noQueues}<span title="Its queues are hidden and stay the deployed ones">No queues</span>{/if}
       {#if data.hideTunnels && tunnels.length}<span
           class="off"
           title="Only the API runs; calls through its tunnels fail">No tunnels</span
@@ -290,7 +290,7 @@
               <label
                 class="switch"
                 title={noQueues
-                  ? 'Off: it is taken off its queues and keeps the deployed ones. A queue another app uses stays on the board for that app.'
+                  ? 'Off: its queues are hidden, and stay the deployed ones.'
                   : 'On: its queues show on the board, where each can be switched to a local copy.'}
               >
                 <input
@@ -299,7 +299,7 @@
                   aria-label="Show {data.name}'s queues"
                   checked={!noQueues}
                   onchange={ev => {
-                    board.set(id, { hideQueues: !ev.currentTarget.checked });
+                    board.showQueues(queues, ev.currentTarget.checked);
                   }}
                 /><span class="track" aria-hidden="true"></span>{noQueues ? 'Off' : 'On'}
               </label>
