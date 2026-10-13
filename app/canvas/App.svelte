@@ -93,13 +93,14 @@
     sent = now;
     void save(board.saved(), leaving).then(kept => (board.unsaved = !kept));
   };
-  // The tunnel cards follow what is on the board: its apps, which of them run without tunnels, and the environment.
+  // The tunnel and queue cards follow what is on the board: its apps, which of them run without tunnels or are off
+  // their queues, and the environment.
   const needs = $derived(
     JSON.stringify([
       board.env,
       board.queues,
       board.hiddenQueues,
-      board.nodes.map(node => [node.id, node.data.hideTunnels]),
+      board.nodes.map(node => [node.id, node.data.hideTunnels, node.data.hideQueues]),
     ]),
   );
   $effect(() => {

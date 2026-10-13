@@ -37,6 +37,8 @@ export interface CardData extends Record<string, unknown> {
   note: string;
   /** Runs without its tunnels, when only its API is needed. */
   hideTunnels?: boolean;
+  /** It is taken off its queues: no link to their cards, and it keeps the deployed ones. */
+  hideQueues?: boolean;
   /** What happens to the clone's uncommitted changes when another branch runs; set aside unless chosen. */
   changes?: Changes;
   /** The libraries it runs with the local copy of, by name. */
@@ -259,6 +261,8 @@ class Board {
     ];
   }
   #onBoard = $derived(new Set(this.nodes.map(node => node.id)));
+  /** The apps on the board that are still on their queues. */
+  #onQueues = $derived(new Set(this.nodes.filter(node => !node.data.hideQueues).map(node => node.id)));
   #outside(id: string): boolean {
     return !!this.#registry?.apps[id]?.outside;
   }
@@ -268,10 +272,11 @@ class Board {
     return Object.entries(this.#registry?.queues ?? {}).flatMap(([id, queue]) => {
       const users = (how: 'publishes' | 'reads') =>
         Object.keys(apps).filter(
-          app => Object.hasOwn(apps[app]?.[how] ?? {}, id) && (this.#onBoard.has(app) || this.#outside(app)),
+          app => Object.hasOwn(apps[app]?.[how] ?? {}, id) && (this.#onQueues.has(app) || this.#outside(app)),
         );
       const [pubs, reads] = [users('publishes'), users('reads')];
-      const shown = !this.hiddenQueues[id] && [...pubs, ...reads].some(app => this.#onBoard.has(app));
+      // A queue between two apps stays for the one that is still on it.
+      const shown = !this.hiddenQueues[id] && [...pubs, ...reads].some(app => this.#onQueues.has(app));
       return shown ? [{ id, queue, pubs, reads }] : [];
     });
   });
@@ -935,8 +940,7 @@ class Board {
             ...(data.branch && { branch: data.branch }),
             ...(data.note && { note: data.note }),
             ...(data.hideTunnels && { tunnels: false }),
-            ...(this.queuesOf(id).length > 0 &&
-              this.queuesOf(id).every(queue => this.hiddenQueues[queue]) && { queues: false }),
+            ...(data.hideQueues && this.queuesOf(id).length > 0 && { queues: false }),
           },
         ]),
       ),
@@ -1138,14 +1142,12 @@ class Board {
     ].slice(0, 20);
     this.name = preset.name;
     this.queues = {};
-    this.hiddenQueues = Object.fromEntries(
-      ids.filter(id => preset.nodes[id]?.queues === false).flatMap(id => this.queuesOf(id).map(queue => [queue, true])),
-    );
+    this.hiddenQueues = {};
     this.nodes = ids.flatMap(id => {
       const app = this.apps.find(one => one.id === id);
       const node = preset.nodes[id];
       if (!app || !node) return [];
-      const chosen = { ...node, hideTunnels: node.tunnels === false };
+      const chosen = { ...node, hideTunnels: node.tunnels === false, hideQueues: node.queues === false };
       return [this.#card(app, (placed && place(id)) || { x: 0, y: 0 }, chosen)];
     });
     const at = Object.fromEntries(this.nodes.map(({ id, position }) => [id, position]));
@@ -1204,6 +1206,7 @@ class Board {
         kind,
         kindLabel,
         ...(chosen.hideTunnels === true && { hideTunnels: true }),
+        ...(chosen.hideQueues === true && { hideQueues: true }),
         ...((chosen.changes === 'take-along' || chosen.changes === 'set-aside') && { changes: chosen.changes }),
         ...(Array.isArray(chosen.libraries) && {
           libraries: chosen.libraries.filter(name => typeof name === 'string'),
@@ -1293,21 +1296,24 @@ class Board {
       env: this.env,
       ...(this.view && { zoom: this.view.zoom, pan: { x: this.view.x, y: this.view.y } }),
       nodes: Object.fromEntries(
-        this.nodes.map(({ id, position, data: { branch, run, platform, note, hideTunnels, changes, libraries } }) => [
-          id,
-          {
-            ...before[id],
-            x: Math.round(position.x),
-            y: Math.round(position.y),
-            branch,
-            run,
-            ...(platform && { platform }),
-            note,
-            hideTunnels: hideTunnels ? true : undefined,
-            changes,
-            libraries: libraries?.length ? libraries : undefined,
-          },
-        ]),
+        this.nodes.map(
+          ({ id, position, data: { branch, run, platform, note, hideTunnels, hideQueues, changes, libraries } }) => [
+            id,
+            {
+              ...before[id],
+              x: Math.round(position.x),
+              y: Math.round(position.y),
+              branch,
+              run,
+              ...(platform && { platform }),
+              note,
+              hideTunnels: hideTunnels ? true : undefined,
+              hideQueues: hideQueues ? true : undefined,
+              changes,
+              libraries: libraries?.length ? libraries : undefined,
+            },
+          ],
+        ),
       ),
       edges: this.edges.map(({ source, target, data }) => ({ from: source, to: target, ...data })),
       queues: this.queues,

@@ -73,19 +73,42 @@ test('a queue is switched to a local copy where Koppler can run one, and the cho
   await expect(queue(page).filter({ hasText: 'Order events' }).getByRole('radio', { name: 'Local' })).toBeChecked();
 });
 
-test("a queue is hidden from its card, and an app's Queues switch hides or brings back all of its queues", async ({
+test("a queue is hidden from its card; an app's Queues switch takes only that app off its queues", async ({
   page,
+  canvas,
 }) => {
   await queue(page).filter({ hasText: 'Receipts' }).getByRole('button', { name: 'Hide Receipts' }).click();
   await expect(queue(page)).toHaveCount(1);
   await card(page, 'orders').getByRole('button', { name: 'Show 1 hidden' }).click();
   await expect(queue(page)).toHaveCount(2);
-  const all = card(page, 'orders').getByRole('switch', { name: "Show Orders API's queues" });
-  await all.uncheck();
+
+  // Order events is between Orders API and Payments API; Receipts is Orders API's alone.
+  const ofOrders = card(page, 'orders').getByRole('switch', { name: "Show Orders API's queues" });
+  const ofPayments = card(page, 'payments').getByRole('switch', { name: "Show Payments API's queues" });
+  await expect(page.locator('.links .flow.msg')).toHaveCount(3);
+  const kept = saved(page);
+  await ofOrders.uncheck();
+  // Its own queue goes, and so does its link to the shared one; that one stays for Payments API, whose switch is still on.
+  await expect(queue(page)).toHaveText([/Order events/]);
+  await expect(page.locator('.links .flow.msg')).toHaveCount(1);
+  await expect(ofPayments).toBeChecked();
+  await page.screenshot({ path: 'test-results/next-queues-one-off.png' });
+  await kept;
+  await page.reload();
+  await expect(ofOrders).not.toBeChecked();
+  await expect(queue(page)).toHaveCount(1);
+  const state = (await (await page.request.get(`${canvas.url}data/state.json`)).json()) as {
+    nodes: Record<string, { hideQueues?: boolean }>;
+  };
+  expect(state.nodes['orders']?.hideQueues).toBe(true);
+  expect(state.nodes['payments']?.hideQueues).toBeUndefined();
+
+  // With both off the shared queue leaves the board; either one brings it back.
+  await ofPayments.uncheck();
   await expect(queue(page)).toHaveCount(0);
-  await expect(page.locator('.links .flow.msg')).toHaveCount(0);
-  await all.check();
+  await ofOrders.check();
   await expect(queue(page)).toHaveCount(2);
+  await expect(page.locator('.links .flow.msg')).toHaveCount(2);
 });
 
 test('a card lists the apps it still calls in the deployed environment, and a click runs one locally too', async ({
