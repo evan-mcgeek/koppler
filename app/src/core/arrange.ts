@@ -239,3 +239,45 @@ export function sidesFor(
   const free = (sides: typeof first) => keep[edge.from] !== sides.fromSide && keep[edge.to] !== sides.toSide;
   return free(first) || !free(second) ? first : second;
 }
+
+/**
+ * Closes up the room the cards take only in full: each band in `needed` that nothing in `taken` covers is cut out.
+ * `show` gives where a place is drawn, `back` where a drawn place is kept.
+ */
+export function squeeze(
+  taken: [number, number][],
+  needed: [number, number][],
+): { show: (y: number) => number; back: (y: number) => number } {
+  const merged = (spans: [number, number][]) =>
+    [...spans]
+      .sort((a, b) => a[0] - b[0])
+      .reduce<[number, number][]>((all, [top, end]) => {
+        const last = all.at(-1);
+        if (last && top <= last[1]) last[1] = Math.max(last[1], end);
+        else all.push([top, end]);
+        return all;
+      }, []);
+  const busy = merged(taken);
+  const bands = merged(needed).flatMap(([top, end]) => {
+    const free: [number, number][] = [];
+    let at = top;
+    for (const [s, e] of busy) {
+      if (e <= at || s >= end) continue;
+      if (s > at) free.push([at, s]);
+      at = Math.max(at, e);
+    }
+    if (at < end) free.push([at, end]);
+    return free;
+  });
+  return {
+    show: y => y - bands.reduce((cut, [s, e]) => cut + Math.max(0, Math.min(y, e) - s), 0),
+    back: d => {
+      let cut = 0;
+      for (const [s, e] of bands) {
+        if (d < s - cut) break;
+        cut += e - s;
+      }
+      return d + cut;
+    },
+  };
+}

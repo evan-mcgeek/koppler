@@ -3,17 +3,18 @@
     Background,
     BackgroundVariant,
     ConnectionMode,
+    getViewportForBounds,
     MiniMap,
     SelectionMode,
     Panel,
     SvelteFlow,
-    getViewportForBounds,
     useSvelteFlow,
     useViewport,
     ViewportPortal,
   } from '@xyflow/svelte';
   import type { Side } from '../src/core/arrange.ts';
   import { cablePath, sidePoint, SIDES, throughPath, type Box } from '../src/core/cables.ts';
+  import { untrack } from 'svelte';
   import AppCard from './AppCard.svelte';
   import Cable from './Cable.svelte';
   import Outside from './Outside.svelte';
@@ -39,6 +40,7 @@
   };
   // Fitting never blows a small board up past its real size.
   const FIT = { padding: 0.15, duration: 200, maxZoom: 1 };
+  const CARD = { w: 260, h: 160 };
   // Not the library's zoomIn and zoomOut: taken here, before its board exists, they stay tied to an empty one.
   const zoomBy = (factor: number) => () => void flow.setZoom(flow.getZoom() * factor, { duration: 150 });
 
@@ -105,7 +107,7 @@
       ev.preventDefault();
       if (ev.shiftKey) board.redo();
       else board.undo();
-    } else if (key === 'f') void flow.fitView(FIT);
+    } else if (key === 'f') void fit();
     else if (key === 'e') board.goEdit();
     else if (key === 'l') board.goLive();
     else if (ev.key === 'v' || ev.key === 'V') tool = 'select';
@@ -123,7 +125,7 @@
       const box = card.getBoundingClientRect();
       return box.right > view.left && box.left < view.right && box.bottom > view.top && box.top < view.bottom;
     });
-    if (!shown) void flow.fitView({ ...FIT, duration: 0 });
+    if (!shown) void fit(0);
   });
   /** A link from an app to a tunnel card: it leaves the app level with the card when it can, so it runs straight. */
   const linkPath = (app: Box, card: Box) => {
@@ -204,13 +206,56 @@
     }),
   );
   const frame = () => new Promise(requestAnimationFrame);
+  $effect(() => {
+    board.brief = viewport.current.zoom < FAR_ZOOM || board.live;
+  });
+  // Fitted in full when the whole board fits that close; else zoomed out, where the cards are short and closed up.
+  // The view is worked out here and set once: a fit the flow queues runs again each time the cards change form.
+  const fit = async (duration = FIT.duration) => {
+    const viewFor = (boxes: Box[], maxZoom: number) => {
+      const x = Math.min(...boxes.map(box => box.x));
+      const y = Math.min(...boxes.map(box => box.y));
+      const bounds = {
+        x,
+        y,
+        width: Math.max(...boxes.map(box => box.x + box.w)) - x,
+        height: Math.max(...boxes.map(box => box.y + box.h)) - y,
+      };
+      return getViewportForBounds(bounds, area?.clientWidth ?? 0, area?.clientHeight ?? 0, 0.2, maxZoom, FIT.padding);
+    };
+    const inFull = () => [
+      ...board.nodes.map(node => ({ ...node.position, ...(full[node.id] ?? board.boxes.get(node.id) ?? CARD) })),
+      ...board.infra.map(card => ({ ...card.position, ...(board.infraBoxes.get(card.id) ?? CARD) })),
+    ];
+    const drawn = () => [...board.boxes.values(), ...board.infraBoxes.values()];
+    if (!area || !board.nodes.length) return;
+    for (let tries = 0; tries < 2; tries++) {
+      const close = viewFor(inFull(), FIT.maxZoom);
+      if (close.zoom < FAR_ZOOM) break;
+      await flow.setViewport(close, { duration: tries ? duration : 0 });
+      await frame();
+      await frame();
+      // Fitted with sizes guessed for cards never seen in full: measured now, it holds if it still fits.
+      if (viewFor(inFull(), FIT.maxZoom).zoom >= FAR_ZOOM) return;
+    }
+    if (!board.brief) {
+      await flow.setViewport(viewFor(inFull(), FIT.maxZoom), { duration: 0 });
+      await frame();
+      await frame();
+    }
+    await flow.setViewport(viewFor(drawn(), FAR_ZOOM - 0.01), { duration });
+  };
   // Each card's last height and the form it was measured in: a change of form is not the card growing.
-  const heights: Record<string, { brief: boolean; height: number } | undefined> = {};
+  const heights: Record<string, { brief: string; height: number } | undefined> = {};
   // Each card's size in full: zoomed out it is drawn, and so measured, in its short form.
   const full: Record<string, { w: number; h: number; live: boolean } | undefined> = {};
   $effect(() => {
     if (viewport.current.zoom < FAR_ZOOM) return;
     for (const [id, { w, h }] of board.boxes) full[id] = { w, h, live: board.live };
+    if (board.live) return;
+    const heights = Object.fromEntries([...board.boxes].map(([id, box]) => [id, Math.round(box.h)]));
+    if (Object.entries(heights).some(([id, h]) => board.fullHeights[id] !== h))
+      untrack(() => (board.fullHeights = { ...board.fullHeights, ...heights }));
   });
   const arrange = async () => {
     // Cards are placed by their full size, so pressing again changes nothing, whatever the zoom.
@@ -222,24 +267,8 @@
     }
     const size = (id: string) => full[id] ?? board.boxes.get(id) ?? { w: 260, h: 160 };
     board.arrange(size);
-    // The cards move first; the view follows once they are placed, fitted to their full sizes too.
-    requestAnimationFrame(() => {
-      if (!area) return;
-      const boxes = [
-        ...board.nodes.map(node => ({ ...node.position, ...size(node.id) })),
-        ...board.infraBoxes.values(),
-      ];
-      const x = Math.min(...boxes.map(box => box.x));
-      const y = Math.min(...boxes.map(box => box.y));
-      const bounds = {
-        x,
-        y,
-        width: Math.max(...boxes.map(box => box.x + box.w)) - x,
-        height: Math.max(...boxes.map(box => box.y + box.h)) - y,
-      };
-      const to = getViewportForBounds(bounds, area.clientWidth, area.clientHeight, 0.2, FIT.maxZoom, FIT.padding);
-      void flow.setViewport(to, { duration: FIT.duration });
-    });
+    // The cards move first; the view follows once they are placed.
+    requestAnimationFrame(() => void fit());
   };
   // A board that was just opened: once its cards have their sizes it is arranged, or only brought into view.
   $effect(() => {
@@ -247,7 +276,7 @@
     if (!how || !board.nodes.every(node => node.measured?.width)) return;
     board.opened = null;
     if (how === 'arrange') void arrange();
-    else requestAnimationFrame(() => void flow.fitView(FIT));
+    else requestAnimationFrame(() => void fit());
   });
 </script>
 
@@ -283,14 +312,24 @@
 >
   <SvelteFlow
     bind:nodes={
-      () => [...board.nodes, ...board.infra],
-      (all: (CardNode | InfraNode)[]) => {
+      () => [...board.nodes, ...board.infra].map(node => ({ ...node, position: board.shown(node.position) })),
+      (drawn: (CardNode | InfraNode)[]) => {
+        // The flow has the cards where they are drawn: one it moved is kept where that is on the full board.
+        const kept = new Map([...board.nodes, ...board.infra].map(node => [node.id, node]));
+        const all = drawn.map(node => {
+          const at = kept.get(node.id);
+          if (at?.dragging && !node.dragging) return { ...node, position: board.dropped(node.id, node.position) };
+          const was = at && board.shown(at.position);
+          return at && was?.x === node.position.x && was.y === node.position.y
+            ? { ...node, position: at.position }
+            : { ...node, position: board.stored(node.position) };
+        }) as (CardNode | InfraNode)[];
         // An app the library moved (a drag, the arrow keys) takes its tunnel cards along, in the same step.
         const was = new Map(board.nodes.map(node => [node.id, node.position]));
         const grew: Record<string, { bottom: number; by: number }> = {};
         let infra = all.filter(node => node.type !== 'app');
         let apps = all.filter(node => node.type === 'app');
-        const brief = viewport.current.zoom < FAR_ZOOM || board.live;
+        const brief = `${String(viewport.current.zoom < FAR_ZOOM)} ${String(board.live)}`;
         // Until the first status is shown, cards are still filling in: that growth is not theirs to push with.
         const settled = live.asked;
         for (const { id, measured } of apps) {
@@ -299,10 +338,9 @@
           const last = heights[id];
           const height = measured?.height;
           if (height) heights[id] = { brief, height };
-          // Its own tunnel cards follow any change of height; the app cards under it only one in the same form.
-          if (settled && last && height && height !== last.height)
-            grew[id] = { bottom: last.height, by: height - last.height };
+          // Only growing in the same form moves what is under it: a change of form is squeezed on screen instead.
           const by = settled && last?.brief === brief && height ? height - last.height : 0;
+          if (by) grew[id] = { bottom: last?.height ?? 0, by };
           const box = board.boxes.get(id);
           if (by && box) {
             const under = (other: Box | undefined) =>
@@ -432,7 +470,7 @@
         </button>
         <span class="sep" aria-hidden="true"></span>
         <button title="Arrange cards by who calls whom, callers on top" onclick={() => void arrange()}>Arrange</button>
-        <button title="Zoom to fit all apps (F)" onclick={() => void flow.fitView(FIT)}>Fit</button>
+        <button title="Zoom to fit all apps (F)" onclick={() => void fit()}>Fit</button>
         <span class="sep" aria-hidden="true"></span>
         <div class="zoom" role="group" aria-label="Zoom">
           <button aria-label="Zoom out" onclick={zoomBy(1 / 1.2)}>−</button>

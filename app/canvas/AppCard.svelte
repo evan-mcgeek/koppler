@@ -22,6 +22,12 @@
   const far = $derived(viewport.current.zoom < FAR_ZOOM);
   /** The short card: zoomed out, or in the Live view. It shows state, not fields. */
   const brief = $derived(far || board.live);
+  // Short, the card keeps its full width: the board is spaced for that, so neighbours never run into each other.
+  let width = $state(0);
+  let fullWidth = $state(0);
+  $effect(() => {
+    if (!brief && width) fullWidth = width;
+  });
   const app = $derived(board.apps.find(one => one.id === id));
   const current = $derived(app?.current || 'current branch');
   const uncommitted = $derived(`${String(app?.dirty ?? 0)} uncommitted ${app?.dirty === 1 ? 'change' : 'changes'}`);
@@ -93,6 +99,8 @@
   class:drop-ok={board.drop?.id === id && board.drop.ok}
   class:drop-bad={board.drop?.id === id && !board.drop.ok}
   class:wiring={!!board.draft}
+  bind:offsetWidth={width}
+  style:width={brief && fullWidth ? `${String(fullWidth)}px` : undefined}
 >
   <header>
     <span class="grip" aria-hidden="true" title="Drag to move">
@@ -527,7 +535,7 @@
     font-size: 15px;
     line-height: 1.2;
     text-wrap: balance;
-    overflow-wrap: anywhere;
+    overflow-wrap: break-word;
   }
   .short .name {
     font-size: 22px;
@@ -943,8 +951,8 @@
   }
   /* The short card reads at a glance: larger, and nothing on it to edit or pull. */
   .short {
-    min-width: 300px;
-    max-width: 460px;
+    min-width: 260px;
+    max-width: 380px;
     padding-bottom: 4px;
   }
   .short header {
@@ -971,9 +979,6 @@
   }
   .short :is(.calls-label, .chip) {
     font-size: 15px;
-  }
-  .reading.far .name {
-    font-size: 26px;
   }
   .reading.far .progress {
     font-size: 24px;

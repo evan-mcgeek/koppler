@@ -192,6 +192,7 @@ export function sanitizeLayout(input: unknown): Loose | null {
       ...(node['showQueues'] === true && { showQueues: true }),
       ...(['set-aside', 'take-along'].includes(changes as string) && { changes }),
       ...(libraries.length > 0 && { libraries }),
+      ...(typeof node['full'] === 'number' && node['full'] > 0 && { full: Math.min(Math.round(node['full']), 5000) }),
     };
   }
   const edges = cables(input['edges']).map(edge => ({
