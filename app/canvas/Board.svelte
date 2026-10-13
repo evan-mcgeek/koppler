@@ -208,6 +208,23 @@
       ];
     }),
   );
+  // The flow draws a picked card over the rest, and else the later ones over the earlier ones.
+  const above = $derived(
+    new Map(board.nodes.map((node, at) => [node.id, (node.selected ? board.nodes.length : 0) + at])),
+  );
+  /** Whether a card that is drawn over this card's end sits on it: then the end is hidden with the card under. */
+  const covered = (at: { x: number; y: number }, owner: string): boolean => {
+    const mine = above.get(owner) ?? 0;
+    return [...board.boxes].some(
+      ([id, box]) =>
+        id !== owner &&
+        (above.get(id) ?? 0) > mine &&
+        at.x > box.x + 1 &&
+        at.x < box.x + box.w - 1 &&
+        at.y > box.y + 1 &&
+        at.y < box.y + box.h - 1,
+    );
+  };
   const frame = () => new Promise(requestAnimationFrame);
   $effect(() => {
     board.brief = viewport.current.zoom < FAR_ZOOM || board.live;
@@ -593,59 +610,63 @@
           {@const a = board.endPoint(index, 'from')}
           {@const b = board.endPoint(index, 'to')}
           {#if a && b}
-            <circle
-              role="presentation"
-              class="plug nodrag nopan"
-              class:cut={board.hovered === edge.id}
-              class:idle={!live.up(edge.source) || !live.up(edge.target)}
-              data-cable={edge.id}
-              class:grabbed={board.grabbed?.id === edge.id && board.grabbed.end === 'from'}
-              cx={a.x}
-              cy={a.y}
-              r="5"
-              onpointerdown={ev => {
-                board.grabEnd(ev, edge.id, 'from');
-              }}
-            />
+            {#if !covered(a, edge.source)}
+              <circle
+                role="presentation"
+                class="plug nodrag nopan"
+                class:cut={board.hovered === edge.id}
+                class:idle={!live.up(edge.source) || !live.up(edge.target)}
+                data-cable={edge.id}
+                class:grabbed={board.grabbed?.id === edge.id && board.grabbed.end === 'from'}
+                cx={a.x}
+                cy={a.y}
+                r="5"
+                onpointerdown={ev => {
+                  board.grabEnd(ev, edge.id, 'from');
+                }}
+              />
+            {/if}
             {@const tested = live.sent(edge.source) && live.sent(edge.target)}
             {@const probe = probes.results[edge.id]}
-            <!-- Tested, the socket is a button for the keyboard too. -->
-            <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-            <circle
-              role={tested ? 'button' : 'presentation'}
-              tabindex={tested ? 0 : undefined}
-              aria-label={tested ? `Test that local ${name(edge.target)} answers ${name(edge.source)}` : undefined}
-              onkeydown={ev => {
-                if (!tested || (ev.key !== 'Enter' && ev.key !== ' ')) return;
-                ev.preventDefault();
-                void probes.test({ key: edge.id, payload: { from: edge.source, to: edge.target } });
-              }}
-              class="socket nodrag nopan"
-              class:tested
-              data-cable={edge.id}
-              class:grabbed={board.grabbed?.id === edge.id && board.grabbed.end === 'to'}
-              cx={b.x}
-              cy={b.y}
-              r="8"
-              onpointerdown={ev => {
-                pressedAt = { x: ev.clientX, y: ev.clientY };
-                board.grabEnd(ev, edge.id, 'to');
-              }}
-              onclick={ev => {
-                // A press that slid reordered the cables or drew a new one: only a press in place tests.
-                if (tested && Math.hypot(ev.clientX - pressedAt.x, ev.clientY - pressedAt.y) < 6)
+            {#if !covered(b, edge.target)}
+              <!-- Tested, the socket is a button for the keyboard too. -->
+              <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+              <circle
+                role={tested ? 'button' : 'presentation'}
+                tabindex={tested ? 0 : undefined}
+                aria-label={tested ? `Test that local ${name(edge.target)} answers ${name(edge.source)}` : undefined}
+                onkeydown={ev => {
+                  if (!tested || (ev.key !== 'Enter' && ev.key !== ' ')) return;
+                  ev.preventDefault();
                   void probes.test({ key: edge.id, payload: { from: edge.source, to: edge.target } });
-              }}
-              >{#if tested}<title>{about(probe, `local ${name(edge.target)} answers`)}</title>{/if}</circle
-            >
-            <circle
-              class="light"
-              data-state={tested ? (probe?.state ?? 'idle') : undefined}
-              data-light={edge.id}
-              cx={b.x}
-              cy={b.y}
-              r="3.4"
-            />
+                }}
+                class="socket nodrag nopan"
+                class:tested
+                data-cable={edge.id}
+                class:grabbed={board.grabbed?.id === edge.id && board.grabbed.end === 'to'}
+                cx={b.x}
+                cy={b.y}
+                r="8"
+                onpointerdown={ev => {
+                  pressedAt = { x: ev.clientX, y: ev.clientY };
+                  board.grabEnd(ev, edge.id, 'to');
+                }}
+                onclick={ev => {
+                  // A press that slid reordered the cables or drew a new one: only a press in place tests.
+                  if (tested && Math.hypot(ev.clientX - pressedAt.x, ev.clientY - pressedAt.y) < 6)
+                    void probes.test({ key: edge.id, payload: { from: edge.source, to: edge.target } });
+                }}
+                >{#if tested}<title>{about(probe, `local ${name(edge.target)} answers`)}</title>{/if}</circle
+              >
+              <circle
+                class="light"
+                data-state={tested ? (probe?.state ?? 'idle') : undefined}
+                data-light={edge.id}
+                cx={b.x}
+                cy={b.y}
+                r="3.4"
+              />
+            {/if}
           {/if}
         {/each}
         <!-- Where a tunnel link reaches its card: whether the app gets to its database or cache through the tunnel. -->
@@ -1053,6 +1074,11 @@
     stroke-width: 1.3;
     stroke-linecap: round;
     stroke-linejoin: round;
+  }
+  /* A group picked by dragging an area keeps each card's own outline, not a box around them all that stays over
+     the cards and takes their clicks; dragging any picked card still moves the group. */
+  .area :global(.svelte-flow__selection-wrapper) {
+    display: none;
   }
   .area :global(.svelte-flow__selection) {
     border: 1px solid var(--cable);
