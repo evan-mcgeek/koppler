@@ -41,7 +41,7 @@
                       >{item.act.label}</button
                     >
                   {/if}
-                  {#each item.notes as note (note.text)}<small class={note.kind} title={note.title}>{note.text}</small
+                  {#each item.notes as note, at (at)}<small class={note.kind} title={note.title}>{note.text}</small
                     >{/each}
                   {#if item.id}<ReviewControls id={item.id} />{/if}
                 </span>
