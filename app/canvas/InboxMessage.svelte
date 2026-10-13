@@ -1,11 +1,11 @@
 <script lang="ts">
   // One message from the agent: what it says, the commands it gives, and for a question the ways to answer it.
+  import Command from './Command.svelte';
   import { inbox, type Message } from './inbox.svelte.ts';
 
   /** `past`: it is history, shown faded with nothing to press. */
   const { one, past }: { one: Message; past: boolean } = $props();
   const KINDS: Record<string, string> = { question: 'Question', result: 'Done', failure: 'Failed', info: 'Update' };
-  let copied = $state('');
   const waits = (message: Message) => message.kind === 'question' && !message.answered;
   const time = (at = '') => {
     const date = new Date(at);
@@ -33,11 +33,6 @@
               : `You answered: ${done.text ?? ''}`;
     return `${how}, ${time(done.at)}.`;
   };
-  const copy = async (command: string) => {
-    await navigator.clipboard.writeText(command).catch(() => undefined);
-    copied = command;
-    setTimeout(() => (copied = ''), 1500);
-  };
   const reply = (ev: SubmitEvent, message: Message) => {
     ev.preventDefault();
     const box = (ev.currentTarget as HTMLFormElement).querySelector('textarea');
@@ -53,12 +48,7 @@
   {#each one.sections ?? [] as section, at (at)}
     {#if section.title}<h4>{section.title}</h4>{/if}
     {#each section.commands ?? [] as command (command)}
-      <div class="cmd">
-        <code>{command}</code>
-        <button type="button" title="Copy this command" onclick={() => void copy(command)}
-          >{copied === command ? 'Copied' : 'Copy'}</button
-        >
-      </div>
+      <Command {command} />
     {/each}
     {#if section.items?.length}
       <ul>
@@ -96,7 +86,6 @@
 
 <style>
   form button,
-  .cmd button,
   .dismiss {
     padding: 4px 10px;
     border: 1px solid var(--line);
@@ -153,22 +142,6 @@
   }
   ul {
     padding-left: 18px;
-  }
-  .cmd {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-  code {
-    flex: 1;
-    min-width: 0;
-    padding: 5px 8px;
-    overflow-x: auto;
-    border: 1px solid var(--line);
-    border-radius: 6px;
-    background: var(--paper);
-    font: 12px var(--mono);
-    white-space: nowrap;
   }
   .choices {
     display: grid;

@@ -1,10 +1,10 @@
 <script lang="ts">
   // "Before this runs on PROD": what the user has to do first, worked out live (sign-ins, hosts entries, credentials,
   // what the stack lacks), in the order it can be done, each with its command.
+  import Command from './Command.svelte';
   import { board } from './board.svelte.ts';
   import { post } from './data.ts';
   import { runs } from './run.svelte.ts';
-  import { toasts } from './toast.svelte.ts';
 
   interface Step {
     title: string;
@@ -21,7 +21,6 @@
   let steps = $state.raw<Step[] | null>(null);
   let failed = $state('');
   let asked = $state(false);
-  let copied = $state(-1);
   const env = $derived(board.env.toUpperCase());
 
   export async function open(): Promise<void> {
@@ -35,14 +34,6 @@
     if ('error' in said) failed = said.error;
     else steps = said.steps ?? [];
   }
-  const copy = async (command: string, at: number) => {
-    const done = await navigator.clipboard.writeText(command).then(
-      () => true,
-      () => false,
-    );
-    if (done) copied = at;
-    else toasts.show('Copy is blocked here. Select the command and copy it.', 'warning');
-  };
   const ask = async () => {
     const gaps = (steps ?? []).filter(step => step.gap && !step.done).map(step => step.title);
     asked = await runs.askFacts(board.env, gaps);
@@ -71,12 +62,7 @@
             {#if !step.done}
               {#if step.why}<small>{step.why}</small>{/if}
               {#if step.command}
-                <span class="cmd">
-                  <code>{step.command}</code>
-                  <button type="button" onclick={() => void copy(step.command ?? '', at)}
-                    >{copied === at ? 'Copied' : 'Copy'}</button
-                  >
-                </span>
+                <Command command={step.command} />
                 {#if step.where}<small>Where: {step.where}</small>{/if}
               {/if}
               {#if step.alt}<small>Or: {step.alt}</small>{/if}
@@ -170,21 +156,8 @@
     display: inline;
     margin-left: 4px;
   }
-  .cmd {
-    display: flex;
-    align-items: center;
-    gap: 8px;
+  li :global(.cmd) {
     margin: 4px 0;
-  }
-  code {
-    flex: 1;
-    min-width: 0;
-    padding: 5px 8px;
-    border: 1px solid var(--line);
-    border-radius: 6px;
-    background: var(--paper);
-    font: 400 12px var(--mono);
-    overflow-wrap: anywhere;
   }
   button {
     padding: 5px 12px;

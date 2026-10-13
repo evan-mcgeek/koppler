@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Command from './Command.svelte';
   import BoardPicker from './BoardPicker.svelte';
   import KindIcon from './KindIcon.svelte';
   import Needs from './Needs.svelte';
@@ -59,15 +60,6 @@
     scanning = false;
     if ('error' in said) toasts.show(said.error, 'warning');
     else location.reload();
-  };
-  const copyRestart = async () => {
-    const command = live.status?.restart ?? '';
-    const done = await navigator.clipboard.writeText(command).then(
-      () => true,
-      () => false,
-    );
-    if (done) toasts.show('Restart command copied');
-    else toasts.show(`Copy is blocked here. Restart it with: ${command}`, 'warning');
   };
   const askDrop = (app: StackApp) => {
     runs.review = {
@@ -271,8 +263,7 @@
     {#if live.status?.restart}
       <div class="warn">
         The canvas server runs older code, so some buttons fail until it restarts. Run this in your terminal:
-        <code>{live.status.restart}</code>
-        <button type="button" aria-label="Copy restart command" onclick={() => void copyRestart()}>Copy</button>
+        <Command command={live.status.restart} label="Copy restart command" />
       </div>
     {/if}
     {#if notCloned}
@@ -566,27 +557,8 @@
     color: var(--warn);
     font-size: 12.5px;
   }
-  footer .warn code {
-    display: block;
+  footer .warn :global(.cmd) {
     margin-top: 6px;
-    padding: 5px 8px;
-    border: 1px solid var(--line);
-    border-radius: 6px;
-    background: var(--paper);
-    color: var(--ink);
-    font: 12px var(--mono);
-    overflow-wrap: anywhere;
-  }
-  footer .warn button {
-    display: block;
-    margin-top: 6px;
-    padding: 3px 9px;
-    border: 1px solid var(--line);
-    border-radius: 6px;
-    background: none;
-    color: var(--ink);
-    font: 600 12px var(--sans);
-    cursor: pointer;
   }
   .note:empty {
     display: none;

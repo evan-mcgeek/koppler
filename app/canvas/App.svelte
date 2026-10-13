@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Command from './Command.svelte';
   import { SvelteFlowProvider } from '@xyflow/svelte';
   import { tick, untrack } from 'svelte';
   import Agent from './Agent.svelte';
@@ -366,7 +367,10 @@
           <Logs />
         </div>
       {:else}
-        <p class="empty">No stack yet. Run <code>koppler init</code>, then open the canvas again.</p>
+        <div class="empty">
+          <p>No stack yet. Run this in your terminal, then open the canvas again.</p>
+          <Command command="koppler init" />
+        </div>
       {/if}
     {/await}
   </main>
@@ -619,12 +623,14 @@
     min-height: 0;
   }
   .empty {
-    margin: 0;
+    display: grid;
+    gap: 8px;
+    max-width: 420px;
     padding: 24px 16px;
     color: var(--muted);
     font-size: 14px;
   }
-  code {
-    font: 13px var(--mono);
+  .empty p {
+    margin: 0;
   }
 </style>

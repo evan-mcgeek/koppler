@@ -1,5 +1,6 @@
 <script lang="ts">
   // The agent's messages, beside the board: questions to answer, and what it finished or failed at.
+  import Command from './Command.svelte';
   import InboxMessage from './InboxMessage.svelte';
   import { ago } from './boards.ts';
   import { inbox, type Message } from './inbox.svelte.ts';
@@ -45,9 +46,10 @@
         <section class="waiting" aria-labelledby="waiting-title">
           <h3 id="waiting-title">Waiting for an agent ({inbox.waiting.length})</h3>
           <p>
-            Sent while no agent was connected. One gets them when you run <code>/koppler-run connect</code> in your agent
-            session; of several runs and Stops only the newest is acted on.
+            Sent while no agent was connected. Of several runs and Stops only the newest is acted on. One gets them when
+            you run this in your agent session:
           </p>
+          <Command command="/koppler-run connect" />
           <ul>
             {#each inbox.waiting as one (one.key)}
               <li>
@@ -153,9 +155,6 @@
   .waiting p {
     color: var(--muted);
     font-size: 12px;
-  }
-  .waiting code {
-    font: 12px var(--mono);
   }
   .waiting ul {
     display: grid;

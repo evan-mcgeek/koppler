@@ -1,5 +1,6 @@
 <script lang="ts">
   // Whether an agent session takes what the canvas sends, and how to connect one.
+  import Command from './Command.svelte';
   import { inbox } from './inbox.svelte.ts';
   import { live } from './live.svelte.ts';
 
@@ -20,7 +21,6 @@
   let how = $state<HTMLButtonElement>();
   let pop = $state<HTMLDivElement>();
   let open = $state(false);
-  let copied = $state(false);
   const listening = $derived(live.status?.agent?.state ?? 'none');
   const agent = $derived(inbox.question ? 'question' : listening);
   const [name, about] = $derived(ABOUT[agent] ?? ABOUT['none'] ?? ['', '']);
@@ -40,11 +40,6 @@
     if (!at || !pop) return;
     pop.style.top = `${String(at.bottom + 6)}px`;
     pop.style.right = `${String(Math.max(12, innerWidth - at.right))}px`;
-  };
-  const copy = async () => {
-    await navigator.clipboard.writeText(COMMAND).catch(() => undefined);
-    copied = true;
-    setTimeout(() => (copied = false), 1500);
   };
   // An agent connected while the steps were open: they are no longer needed.
   $effect(() => {
@@ -100,9 +95,7 @@
       <li>Open your agent session in this project</li>
       <li>
         Run this command there
-        <span class="cmd"
-          ><code>{COMMAND}</code><button type="button" onclick={copy}>{copied ? 'Copied' : 'Copy'}</button></span
-        >
+        <Command command={COMMAND} />
       </li>
       <li>The dot turns green once it listens<small>Anything sent meanwhile waits for it.</small></li>
     </ol>
@@ -223,29 +216,8 @@
     font-weight: 400;
     font-size: 12px;
   }
-  .cmd {
-    display: flex;
-    align-items: center;
-    gap: 8px;
+  li :global(.cmd) {
     margin-top: 6px;
     font-weight: 400;
-  }
-  code {
-    flex: 1;
-    min-width: 0;
-    padding: 5px 8px;
-    border: 1px solid var(--line);
-    border-radius: 6px;
-    background: var(--paper);
-    font: 12px var(--mono);
-  }
-  .cmd button {
-    padding: 5px 10px;
-    border: 1px solid var(--line);
-    border-radius: 6px;
-    background: none;
-    color: var(--ink);
-    font: 600 12px var(--sans);
-    cursor: pointer;
   }
 </style>

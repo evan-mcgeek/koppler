@@ -1,6 +1,7 @@
 <script lang="ts">
   // Credentials: what the apps on the board need stored for this environment. The page can set, test and remove a
   // value, never read one.
+  import Command from './Command.svelte';
   import { SvelteMap } from 'svelte/reactivity';
   import { board } from './board.svelte.ts';
   import { post } from './data.ts';
@@ -14,7 +15,6 @@
     form?: boolean;
     info?: boolean;
     command?: boolean;
-    copied?: boolean;
     message?: string;
     ok?: boolean;
     tested?: boolean;
@@ -89,13 +89,6 @@
     const error = 'error' in said ? said.error : '';
     put(app, name, { tested: false, ok: !error, message: error });
     if (!error) put(app, name, { stored: false, until: Date.now() + 8000 });
-  };
-  const copy = async (app: string, one: Credential) => {
-    await navigator.clipboard.writeText(one.fetchCli ?? '').catch(() => undefined);
-    put(app, one.name, { copied: true });
-    setTimeout(() => {
-      put(app, one.name, { copied: false });
-    }, 1500);
   };
 </script>
 
@@ -204,8 +197,7 @@
                   This command comes from the stack file, so read it before you run it, in your own terminal. It should
                   fetch the value and store it without showing it.
                 </p>
-                <button type="button" onclick={() => void copy(app.id, one)}>{mine.copied ? 'Copied' : 'Copy'}</button>
-                <code>{one.fetchCli}</code>
+                <Command command={one.fetchCli} />
               </div>
             {/if}
           {/if}
@@ -372,8 +364,7 @@
     gap: 6px;
   }
   .acts button,
-  form button,
-  .cmd button {
+  form button {
     padding: 4px 10px;
     border: 1px solid var(--line);
     border-radius: 6px;
@@ -400,19 +391,7 @@
   }
   .cmd {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    align-items: start;
-    gap: 6px 8px;
-  }
-  .cmd code {
-    grid-column: 1 / -1;
-    padding: 6px 8px;
-    overflow-x: auto;
-    border: 1px solid var(--line);
-    border-radius: 6px;
-    background: var(--paper);
-    font: 12px var(--mono);
-    white-space: pre;
+    gap: 6px;
   }
   dl {
     display: grid;

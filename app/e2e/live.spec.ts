@@ -86,7 +86,7 @@ test('apps of the run in progress show whether they answer, with their steps; th
       /Sign in\s*Sign in to AWS/,
       /Start\s*Running\./,
     ]);
-    await expect(card(page, 'orders').locator('.cmd')).toHaveText('aws sso login --profile acme-qa');
+    await expect(card(page, 'orders').locator('.cmd code')).toHaveText('aws sso login --profile acme-qa');
     // The card grew: its tunnel card is still under it, not behind it.
     const grown = await card(page, 'orders').boundingBox();
     const tunnel = await page.locator('.svelte-flow__node-tunnel').boundingBox();
