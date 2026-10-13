@@ -5,7 +5,6 @@
   import Summary from './Summary.svelte';
   import Settings from './Settings.svelte';
   import { board, type StackApp } from './board.svelte.ts';
-  import { openBoard } from './boards.ts';
   import { post } from './data.ts';
   import { dialogs } from './dialogs.svelte.ts';
   import { live } from './live.svelte.ts';
@@ -69,22 +68,6 @@
     );
     if (done) toasts.show('Restart command copied');
     else toasts.show(`Copy is blocked here. Restart it with: ${command}`, 'warning');
-  };
-  // Run alone: one app and its tunnels on a board of its own, straight to the review; the board before is one click
-  // back, from the review itself.
-  const runAlone = (app: StackApp) => {
-    const before = board.alone(app.id);
-    runs.start();
-    if (!before || !runs.review) return;
-    runs.review = {
-      ...runs.review,
-      back: {
-        label: `Back to ${before.name}`,
-        run: () => {
-          openBoard(before);
-        },
-      },
-    };
   };
   const askDrop = (app: StackApp) => {
     runs.review = {
@@ -253,7 +236,7 @@
               aria-label="Run {app.name} alone"
               title="Run alone: just this app and its tunnels, on a board of its own"
               onclick={() => {
-                runAlone(app);
+                runs.alone(app.id);
               }}
             >
               <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"

@@ -159,3 +159,26 @@ test('Stop has a menu: stop the apps and keep the changes, or shut Koppler down'
   await review(page).getByRole('button', { name: 'Shut down' }).click();
   await expect(page.getByRole('status')).toContainText('Koppler is shut down. Start it again with koppler canvas.');
 });
+
+test('a card has a play icon to run its app alone, and a stop icon while it runs', async ({ page }) => {
+  const card = page.locator('.svelte-flow__node-app[data-id="orders"]');
+  // Running, as the server would report it: the card offers Stop, and only that app is stopped.
+  await page.route('**/data/status.json', route =>
+    route.fulfill({ json: { apps: { orders: { listening: true } }, running: ['orders', 'canvas'] } }),
+  );
+  const asked: unknown[] = [];
+  await page.route('**/stop-apps?*', async route => {
+    asked.push(route.request().postDataJSON());
+    await route.fulfill({ json: { stopped: ['orders'] } });
+  });
+  await card.getByRole('button', { name: 'Stop Orders API' }).click();
+  await expect(page.getByText('Stopped Orders API. Its changes stay until you revert.')).toBeVisible();
+  expect(asked).toEqual([{ app: 'orders' }]);
+  await page.screenshot({ path: 'test-results/next-card-icons.png' });
+
+  // Not running: play goes straight to the review of that app alone.
+  const web = page.locator('.svelte-flow__node-app[data-id="web"]');
+  await web.getByRole('button', { name: 'Run Web Shop alone' }).click();
+  await expect(page.getByRole('button', { name: 'Board: Web Shop alone' })).toBeVisible();
+  await expect(review(page).getByRole('button', { name: /Back to/ })).toBeVisible();
+});

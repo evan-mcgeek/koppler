@@ -112,6 +112,32 @@
     <span class="kind">{data.kindLabel}</span>
     <!-- What can be done with the card, as icons in its corner. -->
     <span class="tools nodrag">
+      {#if runs.started.includes(id)}
+        <button
+          class="stop"
+          type="button"
+          aria-label="Stop {data.name}"
+          title="Stop this app; its changes stay"
+          onclick={() => void runs.stopApp(id)}
+        >
+          <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"
+            ><rect class="fill" x="4" y="4" width="8" height="8" rx="1.5" /></svg
+          >
+        </button>
+      {:else}
+        <button
+          type="button"
+          aria-label="Run {data.name} alone"
+          title="Run alone: just this app and its tunnels, on a board of its own"
+          onclick={() => {
+            runs.alone(id);
+          }}
+        >
+          <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"
+            ><path class="fill" d="M5 3.2v9.6l7.8-4.8z" /></svg
+          >
+        </button>
+      {/if}
       {#if live.hasLog(id)}
         <button
           type="button"
@@ -532,8 +558,12 @@
     background: color-mix(in oklab, var(--ink) 8%, transparent);
     color: var(--ink);
   }
-  .tools .remove:hover {
+  .tools :is(.remove, .stop):hover {
     color: var(--bad);
+  }
+  .tools .fill {
+    fill: currentColor;
+    stroke: none;
   }
   .tools svg {
     fill: none;
