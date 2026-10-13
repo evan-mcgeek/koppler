@@ -9,6 +9,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { KINDS, of as kindOf, register } from '../core/kinds.ts';
 import { validateStack } from '../core/stack.ts';
+import { getAt, parsePath, setAt } from '../core/stack-path.ts';
 import { readData, writeData, type Clone } from '../data.ts';
 import { Failure } from '../failure.ts';
 import { TEMP } from '../paths.ts';
@@ -479,6 +480,52 @@ export function addApps(
   }
   if (added.length) writeJson(source, stack);
   return { added };
+}
+
+/** What the stack in use holds at a path (the whole stack without one). */
+export function readStackAt(
+  pathText = '',
+  { config = loadConfig() }: { config?: Config } = {},
+): { value: unknown; error?: undefined } | { error: string } {
+  const used = stackInUse(config);
+  if (used.error !== undefined) return used;
+  if (!pathText) return { value: used.stack };
+  const parsed = parsePath(pathText);
+  if ('error' in parsed) return parsed;
+  return { value: getAt(used.stack, parsed) };
+}
+
+/**
+ * Changes one field of the stack in use, or takes it out when no value is given. The first of the values that keeps
+ * the stack valid is written (a value typed in a terminal may be meant as text or as JSON); a change that breaks one of
+ * the stack's rules is refused with what it breaks, and nothing is written.
+ */
+export function editStack(
+  pathText: string,
+  values?: unknown[],
+  { config = loadConfig() }: { config?: Config } = {},
+): { path: string; value: unknown; error?: undefined } | { error: string } {
+  const used = stackInUse(config);
+  if (used.error !== undefined) return used;
+  const parsed = parsePath(pathText);
+  if ('error' in parsed) return parsed;
+  const before = new Set(validateStack(used.stack));
+  let first = '';
+  for (const value of values ?? [undefined]) {
+    let next: unknown;
+    try {
+      next = setAt(used.stack, parsed, value);
+    } catch (error) {
+      return { error: `${pathText}: ${(error as Error).message}` };
+    }
+    const broken = validateStack(next).filter(problem => !before.has(problem));
+    if (!broken.length) {
+      writeJson(used.source, next);
+      return { path: pathText, value };
+    }
+    first ||= broken.slice(0, 5).join('; ');
+  }
+  return { error: first };
 }
 
 /**

@@ -280,3 +280,34 @@ console.log('switch stacks ok');
   assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')).apps.adyen.consumes, { b: {} });
   fs.rmSync(dir, { recursive: true, force: true });
 }
+
+// Any field of the stack is changed through one checked edit: the value that keeps the stack valid is written, else nothing.
+{
+  const { editStack, readStackAt } = await import('../dist/engine/sync.js');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-edit-'));
+  const file = path.join(dir, 'stack.json');
+  fs.writeFileSync(file, JSON.stringify({ name: 'S', envs: ['qa', 'prod'], apps: { a: { name: 'A', kind: 'node', slug: 'x/a' } } }));
+  const opts = { config: { stack: dir } };
+  const read = at => readStackAt(at, opts).value;
+  // Typed in a terminal: a port is a number, an AWS account id stays text.
+  assert.deepEqual(editStack('apps.a.prereqs[0]', [{ tunnel: 'db.acme.example', port: 5432 }], opts), { path: 'apps.a.prereqs[0]', value: { tunnel: 'db.acme.example', port: 5432 } });
+  assert.equal(editStack('apps.a.prereqs[0].port', [JSON.parse('6543'), '6543'], opts).value, 6543);
+  assert.equal(editStack('apps.a.prereqs[1]', [{ sso: 'acme-dev' }], opts).error, undefined);
+  assert.equal(editStack('apps.a.prereqs[1].account', [JSON.parse('123456789012'), '123456789012'], opts).value, '123456789012');
+  assert.deepEqual(read('apps.a.prereqs[1]'), { sso: 'acme-dev', account: '123456789012' });
+  assert.equal(editStack('apps.a.envs.prod.start', ['npm run prod'], opts).error, undefined);
+  assert.equal(read('apps.a.envs.prod.start'), 'npm run prod');
+  // What breaks a rule is refused with the rule, and the file is left as it was.
+  const before = fs.readFileSync(file, 'utf8');
+  assert.match(editStack('apps.a.kind', [''], opts).error, /apps\.a\.kind: required/);
+  assert.match(editStack('apps.a.envs.staging.start', ['x'], opts).error, /not one of envs/);
+  assert.match(editStack('apps.a.prereqs[0].port', ['not a port'], opts).error, /a port number/);
+  assert.match(editStack('apps.a.prereqs[9]', [{}], opts).error, /no item 9/);
+  assert.match(editStack('apps.__proto__.x', ['y'], opts).error, /cannot be part of a path/);
+  assert.equal(fs.readFileSync(file, 'utf8'), before);
+  // Taken out: a list closes up.
+  assert.equal(editStack('apps.a.prereqs[0]', undefined, opts).error, undefined);
+  assert.deepEqual(read('apps.a.prereqs'), [{ sso: 'acme-dev', account: '123456789012' }]);
+  assert.equal(read('apps.a.nothing'), undefined);
+  fs.rmSync(dir, { recursive: true, force: true });
+}

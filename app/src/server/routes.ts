@@ -10,7 +10,16 @@ import { discardChanges, linkStack, proposeChanges, updateStack } from '../engin
 import { listenerPid } from '../engine/listen.ts';
 import { appendAnswer, appendMessage, clearMessages, readMessages, refusal } from '../engine/messages.ts';
 import { appendNote, appendRun, runRecord, type RunRecord } from '../engine/runs.ts';
-import { addApps, addOutside, createStack, currentStack, forgetStacks, removeApp, useStack } from '../engine/sync.ts';
+import {
+  addApps,
+  addOutside,
+  createStack,
+  editStack,
+  currentStack,
+  forgetStacks,
+  removeApp,
+  useStack,
+} from '../engine/sync.ts';
 import { CODE, TEMP } from '../paths.ts';
 import { redact } from '../scrub.ts';
 import { cableTest } from './cable-test.ts';
@@ -198,6 +207,13 @@ export const ROUTES: Record<string, Route> = {
     if (result.error !== undefined || !result.added.length)
       return { status: 400, body: { error: result.error ?? 'Pick at least one repo that is not in the stack yet.' } };
     return reload('The apps were added, but the stack could not be loaded again. Run koppler sync.', result);
+  },
+  // One field of the stack, set or taken out, checked as the terminal's koppler stack set is.
+  '/stack-edit': body => {
+    const at = typeof body['path'] === 'string' ? body['path'] : '';
+    const result = editStack(at, body['unset'] === true ? undefined : [body['value']]);
+    forgetStacks();
+    return refused(result) ?? reload('The stack changed, but reloading it failed: run koppler sync', result);
   },
   '/apps-outside': body => {
     const result = addOutside(body);

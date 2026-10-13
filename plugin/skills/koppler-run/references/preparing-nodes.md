@@ -29,7 +29,7 @@ For each edge `from -> to`, run `koppler plan --wire <from> <to> [--device ios|a
   A mobile node's `platform` is the device (`ios`, `android` or `phone`); with `run: ide` there is no `platform`, so ask which device the user will pick.
 - `how: env-file`: add the printed lines to the printed file (`.env.local` by default: git-ignored and read on top of `.env` by Vite, Next.js and Create React App), creating it if needed; log it as `env-file`.
   For a browser front end, also set the printed CORS setting in the callee's `-LOCAL` profile, and pass on any warning (no recorded CORS setting, an https page calling an http API).
-- `how: unknown`: find how the caller picks this address in its repo, apply it, and record the real `how` in `stack.json`.
+- `how: unknown`: find how the caller picks this address in its repo, apply it, and record the real `how` with `koppler stack set apps.<caller>.consumes.<callee>.how <how>`.
 - When it says the callee must listen on the network (a phone), start the callee with `koppler run <to> --lan`.
 
 Overrides named in a prerequisite `note` (e.g. an `AWS_PROFILE`) go into the same `-LOCAL` profile.

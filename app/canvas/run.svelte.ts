@@ -414,7 +414,7 @@ class Runs {
       'MISSING:',
       ...gaps.map(gap => `  ${gap}`),
       "Read each app's repo (infrastructure files such as Terraform tfvars, workflow files) and the user's local tunnel aliases. Never read or print a secret value.",
-      'Propose the stack.json additions (apps.<id>.envs.<env>.prereqs, .secrets with fetch steps) and wait for the user to confirm before writing them.',
+      'Propose the additions (apps.<id>.envs.<env>.prereqs, .secrets with fetch steps), wait for the user to confirm, then make them with koppler stack set; never write stack.json.',
     ].join('\n');
     const waiting = (live.status?.agent?.state ?? 'none') === 'none';
     return this.deliver(

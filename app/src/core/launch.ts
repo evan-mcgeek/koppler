@@ -74,7 +74,10 @@ export function launchProfile(
 
 function startDotnet(app: App, ctx: StartContext): Start {
   if (!app.project || !app.launchSettings || !app.baseProfile)
-    return { error: 'needs project, launchSettings and baseProfile in stack.json' };
+    return {
+      error:
+        'needs project, launchSettings and baseProfile; set each with koppler stack set apps.<app>.<field> <value>',
+    };
   const profiles = ctx.profiles ?? {};
   const { local, name } = launchProfile(app, profiles, ctx.env);
   const profile = Object.hasOwn(profiles, name) ? profiles[name] : undefined;
@@ -144,7 +147,9 @@ function startNode(app: App, ctx: StartContext): Start {
   const scripts = ctx.scripts ?? {};
   const script = app.script ?? ['dev', 'start'].find(name => Object.hasOwn(scripts, name));
   if (!script || !Object.hasOwn(scripts, script))
-    return { error: `no ${app.script ?? 'dev or start'} script in package.json; set "script" in stack.json` };
+    return {
+      error: `no ${app.script ?? 'dev or start'} script in package.json; set it with koppler stack set apps.<app>.script <name>`,
+    };
   const framework = app.kind === 'web' ? frameworkOf(ctx.pkg) : null;
   const port = portOf(app.url) ?? framework?.port;
   const run = ['npm', 'run', script];
@@ -181,7 +186,11 @@ function startSam(app: App, ctx: StartContext): Start {
 }
 
 function startOther(app: App, ctx: StartContext): Start {
-  if (!app.start) return { error: 'needs "start" in stack.json: the shell command that starts it, run in its repo' };
+  if (!app.start)
+    return {
+      error:
+        'needs "start", the shell command that starts it, run in its repo: koppler stack set apps.<app>.start "<command>"',
+    };
   return { cwd: ctx.repo, port: portOf(app.url), command: ['sh', '-c', app.start] };
 }
 
@@ -195,7 +204,9 @@ function startFromRecipe(app: App, ctx: StartContext): Start {
   const command = app.start ?? recipe.start(files, { port, platform: ctx.platform });
   if (!command) {
     const what = `cannot tell how this ${recipe.label} app starts`;
-    return { error: `${what}; set "start" in stack.json: the shell command, run in its repo` };
+    return {
+      error: `${what}; set it with koppler stack set apps.<app>.start "<command>": the shell command, run in its repo`,
+    };
   }
   const stop = recipe.stop && [['sh', '-c', `cd ${quote(ctx.repo ?? '.')} && ${recipe.stop}`]];
   return { cwd: ctx.repo, port, command: ['sh', '-c', command], ...(stop && { onStop: stop }) };
