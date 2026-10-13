@@ -15,6 +15,7 @@
   import Logs from './Logs.svelte';
   import Menu from './Menu.svelte';
   import Rail from './Rail.svelte';
+  import AddOutside from './AddOutside.svelte';
   import Repos from './Repos.svelte';
   import Review from './Review.svelte';
   import { runs } from './run.svelte.ts';
@@ -356,6 +357,7 @@
 <Review />
 <Setup bind:this={dialogs.setup} />
 <Repos bind:this={dialogs.repos} />
+<AddOutside bind:this={dialogs.outside} />
 <Findings bind:this={dialogs.findings} />
 <Checklist bind:this={dialogs.checklist} />
 <dialog bind:this={noting} class="noting" aria-labelledby="noting-title" onclose={() => (note = '')}>

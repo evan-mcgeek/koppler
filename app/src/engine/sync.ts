@@ -482,6 +482,56 @@ export function addApps(
 }
 
 /**
+ * Adds a system the apps call that never runs here (a SaaS API, a managed service), with the apps that call it, so it
+ * shows on their boards as an outside card.
+ */
+export function addOutside(
+  given: { name?: unknown; url?: unknown; why?: unknown; calledBy?: unknown; sendsTo?: unknown },
+  { config = loadConfig() }: { config?: Config } = {},
+): { added: string; error?: undefined } | { error: string } {
+  const used = stackInUse(config);
+  if (used.error !== undefined) return used;
+  const { source, stack } = used;
+  const text = (value: unknown, max: number) => (typeof value === 'string' ? value.trim().slice(0, max) : '');
+  const name = text(given.name, 80);
+  if (!name) return { error: 'Give the outside system a name.' };
+  const url = text(given.url, 500);
+  if (url && !/^https?:\/\//.test(url)) return { error: `${url} is not a web address (https://...).` };
+  if (url && !URL.canParse(url)) return { error: `${url} is not a web address.` };
+  const apps = stack.apps;
+  if (Object.values(apps).some(app => app.name?.toLowerCase() === name.toLowerCase()))
+    return { error: `The stack already has ${name}.` };
+  const ids = (list: unknown) =>
+    [...new Set(Array.isArray(list) ? (list as unknown[]) : [])].filter((id): id is string => typeof id === 'string');
+  const callers = ids(given.calledBy);
+  const called = ids(given.sendsTo);
+  const unknown = [...callers, ...called].filter(id => !apps[id] || apps[id].outside);
+  if (unknown.length) return { error: `Not apps of the stack that run here: ${[...new Set(unknown)].join(', ')}.` };
+  if (!callers.length && !called.length)
+    return { error: `Say which apps call ${name}, or which it sends to: its card shows next to them.` };
+  const base =
+    name
+      .toLowerCase()
+      .replace(/[^a-z0-9-]+/g, '-')
+      .replace(/^-+|-+$/g, '') || 'outside';
+  let id = base;
+  for (let n = 2; apps[id]; n++) id = `${base}-${String(n)}`;
+  apps[id] = {
+    name,
+    kind: 'other',
+    outside: text(given.why, 200) || 'An outside system: it never runs here.',
+    ...(url && { deployedUrl: url }),
+    ...(called.length && { consumes: Object.fromEntries(called.map(to => [to, {}])) }),
+  };
+  for (const caller of callers) {
+    const app = apps[caller];
+    if (app) app.consumes = { ...app.consumes, [id]: {} };
+  }
+  writeJson(source, stack);
+  return { added: id };
+}
+
+/**
  * Takes an app out of the stack. Other apps' calls to it go too, since a call to a missing app makes the stack invalid.
  * The clone stays where it is; boards that list the app skip it when they open.
  */

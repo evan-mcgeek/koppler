@@ -255,3 +255,28 @@ console.log('switch stacks ok');
   assert.match(removeApp('zzz', { config: { stack: dir } }).error, /not in the stack/);
   fs.rmSync(dir, { recursive: true, force: true });
 }
+
+// An outside system joins the stack with the apps that call it; what cannot be one is refused and nothing is written.
+{
+  const { addOutside } = await import('../dist/engine/sync.js');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-outside-'));
+  const file = path.join(dir, 'stack.json');
+  fs.writeFileSync(file, JSON.stringify({ name: 'S', envs: ['qa'], apps: { a: { name: 'A', kind: 'node', slug: 'x/a', consumes: { b: { how: 'env' } } }, b: { name: 'B', kind: 'node', slug: 'x/b' }, sf: { name: 'Salesforce', kind: 'other', outside: 'SaaS' } } }));
+  const opts = { config: { stack: dir } };
+  const before = fs.readFileSync(file, 'utf8');
+  assert.match(addOutside({ name: ' ' }, opts).error, /Give the outside system a name/);
+  assert.match(addOutside({ name: 'Stripe', calledBy: [] }, opts).error, /Say which apps call Stripe, or which it sends to/);
+  assert.match(addOutside({ name: 'Stripe', calledBy: ['zzz', 'sf'] }, opts).error, /Not apps of the stack that run here: zzz, sf/);
+  assert.match(addOutside({ name: 'Stripe', url: 'ftp://x', calledBy: ['a'] }, opts).error, /not a web address/);
+  assert.match(addOutside({ name: 'salesforce', calledBy: ['a'] }, opts).error, /already has salesforce/);
+  assert.equal(fs.readFileSync(file, 'utf8'), before);
+  assert.deepEqual(addOutside({ name: 'Stripe Payments', url: 'https://api.stripe.com', calledBy: ['a', 'b', 'a'] }, opts), { added: 'stripe-payments' });
+  const after = JSON.parse(fs.readFileSync(file, 'utf8'));
+  assert.deepEqual(after.apps['stripe-payments'], { name: 'Stripe Payments', kind: 'other', outside: 'An outside system: it never runs here.', deployedUrl: 'https://api.stripe.com' });
+  assert.deepEqual(after.apps.a.consumes, { b: { how: 'env' }, 'stripe-payments': {} });
+  assert.deepEqual(after.apps.b.consumes, { 'stripe-payments': {} });
+  // A webhook: the outside system calls the app.
+  assert.deepEqual(addOutside({ name: 'Adyen', sendsTo: ['b'] }, opts), { added: 'adyen' });
+  assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')).apps.adyen.consumes, { b: {} });
+  fs.rmSync(dir, { recursive: true, force: true });
+}

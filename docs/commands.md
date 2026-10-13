@@ -34,6 +34,7 @@ You can run these yourself too; the agent uses them to do its part.
 | `koppler discover --apply` | Write the agreed findings to `stack.json` |
 | `koppler discover --find "<names>"` | The repos behind names in a description: the stack, your clones, your GitHub orgs |
 | `koppler add <repo or folder>...` / `koppler remove <app>` | Add apps to the stack from your clones, or take one out |
+| `koppler add --outside "<name>" [--called-by <app,...>] [--sends-to <app,...>] [--url <address>] [--why "<why>"]` | Add a system that never runs here (a SaaS API, a payment provider): the apps that call it, and the apps it calls (a webhook). The canvas has the same under "Add outside system…" |
 | `koppler plan [app...] [--env <env>]` | What the newest run starts, restarts and stops; with apps, the tunnels they need |
 | `koppler plan --wire <caller> <callee>` | What to change so a caller uses a local app |
 | `koppler up <app...> [--cable <caller>:<callee>]...` | Start apps as a run, added to what already runs: recorded like Run on the canvas, so the canvas, history and Stop see it |
