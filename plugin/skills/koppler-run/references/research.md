@@ -34,7 +34,7 @@ Show the proposal before writing anything:
 - a board: the apps and the cables of the flow, as a shared or local board;
 - open questions, one line each.
 
-Write only after the user's yes: the stack's `stack.json` (then `koppler sync`), and the board as a preset.
+Make them only after the user's yes, with `koppler stack set` (never by writing `stack.json`), and the board as a preset.
 A shared stack's change is for the user to commit (or `koppler link pr` for a linked one).
 
 Queues, topics and event buses go under `queues`, with `publishes` / `reads` on each app (`references/stack.md`); confirm both ends from the repos and the Terraform, as for a call.

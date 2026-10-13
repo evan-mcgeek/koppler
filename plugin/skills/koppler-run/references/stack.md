@@ -1,5 +1,7 @@
 # Shared stack config: `stack.json`
 
+Nobody writes this file directly. Change any field with `koppler stack set <path> <value>` or `koppler stack unset <path>` (read one with `koppler stack get <path>`); paths look like `apps.orders.url`, `apps.orders.prereqs[0].port` or `apps.orders.envs.prod.start`. Each change is checked against the rules below before it is kept.
+
 One file per stack, in the team's repo, reviewed through PRs.
 It holds facts about the apps, never secret values.
 `koppler sync` validates it (`envs`, and `name` / `kind` / `slug` per app, `consumes` pointing at known apps) and copies it to `<state>/registry.json`.
@@ -136,7 +138,7 @@ Only the ticked ones are written to `stack.json`, as `{ name, kind, slug, pendin
 Map every app's outgoing calls, not just the app you started from: a missing or empty `consumes` means "not mapped yet", never "calls nothing".
 `koppler sync` helps: it searches each cloned app's repo for the other apps' deployed hosts (`deployedUrl`, and each `consumes.<app>.deployed`) and prints:
 
-- `FOUND a -> b`: a call in `a`'s repo that `stack.json` does not list. The canvas lets you cable it; confirm how a local run repoints it, then add it to `consumes`.
+- `FOUND a -> b`: a call in `a`'s repo that `stack.json` does not list. The canvas lets you cable it; confirm how a local run repoints it, then add it with `koppler stack set apps.<a>.consumes.<b> '{...}'`.
 - `UNKNOWN app`: no deployed address is known for it, so calls to it cannot be found. Add its `deployedUrl`.
 - `SHARED host`: two apps use the same address (e.g. one app's QA URL pointing at another app), so calls to it are not attributed. Check those by hand.
 

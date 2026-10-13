@@ -2,7 +2,7 @@
 
 Every problem with Koppler itself goes to a GitHub issue on `evan-mcgeek/koppler`: the `koppler` command, the canvas, the engine, this skill and its references, and the docs.
 That includes a wrong or missing instruction in this skill, a confusing message, and a step you had to work around.
-Problems in the user's own apps or in the stack's facts are not Koppler bugs: tell the user, and fix `stack.json` as usual.
+Problems in the user's own apps or in the stack's facts are not Koppler bugs: tell the user, and fix the stack with `koppler stack set` as usual.
 
 Never work around a Koppler bug silently, and never keep it only in `<state>/NOTES.md`.
 

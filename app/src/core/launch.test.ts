@@ -188,7 +188,9 @@ test('any other kind starts with the command the stack gives it', () => {
     port: 8080,
     command: ['sh', '-c', 'go run ./cmd/api'],
   });
-  expect(startCommand({ kind: 'other' }, { repo: '/repo' }).error).toMatch(/needs "start" in stack.json/);
+  expect(startCommand({ kind: 'other' }, { repo: '/repo' }).error).toMatch(
+    /needs "start".*koppler stack set apps.<app>.start/,
+  );
   expect(startCommand({ kind: 'cobol' }).error).toBe('kind cobol cannot start by id yet');
 });
 
@@ -201,7 +203,9 @@ test('recipes: each technology is started the usual way, from what its repo hold
   expect(run('go', { 'go.mod': '', 'main.go': '' })).toBe('go run .');
   expect(run('go', { 'go.mod': '', 'cmd/api/main.go': '' })).toBe('go run ./cmd/api');
   const twoCommands = { 'go.mod': '', 'cmd/api/main.go': '', 'cmd/worker/main.go': '' };
-  expect(start('go', twoCommands).error).toMatch(/cannot tell how this Go app starts; set "start"/);
+  expect(start('go', twoCommands).error).toMatch(
+    /cannot tell how this Go app starts; set it with koppler stack set apps.<app>.start/,
+  );
   expect(run('go', twoCommands, { start: 'go run ./cmd/api' })).toBe('go run ./cmd/api');
   expect(run('rust', clone('rust'))).toBe('cargo run');
 

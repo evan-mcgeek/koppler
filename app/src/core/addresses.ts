@@ -78,7 +78,7 @@ export function browserChecks(
       out.settings.push({ app: 'callee', env: env.replace('{n}', String(slot)), value: origin });
   else if (origin)
     out.warnings.push(
-      `${callee.name ?? 'the API'} has no recorded CORS setting; the browser may block calls from ${origin}. Record it as "cors": { "env": "<setting>" } in stack.json.`,
+      `${callee.name ?? 'the API'} has no recorded CORS setting; the browser may block calls from ${origin}. Record it with: koppler stack set apps.<app>.cors.env <setting>`,
     );
   if (callerUrl?.startsWith('https:') && callee.url?.startsWith('http:'))
     out.warnings.push("an https page cannot call an http API; use the API's https address or serve the page over http");

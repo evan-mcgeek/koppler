@@ -127,7 +127,7 @@ function print(caller: App, callee: App, wiring: Wiring): void {
   else {
     const where = call.found ? `; found at ${call.found}` : '';
     console.log(
-      `  how ${caller.name} picks this address is not recorded yet${where}: confirm in its repo, then record it in stack.json`,
+      `  how ${caller.name} picks this address is not recorded yet${where}: confirm in its repo, then record it with koppler stack set apps.<caller>.consumes.<callee>.how <how>`,
     );
   }
   if (wiring.needsLan) console.log(`  ${callee.name} must listen on the network: koppler run ${wiring.to} --lan`);

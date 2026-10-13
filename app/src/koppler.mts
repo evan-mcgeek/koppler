@@ -29,6 +29,8 @@ import { appliedCommand, historyCommand, planCommand, runningNames, sessionComma
 import {
   addApps,
   addOutside,
+  editStack,
+  readStackAt,
   candidateRepos,
   createStack,
   init as initStack,
@@ -248,6 +250,34 @@ function add(args: string[]): void {
       ? `Added ${added.added.join(', ')}; fill in how each runs with: koppler discover`
       : 'Nothing to add: they are in the stack already.',
   );
+  sync([]);
+}
+
+/** One field of the stack in use: read it, set it or take it out, checked against the stack's rules. */
+function stackCommand(args: string[]): void {
+  const [what, at, ...rest] = args;
+  if (what === 'get') {
+    const read = readStackAt(at ?? '');
+    if (read.error !== undefined) fail(read.error);
+    if (read.value === undefined) fail(`nothing at ${at ?? ''}`);
+    console.log(JSON.stringify(read.value, null, 2));
+    return;
+  }
+  if ((what !== 'set' && what !== 'unset') || !at || (what === 'set' && !rest.length))
+    fail('usage: koppler stack get [<path>] | set <path> <value> | unset <path>');
+  const raw = rest.join(' ');
+  // Typed in a terminal, 5001 may be a port or a name: whichever keeps the stack valid, JSON first.
+  const values = (() => {
+    if (what === 'unset') return undefined;
+    try {
+      return [JSON.parse(raw) as unknown, raw];
+    } catch {
+      return [raw];
+    }
+  })();
+  const changed = editStack(at, values);
+  if (changed.error !== undefined) fail(changed.error);
+  console.log(what === 'unset' ? `UNSET ${at}` : `SET ${at} = ${JSON.stringify(changed.value)}`);
   sync([]);
 }
 
@@ -515,6 +545,19 @@ const COMMANDS: Command[] = [
     about: 'change a board, even one open on the canvas, which shows the change',
     run: boardCommand,
     example: 'koppler board edit "Checkout" --add orders-api --cable web:orders-api',
+  },
+  {
+    name: 'stack',
+    who: 'agent',
+    args: 'get [<path>] | set <path> <value> | unset <path>',
+    forms: [
+      ['get [<path>]', 'print a field of the stack in use, or the whole stack, as JSON'],
+      ['set <path> <value>', 'set a field: text, or JSON for a number, a list or an object; checked before it is kept'],
+      ['unset <path>', 'take a field out (an item of a list closes up)'],
+    ],
+    about: 'read and change any field of the stack, the only way to change stack.json',
+    run: stackCommand,
+    example: 'koppler stack set apps.orders-api.ready \'{"path":"/health"}\'',
   },
   {
     name: 'say',
