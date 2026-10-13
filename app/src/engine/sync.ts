@@ -507,6 +507,22 @@ export function refreshRegistry(): void {
   if (source && registry && stack) writeData('registry', { ...stack, source, found: registry['found'] });
 }
 
+/**
+ * Replaces the whole stack with an edited copy, as the settings panels save it: checked against every rule first and
+ * against the locks, and written only when it passes. The problems are given as `where: what`, so each finds its field.
+ */
+export function replaceStack(
+  next: unknown,
+  { config = loadConfig() }: { config?: Config } = {},
+): { problems: string[]; error?: undefined } | { error: string; problems?: string[] } {
+  const used = stackInUse(config);
+  if (used.error !== undefined) return used;
+  const before = new Set(validateStack(used.stack));
+  const problems = validateStack(next).filter(problem => !before.has(problem));
+  if (problems.length) return { error: problems.slice(0, 5).join('; '), problems };
+  return saveStack(used.source, used.stack, next) ?? { problems: [] };
+}
+
 /** What the stack in use holds at a path (the whole stack without one). */
 export function readStackAt(
   pathText = '',

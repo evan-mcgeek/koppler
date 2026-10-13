@@ -12,6 +12,7 @@
     ctx,
     required = false,
     depth = 0,
+    drop,
   }: {
     path: string;
     name: string;
@@ -20,11 +21,15 @@
     ctx: Ctx;
     required?: boolean;
     depth?: number;
+    /** Words for taking the value out, when that means more than removing it: "Use QA's". */
+    drop?: string;
   } = $props();
   const kind = $derived(kindOf(schema, value));
   const locked = $derived(ctx.locked(path));
   const id = $props.id();
   let error = $state('');
+  // What the last Save found wrong here wins over nothing; a refusal of this field's own edit wins over both.
+  const shown = $derived(error || ctx.problem?.(path) || '');
   const save = async (next: unknown) => {
     error = (await ctx.save(path, next)) ?? '';
   };
@@ -54,6 +59,7 @@
       ctx.lock(at, on);
     },
     keys: at => ctx.keys(at),
+    problem: at => ctx.problem?.(at),
   };
   const add = async () => {
     if (kind === 'list') {
@@ -74,7 +80,9 @@
 <!-- eslint-disable @typescript-eslint/no-confusing-void-expression -- {@render} of a snippet returns nothing -->
 {#snippet acts()}
   <span class="acts">
-    {#if value !== undefined && !required && !locked}
+    {#if drop && !locked}
+      <button class="words" type="button" onclick={() => void save(undefined)}>{drop}</button>
+    {:else if value !== undefined && !required && !locked}
       <button class="icon" type="button" aria-label="Remove {name}" title="Remove" onclick={() => void save(undefined)}>
         <svg viewBox="0 0 16 16" width="11" height="11" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" /></svg>
       </button>
@@ -174,7 +182,7 @@
       <span class="add"><button type="button" onclick={() => void add()}>Add</button></span>
     {/if}
   {/if}
-  {#if error}<span class="error" role="alert">{error}</span>{/if}
+  {#if shown}<span class="error" role="alert">{shown}</span>{/if}
 {/snippet}
 
 {#if (kind === 'group' || kind === 'table' || kind === 'list') && depth === 0}
@@ -270,7 +278,7 @@
       ></textarea>
     {/if}
     {@render acts()}
-    {#if error}<span class="error" role="alert">{error}</span>{/if}
+    {#if shown}<span class="error" role="alert">{shown}</span>{/if}
   </div>
 {/if}
 
@@ -386,6 +394,16 @@
     stroke: currentColor;
     stroke-width: 1.5;
     stroke-linecap: round;
+  }
+  .words {
+    padding: 2px 8px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: none;
+    color: var(--ink);
+    font: 600 12px var(--sans);
+    white-space: nowrap;
+    cursor: pointer;
   }
   .lock.on {
     color: var(--warn);
