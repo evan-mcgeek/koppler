@@ -218,3 +218,58 @@ test.describe('asked for without its closing slash', () => {
     expect(new URL(page.url()).pathname).toMatch(/\/next\/$/);
   });
 });
+
+test.describe('a board taller than the window', () => {
+  // Five apps in a chain: fitted to the window, the cards are small enough to switch to their short form.
+  const ids = ['one', 'two', 'three', 'four', 'five'];
+  const chain = Object.fromEntries(
+    ids.map((id, index) => [
+      id,
+      {
+        name: `App ${id}`,
+        kind: 'node',
+        slug: `acme/${id}`,
+        url: `http://localhost:${String(6000 + index)}`,
+        ...(ids[index + 1] && { consumes: { [ids[index + 1] ?? '']: { how: 'env', env: 'NEXT_URL' } } }),
+      },
+    ]),
+  );
+  test.use({
+    stack: { name: 'Tall', envs: ['qa'], apps: chain },
+    board: {
+      env: 'qa',
+      mode: 'auto',
+      zoom: 1,
+      pan: { x: 0, y: 0 },
+      nodes: Object.fromEntries(ids.map((id, index) => [id, at(index * 40, index * 40)])),
+      edges: ids.slice(1).map((id, index) => ({ from: ids[index], to: id, fromSide: 'bottom', toSide: 'top' })),
+    },
+  });
+
+  test('Arrange gives the same board however often it is pressed', async ({ page }) => {
+    const places = () =>
+      page
+        .locator('.svelte-flow__node-app')
+        .evaluateAll(cards =>
+          cards.map(card => `${card.getAttribute('data-id') ?? ''} ${(card as HTMLElement).style.transform}`).sort(),
+        );
+    const settled = async () => {
+      await page.getByRole('button', { name: 'Arrange' }).click();
+      let last = '';
+      await expect
+        .poll(async () => {
+          const now = (await page.locator('.svelte-flow__viewport').getAttribute('style')) ?? '';
+          const same = now === last;
+          last = now;
+          return same;
+        })
+        .toBe(true);
+      return places();
+    };
+    const first = await settled();
+    // Fitted, the cards are in their short form now.
+    await expect(page.locator('.card.far').first()).toBeVisible();
+    expect(await settled()).toEqual(first);
+    expect(await settled()).toEqual(first);
+  });
+});

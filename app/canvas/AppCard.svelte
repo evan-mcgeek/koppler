@@ -1,14 +1,13 @@
 <script lang="ts">
   import { Handle, Position, useViewport, type NodeProps } from '@xyflow/svelte';
   import type { Side } from '../src/core/arrange.ts';
-  import { board, type CardNode } from './board.svelte.ts';
+  import { board, FAR_ZOOM, type CardNode } from './board.svelte.ts';
   import { live, progress } from './live.svelte.ts';
   import { logs } from './logs.svelte.ts';
   import { runs } from './run.svelte.ts';
 
   const { id, data, selected }: NodeProps<CardNode> = $props();
   const SIDES: Side[] = ['top', 'right', 'bottom', 'left'];
-  const FAR_ZOOM = 0.6;
   const CHANGES = [
     ['set-aside', 'Set aside', 'Kept aside while it runs the other branch, back on Stop'],
     ['take-along', 'Take along', 'Carried to the other branch, and back on Stop'],
@@ -451,7 +450,8 @@
   .card.selected,
   :global(.svelte-flow__node:focus-visible) .card {
     outline: 2px solid var(--cable);
-    outline-offset: 3px;
+    /* On the border itself: one frame, not a ring around a frame. */
+    outline-offset: -1px;
   }
   .card.drop-ok {
     box-shadow: 0 0 0 3px var(--ok);
