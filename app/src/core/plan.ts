@@ -14,6 +14,8 @@ export interface BoardNode {
   queues?: false;
   changes?: string;
   libraries?: string[];
+  /** Asked to start again, though nothing about it changed. */
+  restart?: true;
 }
 export interface Edge {
   from: string;
@@ -38,6 +40,7 @@ interface NodeInput {
   queues?: unknown;
   changes?: unknown;
   libraries?: unknown;
+  restart?: unknown;
 }
 export interface BoardInput {
   env?: string | null;
@@ -86,6 +89,7 @@ const nodeOf = (n: NodeInput | null): BoardNode => ({
   ...(n?.queues === false && { queues: false as const }),
   ...(text(n?.changes) && { changes: text(n?.changes) }),
   ...(Array.isArray(n?.libraries) && n.libraries.length > 0 && { libraries: n.libraries.map(String).sort() }),
+  ...(n?.restart === true && { restart: true as const }),
 });
 
 export function board(input: BoardInput | null | undefined): Board {
@@ -122,6 +126,7 @@ function reasonsToRestart(
   if (!now || !next) return [];
   const name = (other: string) => o.name?.(other) ?? other;
   const why: string[] = [];
+  if (next.restart) why.push('you asked to restart it');
   if (envChange) why.push(`the environment changes from ${upper(envChange.from)} to ${upper(envChange.to)}`);
   if (now.branch !== next.branch)
     why.push(`its branch changes from ${now.branch || 'the current one'} to ${next.branch || 'the current one'}`);

@@ -194,3 +194,12 @@ test('an app that keeps the deployed queues does not restart when its queue goes
   );
   expect(back.restarts.find(step => step.id === 'sub')?.why).toEqual(['it moves to the local orders queue']);
 });
+
+test('an app asked to restart restarts, and the rest keeps running', () => {
+  const nodes = { api: { run: 'cli' as const }, web: { run: 'cli' as const } };
+  const edges = [{ from: 'web', to: 'api' }];
+  const asked = { env: 'qa', nodes: { ...nodes, api: { ...nodes.api, restart: true } }, edges };
+  const steps = plan({ env: 'qa', nodes, edges }, asked, { running: () => true });
+  expect(steps.restarts).toEqual([{ id: 'api', why: ['you asked to restart it'] }]);
+  expect(steps.keeps.map(step => step.id)).toEqual(['web']);
+});
