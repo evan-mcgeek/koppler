@@ -86,3 +86,35 @@ test('removing the app takes its tunnel card along, and Delete does not remove a
   await card(page, 'orders').getByRole('button', { name: 'Remove Orders API' }).click();
   await expect(tunnels(page)).toHaveCount(0);
 });
+
+test('a card added from the panel is the only one selected: what was selected stays where it is', async ({ page }) => {
+  const tunnel = tunnels(page).first();
+  await tunnel.click({ position: { x: 20, y: 10 } });
+  await expect(tunnel).toHaveClass(/selected/);
+  await page.getByRole('complementary').getByRole('button', { name: 'Payments API', exact: true }).click();
+  const added = card(page, 'payments');
+  await expect(added).toBeVisible();
+  await expect(tunnel).not.toHaveClass(/selected/);
+  const before = await tunnel.boundingBox();
+  const box = await added.locator('header').boundingBox();
+  if (!before || !box) throw new Error('not on the page');
+  await page.mouse.move(box.x + 40, box.y + 10);
+  await page.mouse.down();
+  await page.mouse.move(box.x + 140, box.y + 110, { steps: 8 });
+  await page.mouse.up();
+  expect(await tunnel.boundingBox()).toEqual(before);
+});
+
+test('another board opens with nothing selected, though it has the same tunnel', async ({ page }) => {
+  const tunnel = tunnels(page).first();
+  await tunnel.click({ position: { x: 20, y: 10 } });
+  await expect(tunnel).toHaveClass(/selected/);
+  await page.getByRole('button', { name: /^Board: / }).click();
+  await page
+    .getByRole('dialog', { name: 'Boards' })
+    .getByRole('button', { name: /^Checkout/ })
+    .click();
+  await expect(page.locator('.svelte-flow__node-app')).toHaveCount(3);
+  await expect(tunnels(page)).toHaveCount(1);
+  await expect(page.locator('.svelte-flow__node.selected')).toHaveCount(0);
+});
