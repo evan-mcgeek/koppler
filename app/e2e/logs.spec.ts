@@ -2,7 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Page } from '@playwright/test';
-import { test, expect } from './canvas.ts';
+import { test, expect, actions } from './canvas.ts';
 
 const card = (page: Page, id: string) => page.locator(`.svelte-flow__node[data-id="${id}"]`);
 const at = (x: number, y: number) => ({ x, y, run: 'cli', branch: 'main' });
@@ -27,7 +27,7 @@ test("a card's log opens in a tab, read and laid out, raw on request, and cleare
   fs.writeFileSync(file, 'info: Now listening on: http://localhost:5001\nwarn: The certificate is about to expire\n');
   fs.writeFileSync(path.join(canvas.temp, 'status.json'), JSON.stringify({ apps: { orders: { port: 1 } } }));
 
-  await card(page, 'orders').getByRole('button', { name: 'Show log' }).click();
+  await (await actions(page, 'orders')).getByRole('button', { name: 'Show log' }).click();
   const pane = page.getByRole('region', { name: 'App log' });
   await expect(pane.getByRole('tab', { name: 'Orders API' })).toHaveAttribute('aria-selected', 'true');
   await expect(pane.getByRole('log')).toContainText('Now listening on: http://localhost:5001');
@@ -59,7 +59,7 @@ test('the log pane is resized by its grip, by the keyboard and by Expand, and ke
   fs.mkdirSync(logs, { recursive: true });
   fs.writeFileSync(path.join(logs, 'orders.log'), 'one\ntwo\n');
   fs.writeFileSync(path.join(canvas.temp, 'status.json'), JSON.stringify({ apps: { orders: { port: 1 } } }));
-  await card(page, 'orders').getByRole('button', { name: 'Show log' }).click();
+  await (await actions(page, 'orders')).getByRole('button', { name: 'Show log' }).click();
   const pane = page.getByRole('region', { name: 'App log' });
   const tall = async () => Math.round((await pane.boundingBox())?.height ?? 0);
   const grip = page.getByRole('separator', { name: 'Resize the log' });
@@ -77,7 +77,7 @@ test('the log pane is resized by its grip, by the keyboard and by Expand, and ke
   const big = await tall();
   expect(big).toBeGreaterThan(before + 200);
   await page.reload();
-  await card(page, 'orders').getByRole('button', { name: 'Show log' }).click();
+  await (await actions(page, 'orders')).getByRole('button', { name: 'Show log' }).click();
   expect(await tall()).toBe(big);
 });
 

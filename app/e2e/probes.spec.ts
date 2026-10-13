@@ -2,7 +2,7 @@
 import fs from 'node:fs';
 import net, { type AddressInfo } from 'node:net';
 import path from 'node:path';
-import { test, expect } from './canvas.ts';
+import { test, expect, actions } from './canvas.ts';
 
 const at = (x: number, y: number) => ({ x, y, run: 'cli', branch: 'main' });
 test.use({
@@ -80,7 +80,7 @@ test('a cable is tested once both its apps answer, and again on a click at its s
       await route.fulfill({ json: { ...status, running: ['web', 'orders', 'payments'] } });
     });
     const waits = page.getByRole('button', { name: 'Test that local Payments API answers Orders API' });
-    await expect(page.getByRole('button', { name: 'Stop Payments API' })).toBeVisible();
+    await expect((await actions(page, 'payments')).getByRole('button', { name: 'Stop Payments API' })).toBeVisible();
     await expect(async () => {
       await waits.focus();
       await page.keyboard.press('Enter');

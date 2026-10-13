@@ -1,6 +1,6 @@
 // The new canvas keeps the board: what is changed on it comes back after a reload, from the server's copy.
 import type { Page } from '@playwright/test';
-import { test, expect } from './canvas.ts';
+import { test, expect, actions } from './canvas.ts';
 
 const card = (page: Page, id: string) => page.locator(`.svelte-flow__node[data-id="${id}"]`);
 const saved = (page: Page) =>
@@ -76,6 +76,6 @@ test('a board that was left with no card in sight is brought back into view', as
 
 test('a board that cannot be saved says so', async ({ page }) => {
   await page.route('**/state?**', route => route.abort());
-  await card(page, 'web').getByRole('button', { name: 'Remove Web Shop' }).click();
+  await (await actions(page, 'web')).getByRole('button', { name: 'Remove Web Shop' }).click();
   await expect(page.getByRole('alert')).toContainText('Not saved');
 });
