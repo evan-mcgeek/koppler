@@ -20,6 +20,8 @@ const post = (route: string, body: object) =>
   }).catch(() => undefined);
 /** An element as it reads on screen: what it is, its label, and the card it is on. */
 const describe = (el: Element): string => {
+  // Its text is every cable's and card's: a click there would read like a click on the first cable.
+  if (el.matches('.svelte-flow__pane')) return 'the empty board';
   const named =
     (el.matches('input[type="radio"], input[type="checkbox"]') && el.closest('label')) ||
     el.closest(

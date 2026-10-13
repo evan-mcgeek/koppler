@@ -29,6 +29,8 @@ test('the log keeps clicks, choices and messages with the board, and no typed te
   await expect
     .poll(() => kept().some(entry => entry.kind === 'change' && entry.what.includes('Branch')), { timeout: 10000 })
     .toBe(true);
+  await page.locator('.svelte-flow__pane').click({ position: { x: 900, y: 500 } });
+  await expect.poll(() => kept().some(entry => entry.what === 'the empty board'), { timeout: 10000 }).toBe(true);
   const entries = kept();
   expect(entries.find(entry => entry.kind === 'change' && entry.detail === 'ide')?.what).toContain('in orders');
   expect(entries.find(entry => entry.what.includes('Branch') && entry.kind === 'change')?.detail).toBe('(typed)');
