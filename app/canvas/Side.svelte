@@ -269,10 +269,11 @@
       <p class="unsaved" role="alert">Not saved: the canvas server is not answering. Changes stay on this page.</p>
     {/if}
     {#if live.status?.restart}
-      <p class="warn">
-        The canvas server runs older code, so some buttons fail until it restarts. In your terminal:
-        <button type="button" onclick={() => void copyRestart()}>Copy restart command</button>
-      </p>
+      <div class="warn">
+        The canvas server runs older code, so some buttons fail until it restarts. Run this in your terminal:
+        <code>{live.status.restart}</code>
+        <button type="button" aria-label="Copy restart command" onclick={() => void copyRestart()}>Copy</button>
+      </div>
     {/if}
     {#if notCloned}
       <p class="warn">
@@ -564,6 +565,17 @@
     padding: 0 8px;
     color: var(--warn);
     font-size: 12.5px;
+  }
+  footer .warn code {
+    display: block;
+    margin-top: 6px;
+    padding: 5px 8px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: var(--paper);
+    color: var(--ink);
+    font: 12px var(--mono);
+    overflow-wrap: anywhere;
   }
   footer .warn button {
     display: block;
