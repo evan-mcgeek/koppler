@@ -507,13 +507,15 @@ async function carryOut(stack: Registry, args: string[]): Promise<void> {
     fail(
       `${own.flatMap(one => one.apps).join(', ')}: the sign-in is checked by a command from the stack that the user has not allowed yet, or that changed since. They review it in their own terminal: ${APPROVE}`,
     );
-  const holds = ({ check }: SignIn) =>
-    isDone('shell' in check ? { shell: check.shell } : { sso: check.argv.at(-1) ?? '' }, { approved: mayRun });
+  const holds = ({ check, account }: SignIn) =>
+    isDone('shell' in check ? { shell: check.shell } : { sso: check.argv.at(-1) ?? '', ...(account && { account }) }, {
+      approved: mayRun,
+    });
   const expired = [...signIns.values()].filter(({ signIn }) => holds(signIn) === false);
   if (expired.length) {
     const apps = [...new Set(expired.flatMap(one => one.apps))];
     fail(
-      `Sign in first: ${apps.join(', ')} ${apps.length === 1 ? 'needs' : 'need'} ${expired.map(one => one.signIn.what).join(' and ')} at start, and the sign-in has expired. In your own terminal:\n${expired.map(one => `  ${one.signIn.login}`).join('\n')}\nthen run again`,
+      `Sign in first: ${apps.join(', ')} ${apps.length === 1 ? 'needs' : 'need'} ${expired.map(one => one.signIn.what).join(' and ')} at start, and the sign-in has expired${expired.some(one => one.signIn.account) ? ' or is on another account' : ''}. In your own terminal:\n${expired.map(one => `  ${one.signIn.login}`).join('\n')}\nthen run again`,
     );
   }
   // What a sign-in of the stack's gives its apps is passed to them at start.

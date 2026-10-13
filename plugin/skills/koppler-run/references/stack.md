@@ -159,6 +159,8 @@ The draft, with a `suggestions` block shaped like `stack.json`, goes to `<state>
 ## Sign-ins that are not AWS
 
 `sso` is shorthand for an AWS profile.
+Add `account` (the 12-digit id) next to it when the profile must be one account: signed in to another one then counts as not signed in, and nothing starts.
+A declared sign-in does the same inside its own `check` command.
 Any other sign-in (Azure, Google Cloud, Firebase, a company tool) is declared once at the top of the stack and named by the apps that need it:
 
 ```json
