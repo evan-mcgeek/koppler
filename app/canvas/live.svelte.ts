@@ -49,6 +49,8 @@ export interface Message {
   title: string;
   summary?: string;
   run?: string;
+  /** `koppler`: said by Koppler itself, not by the agent. */
+  from?: string;
   sections?: { title?: string; items?: string[]; commands?: string[] }[];
   choices?: { id: string; label: string; detail?: string }[];
   answered?: Answered | null;

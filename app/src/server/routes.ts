@@ -7,7 +7,7 @@ import { readStack, writeData } from '../data.ts';
 import { applyFindings, current as currentFindingsStack, discover } from '../engine/discover.ts';
 import { discardChanges, linkStack, proposeChanges, updateStack } from '../engine/linked.ts';
 import { listenerPid } from '../engine/listen.ts';
-import { appendAnswer, clearMessages, readMessages } from '../engine/messages.ts';
+import { appendAnswer, appendMessage, clearMessages, readMessages, refusal } from '../engine/messages.ts';
 import { appendNote, appendRun, runRecord, type RunRecord } from '../engine/runs.ts';
 import { addApps, createStack, currentStack, forgetStacks, removeApp, useStack } from '../engine/sync.ts';
 import { CODE, TEMP } from '../paths.ts';
@@ -74,6 +74,8 @@ function startRun(prompt: Prompt, record: RunRecord, command: 'up' | 'down'): vo
     } catch {
       // The log went with a Stop: the exit code still tells.
     }
+    // Said on the canvas too: with no agent connected, the prompt below is read by nobody.
+    appendMessage(refusal(record.id, record.kind, said));
     const finish = `koppler history --done ${record.kind === 'stop' ? record.id : ''}`;
     const text = `${prompt.text}\n\nKoppler already did what it could (koppler ${command} --run ${record.id}); finish the rest, then ${finish}:\n${said}`;
     appendLine(PROMPTS, { ...prompt, text, data: { ...prompt.data, koppler: { exit: code, log } } });

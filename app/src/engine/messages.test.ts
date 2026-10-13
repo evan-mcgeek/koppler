@@ -8,7 +8,8 @@ import { ok } from '../core/testing/ok.ts';
 test('messages are cut to known fields, answered, and cleared without losing an open question', async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-msg-'));
   process.env.KOPPLER_TEMP = dir;
-  const { appendAnswer, appendMessage, clearMessages, readMessages, sanitizeMessage } = await import('./messages.ts');
+  const { appendAnswer, appendMessage, clearMessages, readMessages, refusal, sanitizeMessage } =
+    await import('./messages.ts');
 
   assert.match(sanitizeMessage(null).error as any, /JSON object/);
   assert.match(sanitizeMessage({ summary: 'x' }).error as any, /needs a title/);
@@ -107,5 +108,28 @@ test('messages are cut to known fields, answered, and cleared without losing an 
     assert.equal(byId[current.id], undefined);
     appendAnswer(current.id, { via: 'dismissed' });
     assert.equal(readMessages(100, history).find(x => x.id === current.id)!.answered!.via, 'dismissed');
+  }
+  // What Koppler could not do itself: its last words, with the commands the user runs set apart.
+  {
+    const said = [
+      'Starting Orders',
+      'koppler: Sign in first: Orders needs AWS (acme-dev) at start. In your own terminal:',
+      '  aws sso login --profile acme-dev',
+      'then run again',
+    ].join('\n');
+    assert.deepEqual(refusal('run000003', 'run', said), {
+      kind: 'failure',
+      from: 'koppler',
+      run: 'run000003',
+      title: 'Koppler could not finish this run',
+      summary: 'Sign in first: Orders needs AWS (acme-dev) at start. In your own terminal:',
+      sections: [{ title: '', items: ['then run again'], commands: ['aws sso login --profile acme-dev'] }],
+    });
+    assert.deepEqual(refusal('run000003', 'stop', ''), {
+      kind: 'failure',
+      from: 'koppler',
+      run: 'run000003',
+      title: 'Koppler could not finish this Stop',
+    });
   }
 });

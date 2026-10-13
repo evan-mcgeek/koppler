@@ -29,6 +29,8 @@ export interface Message {
   apps?: string[];
   sections?: Section[];
   choices?: Choice[];
+  /** Set on what Koppler says itself; anything else is from the agent. */
+  from?: 'koppler';
 }
 interface Answer {
   choice?: string;
@@ -96,6 +98,36 @@ export function sanitizeMessage(given: unknown): { message: Message; error?: und
       ...(sections.length && { sections }),
       ...(choices.length && { choices }),
     },
+  };
+}
+
+/**
+ * What Koppler says on the canvas when it could not carry out a run or a Stop itself: its own last words, with each
+ * command the user has to run (the indented lines) set apart, so the canvas gives it a Copy button.
+ */
+export function refusal(run: string, kind: 'run' | 'stop', said: string): Message {
+  const lines = said.split('\n');
+  const last = lines.slice(
+    Math.max(
+      0,
+      lines.findLastIndex(line => line.startsWith('koppler: ')),
+    ),
+  );
+  const isCommand = (line: string) => /^ {2}\S/.test(line);
+  const commands = last.filter(isCommand).map(line => line.trim());
+  // What comes before the commands says why; what comes after says what to do next.
+  const first = last.findIndex(isCommand);
+  const why = (first < 0 ? last : last.slice(0, first)).join(' ').replace(/^koppler: /, '');
+  const after = first < 0 ? [] : last.slice(first).filter(line => line.trim() && !isCommand(line));
+  return {
+    kind: 'failure',
+    from: 'koppler',
+    run,
+    title: `Koppler could not finish this ${kind === 'stop' ? 'Stop' : 'run'}`,
+    ...(text(why, 800) && { summary: text(why, 800) }),
+    ...(commands.length && {
+      sections: [{ title: '', items: after.slice(0, 12).map(line => text(line, 400)), commands: commands.slice(0, 6) }],
+    }),
   };
 }
 

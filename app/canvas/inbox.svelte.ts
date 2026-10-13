@@ -37,7 +37,8 @@ class Inbox {
       if (this.#seen.has(one.id)) continue;
       this.#seen.add(one.id);
       if (!this.#ready) continue;
-      if (one.kind === 'question' && !one.answered) this.open = true;
+      // What Koppler could not do itself needs the user, like a question: the panel opens on it.
+      if ((one.kind === 'question' && !one.answered) || one.from === 'koppler') this.open = true;
       else
         toasts.show(`Agent: ${one.title}`, one.kind === 'failure' ? 'warning' : 'message', {
           label: 'Open',
