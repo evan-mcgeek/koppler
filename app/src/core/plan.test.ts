@@ -154,12 +154,12 @@ test('switching an app to a local library, or back, restarts it and says which',
 test('a board keeps only what it understands', () => {
   const read = board({
     env: 'qa',
-    nodes: { api: { note: { not: 'text' }, tunnels: false, libraries: ['b', 'a'] }, web: null },
+    nodes: { api: { note: { not: 'text' }, tunnels: false, queues: false, libraries: ['b', 'a'] }, web: null },
     edges: [{ from: 'api', to: 'web' }, { from: 'api', to: 'constructor' }, null],
     queues: { thumbs: 'local', other: 'deployed' },
   });
   expect(read.nodes).toEqual({
-    api: { branch: '', run: 'cli', tunnels: false, libraries: ['a', 'b'] },
+    api: { branch: '', run: 'cli', tunnels: false, queues: false, libraries: ['a', 'b'] },
     web: { branch: '', run: 'cli' },
   });
   expect(read.edges).toEqual([{ from: 'api', to: 'web' }]);
@@ -172,4 +172,25 @@ test('protected environments come from the stack, or are every one but the first
   expect(protectedEnvs({ envs: ['prod', 'qa'], protected: ['prod'] })).toEqual(['prod']);
   expect(protectedEnvs({ envs: ['qa', 'prod'], protected: [] })).toEqual([]);
   expect(isProtected({ envs: ['qa', 'prd'] }, 'prd')).toBe(true);
+});
+
+test('an app that keeps the deployed queues does not restart when its queue goes local for the others', () => {
+  const on = (queues: Record<string, string>, nodes: NonNullable<BoardInput['nodes']>): BoardInput => ({
+    env: 'qa',
+    nodes,
+    edges: [],
+    queues,
+  });
+  const both = { pub: { run: 'cli' as const }, sub: { run: 'cli' as const, queues: false } };
+  const options = { running: () => true, queuesOf: () => ['orders'] };
+  const moved = plan(on({}, both), on({ orders: 'local' }, both), options);
+  expect(moved.restarts.map(step => step.id)).toEqual(['pub']);
+  expect(moved.keeps.map(step => step.id)).toEqual(['sub']);
+  // Taking the choice back while the queue is local moves it over.
+  const back = plan(
+    on({ orders: 'local' }, both),
+    on({ orders: 'local' }, { ...both, sub: { run: 'cli' as const } }),
+    options,
+  );
+  expect(back.restarts.find(step => step.id === 'sub')?.why).toEqual(['it moves to the local orders queue']);
 });
