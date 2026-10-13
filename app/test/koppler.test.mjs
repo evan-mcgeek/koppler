@@ -270,24 +270,22 @@ const [crashy, upA, upB, tunA, tunB, runA, runB, agentA, agentB, leftA, leftB] =
   assert.match(fs.readFileSync(path.join(dir, 'history.jsonl'), 'utf8'), /"event":"done"/);
   koppler('stop', '--all', '--yes');
 }
-// stop --apps: everything Koppler runs except the canvas.
+// stop --all: everything Koppler runs except the canvas, which stops with canvas stop.
 {
   const { spawnSync } = await import('node:child_process');
   const fs = await import('node:fs'), os = await import('node:os'), path = await import('node:path'), { fileURLToPath } = await import('node:url');
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-stopapps-'));
   const env = { ...process.env, KOPPLER_STATE: dir, KOPPLER_TEMP: dir, KOPPLER_CONFIG_DIR: dir };
-  cleanups.push(() => spawnSync('node', [path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'dist', 'koppler.mjs'), 'stop', '--all', '--yes'], { env }));
+  cleanups.push(() => spawnSync('node', [path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'dist', 'koppler.mjs'), 'stop', 'canvas'], { env }));
   const koppler = (...args) => { const r = spawnSync('node', [path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'dist', 'koppler.mjs'), ...args], { encoding: 'utf8', env }); return (r.stdout + r.stderr).trim(); };
   koppler('run', 'canvas', '--', 'sleep', '30'); koppler('run', 'api', '--', 'sleep', '30'); koppler('run', 'tunnel-db-5432', '--', 'sleep', '30');
-  const out = koppler('stop', '--apps', '--yes');
+  const out = koppler('stop', '--all', '--yes');
   assert.match(out, /api: stopped/); assert.match(out, /tunnel-db-5432: stopped/); assert.doesNotMatch(out, /canvas/);
   assert.match(koppler('status'), /canvas\s+running/);
-  assert.match(koppler('canvas', 'stop'), /canvas: stopped/);
-  koppler('run', 'canvas', '--', 'sleep', '30');
+  assert.match(koppler('stop', '--apps'), /usage: koppler stop <name\.\.\.> \| --all/);
   // Not a run, so the history gets a note: afterwards it still says why nothing runs.
   assert.match(koppler('history'), /apps stopped, changes kept: (api, tunnel-db-5432|tunnel-db-5432, api)/);
-  koppler('stop', '--all', '--yes');
-  assert.match(koppler('history'), /everything stopped, changes kept: canvas/);
+  assert.match(koppler('canvas', 'stop'), /canvas: stopped/);
   assert.equal(koppler('plan'), 'No Send is waiting to be applied.');
 }
 // An action that is not one of the secrets commands gets the usage line, also when it is named like a built-in property.

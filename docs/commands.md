@@ -18,7 +18,7 @@ Apps and tunnels that `koppler` starts run detached, so they keep running after 
 | `koppler secret set\|list\|remove\|psql <app>[@<env>] [<NAME>]` | Store and manage secrets; a value never shows |
 | `koppler status [--apps] [--debug [name...]]` | What Koppler runs; `--apps` adds the stack's apps and clones; `--debug` gives versions and scrubbed logs for a bug report |
 | `koppler logs <name> [-f] [-n <lines>]` | Show or follow a log, secrets masked |
-| `koppler stop <name...> \| --apps \| --all` | Stop by name, every app and tunnel, or everything including the canvas; the last two ask first |
+| `koppler stop <name...> \| --all` | Stop by name, or every app and tunnel (asks first); changes stay until `koppler down` |
 | `koppler history [--session] [--done [<id>] [--failed "<why>"]]` | Recent runs and Stops and how they ended; `--session` gathers what happened since the last Stop, for a bug report; `--done` marks a run finished |
 | `koppler query <app> [--env <env>] "<sql>"` | A read-only query with the app's stored connection; on production, in your own terminal only |
 

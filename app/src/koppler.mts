@@ -328,8 +328,9 @@ const COMMANDS: Command[] = [
   {
     name: 'stop',
     who: 'you',
-    args: '<name...> | --apps | --all [--yes]',
-    about: 'stop by name; --apps every app and tunnel, --all the canvas too',
+    args: '<name...> | --all [--yes]',
+    about:
+      'stop by name, or --all every app and tunnel; changes stay (down reverts them, canvas stop stops the canvas)',
     run: stop,
     example: 'koppler stop orders-api',
   },

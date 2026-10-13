@@ -258,7 +258,7 @@ export const ROUTES: Record<string, Route> = {
   // With an app, only that one.
   '/stop-apps': async body => {
     const app = body['app'];
-    const { failed, out } = await koppler(typeof app === 'string' ? ['stop', app] : ['stop', '--apps', '--yes'], 60000);
+    const { failed, out } = await koppler(typeof app === 'string' ? ['stop', app] : ['stop', '--all', '--yes'], 60000);
     const stopped = out
       .trim()
       .split('\n')

@@ -15,28 +15,24 @@ import { fail } from '../failure.ts';
 const notAName = (name: string) => `${name} is not a name Koppler gives its processes`;
 
 export async function stop(args: string[]): Promise<void> {
-  // --apps: every app, API and tunnel Koppler runs, but not the canvas; code changes and branches stay as they are.
+  // --all: every app, API and tunnel Koppler runs, but not the canvas; code changes and branches stay as they are.
   const all = args.includes('--all');
-  const apps = args.includes('--apps');
   const names = args.filter(arg => !arg.startsWith('-'));
-  if (!all && !apps && !names.length) fail('usage: koppler stop <name...> | --apps | --all [--yes]');
+  if (!all && !names.length) fail('usage: koppler stop <name...> | --all [--yes]');
   for (const name of names) if (!NAME.test(name)) fail(notAName(name));
   const targets = all
-    ? records()
-    : apps
-      ? records().filter(record => record.name !== 'canvas')
-      : names.map(name => readRecord(name) ?? fail(`${name} is not started by koppler`));
+    ? records().filter(record => record.name !== 'canvas')
+    : names.map(name => readRecord(name) ?? fail(`${name} is not started by koppler`));
   if (!targets.length) {
     console.log('nothing to stop');
     return;
   }
   const asked = `Stop ${targets.map(record => record.name).join(', ')}?`;
-  if ((all || apps) && !(await confirm(asked, args))) fail('nothing stopped (in a script, add --yes)');
+  if (all && !(await confirm(asked, args))) fail('nothing stopped (in a script, add --yes)');
   for (const line of await Promise.all(targets.map(stopOne))) console.log(line);
   // Stopping in bulk is not a run, so the history gets a note of it: later it says why nothing runs any more.
   const stopped = targets.map(record => record.name);
-  if (all) appendNote('stop-all', stopped);
-  else if (apps) appendNote('stop-apps', stopped);
+  if (all) appendNote('stop-apps', stopped);
 }
 
 /** The canvas: started when it is not running, then opened in the browser. */
