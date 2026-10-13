@@ -35,3 +35,9 @@ test('a call the stack does not know is an error, not a guess', () => {
   });
   expect(wireInfo(stack, {}, 'web', 'nope', 'qa')).toEqual({ error: 'nope is not an app in the stack' });
 });
+
+test('a call whose setting holds a route keeps it when the call goes local', () => {
+  const routed = structuredClone(stack);
+  Object.assign(routed.apps['web']?.consumes?.['api'] ?? {}, { path: '/retry_request' });
+  expect(wireInfo(routed, {}, 'web', 'api', 'qa')).toMatchObject({ value: 'http://localhost:5000/retry_request' });
+});
