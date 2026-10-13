@@ -1354,6 +1354,14 @@ class Board {
     const step = this.nodes.length * 32;
     this.#addOnly(this.#card(app, spot ?? { x: from.x + 48 + step, y: from.y + 48 + step }));
   }
+  /** Selects this card alone, app or tunnel, so a drag moves only it. */
+  pick(id: string): void {
+    const only = <T extends { id: string; selected?: boolean }>(one: T): T =>
+      !!one.selected === (one.id === id) ? one : { ...one, selected: one.id === id };
+    this.infra = this.infra.map(only);
+    this.edges = this.edges.map(unselected);
+    this.nodes = this.nodes.map(only);
+  }
   /** A card joins the board as the only one selected, so what was selected before is not dragged along with it. */
   #addOnly(card: CardNode): void {
     this.infra = this.infra.map(unselected);

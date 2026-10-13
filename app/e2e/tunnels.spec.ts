@@ -64,6 +64,28 @@ test('a tunnel card moves with its app, and keeps the place it is dragged to', a
   expect(await tunnels(page).first().boundingBox()).toEqual(dragged);
 });
 
+test('picking the app after its tunnel card drags only the app, with its tunnel card following once', async ({
+  page,
+}) => {
+  const tunnel = tunnels(page).first();
+  await tunnel.click({ position: { x: 40, y: 12 } });
+  await card(page, 'orders').click({ position: { x: 40, y: 12 } });
+  await expect(tunnel).not.toHaveClass(/selected/);
+  const before = await tunnel.boundingBox();
+  const app = await card(page, 'orders').boundingBox();
+  if (!before || !app) throw new Error('not on the page');
+  await page.mouse.move(app.x + 40, app.y + 12);
+  await page.mouse.down();
+  await page.mouse.move(app.x + 140, app.y + 112, { steps: 8 });
+  await page.mouse.up();
+  await expect(card(page, 'web')).not.toHaveClass(/selected/);
+  const moved = await tunnel.boundingBox();
+  const appNow = await card(page, 'orders').boundingBox();
+  if (!moved || !appNow) throw new Error('not on the page');
+  expect([moved.x - appNow.x, moved.y - appNow.y]).toEqual([before.x - app.x, before.y - app.y]);
+  await expect(tunnel).not.toHaveClass(/selected/);
+});
+
 test('the Tunnels switch on the app, or the cross on the tunnel card, runs the app without it', async ({ page }) => {
   await expect(card(page, 'web').getByText('Tunnels')).toHaveCount(0);
   const tunnelsSwitch = card(page, 'orders').getByRole('switch', { name: "Open Orders API's tunnels" });
