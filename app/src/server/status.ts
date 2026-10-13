@@ -8,6 +8,8 @@ import { readStack } from '../data.ts';
 import { linkedStatus } from '../engine/linked.ts';
 import { listenerPid } from '../engine/listen.ts';
 import { boardEdits } from '../engine/boards.ts';
+import { lockedPaths } from '../engine/locks.ts';
+import { stackSource } from '../engine/sync.ts';
 import { readMessages } from '../engine/messages.ts';
 import { recipesFor } from '../engine/recipes.ts';
 import { live, notes, runningEnvs, runningNames, runs } from '../engine/runs.ts';
@@ -232,6 +234,8 @@ async function snapshot(serving: boolean): Promise<Status> {
   status['live'] = live();
   status['messages'] = readMessages();
   status['boardEdits'] = boardEdits();
+  const source = stackSource();
+  status['locks'] = source ? lockedPaths(source) : [];
   status['agent'] = agentState();
   // Sends, Stops and answers no session has taken yet.
   status['waiting'] = waiting();

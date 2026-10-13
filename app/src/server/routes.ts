@@ -8,6 +8,7 @@ import { applyFindings, current as currentFindingsStack, discover } from '../eng
 import { editDone } from '../engine/boards.ts';
 import { discardChanges, linkStack, proposeChanges, updateStack } from '../engine/linked.ts';
 import { listenerPid } from '../engine/listen.ts';
+import { setLock } from '../engine/locks.ts';
 import { appendAnswer, appendMessage, clearMessages, readMessages, refusal } from '../engine/messages.ts';
 import { appendNote, appendRun, runRecord, type RunRecord } from '../engine/runs.ts';
 import {
@@ -18,6 +19,8 @@ import {
   currentStack,
   forgetStacks,
   removeApp,
+  saveStack,
+  stackSource,
   useStack,
 } from '../engine/sync.ts';
 import { CODE, TEMP } from '../paths.ts';
@@ -152,7 +155,8 @@ const found =
     const ids = Array.isArray(body['ids']) ? (body['ids'] as unknown[]).filter(id => typeof id === 'string') : [];
     const applied = applyFindings(stack.stack, findings, ids);
     if (applied.error !== undefined) return { status: 400, body: applied };
-    fs.writeFileSync(stack.source, JSON.stringify(applied.stack, null, 2) + '\n');
+    const refused = saveStack(stack.source, JSON.parse(fs.readFileSync(stack.source, 'utf8')), applied.stack);
+    if (refused) return { status: 400, body: refused };
     forgetStacks();
     await koppler(['sync'], 120000);
     return { status: 200, body: { applied: applied.applied } };
@@ -214,6 +218,14 @@ export const ROUTES: Record<string, Route> = {
     const result = editStack(at, body['unset'] === true ? undefined : [body['value']]);
     forgetStacks();
     return refused(result) ?? reload('The stack changed, but reloading it failed: run koppler sync', result);
+  },
+  // The canvas's lock on a field: the person's own click, so it locks and unlocks.
+  '/stack-lock': body => {
+    const source = stackSource();
+    if (!source || typeof body['path'] !== 'string')
+      return { status: 400, body: { error: 'No stack or no field given' } };
+    const done = setLock(source, body['path'], body['on'] === true);
+    return done.error === undefined ? { status: 200, body: { ok: true } } : { status: 400, body: done };
   },
   '/apps-outside': body => {
     const result = addOutside(body);
