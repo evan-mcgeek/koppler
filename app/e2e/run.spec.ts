@@ -316,3 +316,18 @@ test('shortcuts leave the board alone while the review is open', async ({ page }
   await page.keyboard.press('ControlOrMeta+z');
   await expect(cards).toHaveCount(2);
 });
+
+test('an app cabled to nothing on the board is flagged in the review, and connected from there', async ({ page }) => {
+  await page.getByRole('complementary').getByRole('button', { name: 'Catalog API', exact: true }).click();
+  await page.getByRole('button', { name: 'Run', exact: true }).click();
+  const starts = review(page).locator('li', { has: page.locator('[data-verb="starts"]') });
+  await expect(starts).toContainText('Not cabled to any app here: it runs on its own');
+  const connect = starts.getByLabel('Connect');
+  await expect(connect).toHaveValue('');
+  await expect(connect.locator('optgroup[label="Called by"] option')).toHaveText(['Web Shop', 'Orders API']);
+  await page.screenshot({ path: 'test-results/next-review-alone.png' });
+  await connect.selectOption({ label: 'Web Shop' });
+  await expect(page.locator('.svelte-flow__edge[data-id="web>catalog"]')).toHaveCount(1);
+  await expect(review(page)).not.toContainText('Not cabled');
+  await expect(review(page).getByLabel('Connect')).toHaveCount(0);
+});

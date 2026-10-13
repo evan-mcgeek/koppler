@@ -7,6 +7,17 @@
   const { id }: { id: string } = $props();
   const app = $derived(board.apps.find(one => one.id === id));
   const data = $derived(board.nodes.find(node => node.id === id)?.data);
+  // The apps it could call, and those that could call it, when it is cabled to none of them.
+  const calls = $derived(board.uncabled(id) ? board.cablesOf(id).can : []);
+  const callers = $derived(
+    board.uncabled(id)
+      ? board.nodes.flatMap(node =>
+          node.id !== id && board.cablesOf(node.id).can.some(one => one.id === id)
+            ? board.apps.filter(one => one.id === node.id)
+            : [],
+        )
+      : [],
+  );
   const set = (change: Parameters<typeof board.set>[1]) => {
     board.set(id, change);
     runs.again();
@@ -26,6 +37,32 @@
             set({ branch: branch === app.current ? '' : branch });
           }}
         />
+      </label>
+    {/if}
+    {#if calls.length || callers.length}
+      <label>
+        Connect
+        <select
+          value=""
+          onchange={ev => {
+            const [what, other] = [ev.currentTarget.value[0], ev.currentTarget.value.slice(1)];
+            if (what === '>') board.connect(id, other);
+            else if (what === '<') board.connect(other, id);
+            runs.again();
+          }}
+        >
+          <option value="">Run it on its own</option>
+          {#if calls.length}
+            <optgroup label="Call a local app">
+              {#each calls as other (other.id)}<option value=">{other.id}">{other.name}</option>{/each}
+            </optgroup>
+          {/if}
+          {#if callers.length}
+            <optgroup label="Called by">
+              {#each callers as other (other.id)}<option value="<{other.id}">{other.name}</option>{/each}
+            </optgroup>
+          {/if}
+        </select>
       </label>
     {/if}
     {#if board.switchesOver(id)}

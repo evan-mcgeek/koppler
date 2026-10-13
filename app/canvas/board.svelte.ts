@@ -1380,6 +1380,11 @@ class Board {
     return { can: known.length ? known : may, wired };
   }
 
+  /** On a board with other apps, but cabled to none of them. */
+  uncabled(id: string): boolean {
+    return this.nodes.length > 1 && !this.edges.some(edge => edge.source === id || edge.target === id);
+  }
+
   /** A cable between two cards, on the sides that face each other. */
   connect(from: string, to: string): void {
     const size = (id: string) => this.boxes.get(id) ?? { w: 260, h: 160 };
