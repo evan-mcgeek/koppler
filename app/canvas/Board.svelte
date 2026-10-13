@@ -24,6 +24,7 @@
   import { ago, openBoard } from './boards.ts';
   import { live } from './live.svelte.ts';
   import { probes, type Job, type Probe } from './probes.svelte.ts';
+  import { runs } from './run.svelte.ts';
   import { theme } from './theme.svelte.ts';
 
   const flow = useSvelteFlow();
@@ -522,13 +523,29 @@
             {/if}
           </svg>
         </button>
-        {#if !board.present}<button
+        {#if !board.present}
+          <span class="sep" aria-hidden="true"></span>
+          <button
             class="clear"
             title="Remove every card from this board. Undo brings them back."
+            disabled={!board.nodes.length}
             onclick={() => {
-              board.clear();
+              const n = board.nodes.length;
+              runs.review = {
+                title: `Clear ${board.name ?? 'this board'}?`,
+                sub: `Takes ${n === 1 ? 'its app' : `all ${String(n)} apps`} and their cables off the board. Undo brings them back.`,
+                notices: [],
+                groups: [],
+                ok: 'Clear board',
+                prod: true,
+                blocked: false,
+                confirm: () => {
+                  board.clear();
+                },
+              };
             }}>Clear</button
-          >{/if}
+          >
+        {/if}
       </div>
     </Panel>
     <!-- The whole board at a glance; dragging in it moves the view, scrolling on it zooms. -->

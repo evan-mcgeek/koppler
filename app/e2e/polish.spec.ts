@@ -83,6 +83,7 @@ test('a protected environment marks the frame, and an emptied board says how to 
   await expect(page.getByRole('banner')).toHaveClass(/protected/);
   await page.screenshot({ path: 'test-results/next-protected.png' });
   await page.getByRole('button', { name: 'Clear' }).click();
+  await page.getByRole('button', { name: 'Clear board' }).click();
   await expect(page.getByText('Click the apps you want to run together.')).toBeVisible();
 });
 
