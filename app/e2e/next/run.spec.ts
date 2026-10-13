@@ -201,3 +201,80 @@ test('a running card has a restart icon: only that app restarts, shown in the re
   await expect(restarts).not.toContainText('Web Shop');
   await page.screenshot({ path: 'test-results/next-card-restart.png' });
 });
+
+test('the review lists remembered changes, and a card is changed or a call run locally from inside it', async ({
+  page,
+}) => {
+  const recipes = {
+    orders: [{ why: 'point it at the test tenant', file: 'appsettings.json', when: { always: true }, here: null }],
+  };
+  await page.route('**/data/status.json', route => route.fulfill({ json: { apps: {}, recipes } }));
+  const starts = review(page).locator('li', { has: page.locator('[data-verb="starts"]') });
+  // The review is read from the status as it is when Run is pressed.
+  await expect(async () => {
+    await page.keyboard.press('Escape');
+    await page.getByRole('button', { name: 'Run', exact: true }).click();
+    await expect(starts).toContainText('Remembered change: point it at the test tenant (not run here yet)', {
+      timeout: 500,
+    });
+  }).toPass();
+
+  // Its tunnels are switched off here, as on the card; the review says what that means.
+  await starts.getByRole('switch', { name: 'Tunnels' }).uncheck();
+  await expect(review(page)).toContainText('Only its API runs; calls through its tunnels fail');
+  await expect(page.getByRole('switch', { name: "Open Orders API's tunnels" })).not.toBeChecked();
+
+  // A deployed app that is cloned here can run locally too: it joins the board, cabled from its caller.
+  const calls = review(page)
+    .locator('li', { has: page.locator('[data-verb="calls"]') })
+    .first();
+  await calls.getByRole('button', { name: 'Run locally' }).first().click();
+  await expect(page.locator('.svelte-flow__node-app')).toHaveCount(3);
+  await expect(starts.locator('.apps > span')).toHaveCount(3);
+  // Every caller on the board is pointed at it, so it is no longer a deployed call.
+  await expect(review(page).getByRole('button', { name: 'Run locally' })).toHaveCount(1);
+  await page.screenshot({ path: 'test-results/next-review-controls.png' });
+});
+
+test('what stands in the way of a protected run opens a checklist of what to do first', async ({ page }) => {
+  const steps = [
+    {
+      title: 'Sign in to AWS (acme-prod)',
+      why: 'Orders API reads its settings from AWS.',
+      command: 'aws sso login --profile acme-prod',
+      where: 'anywhere',
+      apps: ['Orders API'],
+      done: false,
+    },
+    { title: 'A PROD tunnel for Orders API', gap: true, done: false },
+    { title: 'Trust the HTTPS certificate', done: true },
+  ];
+  const asked: unknown[] = [];
+  await page.route('**/needs?*', async route => {
+    asked.push(route.request().postDataJSON());
+    await route.fulfill({ json: { steps } });
+  });
+  // A credential the app always needs is not stored for PROD: the run is held back.
+  const needs = [
+    { name: 'ConnectionStrings__Orders', stored: false, when: 'Always. The app does not start without it.' },
+  ];
+  await page.route('**/data/status.json', route =>
+    route.fulfill({ json: { apps: {}, secrets: { orders: { prod: needs } } } }),
+  );
+  await page.getByRole('radio', { name: 'PROD' }).check();
+  await expect(async () => {
+    await page.keyboard.press('Escape');
+    await page.getByRole('button', { name: 'Run', exact: true }).click();
+    await expect(review(page)).toContainText('Store first, then send', { timeout: 500 });
+  }).toPass();
+  await review(page).getByRole('button', { name: 'What to do' }).first().click();
+  const list = page.getByRole('dialog', { name: 'Before this runs on PROD' });
+  await expect(list.getByRole('listitem')).toHaveCount(3);
+  await expect(list).toContainText('aws sso login --profile acme-prod');
+  await expect(list.getByRole('button', { name: 'Copy' })).toBeVisible();
+  await expect(list.getByRole('button', { name: 'Ask the agent to find them' })).toBeVisible();
+  expect(asked[0]).toMatchObject({ env: 'prod', apps: ['web', 'orders'] });
+  await page.screenshot({ path: 'test-results/next-checklist.png' });
+  await list.getByRole('button', { name: 'Done' }).click();
+  await expect(list).toBeHidden();
+});

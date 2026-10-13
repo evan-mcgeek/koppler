@@ -164,3 +164,33 @@ test('the board has an overview that moves the view, and no mark of the library'
   expect(await view()).not.toBe(before);
   await expect(page.locator('.svelte-flow__attribution')).toHaveCount(0);
 });
+
+test.describe('cards stacked in a column', () => {
+  test.use({
+    board: {
+      env: 'qa',
+      mode: 'auto',
+      zoom: 1,
+      pan: { x: 40, y: 20 },
+      nodes: { web: at(0, 0), payments: at(40, 420), orders: at(700, 420) },
+      edges: [],
+    },
+  });
+
+  test('a card that grows pushes the card under it down, and lets it back up when it shrinks', async ({ page }) => {
+    const top = async (id: string) => Math.round((await card(page, id).boundingBox())?.y ?? 0);
+    const tall = async () => Math.round((await card(page, 'web').boundingBox())?.height ?? 0);
+    await expect(card(page, 'payments')).toBeVisible();
+    const [under, aside, before] = [await top('payments'), await top('orders'), await tall()];
+    await card(page, 'web').getByRole('button', { name: 'Add a note for the agent' }).click();
+    await expect.poll(tall).toBeGreaterThan(before);
+    const grown = (await tall()) - before;
+    await expect.poll(() => top('payments')).toBe(under + grown);
+    // A card that is not under it stays.
+    expect(await top('orders')).toBe(aside);
+    await card(page, 'web').getByLabel('Note for the agent').focus();
+    await card(page, 'web').getByLabel('Note for the agent').blur();
+    await expect.poll(tall).toBe(before);
+    await expect.poll(() => top('payments')).toBe(under);
+  });
+});

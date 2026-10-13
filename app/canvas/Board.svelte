@@ -187,6 +187,8 @@
     }),
   );
   const frame = () => new Promise(requestAnimationFrame);
+  // Each card's last height and the form it was measured in: a change of form is not the card growing.
+  const heights: Record<string, { brief: boolean; height: number } | undefined> = {};
   // Each card's size in full: zoomed out it is drawn, and so measured, in its short form.
   const full: Record<string, { w: number; h: number; live: boolean } | undefined> = {};
   $effect(() => {
@@ -265,7 +267,29 @@
         const tall = new Map(board.nodes.map(node => [node.id, node.measured?.height]));
         let nudged = false;
         let infra = all.filter(node => node.type !== 'app');
-        const apps = all.filter(node => node.type === 'app');
+        let apps = all.filter(node => node.type === 'app');
+        const brief = viewport.current.zoom < FAR_ZOOM || board.live;
+        for (const { id, measured } of apps) {
+          // Grown or shrunk in the same form, it moves the app cards under it too, each with its own tunnel cards.
+          // ponytail: only the cards straight under it; a card under one of those, off to the side, stays.
+          const last = heights[id];
+          const height = measured?.height;
+          if (height) heights[id] = { brief, height };
+          const by = last?.brief === brief && height ? height - last.height : 0;
+          const box = board.boxes.get(id);
+          if (by && box) {
+            const under = (other: Box | undefined) =>
+              !!other && other.y >= box.y + (last?.height ?? 0) && other.x < box.x + box.w && box.x < other.x + other.w;
+            for (const below of apps.filter(node => node.id !== id && under(board.boxes.get(node.id))))
+              infra = board.followed(below.id, { x: 0, y: by }, infra);
+            apps = apps.map(node =>
+              node.id !== id && under(board.boxes.get(node.id))
+                ? { ...node, position: { x: node.position.x, y: node.position.y + by } }
+                : node,
+            );
+            nudged = true;
+          }
+        }
         for (const { id, position, measured } of apps) {
           // A card that grows or shrinks (its steps open, a note) moves the cards stacked under it by as much.
           const [before, now] = [tall.get(id), measured?.height];

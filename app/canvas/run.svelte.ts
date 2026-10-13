@@ -5,18 +5,23 @@ import { board } from './board.svelte.ts';
 import { openBoard } from './boards.ts';
 import { post, save } from './data.ts';
 import { live } from './live.svelte.ts';
+import { dialogs } from './dialogs.svelte.ts';
 import { toasts } from './toast.svelte.ts';
 
 /** One line of a review: an app or a tunnel, with what is worth knowing under it. */
 export interface ReviewItem {
   name: string;
-  notes: { text: string; kind?: 'host' | 'flag' }[];
+  notes: { text: string; kind?: 'host' | 'flag'; title?: string }[];
   off?: boolean;
+  /** The app whose card controls the review offers: what it starts with can still be changed here. */
+  id?: string;
+  /** Something to do about this line, without leaving the review. */
+  act?: { label: string; title: string; run: () => void };
 }
 export interface Review {
   title: string;
   sub: string;
-  notices: { text: string; kind?: 'prod' }[];
+  notices: { text: string; kind?: 'prod'; act?: { label: string; run: () => void } }[];
   groups: { verb: string; label: string; items: ReviewItem[] }[];
   ok: string;
   /** Marks the confirm button red: a protected environment, or a stop. */
@@ -152,6 +157,7 @@ class Runs {
       label,
       items: steps[verb].map(step => ({
         name: name(step.id),
+        ...((verb === 'starts' || verb === 'restarts') && { id: step.id }),
         notes: [
           ...(step.why.length ? [{ text: step.why.join('; ') }] : []),
           ...(verb === 'starts' || verb === 'restarts' ? extra(step.id) : []),
@@ -165,7 +171,14 @@ class Runs {
    * Run: the review of what the board asks for, sent when confirmed. With a note it goes to the agent first; as a
    * checklist the agent changes nothing and lists the steps.
    */
+  #asked: { note?: string; manual?: boolean; restart?: string } = {};
+  /** The review again, after something it shows was changed from inside it. */
+  again(): void {
+    this.start(this.#asked);
+  }
+
   start({ note, manual = false, restart }: { note?: string; manual?: boolean; restart?: string } = {}): void {
+    this.#asked = { manual, ...(note && { note }), ...(restart && { restart }) };
     const asked = this.graph();
     const graph = {
       ...asked,
@@ -187,6 +200,14 @@ class Runs {
     const borrowed = board.nodes.filter(node => board.borrowsTunnels(node.id)).map(node => node.id);
     const tunnels = board.plan;
     const skipped = board.nodes.filter(node => node.data.hideTunnels && board.tunnelsOf(node.id).length);
+    // What stands in the way has a list of what to do about it.
+    const whatToDo = {
+      label: 'What to do',
+      run: () => {
+        this.review = null;
+        void dialogs.checklist?.open();
+      },
+    };
     const notes = (id: string): ReviewItem['notes'] => {
       const node = board.nodes.find(one => one.id === id);
       const app = board.apps.find(one => one.id === id);
@@ -194,7 +215,10 @@ class Runs {
       const onCurrent = !node.data.branch || node.data.branch === app.current;
       const changes = several(app.dirty, 'change').replace(/^(\d+) /, '$1 uncommitted ');
       return [
-        { text: node.data.branch || app.current || 'current branch', kind: 'host' },
+        // With a branch to pick below, the branch is not said twice.
+        ...(new Set([app.current, ...app.branches]).size > 1
+          ? []
+          : [{ text: node.data.branch || app.current || 'current branch', kind: 'host' as const }]),
         ...(app.dirty && onCurrent ? [{ text: `With your ${changes}`, kind: 'flag' as const }] : []),
         ...(app.dirty && !onCurrent
           ? [
@@ -204,6 +228,20 @@ class Runs {
               },
             ]
           : []),
+        // The remembered code changes this run applies: for this environment, or for a cable the app has here.
+        ...(live.status?.recipes?.[id] ?? [])
+          .filter(
+            ({ when }) =>
+              when?.always ||
+              when?.env === graph.env ||
+              graph.edges.some(edge => edge.from === id && edge.to === when?.calls),
+          )
+          .map(recipe => {
+            const ran = recipe.here
+              ? `${recipe.here.ok ? 'works on my machine' : 'failed here'}, last run ${recipe.here.at}`
+              : 'not run here yet';
+            return { text: `Remembered change: ${recipe.why} (${ran})`, title: recipe.file };
+          }),
         ...(node.data.run === 'ide' ? [{ text: 'You start it; the agent only prepares it' }] : []),
         ...(node.data.note ? [{ text: `Note: ${node.data.note}` }] : []),
         ...(board.localLibraries(id).length
@@ -228,11 +266,12 @@ class Runs {
               {
                 text: `The stack has no ${env} sign-in or tunnel for ${borrowed.map(name).join(', ')}. Koppler will not use another environment's.`,
                 kind: 'prod' as const,
+                act: whatToDo,
               },
             ]
           : []),
         ...(missing.length && board.protected
-          ? [{ text: `Store first, then send: ${missing.join(', ')}.`, kind: 'prod' as const }]
+          ? [{ text: `Store first, then send: ${missing.join(', ')}.`, kind: 'prod' as const, act: whatToDo }]
           : []),
         ...(board.protected
           ? [
@@ -268,10 +307,25 @@ class Runs {
               {
                 verb: 'calls',
                 label: `Calls ${board.protected ? env : `deployed ${env}`}`,
-                items: Object.entries(called).map(([to, from]) => ({
-                  name: name(to),
-                  notes: [{ text: `from ${from.map(name).join(', ')}` }],
-                })),
+                items: Object.entries(called).map(([to, from]) => {
+                  const callee = board.apps.find(app => app.id === to);
+                  const can = callee?.cloned && !callee.outside && callee.answers;
+                  return {
+                    name: name(to),
+                    notes: [{ text: `from ${from.map(name).join(', ')}` }],
+                    ...(can && {
+                      act: {
+                        label: 'Run locally',
+                        title: `Run it locally too, and point ${from.map(name).join(', ')} at it`,
+                        run: () => {
+                          board.add(to);
+                          for (const caller of from) board.connect(caller, to);
+                          this.again();
+                        },
+                      },
+                    }),
+                  };
+                }),
               },
             ]
           : []),
