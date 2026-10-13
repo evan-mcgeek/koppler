@@ -1,6 +1,8 @@
 // The processes Koppler starts: apps, tunnels and the canvas. Each runs detached, so it outlives the terminal or agent
 // session that started it, writes its log to a file, and has a record that says how to find it and stop it.
 import fs from 'node:fs';
+import http from 'node:http';
+import https from 'node:https';
 import path from 'node:path';
 import { execFileSync, spawn } from 'node:child_process';
 import { fail, Failure } from '../failure.ts';
@@ -36,6 +38,13 @@ export interface ProcessRecord {
   psStart: string;
 }
 /** What `koppler run` was asked for. */
+/** When a started app is ready: a GET of this address answers, with `status` or any status below 400. */
+export interface Ready {
+  url: string;
+  status?: number | undefined;
+  /** Seconds. */
+  timeout?: number | undefined;
+}
 export interface RunOptions {
   name: string;
   /** Empty for a stack app started by its id. */
@@ -54,6 +63,8 @@ export interface RunOptions {
   holdsSecrets?: boolean;
   /** Settings for this start only, such as the address of a local app it calls. */
   setEnv?: Record<string, string>;
+  /** An address, or a path on its port. */
+  ready?: Ready;
 }
 
 /** A program's output, or nothing when it fails or is not there. */
@@ -94,6 +105,7 @@ export function parseRun(args: string[]): RunOptions {
     else if (option === '--bind') options.bind = value();
     else if (option === '--env') options.env = value();
     else if (option === '--device') options.device = value();
+    else if (option === '--ready') options.ready = { url: value() };
     else throw new Error(`unknown option ${option}`);
   }
   if (!NAME.test(options.name)) throw new Error('name must be lowercase letters, digits and dashes');
@@ -201,6 +213,39 @@ async function waitForPort(record: ProcessRecord, port: number): Promise<void> {
   );
 }
 
+const statusOf = (url: URL) =>
+  new Promise<number | null>(resolve => {
+    const get = url.protocol === 'https:' ? https.get : http.get;
+    // Its own development certificate is not one this process trusts; the address is on this machine.
+    const request = get(url, { rejectUnauthorized: false, timeout: 4000 }, response => {
+      response.resume();
+      resolve(response.statusCode ?? null);
+    });
+    request.once('timeout', () => request.destroy());
+    request.once('error', () => {
+      resolve(null);
+    });
+  });
+/** Waits until the app says it is ready: a port can answer while startup is still failing. */
+async function waitUntilReady(record: ProcessRecord, port: number, ready: Ready) {
+  const url = new URL(ready.url, `http://${record.bind ?? 'localhost'}:${String(port)}`);
+  const wait = ready.timeout ? ready.timeout * 1000 : START_WAIT;
+  const wanted = (status: number | null) =>
+    status !== null && (ready.status === undefined ? status < 400 : status === ready.status);
+  console.log(`waiting for ${record.name} to be ready at ${url.pathname}…`);
+  const until = Date.now() + wait;
+  let last: number | null = null;
+  while (Date.now() < until && alive(record) && !wanted((last = await statusOf(url)))) await sleep(1000);
+  if (!alive(record))
+    fail(`${record.name} exited before it was ready; last lines of ${record.log}:\n${tailOf(record.log, 15)}`);
+  if (wanted(last)) return;
+  const said = last === null ? 'nothing answers there' : `it answers ${String(last)}`;
+  throw new Failure(
+    `${record.name} is running (pid ${String(record.pid)}) but is not ready: ${said} at ${url.pathname} after ${String(wait / 1000)}s; see ${record.log}`,
+    2,
+  );
+}
+
 /** Starts a command detached, with its log and its record, and returns once it runs (and answers, when it has a port). */
 export async function startProcess(options: RunOptions): Promise<ProcessRecord> {
   const { name, command } = options;
@@ -254,6 +299,7 @@ export async function startProcess(options: RunOptions): Promise<ProcessRecord> 
   await sleep(700);
   if (!alive(record)) fail(`${name} exited right away; last lines of ${log}:\n${tailOf(log, 15)}`);
   if (record.port) await waitForPort(record, record.port);
+  if (record.port && options.ready) await waitUntilReady(record, record.port, options.ready);
   const answering = record.port ? `, answering on port ${String(record.port)}` : '';
   console.log(`started ${name} (pid ${String(record.pid)})${answering}, log ${log}`);
   return record;

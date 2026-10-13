@@ -25,6 +25,7 @@ export async function run(args: string[], extra: Partial<RunOptions> = {}): Prom
     if (app.cwd !== undefined) options.cwd = app.cwd;
     else delete options.cwd;
     if (port !== undefined) options.port = port;
+    if (app.ready) options.ready = app.ready;
     if (app.device) console.log(`device: ${app.device.name} (${app.device.platform})`);
   }
   if (options.dryRun) {
