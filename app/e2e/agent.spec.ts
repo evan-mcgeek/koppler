@@ -15,8 +15,13 @@ test('with no agent the bar says so and shows how to connect one; a connected ag
   const steps = page.getByRole('dialog', { name: 'Connect an agent' });
   await expect(steps.locator('code')).toHaveText('/koppler-run connect');
   await page.screenshot({ path: 'test-results/next-agent.png' });
+  // Where the browser blocks copying, the box says so instead of claiming it copied.
+  await steps.getByRole('button', { name: 'Copy' }).click();
+  await expect(page.getByRole('alert').filter({ hasText: 'Copy is blocked here' })).toBeVisible();
+  await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
   await steps.getByRole('button', { name: 'Copy' }).click();
   await expect(steps.getByRole('button', { name: 'Copied' })).toBeVisible();
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('/koppler-run connect');
 
   // Something waits for an agent: the bar warns, with how many.
   let status: object = { apps: {}, agent: { state: 'none' }, queued: 2 };

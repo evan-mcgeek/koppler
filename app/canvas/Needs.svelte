@@ -2,6 +2,7 @@
   // What the stack needs on this machine and does not have: missing programs with how to install them, the stack's
   // own checks that wait for approval, and facts the stack lacks for an environment. Shown only when there is
   // something to do.
+  import Command from './Command.svelte';
   import { board } from './board.svelte.ts';
   import { live } from './live.svelte.ts';
   import { runs } from './run.svelte.ts';
@@ -10,7 +11,6 @@
   const id = $props.id();
   let open = $state<HTMLButtonElement>();
   let pop = $state<HTMLDivElement>();
-  let copied = $state('');
   let asked = $state<string[]>([]);
   const all = $derived((live.status?.checks ?? []).filter(check => check.state !== 'ok'));
   const todo = $derived(all.filter(check => check.state !== 'gap'));
@@ -51,11 +51,6 @@
     (gap.detail ?? '')
       .replace(`for ${appName(gap.app ?? '')}'s `, 'for its ')
       .replace(` for ${appName(gap.app ?? '')}`, '');
-  const copy = async (text: string) => {
-    await navigator.clipboard.writeText(text).catch(() => undefined);
-    copied = text;
-    setTimeout(() => (copied = ''), 1500);
-  };
   const ask = async (env: string, app?: string) => {
     const sent = await runs.askFacts(
       env,
@@ -93,11 +88,7 @@
           <strong>{check.name}</strong>
           <small>{about(check)}</small>
           {#if run}
-            <span class="cmd"
-              ><code>{run}</code><button type="button" onclick={() => void copy(run)}
-                >{copied === run ? 'Copied' : 'Copy'}</button
-              ></span
-            >
+            <Command command={run} />
           {/if}
         </li>
       {/each}
@@ -184,22 +175,6 @@
     margin: 0;
     color: var(--muted);
     font-size: 12px;
-  }
-  .cmd {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-  code {
-    flex: 1;
-    min-width: 0;
-    padding: 5px 8px;
-    overflow-x: auto;
-    border: 1px solid var(--line);
-    border-radius: 6px;
-    background: var(--paper);
-    font: 12px var(--mono);
-    white-space: nowrap;
   }
   .pop button {
     justify-self: start;

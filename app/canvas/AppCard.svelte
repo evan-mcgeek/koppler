@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Command from './Command.svelte';
   import BranchPicker from './BranchPicker.svelte';
   import { Handle, Position, useViewport, type NodeProps } from '@xyflow/svelte';
   import type { Side } from '../src/core/arrange.ts';
@@ -53,12 +54,6 @@
   const failed = $derived(steps.find(step => step.state === 'failed'));
   let open = $state(false);
   let asked = $state(false);
-  let copiedStep = $state(-1);
-  const copyStep = async (command: string, at: number) => {
-    await navigator.clipboard.writeText(command).catch(() => undefined);
-    copiedStep = at;
-    setTimeout(() => (copiedStep = -1), 1500);
-  };
   /** A side whose one cable sits on the port: the ring stays lit under its end. */
   const lit = (side: Side) => board.ends.onPort.some(port => port.id === id && port.side === side);
   const wire = (ev: Event) => {
@@ -409,13 +404,7 @@
             <span class="what">{step.label}</span>
             {#if step.detail}<span class="detail">{step.detail}</span>{/if}
             {#if step.copy}
-              {@const command = step.copy}
-              <div class="cmd-box">
-                <code class="cmd">{command}</code>
-                <button class="copy" type="button" title="Copy this command" onclick={() => copyStep(command, at)}>
-                  {copiedStep === at ? 'Copied' : 'Copy'}
-                </button>
-              </div>
+              <Command command={step.copy} />
             {/if}
           </li>
         {/each}
@@ -864,36 +853,9 @@
     grid-column: 2;
     color: var(--muted);
   }
-  .cmd-box {
-    position: relative;
+  .step :global(.cmd) {
     grid-column: 2;
     margin-top: 4px;
-    border: 1px solid var(--line);
-    border-radius: 6px;
-    background: var(--paper);
-  }
-  .cmd {
-    display: block;
-    max-height: 132px;
-    margin-top: 30px;
-    padding: 0 10px 8px;
-    overflow-y: auto;
-    font: 12px/1.45 var(--mono);
-    white-space: pre-wrap;
-    overflow-wrap: anywhere;
-    cursor: text;
-  }
-  .copy {
-    position: absolute;
-    top: 5px;
-    right: 5px;
-    padding: 2px 8px;
-    border: 1px solid var(--line);
-    border-radius: 5px;
-    background: var(--surface);
-    color: var(--ink);
-    font: 600 12px var(--sans);
-    cursor: pointer;
   }
   .acts {
     contain: inline-size;
