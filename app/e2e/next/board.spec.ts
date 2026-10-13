@@ -264,12 +264,25 @@ test.describe('a board taller than the window', () => {
           return same;
         })
         .toBe(true);
-      return places();
+      return [last, ...(await places())];
     };
     const first = await settled();
     // Fitted, the cards are in their short form now.
     await expect(page.locator('.card.far').first()).toBeVisible();
     expect(await settled()).toEqual(first);
+    // Pressed again before the view has come to rest, it still ends on the same board and the same view.
+    for (let press = 0; press < 4; press++) await page.getByRole('button', { name: 'Arrange' }).click();
     expect(await settled()).toEqual(first);
+  });
+
+  test('the zoom percentage keeps its width, so the toolbar does not shift while zooming', async ({ page }) => {
+    const percent = page.getByTitle('Reset to 100%');
+    const width = async () => (await percent.boundingBox())?.width;
+    await percent.click();
+    await expect(percent).toHaveText('100%');
+    const wide = await width();
+    await page.getByRole('button', { name: 'Zoom out' }).click();
+    await expect(percent).toHaveText('83%');
+    expect(await width()).toBe(wide);
   });
 });

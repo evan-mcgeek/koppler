@@ -1377,9 +1377,8 @@ class Board {
   }
 
   /** Arrange: places the cards, picks each cable's sides and its order along them, and drops the waypoints. */
-  arrange(): void {
+  arrange(card = (id: string): { w: number; h: number } => this.boxes.get(id) ?? { w: 260, h: 160 }): void {
     const links = this.cables.map(({ from, to }) => ({ from, to }));
-    const card = (id: string) => this.boxes.get(id) ?? { w: 260, h: 160 };
     // An app is given the room of its tunnel cards too: beside it when it calls others, else under it.
     const size = (id: string) => {
       const led = this.ledBy(id).map(key => this.infraBoxes.get(key) ?? TUNNEL);

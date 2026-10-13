@@ -7,6 +7,7 @@
     SelectionMode,
     Panel,
     SvelteFlow,
+    getViewportForBounds,
     useSvelteFlow,
     useViewport,
     ViewportPortal,
@@ -184,17 +185,40 @@
     }),
   );
   const frame = () => new Promise(requestAnimationFrame);
+  // Each card's size in full: zoomed out it is drawn, and so measured, in its short form.
+  const full: Record<string, { w: number; h: number; live: boolean } | undefined> = {};
+  $effect(() => {
+    if (viewport.current.zoom < FAR_ZOOM) return;
+    for (const [id, { w, h }] of board.boxes) full[id] = { w, h, live: board.live };
+  });
   const arrange = async () => {
-    // Zoomed out, cards are drawn in their short form, and the fit that follows may change the zoom and so the form.
-    // They are always placed by their full size: the board comes in close first, so that is what is measured.
-    if (viewport.current.zoom < FAR_ZOOM) {
+    // Cards are placed by their full size, so pressing again changes nothing, whatever the zoom.
+    // Only a card never seen in full brings the board in close first, to be measured.
+    if (viewport.current.zoom < FAR_ZOOM && !board.nodes.every(node => full[node.id]?.live === board.live)) {
       await flow.setZoom(1, { duration: 0 });
       await frame();
       await frame();
     }
-    board.arrange();
-    // The cards move first; the view follows once they are placed.
-    requestAnimationFrame(() => void flow.fitView(FIT));
+    const size = (id: string) => full[id] ?? board.boxes.get(id) ?? { w: 260, h: 160 };
+    board.arrange(size);
+    // The cards move first; the view follows once they are placed, fitted to their full sizes too.
+    requestAnimationFrame(() => {
+      if (!area) return;
+      const boxes = [
+        ...board.nodes.map(node => ({ ...node.position, ...size(node.id) })),
+        ...board.infraBoxes.values(),
+      ];
+      const x = Math.min(...boxes.map(box => box.x));
+      const y = Math.min(...boxes.map(box => box.y));
+      const bounds = {
+        x,
+        y,
+        width: Math.max(...boxes.map(box => box.x + box.w)) - x,
+        height: Math.max(...boxes.map(box => box.y + box.h)) - y,
+      };
+      const to = getViewportForBounds(bounds, area.clientWidth, area.clientHeight, 0.2, FIT.maxZoom, FIT.padding);
+      void flow.setViewport(to, { duration: FIT.duration });
+    });
   };
   // A board that was just opened: once its cards have their sizes it is arranged, or only brought into view.
   $effect(() => {
@@ -363,7 +387,7 @@
         <span class="sep" aria-hidden="true"></span>
         <div class="zoom" role="group" aria-label="Zoom">
           <button aria-label="Zoom out" onclick={zoomBy(1 / 1.2)}>−</button>
-          <button title="Reset to 100%" onclick={() => void flow.setZoom(1, { duration: 200 })}>
+          <button class="percent" title="Reset to 100%" onclick={() => void flow.setZoom(1, { duration: 200 })}>
             {Math.round(viewport.current.zoom * 100)}%
           </button>
           <button aria-label="Zoom in" onclick={zoomBy(1.2)}>+</button>
@@ -797,6 +821,11 @@
   .zoom {
     display: flex;
     gap: 2px;
+  }
+  .tools .percent {
+    width: 62px;
+    padding-inline: 0;
+    font-variant-numeric: tabular-nums;
   }
   .tools button {
     padding: 6px 12px;
