@@ -137,7 +137,9 @@
       aria-selected={at === active}
       title={branch}
       onpointerenter={() => (active = at)}
-      onclick={() => {
+      onclick={ev => {
+        // The list sits in the field's label: a click passed on to the field would open it again.
+        ev.preventDefault();
         pick(branch);
       }}
     >

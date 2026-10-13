@@ -46,6 +46,7 @@ test("a card offers the clone's branches, who starts it, and for a mobile app it
   await branch.click();
   await options.filter({ hasText: 'main' }).click();
   await expect(branch).toHaveValue('main');
+  await expect(page.getByRole('listbox')).toBeHidden();
   await branch.fill('not/pushed-yet');
   await branch.blur();
   await expect(branch).toHaveValue('not/pushed-yet');
