@@ -45,6 +45,14 @@ export interface CardData extends Record<string, unknown> {
 export type Changes = 'set-aside' | 'take-along';
 /** Below this zoom a card is drawn in its short form. */
 export const FAR_ZOOM = 0.6;
+type Size = { w: number; h: number };
+/** Arrange's layouts, in the order it steps through them: callers on top or on the left, and each read the other way round. */
+const LAYOUTS = [
+  ['down', false],
+  ['right', false],
+  ['down', true],
+  ['right', true],
+] as const;
 /** A stack on this machine. */
 export interface KnownStack {
   dir: string;
@@ -373,11 +381,11 @@ class Board {
    * Tunnel cards go on the first side of their app its cables do not use (below, else right, left, above), so they
    * are never in front of cables, stacked there as one block with the app.
    */
-  #beside(id: string, cards: InfraNode[]): InfraNode[] {
+  #beside(id: string, cards: InfraNode[], size: Size = this.boxes.get(id) ?? { w: 260, h: 200 }): InfraNode[] {
     const app = this.nodes.find(node => node.id === id);
     const led = new Set(this.ledBy(id));
     if (!app || !led.size) return cards;
-    const box = { ...app.position, ...(this.boxes.get(id) ?? { w: 260, h: 200 }) };
+    const box = { ...app.position, ...size };
     const side = this.infraSide(id);
     let y = side === 'bottom' ? box.y + box.h + TUNNEL.gap / 2 : side === 'top' ? box.y - TUNNEL.gap / 2 : box.y;
     return cards.map(card => {
@@ -1376,33 +1384,51 @@ class Board {
     this.edges = this.edges.filter(edge => edge.source !== id && edge.target !== id);
   }
 
-  /** Arrange: places the cards, picks each cable's sides and its order along them, and drops the waypoints. */
-  arrange(card = (id: string): { w: number; h: number } => this.boxes.get(id) ?? { w: 260, h: 160 }): void {
+  #arranged = { key: '', version: 0 };
+  /**
+   * Arrange: places the cards, picks each cable's sides and its order along them, and drops the waypoints.
+   * Pressed again on the board as it left it, it gives the next of its layouts.
+   */
+  arrange(card = (id: string): Size => this.boxes.get(id) ?? { w: 260, h: 160 }): void {
+    const key = () => JSON.stringify(this.nodes.map(({ id, position }) => [id, position.x, position.y]));
+    const was = key();
+    let version = was === this.#arranged.key ? this.#arranged.version + 1 : 0;
+    // A layout that leaves every card where it is goes on to the next one.
+    for (let tries = 0; tries < LAYOUTS.length; tries++, version++) {
+      const [dir, mirror] = LAYOUTS[version % LAYOUTS.length] ?? LAYOUTS[0];
+      this.#place(card, dir, mirror);
+      if (key() !== was) break;
+    }
+    this.#arranged = { key: key(), version };
+  }
+
+  #place(card: (id: string) => Size, dir: 'down' | 'right', mirror: boolean): void {
     const links = this.cables.map(({ from, to }) => ({ from, to }));
-    // An app is given the room of its tunnel cards too: beside it when it calls others, else under it.
+    // An app is given the room of its tunnel cards too: top-down beside it when it calls others, else under it.
     const size = (id: string) => {
       const led = this.ledBy(id).map(key => this.infraBoxes.get(key) ?? TUNNEL);
       const { w, h } = card(id);
       if (!led.length) return { w, h };
       const tall = led.reduce((sum, box) => sum + box.h + TUNNEL.gap / 2, 0);
-      return links.some(link => link.from === id)
-        ? { w: w + TUNNEL.gap + Math.max(...led.map(box => box.w)), h: Math.max(h, tall) }
-        : { w, h: h + tall };
+      const wide = Math.max(...led.map(box => box.w));
+      return dir === 'down' && links.some(link => link.from === id)
+        ? { w: w + TUNNEL.gap + wide, h: Math.max(h, tall) }
+        : { w: Math.max(w, wide), h: h + tall };
     };
     const placed = arrange(
       this.nodes.map(node => node.id),
       links,
       size,
-      'down',
-      false,
+      dir,
+      mirror,
       { pad: PAD },
     );
-    const cables: Cable[] = links.map(link => ({ ...link, ...sidesFor(placed, link, 'down', card) }));
+    const cables: Cable[] = links.map(link => ({ ...link, ...sidesFor(placed, link, dir, card) }));
     orderSlots(cables, id => ({ ...(placed[id] ?? { x: 0, y: 0 }), ...card(id) }));
     this.nodes = this.nodes.map(node => ({ ...node, position: placed[node.id] ?? node.position }));
     this.edges = cables.map(({ from, to, ...data }) => cable(from, to, data));
     let cards = this.infra;
-    for (const node of this.nodes) cards = this.#beside(node.id, cards);
+    for (const node of this.nodes) cards = this.#beside(node.id, cards, card(node.id));
     this.infra = cards;
   }
 }

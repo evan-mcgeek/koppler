@@ -246,7 +246,9 @@ test.describe('a board taller than the window', () => {
     },
   });
 
-  test('Arrange gives the same board however often it is pressed', async ({ page }) => {
+  test('Arrange steps through its layouts when pressed again, and comes back to the first with the same view', async ({
+    page,
+  }) => {
     const places = () =>
       page
         .locator('.svelte-flow__node-app')
@@ -269,10 +271,13 @@ test.describe('a board taller than the window', () => {
     const first = await settled();
     // Fitted, the cards are in their short form now.
     await expect(page.locator('.card.far').first()).toBeVisible();
+    // A chain has two layouts: callers on top, and callers on the left. The button keeps its name.
+    const second = await settled();
+    expect(second).not.toEqual(first);
+    await expect(page.getByRole('button', { name: 'Arrange', exact: true })).toBeVisible();
     expect(await settled()).toEqual(first);
-    // Pressed again before the view has come to rest, it still ends on the same board and the same view.
-    for (let press = 0; press < 4; press++) await page.getByRole('button', { name: 'Arrange' }).click();
-    expect(await settled()).toEqual(first);
+    expect(await settled()).toEqual(second);
+    await page.screenshot({ path: 'test-results/next-arrange-right.png' });
   });
 
   test('the zoom percentage keeps its width, so the toolbar does not shift while zooming', async ({ page }) => {
