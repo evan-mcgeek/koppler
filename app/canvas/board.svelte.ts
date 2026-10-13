@@ -223,6 +223,10 @@ class Board {
       ]),
     ),
   );
+  /** Presenting: the board alone, full screen. */
+  present = $state(false);
+  /** Full screen is being changed from here: the browser's word about it is not the user leaving.  */
+  entering = false;
   /** Zoomed out or in Live the cards are short: the empty bands their full form needs are squeezed, on screen only. */
   brief = $state(false);
   /** Each card's height in full, as last drawn so: short, the room it needs only then is closed up. */

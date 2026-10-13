@@ -222,6 +222,11 @@
   };
 </script>
 
+<svelte:document
+  onfullscreenchange={() => {
+    if (!document.fullscreenElement && !board.entering) board.present = false;
+  }}
+/>
 <svelte:window
   onkeydown={keys}
   onpagehide={() => {
@@ -233,7 +238,7 @@
   ondrop={dropped}
 />
 
-<header class:protected={board.protected} bind:this={bar}>
+<header class:protected={board.protected} bind:this={bar} hidden={board.present}>
   <button
     class="side-toggle"
     type="button"
@@ -388,7 +393,7 @@
   <main inert={!!loading}>
     {#await opened then found}
       {#if found}
-        {#if side}<Side />{:else}<Rail open={openSide} />{/if}
+        {#if board.present}{:else if side}<Side />{:else}<Rail open={openSide} />{/if}
         <div class="stage">
           <div class="board">
             <SvelteFlowProvider>
@@ -396,7 +401,7 @@
             </SvelteFlowProvider>
             <Toast />
           </div>
-          <Logs />
+          {#if !board.present}<Logs />{/if}
         </div>
       {:else}
         <div class="empty">
@@ -406,10 +411,13 @@
       {/if}
     {/await}
   </main>
-  <Inbox />
+  {#if !board.present}<Inbox />{/if}
 </div>
 
 <style>
+  header[hidden] {
+    display: none;
+  }
   header {
     display: flex;
     align-items: center;

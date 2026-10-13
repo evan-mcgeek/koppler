@@ -55,3 +55,31 @@ test('Live shows the same board in the same places as cards to read, and nothing
   await page.keyboard.press('l');
   await expect(page.getByRole('radio', { name: 'Live' })).toBeChecked();
 });
+
+test('Present shows the board alone, and Escape brings the page back', async ({ page }) => {
+  const bar = page.getByRole('button', { name: 'Run', exact: true });
+  const side = page.getByRole('complementary');
+  await expect(bar).toBeVisible();
+  await page.getByRole('button', { name: 'Present' }).click();
+  await expect(bar).toBeHidden();
+  await expect(side).toBeHidden();
+  await expect(card(page, 'web')).toBeInViewport({ ratio: 1 });
+  await expect(page.getByRole('button', { name: 'Clear' })).toHaveCount(0);
+  await page.screenshot({ path: 'test-results/next-present.png' });
+  await page.keyboard.press('Escape');
+  await expect(bar).toBeVisible();
+  await expect(side).toBeVisible();
+  await page.keyboard.press('p');
+  await expect(bar).toBeHidden();
+  await page.getByRole('button', { name: 'Stop presenting' }).click();
+  await expect(bar).toBeVisible();
+});
+
+test('the overview of the board sits over the toolbar, at the bottom right', async ({ page }) => {
+  const map = await page.getByRole('img', { name: 'Overview of the board' }).boundingBox();
+  const tools = await page.getByRole('toolbar', { name: 'Board' }).boundingBox();
+  if (!map || !tools) throw new Error('not on the page');
+  expect(map.y + map.height).toBeLessThan(tools.y);
+  expect(Math.round(tools.y - (map.y + map.height))).toBeLessThan(24);
+  expect(Math.abs(map.x + map.width - (tools.x + tools.width))).toBeLessThan(2);
+});

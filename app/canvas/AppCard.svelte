@@ -958,7 +958,8 @@
   .short header {
     min-height: 60px;
   }
-  .short :is(.remove, .port) {
+  .short :is(.remove, .port),
+  .far .tools {
     display: none;
   }
   .short .progress {
