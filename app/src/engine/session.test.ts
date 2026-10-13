@@ -39,7 +39,8 @@ test('a session is gathered after a full Stop, with what went wrong at a glance'
   );
   fs.appendFileSync(log, 'fail: postgres://admin:app-not-real@db/orders refused\n');
   fs.writeFileSync(path.join(logs, 'canvas.log'), 'Authorization: Bearer canvas-not-real\n');
-  const out = collectSession({ temp: dir, logsDir: logs, stop: runs[3]!, runs });
+  const { dir: out, quiet } = collectSession({ temp: dir, logsDir: logs, stop: runs[3]!, runs });
+  assert.equal(quiet, false);
   // Every log gathered for the agent has its secrets masked.
   for (const f of ['up-r1.log', 'logs/api.log', 'canvas.log'])
     assert.doesNotMatch(fs.readFileSync(path.join(out, f), 'utf8'), /not-real/, f);
@@ -49,7 +50,7 @@ test('a session is gathered after a full Stop, with what went wrong at a glance'
   );
   // Without a Stop, what is still going on is gathered: everything after the last finished Stop.
   const more = [...runs, { id: 'r9', at: '2026-01-01T11:00:00Z', kind: 'run', state: 'failed', reason: 'sign-in' }];
-  const now = collectSession({ temp: dir, logsDir: logs, runs: more });
+  const { dir: now } = collectSession({ temp: dir, logsDir: logs, runs: more });
   assert.equal(path.basename(now), 'current');
   assert.deepEqual(
     JSON.parse(fs.readFileSync(path.join(now, 'runs.json'), 'utf8')).map((r: any) => r.id),
@@ -67,4 +68,21 @@ test('a session is gathered after a full Stop, with what went wrong at a glance'
   assert.match(summary, /button#stop x5/);
   assert.match(summary, /api 2/);
   assert.doesNotMatch(fs.readFileSync(path.join(out, 'debug.jsonl'), 'utf8'), /old click/);
+});
+
+test('a session where nothing went wrong is gathered and called quiet, so no review is asked for', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-session-')),
+    logs = path.join(dir, 'logs');
+  fs.mkdirSync(logs);
+  const runs = [
+    { id: 'stop1', kind: 'stop', at: '2026-01-01T09:30:00Z', state: 'done', nodes: {} },
+    { id: 'stop2', kind: 'stop', at: '2026-01-01T09:32:00Z', state: 'done', nodes: {} },
+  ];
+  fs.writeFileSync(
+    path.join(dir, 'debug.jsonl'),
+    JSON.stringify({ at: '2026-01-01T09:31:00Z', kind: 'message', what: 'Stopping and reverting' }),
+  );
+  const { dir: out, quiet } = collectSession({ temp: dir, logsDir: logs, stop: runs[1]!, runs });
+  assert.equal(quiet, true);
+  assert.ok(fs.existsSync(path.join(out, 'summary.md')));
 });
