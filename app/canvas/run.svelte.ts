@@ -745,9 +745,11 @@ class Runs {
               {
                 verb: 'stops',
                 label: 'Revert',
-                items: left.map(change => ({
-                  name: name(change.app),
-                  notes: [{ text: `${change.title}${change.file ? ` (${change.file})` : ''}` }],
+                items: [...new Set(left.map(change => change.app))].map(app => ({
+                  name: name(app),
+                  notes: left
+                    .filter(change => change.app === app)
+                    .map(change => ({ text: `${change.title}${change.file ? ` (${change.file})` : ''}` })),
                 })),
               },
             ]

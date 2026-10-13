@@ -86,6 +86,24 @@ test('Stop says what it leaves alone, and is carried out when confirmed', async 
   await expect.poll(lastRun).toBe('stop');
 });
 
+test('Stop lists every change the last run left, two on one app on its one line', async ({ page }) => {
+  const changes = [
+    { app: 'orders', kind: 'checkout', file: '', title: 'Branch switched' },
+    { app: 'orders', kind: 'edit', file: 'appsettings.json', title: 'Temporary edit' },
+    { app: 'web', kind: 'checkout', file: '', title: 'Branch switched' },
+  ];
+  await page.route('**/data/status.json', route =>
+    route.fulfill({ json: { apps: {}, runs: [{ id: 'r1', kind: 'run', state: 'done', changes }] } }),
+  );
+  await page.reload();
+  await page.getByRole('button', { name: 'Stop', exact: true }).click();
+  const lines = review(page).locator('.apps > span');
+  await expect(lines).toHaveCount(2);
+  await expect(lines.first()).toContainText('Orders API');
+  await expect(lines.first()).toContainText('Branch switched');
+  await expect(lines.first()).toContainText('Temporary edit (appsettings.json)');
+});
+
 test('Run is off on an empty board', async ({ page }) => {
   await page.getByRole('button', { name: 'Clear' }).click();
   await expect(page.getByRole('button', { name: 'Run', exact: true })).toBeDisabled();
