@@ -9,7 +9,10 @@
   let panel = $state<HTMLElement>();
   const list = $derived(inbox.messages);
   const waits = (one: Message) => one.kind === 'question' && !one.answered;
-  const current = (one: Message) => !live.status?.startedAt || (one.at ?? '') >= live.status.startedAt || waits(one);
+  // What Koppler could not do in a run that another run replaced is history.
+  const replaced = (one: Message) => one.from === 'koppler' && !!one.answered;
+  const current = (one: Message) =>
+    !replaced(one) && (!live.status?.startedAt || (one.at ?? '') >= live.status.startedAt || waits(one));
   const now = $derived(list.filter(current));
   const earlier = $derived(list.filter(one => !current(one)));
   /** Only the newest message and questions still open can be acted on; the rest is history. */

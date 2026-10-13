@@ -92,3 +92,31 @@ test('the light sums up the board, and the Flow check tests every connection and
     orders.close();
   }
 });
+
+test('an app the Flow check found starting is checked again once it answers', async ({ page }) => {
+  const asked: { node?: string }[] = [];
+  await page.route('**/cable-test?*', async route => {
+    asked.push(route.request().postDataJSON() as { node?: string });
+    await route.fulfill({ json: { ok: true, text: 'Answers, 200 in 12 ms', detail: 'It answered.' } });
+  });
+  // Web Shop was started and its process is up, but nothing answers on its port yet.
+  let listening = false;
+  await page.route('**/data/status.json', route =>
+    route.fulfill({
+      json: {
+        apps: { web: { port: 3000, listening } },
+        running: ['web'],
+        progress: { run: 'run12345', env: 'qa', apps: ['web'] },
+      },
+    }),
+  );
+  const chip = page.locator('header .chip');
+  await expect(chip).toHaveText('Starting Web Shop');
+  await chip.click();
+  const row = page.getByRole('dialog', { name: 'Flow check' }).locator('.row', { hasText: 'Web Shop' }).first();
+  await expect(row).toContainText('Starting');
+  expect(asked.filter(one => one.node === 'web')).toHaveLength(0);
+  listening = true;
+  await expect(row).toContainText('200 in 12 ms');
+  expect(asked.filter(one => one.node === 'web')).toHaveLength(1);
+});

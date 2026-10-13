@@ -141,7 +141,7 @@ export const appendAnswer = (id: string, answer: Answer): void => {
   append({ answer: id, at: new Date().toISOString(), ...answer });
 };
 
-/** The latest messages, each with its answer when there is one. A question about a run a newer Send replaced is closed. */
+/** The latest messages, each with its answer when there is one. A question about a run a newer Send replaced is closed, and so is what Koppler said about it. */
 export function readMessages(limit = 20, history: { id: string; at: string }[] = runs()): Shown[] {
   let raw: string;
   try {
@@ -174,7 +174,9 @@ export function readMessages(limit = 20, history: { id: string; at: string }[] =
   for (const message of list) {
     const at = message.run ? order.indexOf(message.run) : -1;
     const next = at >= 0 ? history[at + 1] : undefined;
-    if (message.kind === 'question' && !message.answered && next) message.answered = { at: next.at, via: 'replaced' };
+    // What Koppler could not do in a run is history once another run was sent.
+    const closes = message.kind === 'question' || message.from === 'koppler';
+    if (closes && !message.answered && next) message.answered = { at: next.at, via: 'replaced' };
   }
   return list.slice(-limit);
 }

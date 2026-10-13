@@ -128,4 +128,9 @@ test('what Koppler could not start opens the panel by itself, with the command t
   await expect(panel).toContainText('Sign in first: Web Shop needs AWS (acme-dev) at start.');
   await expect(panel.locator('.cmd code')).toHaveText('aws sso login --profile acme-dev');
   await expect(panel.getByRole('button', { name: 'Copy' })).toBeVisible();
+  // Another run was sent: what the first one could not do is history, and the panel closes again.
+  messages = messages.map(one => ({ ...one, answered: { at: new Date().toISOString(), via: 'replaced' } }));
+  await expect(panel).toHaveCount(0);
+  await page.locator('header .agent').click();
+  await expect(panel.getByText('Earlier (1)')).toBeVisible();
 });
