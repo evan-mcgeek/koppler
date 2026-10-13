@@ -129,14 +129,18 @@ class Live {
 
   /** Asks for the status now and every second and a half, while the page is in view. */
   watch(): void {
+    let asking = false;
     const ask = async () => {
-      if (document.hidden) return;
+      // One at a time: a slow answer is not asked for again on top of itself.
+      if (document.hidden || asking) return;
+      asking = true;
       try {
         const answer = await fetch('data/status.json');
         if (answer.ok) this.status = (await answer.json()) as Status;
       } catch {
         // The server is away: the last status stays until it answers again.
       }
+      asking = false;
     };
     void ask();
     clearInterval(this.#timer);

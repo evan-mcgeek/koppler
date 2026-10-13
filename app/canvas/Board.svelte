@@ -82,8 +82,8 @@
   ] as const;
   const shortcut = (ev: KeyboardEvent) => {
     if (ev.altKey || (ev.target as Element).closest('input, select, textarea')) return;
-    // A dialog over the board has the keyboard to itself.
-    if (document.querySelector('dialog[open]')) return;
+    // A dialog or a menu over the board has the keyboard to itself.
+    if (document.querySelector('dialog[open], :popover-open')) return;
     const key = ev.key.toLowerCase();
     if (ev.metaKey || ev.ctrlKey) {
       if (key !== 'z') return;
