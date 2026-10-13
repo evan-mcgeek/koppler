@@ -57,6 +57,7 @@ test('Clear empties the board, and undo brings it back', async ({ page }) => {
   await expect(cards(page)).toHaveCount(3);
   await nextEdit(page);
   await page.getByRole('button', { name: 'Clear' }).click();
+  await page.getByRole('button', { name: 'Clear board' }).click();
   await expect(cards(page)).toHaveCount(0);
   await expect(page.getByText('0 of 4 on the board')).toBeVisible();
   await page.getByRole('button', { name: 'Undo' }).click();
