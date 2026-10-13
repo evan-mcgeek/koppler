@@ -71,8 +71,23 @@ test('on a protected environment the review says so, in red', async ({ page }) =
   await expect(review(page).getByRole('button', { name: 'Run on PROD' })).toHaveClass(/prod/);
 });
 
-test('Stop says what it leaves alone, and is carried out when confirmed', async ({ page, canvas }) => {
-  await page.getByRole('button', { name: 'Stop', exact: true }).click();
+test('with nothing running Stop is off, and what the last run left is reverted from its menu', async ({
+  page,
+  canvas,
+}) => {
+  await expect(page.getByRole('button', { name: 'Stop', exact: true })).toBeDisabled();
+  const menu = page.getByRole('button', { name: 'More ways to stop' });
+  await menu.click();
+  await expect(page.getByRole('menuitem', { name: /Stop apps, keep changes/ })).toBeDisabled();
+  await expect(page.getByRole('menuitem', { name: /Revert temporary changes/ })).toBeDisabled();
+  await page.keyboard.press('Escape');
+  const changes = [{ app: 'orders', kind: 'checkout', file: '', title: 'Branch switched' }];
+  await page.route('**/data/status.json', async route => {
+    const real = (await (await route.fetch()).json()) as { runs?: object[] };
+    await route.fulfill({ json: { ...real, runs: [{ id: 'r1', kind: 'run', state: 'done', changes }] } });
+  });
+  await menu.click();
+  await page.getByRole('menuitem', { name: /Revert temporary changes/ }).click();
   await expect(review(page).getByRole('heading')).toHaveText('Revert temporary changes');
   await expect(review(page)).toContainText('Left alone: anything you started yourself');
   await review(page).getByRole('button', { name: 'Revert' }).click();
@@ -96,7 +111,8 @@ test('Stop lists every change the last run left, two on one app on its one line'
     route.fulfill({ json: { apps: {}, runs: [{ id: 'r1', kind: 'run', state: 'done', changes }] } }),
   );
   await page.reload();
-  await page.getByRole('button', { name: 'Stop', exact: true }).click();
+  await page.getByRole('button', { name: 'More ways to stop' }).click();
+  await page.getByRole('menuitem', { name: /Revert temporary changes/ }).click();
   const lines = review(page).locator('.apps > span');
   await expect(lines).toHaveCount(2);
   await expect(lines.first()).toContainText('Orders API');
