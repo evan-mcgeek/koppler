@@ -556,14 +556,18 @@ class Board {
   }
 
   /** A free spot for a new card beside what it is linked to: right of what calls it, left of what it feeds. */
-  #nextTo(id: string, cards: InfraNode[]): Point {
+  #nextTo(
+    id: string,
+    cards: InfraNode[],
+    sizeOf = (key: string): Size => this.boxes.get(key) ?? { w: 260, h: 200 },
+  ): Point {
     const size = TUNNEL;
     const box = (key: string): Box | undefined => {
       const card = cards.find(one => one.id === key && (one.id === id || one.position.x || one.position.y));
       const app = this.nodes.find(node => node.id === key);
       return card
         ? { ...card.position, ...(this.infraBoxes.get(key) ?? size) }
-        : app && { ...app.position, ...(this.boxes.get(key) ?? { w: 260, h: 200 }) };
+        : app && { ...app.position, ...sizeOf(key) };
     };
     const near = this.flows.flatMap(flow => {
       const other = flow.from === id ? flow.to : flow.to === id ? flow.from : undefined;
@@ -1531,6 +1535,12 @@ class Board {
     this.edges = cables.map(({ from, to, ...data }) => cable(from, to, data));
     let cards = this.infra;
     for (const node of this.nodes) cards = this.#beside(node.id, cards, card(node.id));
+    // Queues and outside systems go beside what they are linked to, each on the first free spot.
+    for (const one of cards.filter(other => other.type !== 'tunnel')) {
+      const parked = cards.map(other => (other.id === one.id ? { ...other, position: { x: 0, y: 0 } } : other));
+      const spot = this.#nextTo(one.id, parked, card);
+      cards = cards.map(other => (other.id === one.id ? { ...other, position: spot } : other));
+    }
     this.infra = cards;
   }
 }

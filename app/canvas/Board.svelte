@@ -3,6 +3,7 @@
     Background,
     BackgroundVariant,
     ConnectionMode,
+    getViewportForBounds,
     MiniMap,
     SelectionMode,
     Panel,
@@ -39,6 +40,7 @@
   };
   // Fitting never blows a small board up past its real size.
   const FIT = { padding: 0.15, duration: 200, maxZoom: 1 };
+  const CARD = { w: 260, h: 160 };
   // Not the library's zoomIn and zoomOut: taken here, before its board exists, they stay tied to an empty one.
   const zoomBy = (factor: number) => () => void flow.setZoom(flow.getZoom() * factor, { duration: 150 });
 
@@ -207,18 +209,41 @@
   $effect(() => {
     board.brief = viewport.current.zoom < FAR_ZOOM || board.live;
   });
-  // Fitted in full when the whole board fits that close; else zoomed out, where the cards are short and squeezed together.
+  // Fitted in full when the whole board fits that close; else zoomed out, where the cards are short and closed up.
+  // The view is worked out here and set once: a fit the flow queues runs again each time the cards change form.
   const fit = async (duration = FIT.duration) => {
-    const settled = async () => {
-      await frame();
-      await frame();
+    const viewFor = (boxes: Box[], maxZoom: number) => {
+      const x = Math.min(...boxes.map(box => box.x));
+      const y = Math.min(...boxes.map(box => box.y));
+      const bounds = {
+        x,
+        y,
+        width: Math.max(...boxes.map(box => box.x + box.w)) - x,
+        height: Math.max(...boxes.map(box => box.y + box.h)) - y,
+      };
+      return getViewportForBounds(bounds, area?.clientWidth ?? 0, area?.clientHeight ?? 0, 0.2, maxZoom, FIT.padding);
     };
-    await flow.fitView({ ...FIT, minZoom: FAR_ZOOM, duration: 0 });
-    await settled();
-    await flow.fitView({ ...FIT, duration: flow.getZoom() >= FAR_ZOOM ? duration : 0 });
-    if (flow.getZoom() >= FAR_ZOOM) return;
-    await settled();
-    await flow.fitView({ ...FIT, maxZoom: FAR_ZOOM - 0.01, duration });
+    const inFull = () => [
+      ...board.nodes.map(node => ({ ...node.position, ...(full[node.id] ?? board.boxes.get(node.id) ?? CARD) })),
+      ...board.infra.map(card => ({ ...card.position, ...(board.infraBoxes.get(card.id) ?? CARD) })),
+    ];
+    const drawn = () => [...board.boxes.values(), ...board.infraBoxes.values()];
+    if (!area || !board.nodes.length) return;
+    for (let tries = 0; tries < 2; tries++) {
+      const close = viewFor(inFull(), FIT.maxZoom);
+      if (close.zoom < FAR_ZOOM) break;
+      await flow.setViewport(close, { duration: tries ? duration : 0 });
+      await frame();
+      await frame();
+      // Fitted with sizes guessed for cards never seen in full: measured now, it holds if it still fits.
+      if (viewFor(inFull(), FIT.maxZoom).zoom >= FAR_ZOOM) return;
+    }
+    if (!board.brief) {
+      await flow.setViewport(viewFor(inFull(), FIT.maxZoom), { duration: 0 });
+      await frame();
+      await frame();
+    }
+    await flow.setViewport(viewFor(drawn(), FAR_ZOOM - 0.01), { duration });
   };
   // Each card's last height and the form it was measured in: a change of form is not the card growing.
   const heights: Record<string, { brief: string; height: number } | undefined> = {};
