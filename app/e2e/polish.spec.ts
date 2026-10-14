@@ -1,10 +1,8 @@
 // The new canvas's frame and messages: refused cables, the protected environment, the empty board, the sheets.
 import type { Page } from '@playwright/test';
-import { test, expect, STACK } from './canvas.ts';
+import { at, card, expect, STACK, test } from './canvas.ts';
 
-const card = (page: Page, id: string) => page.locator(`.svelte-flow__node[data-id="${id}"]`);
 const cable = (page: Page, id: string) => page.locator(`.svelte-flow__edge[data-id="${id}"]`);
-const at = (x: number, y: number) => ({ x, y, run: 'cli', branch: 'main' });
 const middle = async (page: Page, id: string) => {
   const box = await card(page, id).boundingBox();
   if (!box) throw new Error('no card');

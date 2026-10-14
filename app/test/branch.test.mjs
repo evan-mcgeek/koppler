@@ -4,6 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { switchBack, switchTo } from '../dist/engine/branch.js';
+import { test } from 'node:test';
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-branch-')), repo = path.join(dir, 'repo'), logFile = path.join(dir, 'actions.json');
 const git = (...a) => execFileSync('git', ['-C', repo, ...a], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
@@ -13,27 +14,27 @@ fs.writeFileSync(path.join(repo, 'a.txt'), 'one\n'); git('add', '.'); git('commi
 git('branch', 'feature/x');
 const branch = () => git('rev-parse', '--abbrev-ref', 'HEAD');
 
-// Uncommitted changes need a choice; set aside, they come back on the way back.
-fs.writeFileSync(path.join(repo, 'a.txt'), 'mine\n'); fs.writeFileSync(path.join(repo, 'new.txt'), 'untracked\n');
-assert.match(switchTo({ app: 'api', repo, to: 'feature/x', how: null, logFile }).error, /2 uncommitted changes on develop: choose --set-aside or --take-along/);
-assert.match(switchTo({ app: 'api', repo, to: 'feature/x', how: 'set-aside', logFile }).message, /develop -> feature\/x, your 2 uncommitted changes are set aside until Stop/);
-assert.equal(branch(), 'feature/x');
-assert.equal(fs.readFileSync(path.join(repo, 'a.txt'), 'utf8'), 'one\n');
-assert.match(switchBack({ app: 'api', logFile }).message, /back on develop, your set-aside changes are back/);
-assert.equal(branch(), 'develop');
-assert.equal(fs.readFileSync(path.join(repo, 'a.txt'), 'utf8'), 'mine\n');
-assert.ok(fs.existsSync(path.join(repo, 'new.txt')));
-assert.deepEqual(JSON.parse(fs.readFileSync(logFile, 'utf8')), []);
+test('Uncommitted changes need a choice; set aside, they come back on the way back.', async () => {
+  fs.writeFileSync(path.join(repo, 'a.txt'), 'mine\n'); fs.writeFileSync(path.join(repo, 'new.txt'), 'untracked\n');
+  assert.match(switchTo({ app: 'api', repo, to: 'feature/x', how: null, logFile }).error, /2 uncommitted changes on develop: choose --set-aside or --take-along/);
+  assert.match(switchTo({ app: 'api', repo, to: 'feature/x', how: 'set-aside', logFile }).message, /develop -> feature\/x, your 2 uncommitted changes are set aside until Stop/);
+  assert.equal(branch(), 'feature/x');
+  assert.equal(fs.readFileSync(path.join(repo, 'a.txt'), 'utf8'), 'one\n');
+  assert.match(switchBack({ app: 'api', logFile }).message, /back on develop, your set-aside changes are back/);
+  assert.equal(branch(), 'develop');
+  assert.equal(fs.readFileSync(path.join(repo, 'a.txt'), 'utf8'), 'mine\n');
+  assert.ok(fs.existsSync(path.join(repo, 'new.txt')));
+  assert.deepEqual(JSON.parse(fs.readFileSync(logFile, 'utf8')), []);
+});
 
-// Taken along, the changes travel both ways.
-assert.match(switchTo({ app: 'api', repo, to: 'feature/x', how: 'take-along', logFile }).message, /changes came along/);
-assert.equal(fs.readFileSync(path.join(repo, 'a.txt'), 'utf8'), 'mine\n');
-assert.match(switchBack({ app: 'api', logFile }).message, /back on develop$/);
-assert.equal(branch(), 'develop');
-console.log('branch tests ok');
+test('Taken along, the changes travel both ways.', async () => {
+  assert.match(switchTo({ app: 'api', repo, to: 'feature/x', how: 'take-along', logFile }).message, /changes came along/);
+  assert.equal(fs.readFileSync(path.join(repo, 'a.txt'), 'utf8'), 'mine\n');
+  assert.match(switchBack({ app: 'api', logFile }).message, /back on develop$/);
+  assert.equal(branch(), 'develop');
+});
 
-// A clone that was on a commit, not a branch, goes back to that commit.
-{
+test('A clone that was on a commit, not a branch, goes back to that commit.', async () => {
   git('stash', 'push', '-q', '--include-untracked'); git('stash', 'drop', '-q');
   git('switch', '-q', '--detach');
   const commit = git('rev-parse', 'HEAD'), log = () => JSON.parse(fs.readFileSync(logFile, 'utf8'));
@@ -68,11 +69,9 @@ console.log('branch tests ok');
   fs.writeFileSync(logFile, JSON.stringify([{ kind: 'checkout', app: 'api', repo: path.join(dir, 'gone'), from: 'develop', to: 'feature/x' }]));
   assert.match(switchBack({ app: 'api', logFile }).error, /clone is no longer at/);
   assert.match(switchTo({ app: 'api', repo: path.join(dir, 'gone'), to: 'feature/x', how: null, logFile }).error, /^api: /);
-  console.log('switching back tests ok');
-}
+});
 
-// A clone the user moved to a third branch stays there: Stop drops the switch instead of undoing it or asking again.
-{
+test('A clone the user moved to a third branch stays there: Stop drops the switch instead of undoing it or asking again.', async () => {
   const d = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-branch-moved-')), r = path.join(d, 'repo'), log = path.join(d, 'actions.json');
   const g = (...a) => execFileSync('git', ['-C', r, ...a], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
   fs.mkdirSync(r); g('init', '-q', '-b', 'develop'); g('config', 'user.email', 't@t'); g('config', 'user.name', 't');
@@ -100,4 +99,4 @@ console.log('branch tests ok');
   assert.match(switchBack({ app: 'api', logFile: log }).message, /your set-aside changes wait in the stash as "koppler: api on develop while it runs feature\/x"/);
   assert.match(g('stash', 'list'), /koppler: api on develop/);
   assert.equal(entries(), 0);
-}
+});

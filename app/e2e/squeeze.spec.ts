@@ -1,8 +1,7 @@
 // Zoomed out the cards are short: the room only their full form needs is closed up on screen, and nothing is moved.
 import type { Page } from '@playwright/test';
-import { test, expect } from './canvas.ts';
+import { card, expect, test } from './canvas.ts';
 
-const card = (page: Page, id: string) => page.locator(`.svelte-flow__node[data-id="${id}"]`);
 const at = (x: number, y: number, full?: number) => ({ x, y, run: 'cli', branch: 'main', ...(full && { full }) });
 const box = async (page: Page, id: string) => {
   const got = await card(page, id).boundingBox();

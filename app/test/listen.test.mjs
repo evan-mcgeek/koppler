@@ -5,41 +5,50 @@ import path from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { until } from './helpers.mjs';
+import { test } from 'node:test';
 
-// One session listens at a time; one the user moved away from cannot take the connection back by listening again.
-const koppler = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'dist', 'koppler.mjs');
-const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-listen-')), env = { ...process.env, KOPPLER_TEMP: dir };
-const listener = () => { try { return JSON.parse(fs.readFileSync(path.join(dir, 'listener.json'), 'utf8')); } catch { return {}; } };
-const gone = child => new Promise(resolve => child.exitCode !== null || child.signalCode ? resolve() : child.once('exit', resolve));
-const start = (...args) => new Promise(resolve => { const p = spawn('node', [koppler, 'listen', ...args], { env }); let out = ''; p.stdout.on('data', d => { out += d; if (out.includes('\n')) resolve({ p, out }); }); setTimeout(() => resolve({ p, out }), 1500); });
-const wait = ms => new Promise(r => setTimeout(r, ms));
+let a, again, b, bAgain, dir, env, gone, idA, idB, koppler, listener, wait;
+test('One session listens at a time; one the user moved away from cannot take the connection back by listening again.', async () => {
+  koppler = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'dist', 'koppler.mjs');
+  dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-listen-')), env = { ...process.env, KOPPLER_TEMP: dir };
+  listener = () => { try { return JSON.parse(fs.readFileSync(path.join(dir, 'listener.json'), 'utf8')); } catch { return {}; } };
+  gone = child => new Promise(resolve => child.exitCode !== null || child.signalCode ? resolve() : child.once('exit', resolve));
+  const start = (...args) => new Promise(resolve => { const p = spawn('node', [koppler, 'listen', ...args], { env }); let out = ''; p.stdout.on('data', d => { out += d; if (out.includes('\n')) resolve({ p, out }); }); setTimeout(() => resolve({ p, out }), 1500); });
+  wait = ms => new Promise(r => setTimeout(r, ms));
 
-const a = await start('take');
-const idA = a.out.match(/session (\w+)/)[1];
-assert.equal(listener().session, idA);
-const b = await start('take');
-const idB = b.out.match(/session (\w+)/)[1];
-assert.notEqual(idA, idB);
-// A is stopped by B taking over, and B stays the one connected.
-await gone(a.p);
-assert.equal(listener().session, idB);
-// A listens again as itself: refused, B keeps the connection.
-const again = spawnSync('node', [koppler, 'listen', 'as', idA], { env, encoding: 'utf8' });
-assert.equal(again.status, 3);
-assert.match(again.stderr, /Another session is connected/);
-assert.equal(listener().session, idB);
-// B listening again as itself is fine.
-b.p.kill(); await gone(b.p);
-const bAgain = spawn('node', [koppler, 'listen', 'as', idB], { env });
-await until('B listening again', () => listener().pid === bAgain.pid);
-assert.equal(listener().session, idB);
-// A listener releases its connection on its way out, which writes in the folder: wait for it before removing the folder.
-bAgain.kill(); a.p.kill(); await gone(bAgain);
-fs.rmSync(dir, { recursive: true, force: true });
-console.log('listen tests ok');
+  a = await start('take');
+  idA = a.out.match(/session (\w+)/)[1];
+  assert.equal(listener().session, idA);
+  b = await start('take');
+  idB = b.out.match(/session (\w+)/)[1];
+  assert.notEqual(idA, idB);
+});
 
-// The cases a connection must survive, each in its own folder.
-{
+test('A is stopped by B taking over, and B stays the one connected.', async () => {
+  await gone(a.p);
+  assert.equal(listener().session, idB);
+});
+
+test('A listens again as itself: refused, B keeps the connection.', async () => {
+  again = spawnSync('node', [koppler, 'listen', 'as', idA], { env, encoding: 'utf8' });
+  assert.equal(again.status, 3);
+  assert.match(again.stderr, /Another session is connected/);
+  assert.equal(listener().session, idB);
+});
+
+test('B listening again as itself is fine.', async () => {
+  b.p.kill(); await gone(b.p);
+  bAgain = spawn('node', [koppler, 'listen', 'as', idB], { env });
+  await until('B listening again', () => listener().pid === bAgain.pid);
+  assert.equal(listener().session, idB);
+});
+
+test('A listener releases its connection on its way out, which writes in the folder: wait for it before removing the folder.', async () => {
+  bAgain.kill(); a.p.kill(); await gone(bAgain);
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('The cases a connection must survive, each in its own folder.', async () => {
   const fresh = () => { const d = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-listen-')); return { d, env: { ...process.env, KOPPLER_TEMP: d }, file: n => path.join(d, n) }; };
   const prompt = n => JSON.stringify({ tag: 'koppler', text: `run ${n}`, data: { id: `run00000${n}` }, at: 't' }) + '\n';
   const run = (t, ...args) => spawnSync('node', [koppler, 'listen', ...args], { env: t.env, encoding: 'utf8', timeout: 8000 });
@@ -73,5 +82,4 @@ console.log('listen tests ok');
     // Nothing to wait for but time: a signal sent by mistake would have arrived by now.
     run(t, 'stop'); await ended(b); await wait(200);
     assert.equal(bystander.exitCode ?? bystander.signalCode, null); bystander.kill(); }
-  console.log('listen cases ok');
-}
+});

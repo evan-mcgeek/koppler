@@ -1,12 +1,9 @@
 // The new canvas's queue cards, outside systems and the apps a card still calls in the deployed environment.
 import type { Page } from '@playwright/test';
-import { test, expect, STACK } from './canvas.ts';
+import { card, expect, saved, STACK, test } from './canvas.ts';
 
-const card = (page: Page, id: string) => page.locator(`.svelte-flow__node[data-id="${id}"]`);
 const queue = (page: Page) => page.locator('.svelte-flow__node-queue');
 const outside = (page: Page) => page.locator('.svelte-flow__node-outside');
-const saved = (page: Page) =>
-  page.waitForResponse(r => r.url().includes('/state?') && r.request().method() === 'POST' && r.ok());
 const at = (x: number, y: number) => ({ x, y, run: 'cli', branch: 'main', showQueues: true });
 const { orders, payments } = STACK.apps;
 const stack = {

@@ -1,8 +1,7 @@
 // The new canvas (canvas/, on Svelte Flow), served beside today's and driven the way a person does.
 import type { Locator, Page } from '@playwright/test';
-import { test, expect } from './canvas.ts';
+import { at, card, expect, test } from './canvas.ts';
 
-const card = (page: Page, id: string) => page.locator(`.svelte-flow__node[data-id="${id}"]`);
 const cable = (page: Page, id: string) => page.locator(`.svelte-flow__edge[data-id="${id}"]`);
 const socket = (page: Page, id: string) => page.locator(`.ends .socket[data-cable="${id}"]`);
 const view = (page: Page) => page.locator('.svelte-flow__viewport').evaluate(el => getComputedStyle(el).transform);
@@ -12,7 +11,6 @@ const middle = async (of: Locator) => {
   return { x: box.x + box.width / 2, y: box.y + box.height / 2, box };
 };
 
-const at = (x: number, y: number) => ({ x, y, run: 'cli', branch: 'main' });
 test.use({
   board: {
     env: 'qa',

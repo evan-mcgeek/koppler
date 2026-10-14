@@ -1,15 +1,7 @@
 // The new canvas's side notes: what is worth knowing about the board, and what the stack needs on this machine.
-import fs from 'node:fs';
-import path from 'node:path';
 import type { Page } from '@playwright/test';
-import { test, expect, nextEdit } from './canvas.ts';
+import { at, expect, nextEdit, sent, test } from './canvas.ts';
 
-const at = (x: number, y: number) => ({ x, y, run: 'cli', branch: 'main' });
-const sent = (temp: string) => {
-  const file = path.join(temp, 'prompts.jsonl');
-  const lines = fs.existsSync(file) ? fs.readFileSync(file, 'utf8').split('\n').filter(Boolean) : [];
-  return lines.map(line => JSON.parse(line) as { tag: string; text: string; data: Record<string, unknown> });
-};
 const notes = (page: Page) => page.getByRole('group', { name: 'About this board' }).getByRole('note');
 test.use({
   uncloned: ['catalog'],

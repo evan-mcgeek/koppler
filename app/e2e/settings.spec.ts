@@ -3,9 +3,8 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Page } from '@playwright/test';
-import { test, expect, STACK, actions } from './canvas.ts';
+import { actions, at, expect, STACK, test } from './canvas.ts';
 
-const at = (x: number, y: number) => ({ x, y, run: 'cli', branch: 'main' });
 test.use({
   board: { env: 'qa', mode: 'auto', zoom: 1, pan: { x: 60, y: 60 }, nodes: { orders: at(0, 0) }, edges: [] },
 });

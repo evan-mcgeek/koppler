@@ -1,11 +1,8 @@
 // The new canvas's logs pane, and asking the agent about a start that failed.
 import fs from 'node:fs';
 import path from 'node:path';
-import type { Page } from '@playwright/test';
-import { test, expect, actions } from './canvas.ts';
+import { actions, at, card, expect, test } from './canvas.ts';
 
-const card = (page: Page, id: string) => page.locator(`.svelte-flow__node[data-id="${id}"]`);
-const at = (x: number, y: number) => ({ x, y, run: 'cli', branch: 'main' });
 test.use({
   board: {
     env: 'qa',

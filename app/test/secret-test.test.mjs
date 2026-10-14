@@ -4,6 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { test } from 'node:test';
 
 const bin = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'bin', 'secret-test');
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-secret-test-'));
@@ -14,17 +15,18 @@ fs.writeFileSync(path.join(dir, 'orders-api.env'), "export API_KEY=sk_test_abc\n
 assert.deepEqual(run('orders-api', 'MISSING'), [2, 'not stored']);
 assert.deepEqual(run('orders-api', 'API_KEY'), [2, 'cannot test: not a database or cache connection Koppler reads']);
 assert.equal(run('../etc', 'X')[0], 2);
-// Nothing listens on port 1: the outcome is a plain reason, and no part of the value is printed.
-const [status, out] = run('orders-api', 'ConnectionStrings__DB');
-if (!out.startsWith('cannot test: psql')) { assert.equal(status, 1); assert.equal(out, 'failed: nothing answers at its address (is the tunnel up?)'); }
-for (const leak of ['hunter2', 'sk_test', 'Username', 'orders;']) assert.equal(out.includes(leak), false);
-// Each environment has its own store.
-assert.deepEqual(run('orders-api@prod', 'ConnectionStrings__DB'), [2, 'not stored']);
-fs.rmSync(dir, { recursive: true });
-console.log('secret-test tests ok');
+test('Nothing listens on port 1: the outcome is a plain reason, and no part of the value is printed.', async () => {
+  const [status, out] = run('orders-api', 'ConnectionStrings__DB');
+  if (!out.startsWith('cannot test: psql')) { assert.equal(status, 1); assert.equal(out, 'failed: nothing answers at its address (is the tunnel up?)'); }
+  for (const leak of ['hunter2', 'sk_test', 'Username', 'orders;']) assert.equal(out.includes(leak), false);
+});
 
-// secret-psql --pgpass writes the line tools look up, replaces an older one, prints no password and refuses a protected store.
-{
+test('Each environment has its own store.', async () => {
+  assert.deepEqual(run('orders-api@prod', 'ConnectionStrings__DB'), [2, 'not stored']);
+  fs.rmSync(dir, { recursive: true });
+});
+
+test('secret-psql --pgpass writes the line tools look up, replaces an older one, prints no password and refuses a protected store.', async () => {
   const psqlBin = path.join(path.dirname(bin), 'secret-psql');
   const d = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-secret-psql-')), pgpass = path.join(d, 'pgpass');
   const local = "Host=localhost;Port=5437;Database=orders;Username=root;Password=p:w\\d-not-real", remote = 'Host=db.internal;Database=or.ers;Username=root;Password=remote-not-real';
@@ -55,38 +57,36 @@ console.log('secret-test tests ok');
   for (let i = 0; i < 2; i++) assert.equal(go(['orders-api', 'REMOTE', '--pgpass']).status, 0);
   assert.deepEqual(lines(), [...written, 'db.internal:5432:orxers:root:keep-me-too', 'db.internal:5432:or.ers:root:remote-not-real']);
   fs.rmSync(d, { recursive: true });
-  console.log('secret-psql tests ok');
-}
+});
 
-// The Keychain store (macOS): the same set / names / value / remove, in a keychain of its own inside a throwaway home,
-// so the user's own keychain is never touched and the test does not depend on it.
-if (process.platform === 'darwin') {
-  const store = path.join(path.dirname(bin), 'secret-store');
-  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-keychain-')), keychain = path.join(home, 'Library', 'Keychains', 'test.keychain-db');
-  const env = { ...process.env, HOME: home, KOPPLER_SECRET_BACKEND: 'keychain', KOPPLER_KEYCHAIN: keychain, KOPPLER_KEYCHAIN_PREFIX: `koppler-selftest-${process.pid}` };
-  delete env.KOPPLER_SECRETS;
-  fs.mkdirSync(path.dirname(keychain), { recursive: true });
-  for (const args of [['create-keychain', '-p', 'test', keychain], ['unlock-keychain', '-p', 'test', keychain]]) {
-    const made = spawnSync('security', args, { encoding: 'utf8', env });
-    assert.equal(made.status, 0, `security ${args[0]}: ${made.stderr}`);
+test('The Keychain store (macOS): the same set / names / value / remove, in a keychain of its own inside a throwaway home, so the user\'s own keychain is never touched and the test does not depend on it.', async () => {
+  if (process.platform === 'darwin') {
+    const store = path.join(path.dirname(bin), 'secret-store');
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-keychain-')), keychain = path.join(home, 'Library', 'Keychains', 'test.keychain-db');
+    const env = { ...process.env, HOME: home, KOPPLER_SECRET_BACKEND: 'keychain', KOPPLER_KEYCHAIN: keychain, KOPPLER_KEYCHAIN_PREFIX: `koppler-selftest-${process.pid}` };
+    delete env.KOPPLER_SECRETS;
+    fs.mkdirSync(path.dirname(keychain), { recursive: true });
+    for (const args of [['create-keychain', '-p', 'test', keychain], ['unlock-keychain', '-p', 'test', keychain]]) {
+      const made = spawnSync('security', args, { encoding: 'utf8', env });
+      assert.equal(made.status, 0, `security ${args[0]}: ${made.stderr}`);
+    }
+    const ks = (args, input) => { const r = spawnSync(store, args, { encoding: 'utf8', env, input, timeout: 15000 }); return [r.status, r.stdout.trim()]; };
+    const tricky = 'Host=db;Password=a "quoted" $val\\ue with spaces & ünïcode';
+    try {
+      assert.equal(ks(['set', 'orders-api', 'ConnectionStrings__DB'], tricky)[0], 0);
+      assert.equal(ks(['set', 'orders-api', 'API_KEY'], 'k1')[0], 0);
+      assert.equal(ks(['set', 'orders-api', 'API_KEY'], 'k2')[0], 0);
+      assert.deepEqual(ks(['names', 'orders-api'])[1].replace(/^orders-api: */, '').split(' ').sort(), ['API_KEY', 'ConnectionStrings__DB']);
+      assert.deepEqual(ks(['value', 'orders-api', 'ConnectionStrings__DB']), [0, tricky]);
+      assert.deepEqual(ks(['value', 'orders-api', 'API_KEY']), [0, 'k2']);
+      assert.equal(ks(['names', 'other-api'])[1], '');
+      assert.notEqual(ks(['value', 'orders-api', 'MISSING'])[0], 0);
+      assert.equal(ks(['set', 'orders-api', 'EMPTY'], '')[0], 1);
+      assert.equal(ks(['set', '../x', 'A'], 'v')[0], 2);
+    } finally {
+      for (const n of ['ConnectionStrings__DB', 'API_KEY']) ks(['remove', 'orders-api', n]);
+    }
+    assert.equal(ks(['names', 'orders-api'])[1], '');
+    fs.rmSync(home, { recursive: true, force: true });
   }
-  const ks = (args, input) => { const r = spawnSync(store, args, { encoding: 'utf8', env, input, timeout: 15000 }); return [r.status, r.stdout.trim()]; };
-  const tricky = 'Host=db;Password=a "quoted" $val\\ue with spaces & ünïcode';
-  try {
-    assert.equal(ks(['set', 'orders-api', 'ConnectionStrings__DB'], tricky)[0], 0);
-    assert.equal(ks(['set', 'orders-api', 'API_KEY'], 'k1')[0], 0);
-    assert.equal(ks(['set', 'orders-api', 'API_KEY'], 'k2')[0], 0);
-    assert.deepEqual(ks(['names', 'orders-api'])[1].replace(/^orders-api: */, '').split(' ').sort(), ['API_KEY', 'ConnectionStrings__DB']);
-    assert.deepEqual(ks(['value', 'orders-api', 'ConnectionStrings__DB']), [0, tricky]);
-    assert.deepEqual(ks(['value', 'orders-api', 'API_KEY']), [0, 'k2']);
-    assert.equal(ks(['names', 'other-api'])[1], '');
-    assert.notEqual(ks(['value', 'orders-api', 'MISSING'])[0], 0);
-    assert.equal(ks(['set', 'orders-api', 'EMPTY'], '')[0], 1);
-    assert.equal(ks(['set', '../x', 'A'], 'v')[0], 2);
-  } finally {
-    for (const n of ['ConnectionStrings__DB', 'API_KEY']) ks(['remove', 'orders-api', n]);
-  }
-  assert.equal(ks(['names', 'orders-api'])[1], '');
-  fs.rmSync(home, { recursive: true, force: true });
-  console.log('keychain store tests ok');
-}
+});

