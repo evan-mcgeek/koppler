@@ -24,6 +24,7 @@
   import Repos from './Repos.svelte';
   import Review from './Review.svelte';
   import { runs } from './run.svelte.ts';
+  import { stacks } from './stacks.svelte.ts';
   import Setup from './Setup.svelte';
   import Side from './Side.svelte';
   import StackPicker from './StackPicker.svelte';
@@ -63,7 +64,7 @@
   });
   /** A stack on its way in, from here, another tab or the terminal: the board waits until the page reloads with it. */
   const loading = $derived(
-    runs.switching ?? (live.status?.loading && live.status.loading !== board.dir ? live.status.loading : null),
+    stacks.switching ?? (live.status?.loading && live.status.loading !== board.dir ? live.status.loading : null),
   );
   const loadingName = $derived(live.status?.stacks?.find(stack => stack.dir === loading)?.name ?? 'the stack');
   // The stack in use changed and its data is loaded: this page shows the old one, so it opens again.

@@ -75,8 +75,7 @@
         type="button"
         disabled={review.blocked}
         onclick={() => {
-          review.confirm();
-          runs.review = null;
+          runs.confirm();
         }}>{review.ok}</button
       >
     </div>

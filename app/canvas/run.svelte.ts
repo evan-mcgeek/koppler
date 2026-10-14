@@ -474,141 +474,6 @@ class Runs {
     return last && last.kind !== 'stop' ? (last.changes ?? []) : [];
   }
 
-  /** The stack being switched to from this page, until the page reloads with it. */
-  switching = $state<string | null>(null);
-
-  /** Another stack: at once when nothing runs here, else after the Stop and revert its review shows. */
-  useStack(to: { dir: string; name: string }): void {
-    const steps = this.#plan({ env: board.env, nodes: {}, edges: [] });
-    if (!steps.stops.length && !this.started.length) {
-      void this.#switch(to.dir);
-      return;
-    }
-    this.review = {
-      title: `Switch to ${to.name}`,
-      sub: `${board.stack} still has something running. It is stopped and reverted first, then Koppler switches.`,
-      notices: [{ text: `Your boards and history for ${board.stack} are kept and come back when you switch back.` }],
-      groups: this.#groups(steps).filter(group => group.verb === 'stops'),
-      ok: 'Stop, revert and switch',
-      prod: true,
-      blocked: false,
-      confirm: () => {
-        const text = `Stop and revert this stack using the koppler-run skill (stop every process the agent started, revert every temporary code change), then switch Koppler to the stack "${to.name}": koppler history done <this run's id>, then koppler use "${to.dir}". Report what was stopped and reverted.`;
-        void this.deliver(
-          text,
-          { tag: 'koppler-stop', data: { action: 'stop', id: newRunId(), switchTo: to.dir } },
-          'Sent. Koppler switches once everything is stopped',
-        );
-      },
-    };
-  }
-  /** Calls a stack action on the server that answers with a result or an error. */
-  async #stack<T extends object>(action: string): Promise<T | null> {
-    const said = await post<T>(action);
-    if (!('error' in said)) return said;
-    toasts.show(said.error, 'warning');
-    return null;
-  }
-  /** Brings in what changed in the shared stack on GitHub. */
-  async updateStack(): Promise<void> {
-    const said = await this.#stack<{ updated?: boolean; message?: string }>('stack-update');
-    if (said?.updated) location.reload();
-    else if (said) toasts.show(said.message ?? 'Already up to date.');
-  }
-  /** What this copy of a linked stack has that the shared one does not: shared as a pull request, or dropped. */
-  shareChanges(): void {
-    const linked = live.status?.linked;
-    if (!linked) return;
-    const items = linked.changes.map(change => ({
-      name: change.replace(/^./, first => first.toUpperCase()),
-      notes: [],
-    }));
-    const groups = [{ verb: 'keeps', label: 'Changes', items }];
-    this.review = {
-      title: 'Changes not in the shared stack yet',
-      sub: `What Koppler learned here, kept in your copy of ${board.stack}. The shared stack on GitHub stays as it is until a pull request is merged.`,
-      notices: [
-        ...(linked.pr
-          ? [
-              {
-                text: `A pull request is already open: ${linked.pr}. Opening another replaces nothing; close the old one if you open a new one.`,
-              },
-            ]
-          : []),
-        {
-          text: 'Opening a pull request pushes a new branch to the shared repo with your GitHub account, for your team to review. No secret values are in it.',
-        },
-      ],
-      groups,
-      ok: 'Open pull request',
-      prod: false,
-      blocked: false,
-      confirm: () => {
-        toasts.show('Opening the pull request…');
-        void this.#stack<{ url?: string }>('stack-pr').then(said => {
-          if (said)
-            toasts.show('Pull request opened', 'message', {
-              label: 'View',
-              run: () => window.open(said.url, '_blank', 'noopener'),
-            });
-        });
-      },
-      back: {
-        label: 'Discard my changes instead',
-        run: () => {
-          this.review = {
-            title: 'Discard your changes',
-            sub: `Your copy of ${board.stack} goes back to the shared stack as last fetched. What Koppler learned here is lost.`,
-            notices: [],
-            groups,
-            ok: 'Discard',
-            prod: true,
-            blocked: false,
-            confirm: () => {
-              void this.#stack('stack-discard').then(said => {
-                if (said) location.reload();
-              });
-            },
-          };
-        },
-      },
-    };
-  }
-  /** A new stack, or one from GitHub: asked for at once when nothing runs, else after a Stop and revert. */
-  addStack(ask: () => void): void {
-    const steps = this.#plan({ env: board.env, nodes: {}, edges: [] });
-    if (!steps.stops.length && !this.started.length) {
-      ask();
-      return;
-    }
-    this.review = {
-      title: 'Start a new stack',
-      sub: `${board.stack} still has something running. It is stopped and reverted first; then choose Add a stack again.`,
-      notices: [{ text: `Your boards and history for ${board.stack} are kept and come back when you switch back.` }],
-      groups: this.#groups(steps).filter(group => group.verb === 'stops'),
-      ok: 'Stop and revert',
-      prod: true,
-      blocked: false,
-      confirm: () => {
-        void this.deliver(
-          'Stop and revert this stack using the koppler-run skill (stop every process the agent started, revert every temporary code change), so the user can start a new stack. Report what was stopped and reverted.',
-          { tag: 'koppler-stop', data: { action: 'stop', id: newRunId() } },
-          'Stopping and reverting',
-        );
-      },
-    };
-  }
-  async #switch(dir: string): Promise<void> {
-    this.switching = dir;
-    const said = await post<{ error?: string }>('stack', { use: dir });
-    if (!said.error) {
-      location.reload();
-      return;
-    }
-    this.switching = null;
-    toasts.show(said.error, 'warning');
-  }
-
   /** Stops every app and tunnel now; branches and code changes stay until a Stop and revert. */
   stopApps(): void {
     // An app from the IDE only has Koppler's log follower here: the app itself keeps running in the IDE.
@@ -713,11 +578,10 @@ class Runs {
 
   /** Stop: what Koppler started is stopped and its temporary changes are undone. */
   stop(): void {
-    const steps = this.#plan({ env: board.env, nodes: {}, edges: [] });
     const { started, left } = this;
-    const others = started.filter(one => !board.apps.some(app => app.id === one));
+    const others = started.filter(one => !board.app(one));
     const running = started.length > 0;
-    this.review = {
+    this.stopReview({
       title: running ? 'Stop and revert' : 'Revert temporary changes',
       sub: running
         ? 'Koppler stops what it started and undoes its temporary changes; the agent only gets what it cannot undo safely.'
@@ -728,36 +592,65 @@ class Runs {
           text: 'Left alone: anything you started yourself or from your IDE, your AWS sign-ins and stored credentials.',
         },
       ],
-      groups: [
-        ...(running ? this.#groups(steps).filter(group => group.verb === 'stops') : []),
-        ...(left.length
-          ? [
-              {
-                verb: 'stops',
-                label: 'Revert',
-                items: [...new Set(left.map(change => change.app))].map(app => ({
-                  name: name(app),
-                  notes: left
-                    .filter(change => change.app === app)
-                    .map(change => ({ text: `${change.title}${change.file ? ` (${change.file})` : ''}` })),
-                })),
-              },
-            ]
-          : []),
-      ],
+      stops: running,
+      also: left.length
+        ? [
+            {
+              verb: 'stops',
+              label: 'Revert',
+              items: [...new Set(left.map(change => change.app))].map(app => ({
+                name: name(app),
+                notes: left
+                  .filter(change => change.app === app)
+                  .map(change => ({ text: `${change.title}${change.file ? ` (${change.file})` : ''}` })),
+              })),
+            },
+          ]
+        : [],
       ok: running ? 'Stop and revert' : 'Revert',
+      text: 'Stop and revert this stack using the koppler-run skill: stop every process the agent started (apps, tunnels, background tasks; leave anything started from an IDE or by me) and revert every temporary code change (do-not-commit edits and added launch profiles). Report what was stopped and reverted.',
+      sent: 'Stopping and reverting',
+    });
+  }
+
+  /**
+   * The review of a Stop and revert: what stops (unless `stops` is false), what else is listed, and what the agent is
+   * told once it is confirmed. `data` goes with the request, such as the stack to switch to afterwards.
+   */
+  stopReview({
+    stops = true,
+    also = [],
+    text,
+    sent,
+    data = {},
+    ...shown
+  }: Pick<Review, 'title' | 'sub' | 'notices' | 'ok'> & {
+    stops?: boolean;
+    also?: Review['groups'];
+    text: string;
+    sent: string;
+    data?: object;
+  }): void {
+    const steps = this.#plan({ env: board.env, nodes: {}, edges: [] });
+    this.review = {
+      ...shown,
+      groups: [...(stops ? this.#groups(steps).filter(group => group.verb === 'stops') : []), ...also],
       prod: true,
       blocked: false,
       confirm: () => {
-        const text =
-          'Stop and revert this stack using the koppler-run skill: stop every process the agent started (apps, tunnels, background tasks; leave anything started from an IDE or by me) and revert every temporary code change (do-not-commit edits and added launch profiles). Report what was stopped and reverted.';
-        void this.deliver(
-          text,
-          { tag: 'koppler-stop', data: { action: 'stop', id: newRunId() } },
-          'Stopping and reverting',
-        );
+        void this.deliver(text, { tag: 'koppler-stop', data: { action: 'stop', id: newRunId(), ...data } }, sent);
       },
     };
+  }
+  /** Whether anything Koppler would stop runs: nothing to stop and revert before leaving this stack. */
+  get idle(): boolean {
+    return !this.#plan({ env: board.env, nodes: {}, edges: [] }).stops.length && !this.started.length;
+  }
+  /** Does what the open review says; the review closes first, so what it does can open another. */
+  confirm(): void {
+    const review = this.review;
+    this.review = null;
+    review?.confirm();
   }
 }
 export const runs = new Runs();
