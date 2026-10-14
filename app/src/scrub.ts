@@ -4,7 +4,7 @@
 import os from 'node:os';
 
 const SECRET_SETTING =
-  /(password|passwd|pwd|secret|token|api[_-]?key|access[_-]?key)(\\?["']?\s*[=:]\s*)(?:(\\?["'])[^\n]*?\3|[^;"'\s,}&]+)/gi;
+  /(password|passwd|pwd|secret|token|api[_-]?key|access[_-]?key|account[_-]?key)(\\?["']?\s*[=:]\s*)(?:(\\?["'])[^\n]*?\3|[^;"'\s]+)/gi;
 /** Masks what logs echo on errors: connection strings, tokens, keys. Terminal colours go too. */
 export const redact = (text: string): string =>
   text
@@ -13,7 +13,11 @@ export const redact = (text: string): string =>
       SECRET_SETTING,
       (_all, key: string, separator: string, quote = '') => `${key}${separator}${String(quote)}***${String(quote)}`,
     )
-    .replace(/\b([a-z][a-z0-9+.-]*:\/\/)[^\s/:@]+:[^\s/@]+@/gi, '$1***:***@')
+    .replace(/-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?(?:-----END [A-Z ]*PRIVATE KEY-----|$)/g, '***private key***')
+    .replace(/\b([a-z][a-z0-9+.-]*:\/\/)[^\s/:@]+:[^\s@]+@/gi, '$1***:***@')
+    .replace(/\b([a-z][a-z0-9+.-]*:\/\/)[^\s/:@]{8,}@/gi, '$1***@')
+    .replace(/([?&;]sig=)[^&\s;"']+/gi, '$1***')
+    .replace(/\b(Basic\s+)[A-Za-z0-9+/=]{8,}/g, '$1***')
     .replace(/\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{5,}/g, '***jwt***')
     .replace(/\b(Bearer\s+)[A-Za-z0-9._~+/=-]{8,}/g, '$1***')
     .replace(

@@ -16,7 +16,10 @@ export function tail(file: string, bytes = TAIL_BYTES, lines = TAIL_LINES): stri
     fs.readSync(fd, buffer, 0, length, size - length);
     fs.closeSync(fd);
     // Color codes, as terminals send them or as `flutter logs` spells them out, are noise on a card.
-    const plain = buffer.toString('utf8').replace(/(?:\x1b|\\\^\[)\[[0-9;]*m/g, '');
+    // A read that starts mid-file starts mid-line: that piece goes, so a secret never shows without the name that masks it.
+    const text = buffer.toString('utf8');
+    const whole = size > length ? text.slice(text.indexOf('\n') + 1) : text;
+    const plain = whole.replace(/(?:\x1b|\\\^\[)\[[0-9;]*m/g, '');
     const last = redact(plain).trimEnd().split('\n').slice(-lines);
     return last.map(line => (line.length > 4000 ? `${line.slice(0, 4000)} …` : line)).join('\n');
   } catch {

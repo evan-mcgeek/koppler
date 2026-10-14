@@ -7,6 +7,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { takeSecrets } from './safe-env.ts';
 
 /** The settings the template gives its functions, by name: only these reach the functions. */
 export const declared = (yaml: string): string[] => [
@@ -29,7 +30,9 @@ export const functions = (yaml: string): { name: string; triggers: string[] }[] 
 /** samconfig.toml's parameter_overrides for the first of the environment's names that has them. */
 export function overrides(toml: string, envs: string[]): { env: string; value: string } | null {
   for (const env of envs) {
-    const section = new RegExp(`\\[${env}\\.deploy\\.parameters\\]([\\s\\S]*?)(?=\\n\\[|$)`).exec(toml);
+    const section = new RegExp(
+      `\\[${env.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\.deploy\\.parameters\\]([\\s\\S]*?)(?=\\n\\[|$)`,
+    ).exec(toml);
     const line = /parameter_overrides\s*=\s*"((?:[^"\\]|\\.)*)"/.exec(section?.[1] ?? '');
     if (line) return { env, value: (line[1] ?? '').replace(/\\"/g, '"') };
   }
@@ -51,9 +54,11 @@ async function main(port: number, config: { template?: string; envs?: string[] }
   }
   const text = fs.readFileSync(template, 'utf8');
 
+  // Read once and taken out of the environment, so the build and Docker commands started below never carry them.
+  const all = { ...process.env, ...takeSecrets() };
   const given = Object.fromEntries(
     declared(text).flatMap((name): [string, string][] => {
-      const value = process.env[name];
+      const value = all[name];
       return value === undefined ? [] : [[name, inContainer(value)]];
     }),
   );

@@ -3,6 +3,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { writeJson } from '../json-files.ts';
 import { getAt, parsePath } from '../core/stack-path.ts';
 
 const locksFile = () =>
@@ -21,10 +22,7 @@ export const lockedPaths = (source: string): string[] => all()[source] ?? [];
 export function setLock(source: string, at: string, on: boolean): { error?: string } {
   if ('error' in parsePath(at)) return { error: `${at} is not a path such as apps.orders.url` };
   const rest = lockedPaths(source).filter(one => one !== at);
-  fs.mkdirSync(path.dirname(locksFile()), { recursive: true });
-  fs.writeFileSync(locksFile(), JSON.stringify({ ...all(), [source]: on ? [...rest, at] : rest }, null, 2) + '\n', {
-    mode: 0o600,
-  });
+  writeJson(locksFile(), { ...all(), [source]: on ? [...rest, at] : rest });
   return {};
 }
 

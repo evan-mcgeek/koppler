@@ -20,6 +20,7 @@ import { tail } from './logs.ts';
 import { mobileState, refreshMobile, type MobileApp } from './mobile.ts';
 import { secretsStatus } from './secrets.ts';
 import { waiting } from './waiting.ts';
+import { APP_ID, RUN_ID } from '../ids.ts';
 
 type Loose = Record<string, unknown>;
 interface Step {
@@ -40,8 +41,6 @@ type Status = Loose & { apps: Record<string, AppStatus> };
 
 export const SOURCE = path.join(TEMP, 'status.json');
 const OUT = path.join(TEMP, 'status.js');
-const RUN_ID = /^[a-z0-9]{6,40}$/;
-const APP_ID = /^[a-z0-9-]{1,64}$/;
 const STEP_STATES = ['done', 'failed', 'user', 'todo'];
 /** A value from a file as text, cut to size. */
 const cut = (value: unknown, most: number) => String(value).slice(0, most);
@@ -174,12 +173,13 @@ function recipesByApp(): Record<string, object[]> {
 
 /** Whether an agent session takes Sends: listening now, working on one it took (for up to two hours), or none. */
 function agentState(): { state: string; since?: string | undefined; busy?: string } {
-  let listener: { pid: number | null; since?: string; busy?: string; started?: string | null };
+  let listener: { pid: number | null; since?: string; busy?: string; started?: string | null } | null;
   try {
     listener = readJson(path.join(TEMP, 'listener.json')) as typeof listener;
   } catch {
     return { state: 'none' };
   }
+  if (typeof listener !== 'object' || listener === null) return { state: 'none' };
   if (listener.pid) return listenerPid(listener) ? { state: 'listening', since: listener.since } : { state: 'none' };
   // Working on what it took, until it marks a run done or failed after that: then it has finished and is not listening.
   const ended = Math.max(0, ...runs().map(run => Date.parse(run.endedAt ?? '') || 0));
@@ -189,6 +189,14 @@ function agentState(): { state: string; since?: string | undefined; busy?: strin
     : { state: 'none' };
 }
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+/** Where an app's log is read from: the file it names when that is a log, else where Koppler keeps its own. */
+export const logFile = (id: string, named: unknown): string =>
+  typeof named === 'string' && path.isAbsolute(named) && /\.(log|out|txt)$/i.test(named)
+    ? named
+    : path.join(LOGS, `${id}.log`);
+
 async function snapshot(serving: boolean): Promise<Status> {
   let written: Partial<Status> = {};
   try {
@@ -197,7 +205,12 @@ async function snapshot(serving: boolean): Promise<Status> {
     // No agent wrote a status yet.
   }
   // An app Koppler started itself (koppler up) has a card too, even when no agent wrote a status for it.
-  const status: Status = { ...written, apps: written.apps ?? {} };
+  // Anyone can have written that file: only what is shaped like an app's status is kept.
+  const given = isRecord(written) ? written : {};
+  const apps = Object.entries(isRecord(given.apps) ? given.apps : {}).filter(
+    ([id, app]) => APP_ID.test(id) && isRecord(app),
+  );
+  const status: Status = { ...given, apps: Object.fromEntries(apps) };
   for (const name of runningNames()) {
     if (status.apps[name] || name === 'canvas' || name.startsWith('tunnel-')) continue;
     try {
@@ -216,7 +229,7 @@ async function snapshot(serving: boolean): Promise<Status> {
   for (const [id, app] of Object.entries(status.apps)) {
     if (app.port) app.listening = await portOpen(app.port);
     if (mobileState[id]) app.running = mobileState[id];
-    app.logTail = tail(app.log || path.join(LOGS, `${id}.log`));
+    app.logTail = tail(logFile(id, app.log));
     delete app.log;
   }
   const ports = await Promise.all(
