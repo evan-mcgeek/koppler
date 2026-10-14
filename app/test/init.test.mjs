@@ -54,3 +54,26 @@ test('koppler add takes a clone into the stack in use, by its name or its folder
   assert.deepEqual(Object.keys(apps).sort(), ['acme-orders', 'acme-web']);
   fs.rmSync(dir, { recursive: true, force: true });
 });
+
+test('koppler canvas --new-address gives a running canvas a new address, and the old one stops working', async () => {
+  const { freePorts } = await import('./helpers.mjs');
+  const [port] = await freePorts(1);
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-address-'));
+  const env = { ...process.env, HOME: dir, KOPPLER_STATE: path.join(dir, 'state'), KOPPLER_CONFIG_DIR: path.join(dir, 'config'), KOPPLER_PORT: String(port) };
+  const koppler = (...args) => spawnSync('node', [entry, ...args], { encoding: 'utf8', env });
+  const url = () => fs.readFileSync(path.join(dir, 'state', 'run', 'canvas-url'), 'utf8').trim();
+  try {
+    assert.equal(koppler('canvas', '--no-open').status, 0);
+    const before = url();
+    assert.equal((await fetch(before)).status, 200);
+    const renewed = koppler('canvas', '--new-address', '--no-open');
+    assert.equal(renewed.status, 0, renewed.stderr);
+    assert.match(renewed.stdout, /new address/);
+    assert.notEqual(url(), before);
+    assert.equal((await fetch(before)).status, 404);
+    assert.equal((await fetch(url())).status, 200);
+  } finally {
+    koppler('canvas', 'stop');
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});

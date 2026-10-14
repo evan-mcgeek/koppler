@@ -7,6 +7,19 @@
   import { debug } from './debug.svelte.ts';
   import { theme } from './theme.svelte.ts';
   import { toasts } from './toast.svelte.ts';
+  import { post } from './data.ts';
+
+  // A new address: every other open tab and every copied link stops working, so it is asked for twice.
+  let renewing = $state(false);
+  const renew = async () => {
+    const said = await post<{ path: string }>('new-address', { port: location.port });
+    if ('error' in said) {
+      toasts.show(`No new address: ${said.error}`, 'warning');
+      renewing = false;
+      return;
+    }
+    location.replace(said.path + location.hash);
+  };
 
   const copyLog = async () => {
     const text = await debug.read();
@@ -54,6 +67,21 @@
           debug.clear();
           toasts.show('Debug log cleared');
         }}>Clear</button
+      >
+    {/if}
+  </div>
+  <div class="row address">
+    {#if renewing}
+      <span class="warn">Other open tabs and copied links stop working.</span>
+      <button class="text" type="button" onclick={() => (renewing = false)}>Cancel</button>
+      <button class="text go" type="button" onclick={() => void renew()}>Get it</button>
+    {:else}
+      <span>Address</span>
+      <button
+        class="text"
+        type="button"
+        title="Give the canvas a new address, so a link that was copied or shared no longer opens it"
+        onclick={() => (renewing = true)}>New address</button
       >
     {/if}
   </div>
@@ -149,5 +177,14 @@
     border-color: var(--line);
     background: var(--paper);
     color: var(--ink);
+  }
+  .address .warn {
+    flex: 1;
+    max-width: 200px;
+    color: var(--muted);
+    font-size: 12px;
+  }
+  .address .go {
+    color: var(--bad);
   }
 </style>
