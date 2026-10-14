@@ -72,11 +72,36 @@ test('koppler up: two tunnels that want the same port. The one that moves takes 
   fs.writeFileSync(path.join(dir, 'local.json'), JSON.stringify({ apps: { a: { path: dir }, b: { path: dir } } }));
   const r = koppler('up', 'a', 'b');
   assert.equal(r.code, 0, r.out);
-  assert.match(r.out, new RegExp(`started tunnel-db-a-${tunnel}\\b`));
-  assert.match(r.out, new RegExp(`started tunnel-db-b-${tunnel + 2}\\b`));
+  assert.match(r.out, new RegExp(`started tunnel-db-a-internal-${tunnel}\\b`));
+  assert.match(r.out, new RegExp(`started tunnel-db-b-internal-${tunnel + 2}\\b`));
   const log = id => fs.readFileSync(path.join(dir, 'logs', `${id}.log`), 'utf8');
   assert.match(log('b'), new RegExp(`DB_ADDR=localhost:${tunnel + 2}\\b`));
   assert.match(log('a'), /DB_ADDR=unset/);
+  koppler('stop', '--all', '--yes');
+});
+
+test('koppler up on PROD never takes the QA tunnel left open on the same port: the run stops and says what holds it.', async () => {
+  const { spawnSync } = await import('node:child_process');
+  const fs = await import('node:fs'), os = await import('node:os'), path = await import('node:path'), { fileURLToPath } = await import('node:url');
+  const [appPort, dbPort] = await freePorts(2);
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-tunnelenv-')), bin = path.join(dir, 'bin');
+  const env = { ...process.env, KOPPLER_STATE: dir, KOPPLER_TEMP: dir, KOPPLER_CONFIG_DIR: dir, PATH: `${bin}:${process.env.PATH}` };
+  const entry = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'dist', 'koppler.mjs');
+  cleanups.push(() => spawnSync('node', [entry, 'stop', '--all', '--yes'], { env }));
+  const koppler = (...args) => { const r = spawnSync('node', [entry, ...args], { encoding: 'utf8', env }); return { out: (r.stdout + r.stderr).trim(), code: r.status }; };
+  fs.mkdirSync(bin);
+  fs.writeFileSync(path.join(bin, 'cloudflared'), '#!/bin/sh\nfor last; do :; done\nexec python3 -m http.server "${last##*:}" --bind 127.0.0.1\n', { mode: 0o755 });
+  const db = host => ({ tunnel: host, port: dbPort });
+  const stack = { envs: ['qa', 'prod'], apps: { api: { name: 'API', kind: 'other', start: `exec python3 -m http.server ${appPort} --bind 127.0.0.1`, url: `http://localhost:${appPort}`, prereqs: [db('db.qa.acme.example')], envs: { prod: { prereqs: [db('db.prod.acme.example')] } } } } };
+  fs.writeFileSync(path.join(dir, 'registry.json'), JSON.stringify(stack)); allowStack(dir, stack);
+  fs.writeFileSync(path.join(dir, 'local.json'), JSON.stringify({ apps: { api: { path: dir } } }));
+  const qa = koppler('up', 'api', '--env', 'qa');
+  assert.equal(qa.code, 0, qa.out);
+  koppler('stop', 'api', '--yes');
+  const prod = koppler('up', 'api', '--env', 'prod');
+  assert.notEqual(prod.code, 0, prod.out);
+  assert.doesNotMatch(prod.out, /already open/);
+  assert.match(prod.out, new RegExp(`port ${dbPort}.*tunnel-db-qa-acme-example-${dbPort}`, 's'));
   koppler('stop', '--all', '--yes');
 });
 
