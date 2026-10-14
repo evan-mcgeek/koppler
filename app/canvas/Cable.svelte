@@ -5,7 +5,7 @@
   import { wiring } from './wiring.svelte.ts';
   import { live } from './live.svelte.ts';
 
-  const { id, source, target, data: given }: EdgeProps = $props();
+  const { id, source, target, selected, data: given }: EdgeProps = $props();
   const data = $derived(given as CableData | undefined);
   const index = $derived(board.edges.findIndex(edge => edge.id === id));
   const a = $derived(wiring.endPoint(index, 'from'));
@@ -24,9 +24,9 @@
     return `translate(${String(b.x + x * 10)} ${String(b.y + y * 10)}) rotate(${String((Math.atan2(-y, -x) * 180) / Math.PI)})`;
   });
   const name = board.nameOf;
-  /** The middle of the cable, where the mark to unplug it shows while it is pointed at: measured only then. */
+  /** The middle of the cable, where the mark to unplug it shows while it is pointed at or picked: measured only then. */
   const middle = $derived.by(() => {
-    if (!path || board.hovered !== id) return '';
+    if (!path || (board.hovered !== id && !selected) || board.live) return '';
     const probe = document.createElementNS('http://www.w3.org/2000/svg', 'path');
     probe.setAttribute('d', path);
     const at = probe.getPointAtLength(probe.getTotalLength() / 2);
@@ -44,13 +44,26 @@
     onpointerenter={() => (board.hovered = id)}
     onpointerleave={() => (board.hovered = null)}
   >
-    <title>{name(source)} calls local {name(target)}. Click to unplug.</title>
+    <title>{name(source)} calls local {name(target)}. Click to pick it; the × in its middle unplugs it.</title>
     <path class="svelte-flow__edge-interaction hit" d={path} />
     <path class="under" d={path} />
     <path class="wire" d={path} />
     <path class="head" d="M-10,-5 L0,0 L-10,5 L-7.5,0 Z" transform={head} />
     {#if middle}
-      <g class="cut" transform={middle}>
+      <g
+        class="cut nodrag"
+        transform={middle}
+        role="button"
+        tabindex="-1"
+        aria-label="Unplug {name(source)} from {name(target)}"
+        onclick={ev => {
+          ev.stopPropagation();
+          board.cut(source, target);
+        }}
+        onkeydown={ev => {
+          if (ev.key === 'Enter' || ev.key === ' ') board.cut(source, target);
+        }}
+      >
         <circle r="8" />
         <path d="M-3,-3 L3,3 M3,-3 L-3,3" />
       </g>
@@ -79,14 +92,16 @@
     stroke: var(--bad);
     stroke-width: 1.8;
   }
-  :global(.svelte-flow__edge:hover) .cut {
+  :global(.svelte-flow__edge:hover) .cut,
+  :global(.svelte-flow__edge.selected) .cut {
     visibility: visible;
+    cursor: pointer;
   }
-  :global(.svelte-flow__edge:hover) :is(.wire, .head) {
-    stroke: var(--bad);
-  }
-  :global(.svelte-flow__edge:hover) .head {
+  .cut:hover circle {
     fill: var(--bad);
+  }
+  .cut:hover path {
+    stroke: var(--surface);
   }
   /* Dashed until the apps at both ends run. */
   .idle :is(.wire, .head) {

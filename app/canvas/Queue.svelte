@@ -1,13 +1,18 @@
 <script lang="ts">
   import Icon from './Icon.svelte';
+  import TriangleAlert from '@lucide/svelte/icons/triangle-alert';
   import X from '@lucide/svelte/icons/x';
+  import { useViewport } from '@xyflow/svelte';
   import Cog from './Cog.svelte';
   import type { NodeProps } from '@xyflow/svelte';
-  import { board, type QueueNode } from './board.svelte.ts';
+  import { board, FAR_ZOOM, type QueueNode } from './board.svelte.ts';
   import { dialogs } from './dialogs.svelte.ts';
 
   const { id, data, selected }: NodeProps<QueueNode> = $props();
   const env = $derived(board.env.toUpperCase());
+  const viewport = useViewport();
+  // Zoomed out the card is read for its place in the flow; the warning waits for a closer look.
+  const far = $derived(viewport.current.zoom < FAR_ZOOM);
 </script>
 
 <div
@@ -18,7 +23,14 @@
   title={data.about.join('\n')}
 >
   <span class="what">{data.name}</span>
-  <span class="kind">{data.kind}</span>
+  <span class="kind"
+    >{#if data.shares && !far}<span
+        class="warn"
+        role="img"
+        aria-label={data.shares}
+        title={data.about.slice(1).join('\n')}><Icon of={TriangleAlert} size={13} /></span
+      >{/if}{data.kind}</span
+  >
   <button
     class="hide nodrag"
     type="button"
@@ -65,7 +77,6 @@
       />Local
     </label>
   </span>
-  {#if data.shares}<span class="shares">{data.shares}</span>{/if}
 </div>
 
 <style>
@@ -144,10 +155,10 @@
     outline: 2px solid var(--cable);
     outline-offset: 1px;
   }
-  .shares {
-    grid-column: 1 / -1;
+  .warn {
+    display: inline-grid;
+    margin-right: 6px;
     color: var(--warn);
-    font-size: 12px;
-    font-weight: 600;
+    vertical-align: -2px;
   }
 </style>

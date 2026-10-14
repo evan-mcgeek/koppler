@@ -382,9 +382,6 @@
     panOnDrag={tool === 'hand' ? true : [1, 2]}
     selectionOnDrag={tool === 'select'}
     selectionMode={SelectionMode.Partial}
-    onedgeclick={({ edge }) => {
-      if (!board.live) board.cut(edge.source, edge.target);
-    }}
     colorMode={theme.now}
     minZoom={0.2}
     proOptions={{ hideAttribution: true }}
