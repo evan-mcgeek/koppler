@@ -3,7 +3,7 @@
   import { board } from './board.svelte.ts';
   import { dialogs } from './dialogs.svelte.ts';
   import { live } from './live.svelte.ts';
-  import { runs } from './run.svelte.ts';
+  import { stacks as switcher } from './stacks.svelte.ts';
 
   const id = $props.id();
   let picker = $state<HTMLButtonElement>();
@@ -14,7 +14,7 @@
   /** What else can be done with stacks, under the list. */
   const acts = $derived([
     ...(linked
-      ? [{ icon: '↻', label: 'Check for updates from GitHub', count: 0, run: () => void runs.updateStack() }]
+      ? [{ icon: '↻', label: 'Check for updates from GitHub', count: 0, run: () => void switcher.updateStack() }]
       : []),
     ...(linked?.changes.length
       ? [
@@ -23,7 +23,7 @@
             label: 'Changes not shared yet',
             count: linked.changes.length,
             run: () => {
-              runs.shareChanges();
+              switcher.shareChanges();
             },
           },
         ]
@@ -36,7 +36,7 @@
       label: 'Add a stack: new, or from GitHub',
       count: 0,
       run: () => {
-        runs.addStack(() => dialogs.setup?.open());
+        switcher.addStack(() => dialogs.setup?.open());
       },
     },
   ]);
@@ -94,7 +94,7 @@
       title={stack.path}
       onclick={() => {
         list?.hidePopover();
-        runs.useStack(stack);
+        switcher.useStack(stack);
       }}
     >
       <span class="check" aria-hidden="true"></span>
