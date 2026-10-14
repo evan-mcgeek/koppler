@@ -1,4 +1,4 @@
-// The canvas tests: each starts its own canvas server (e2e/canvas.mjs) and drives the page the way a person does.
+// The canvas tests: each starts its own canvas server (e2e/canvas.ts) and drives the page the way a person does.
 import { defineConfig } from '@playwright/test';
 
 export default defineConfig({

@@ -69,7 +69,7 @@ It holds facts about the apps, never secret values.
 Local libraries need nothing in `stack.json`: `koppler sync` matches each app's dependencies (`pubspec.yaml`, `package.json`) with the packages your clones publish, and the card offers a Libraries switch for each. Switched on, `koppler up` points the app at your clone (a `pubspec_overrides.yaml` for Dart, `npm install --no-save` for npm) and Stop reverts it; .NET libraries are not covered yet.
 
 Top-level `presets` are the team boards: `[{ "name": "Mobile App + Mobile API", "version": 1, "nodes": { "<app>": { "run": "cli", "platform"?, "branch"?, "note"? } }, "edges": [{ "from", "to" }] }]`. The canvas lays them out by who calls whom; `koppler sync` checks every app and cable exists. Every board a user builds is kept as their own, saved as they change it; Share copies it as JSON to add here.
-A single preset in its own `.json` file (the JSON that Share copies), a list of them, or a whole `stack.json` can be opened from the canvas's board selector, as a file or as a GitHub link.
+A single preset in its own `.json` file (the JSON that Copy in the board selector copies; Share makes a board a team board of the stack), a list of them, or a whole `stack.json` can be opened from the canvas's board selector, as a file or as a GitHub link.
 
 Every preset carries the `version` of the preset format it was saved in (`VERSION` in `core/presets`, currently 1); `koppler sync` requires it on shared presets.
 Before any preset opens, its version is compared with the one this Koppler reads:
@@ -78,7 +78,7 @@ Before any preset opens, its version is compared with the one this Koppler reads
 
 It is then checked against the stack and your clones: apps the stack does not have or you have not cloned are left out, a run mode or platform the app does not offer falls back to one it does, a cable between apps that do not call each other is dropped, and a branch missing from your clone is pointed out.
 Each change is listed when the preset loads; a preset with nothing left to open is refused and the board stays as it was.
-To change the format: raise `VERSION`, add the `MIGRATIONS` step from the previous version, and cover it in `presets.test.mjs`.
+To change the format: raise `VERSION`, add the `MIGRATIONS` step from the previous version, and cover it in `app/src/core/presets.test.ts`.
 
 Other fields (`config`, `overrides`, `note`) are free-form facts for the agent to read.
 
@@ -122,7 +122,7 @@ Koppler reads it through the user's `gh` login and keeps a copy in `~/.config/ko
 
 A `lambda` app says how to build and trigger it: `"lambda": { "project", "handler", "runtime", "timeout", "routes": ["retry_request"], "secret": { "id": "<the Secrets Manager name the function asks for>", "from": "<the stored secret holding its JSON>" } }`.
 Callers post to `url` plus a route, as they post to API Gateway when deployed.
-A callee whose address lives inside that secret is repointed by writing `{ "set": { "<key>": "http://host.docker.internal:<port>/" } }` to `<state>/lambda-<app id>.json` before the start (the function runs in Docker, where `localhost` is not the Mac); log it as an `env-file` action.
+A callee whose address lives inside that secret cannot be repointed by a command yet: say so to the user, and report it as a Koppler gap (`references/reporting-bugs.md`). Never write a Koppler file to work around it.
 
 When a recipe cannot tell how the app starts (several Go commands, a Python repo with no known framework, plain Maven), `koppler run` says so and asks for `start`.
 The port in the app's `url` wins over the usual one. The recipes live in the app's `core/kinds`; only .NET, Flutter, Node and the web frameworks have been run for real so far.
@@ -156,7 +156,7 @@ Tests, docs, lock files and migration tools are not searched.
 It reads out names and plain addresses only (a host, or an http(s) URL with no credentials or query); every other value stays in the repo.
 Environments come from variable files named after them (`deployment-dev.tfvars`) or, without those, from trying each stack environment and alias as the Terraform workspace.
 What it cannot work out (a domain passed in by the deploy pipeline, a name built from a random suffix) is reported as not found or counted.
-The draft, with a `suggestions` block shaped like `stack.json`, goes to `<state>/stack.deployed.json`. Review it before copying anything across.
+The draft, with a `suggestions` block shaped like `stack.json`, goes to `<state>/stack.deployed.json`. Review it, then keep what holds with `koppler discover --apply` or `koppler stack set`.
 
 ## Sign-ins that are not AWS
 

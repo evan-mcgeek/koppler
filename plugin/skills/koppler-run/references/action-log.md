@@ -1,12 +1,12 @@
 # Action log and stop / revert
 
 Stop and revert (canvas button, prompt tag `koppler-stop`, or asked in chat) means: **stop every process the agent started, and revert every temporary code change** (including ones the log does not know about).
-The agent keeps `<state>/actions.json` so it knows exactly what it started and changed.
+The action log lists exactly what was started and changed. It is written through `koppler actions`, never by hand.
 
 ## Action log
 
-In `auto` mode, append one object per action to `<state>/actions.json` (JSON array, in order) just before you make the change, so a change interrupted part-way still has its entry. Never store secret values.
-If the file cannot be read as a JSON list, stop and tell the user: never start it afresh, since every entry in it is a change Stop must undo. Koppler's own commands refuse the same way and keep a copy (`actions.json.damaged-<time>`).
+In `auto` mode, log one entry per change with `koppler actions add '<json>'` (or `add --file <json file>` for a list) just before you make the change, so a change interrupted part-way still has its entry. The command checks the entry, wants every `file` as a full path, and refuses a secret value. `koppler actions` lists the log (`--json` for the entries).
+If a command says the log is damaged, stop and tell the user: never start it afresh, since every entry in it is a change Stop must undo. Koppler's own commands refuse the same way and keep a copy (`actions.json.damaged-<time>`).
 Give every entry its `app`, so that when a later run drops one app from the board, only that app's entries are stopped and reverted and removed from the log; a full Stop and revert still empties it.
 The log says how to undo things; which runs and Stops happened, and how they ended, is the run history (`koppler history`, `<state>/history.jsonl`, written by the canvas and `koppler history done`).
 
@@ -22,8 +22,6 @@ The log says how to undo things; which runs and Stops happened, and how they end
 | `secret` | `app`, `env` (name only) |
 
 `koppler history done` copies the code changes in this log (`edit`, `profile`, `env-file`, `checkout`) into the run's history entry, with secrets masked, so the canvas History shows them as diffs even after a revert. Log each change before calling it.
-
-Also write `<state>/state.json` after every run from the canvas, so a fresh open restores the layout: `data.layout`, as JSON
 
 ## Koppler does it
 
@@ -47,6 +45,6 @@ Leave running: anything the user started (IDE sessions, their own terminals, tun
 5. **Checkouts:** `koppler switch <app> --back` for each: it switches back and brings set-aside changes back. If it reports new uncommitted changes, tell the user and leave that app on its branch.
 6. **Secrets:** leave stored values; mention `bin/secret-list` so the user can decide.
 
-Finish by checking `git -C <repo> status --porcelain` for each stack repo shows no change the skill made, empty the log (`[]`), and report one line per stopped process and reverted change, plus anything left as is and why.
+Finish by checking `git -C <repo> status --porcelain` for each stack repo shows no change the skill made, empty the log with `koppler actions clear` (`--app <app>` when only one app was dropped), and report one line per stopped process and reverted change, plus anything left as is and why.
 
 > This command modifies state.

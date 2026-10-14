@@ -387,7 +387,7 @@ class Runs {
       confirm: () => {
         const confirmed = Object.fromEntries(VERBS.map(([verb]) => [verb, steps[verb]]));
         const text =
-          'Set up and run this stack using the koppler-run skill and temp/registry.js.\n' +
+          'Set up and run this stack using the koppler-run skill.\n' +
           this.#describe(graph) +
           '\nPLAN the user confirmed on the canvas (do exactly this; check it first with koppler plan):\n' +
           describe(steps, { name })

@@ -6,7 +6,7 @@
 npm install -g koppler
 ```
 
-Koppler needs macOS, git and Node 22 or newer.
+Koppler needs macOS or Linux, git and Node 22 or newer.
 Until it is on npm, install it from a clone: `npm install -g ./koppler/app`.
 The [agent add-on](../README.md#the-agent-add-on) is optional.
 

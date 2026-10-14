@@ -8,7 +8,7 @@ Every change below is proposed with the exact diff or command and applied only a
 ## Remembered changes
 
 Before working out any temporary edit, run `koppler recipes --apply <every local app>`: it applies the remembered changes (`koppler recipes`) that match the latest Send's environment and cables, logs them for Stop, and says which no longer fit because the code moved.
-For an edit you still have to make, log it as usual; once the app runs with it, ask the user "Remember this for next time?" and on yes run `koppler recipes --remember <app> --why "<plain reason>" --when <always|calls:<app>|env:<env>>`. Add `--any-os` only when nothing in the edit depends on the operating system. It is shared through stack.json unless it names a path, alias or user only this machine has; then it stays private.
+For an edit you still have to make, log it first with `koppler actions add`; once the app runs with it, ask the user "Remember this for next time?" and on yes run `koppler recipes --remember <app> --why "<plain reason>" --when <always|calls:<app>|env:<env>>`. Add `--any-os` only when nothing in the edit depends on the operating system. It is shared through stack.json unless it names a path, alias or user only this machine has; then it stays private.
 A recipe that moved: make the edit again by hand, then offer to remember the new one.
 
 ## Branches

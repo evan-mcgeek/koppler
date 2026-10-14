@@ -1,6 +1,6 @@
 # A stack from a description
 
-The user describes a flow in words ("push notifications from the wallet to the app") or attaches a diagram (a drawing, a screenshot, an Excalidraw export).
+The user describes a flow in words ("order updates from the Orders API to the app") or attaches a diagram (a drawing, a screenshot, an Excalidraw export).
 You turn it into a proposed stack and a wired board. The description is a lead, not a fact: every fact comes from the repos.
 
 ## 1. Read the description
@@ -14,7 +14,7 @@ Show the list back to the user in one short message and fix what they correct be
 
 ## 2. Find each one
 
-`koppler discover --find "<name>" "<name>" ...` searches the stack, then the clones on this Mac, then GitHub in the user's own organisations (through their `gh` login).
+`koppler discover --find "<name>,<name>"` searches the stack, then the clones on this Mac, then GitHub in the user's own organisations (through their `gh` login).
 - One match: use it.
 - Several or none: ask which, showing the candidates; never pick one yourself. An archived repo is rarely the one meant; say so.
 - Not cloned: give the clone command and ask before cloning anything.
@@ -34,7 +34,7 @@ Show the proposal before writing anything:
 - a board: the apps and the cables of the flow, as a shared or local board;
 - open questions, one line each.
 
-Make them only after the user's yes, with `koppler stack set` (never by writing `stack.json`), and the board as a preset.
+Make them only after the user's yes, with `koppler stack set` (never by writing `stack.json`); the board is built on the canvas or with `koppler board edit`, and the user shares it with the team with Share.
 A shared stack's change is for the user to commit (or `koppler link pr` for a linked one).
 
 Queues, topics and event buses go under `queues`, with `publishes` / `reads` on each app (`references/stack.md`); confirm both ends from the repos and the Terraform, as for a call.
