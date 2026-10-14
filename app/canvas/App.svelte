@@ -1,4 +1,5 @@
 <script lang="ts">
+  import CommandDialog from './CommandDialog.svelte';
   import Icon from './Icon.svelte';
   import PanelLeft from '@lucide/svelte/icons/panel-left';
   import Square from '@lucide/svelte/icons/square';
@@ -413,6 +414,7 @@
 <SettingsPanel bind:this={dialogs.settings} />
 <Findings bind:this={dialogs.findings} />
 <Checklist bind:this={dialogs.checklist} />
+<CommandDialog bind:this={dialogs.command} />
 <dialog bind:this={noting} class="noting" aria-labelledby="noting-title" onclose={() => (note = '')}>
   <form
     method="dialog"

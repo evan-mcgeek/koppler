@@ -123,6 +123,44 @@ const EnvOverlay = z.looseObject(
   },
   { error: 'an object' },
 );
+/** The icons a command's button can have on its card. */
+export const COMMAND_ICONS = [
+  'play',
+  'database',
+  'sprout',
+  'refresh',
+  'trash',
+  'terminal',
+  'upload',
+  'download',
+] as const;
+const AppCommand = z.looseObject(
+  {
+    label: required.describe('Its button: Seed, Migrate'),
+    run: z.string({ error: 'a shell command' }).min(1).describe('The shell command, run in its repo with its secrets'),
+    icon: z.enum(COMMAND_ICONS, { error: `one of ${COMMAND_ICONS.join(', ')}` }).optional(),
+    confirm: z.string().optional().describe('A question to answer yes to first, for a command that changes data'),
+    args: z
+      .array(
+        z.looseObject({
+          name: z.string().regex(/^[A-Za-z][A-Za-z0-9_]{0,31}$/, { error: 'a name such as COUNT' }),
+          label: z.string().optional(),
+          type: z.enum(['text', 'number', 'choice'], { error: 'text, number or choice' }).optional(),
+          choices: z.array(z.string()).optional(),
+          required: z.boolean().optional(),
+        }),
+        { error: 'a list' },
+      )
+      .optional()
+      .describe('What it asks for; each value reaches the command as a setting of its name'),
+    show: z
+      .enum(['canvas', 'cli', 'both'], { error: 'canvas, cli or both' })
+      .optional()
+      .describe('Where it is offered: a button on the card, koppler do, or both (the default)'),
+    timeout: z.number().positive().optional().describe('Seconds it may take, 1800 by default'),
+  },
+  { error: 'an object with a label and a command to run' },
+);
 const App = z.looseObject(
   {
     name: required.describe('Its name on the canvas'),
@@ -168,6 +206,12 @@ const App = z.looseObject(
       .describe(
         'It runs to completion, like a migration: the exit code it must end with (0) and the seconds it may take',
       ),
+    commands: z
+      .record(z.string().regex(/^[a-z0-9][a-z0-9-]{0,31}$/, { error: 'an id such as seed' }), AppCommand, {
+        error: 'an object',
+      })
+      .optional()
+      .describe('Buttons such as Seed or Migrate on its card, also run with koppler do'),
     after: z
       .array(z.string(), { error: 'a list of app ids' })
       .optional()

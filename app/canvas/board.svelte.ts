@@ -324,6 +324,10 @@ class Board {
   #onBoard = $derived(new Set(this.cards.map(node => node.id)));
   /** The apps on the board that are still on their queues. */
   #onQueues = $derived(new Set(this.cards.filter(node => node.data.showQueues).map(node => node.id)));
+  /** The commands an app's stack entry offers on its card, such as Seed or Migrate. */
+  commandsOf(id: string) {
+    return Object.entries(this.#registry?.apps[id]?.commands ?? {}).filter(([, one]) => (one.show ?? 'both') !== 'cli');
+  }
   #outside(id: string): boolean {
     return !!this.#registry?.apps[id]?.outside;
   }

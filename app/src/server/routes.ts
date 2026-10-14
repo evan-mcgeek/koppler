@@ -174,6 +174,22 @@ export const ROUTES: Record<string, Route> = {
     const done = setLock(source, body['path'], body['on'] === true);
     return done.error === undefined ? { status: 200, body: { ok: true } } : { status: 400, body: done };
   },
+  // One of an app's commands from the stack: `koppler do` runs it, refuses what is not allowed, and says how it ended.
+  '/app-command': body => {
+    const { app, command, args } = body;
+    const given = args && typeof args === 'object' && !Array.isArray(args) ? Object.entries(args) : [];
+    const plain = (value: unknown) => typeof value === 'string' && /^[a-z0-9][a-z0-9-]{0,63}$/.test(value);
+    if (!plain(app) || !plain(command)) return { status: 400, body: { error: 'Which command of which app?' } };
+    if (given.some(([name, value]) => !/^[A-Za-z][A-Za-z0-9_]{0,31}$/.test(name) || typeof value !== 'string'))
+      return { status: 400, body: { error: 'Each value is text, under its name.' } };
+    const values = given.flatMap(([name, value]) => ['--arg', `${name}=${String(value)}`]);
+    spawn(
+      process.execPath,
+      [path.join(CODE, 'koppler.mjs'), 'do', String(app), String(command), '--from-canvas', '--yes', ...values],
+      { detached: true, stdio: 'ignore' },
+    ).unref();
+    return { status: 200, body: { started: true } };
+  },
   '/apps-outside': body => {
     const result = addOutside(body);
     forgetStacks();

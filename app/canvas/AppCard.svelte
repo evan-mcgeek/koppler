@@ -14,6 +14,8 @@
   import type { Side } from '../src/core/arrange.ts';
   import { board, FAR_ZOOM, type CardNode } from './board.svelte.ts';
   import { wiring } from './wiring.svelte.ts';
+  import { COMMAND_ICON, runCommand } from './commands.ts';
+  import { toasts } from './toast.svelte.ts';
   import { live, progress, STATE_NAMES } from './live.svelte.ts';
   import { logs } from './logs.svelte.ts';
   import { runs } from './run.svelte.ts';
@@ -170,6 +172,23 @@
         <Icon of={Logs} size={15} />
       </button>
     {/if}
+    {#each board.commandsOf(id) as [key, command] (key)}
+      {@const ask = { app: id, appName: data.name, key, command }}
+      <button
+        type="button"
+        aria-label="{command.label} on {data.name}"
+        title={command.confirm ? `${command.label}: ${command.confirm}` : command.label}
+        onclick={() => {
+          if (command.confirm || command.args?.length) dialogs.command?.open(ask);
+          else
+            void runCommand(ask).then(error => {
+              if (error) toasts.show(error, 'warning');
+            });
+        }}
+      >
+        <Icon of={COMMAND_ICON[command.icon ?? 'terminal']} size={15} />
+      </button>
+    {/each}
     <button
       type="button"
       aria-label="Settings for {data.name}"
