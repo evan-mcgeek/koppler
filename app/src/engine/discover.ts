@@ -6,9 +6,11 @@ import { fail } from '../failure.ts';
 import { of as kindOf } from '../core/kinds.ts';
 import { validateStack } from '../core/stack.ts';
 import { readClones, readStack } from '../data.ts';
-import { draftApp, ENV_TOKEN, readRepo, stackEnv } from './deployed.ts';
+import { ENV_TOKEN, stackEnv } from '../core/terraform.ts';
+import { draftApp, readRepo } from './deployed.ts';
 import { localPorts } from './investigate.ts';
-import { grepClone, hostsByApp, missingCalls, saveStack, urlsInClone } from './sync.ts';
+import { grepClone, hostsByApp, missingCalls, urlsInClone } from './calls.ts';
+import { saveStack } from './stack-file.ts';
 
 interface AppFile {
   name?: string;

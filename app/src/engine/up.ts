@@ -23,7 +23,8 @@ import { alive, listener, readRecord, sh, sleep, stopOne } from './processes.ts'
 import * as localQueue from './queues.ts';
 import { matches, prepare, recipesFor } from './recipes.ts';
 import { run } from './run.ts';
-import { appendRun, appliedCommand, live, planFor, runningPart, runRecord, runs, type Run } from './runs.ts';
+import { appliedCommand, planFor, runningPart } from './runs.ts';
+import { appendRun, live, runRecord, runs, type Run } from './history.ts';
 import { wireInfo } from './wire.ts';
 import { writeJson } from '../json-files.ts';
 import { appOn } from '../core/stack.ts';

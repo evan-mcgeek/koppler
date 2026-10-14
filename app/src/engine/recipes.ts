@@ -15,8 +15,8 @@ import { readClones, readStack } from '../data.ts';
 import { configDir, tempDir } from '../paths.ts';
 import { readActions, updateActions, type Action, type EditAction } from './actions.ts';
 import { APPROVE, approved } from './checks.ts';
-import { runs } from './runs.ts';
-import { saveStack } from './sync.ts';
+import { runs } from './history.ts';
+import { saveStack } from './stack-file.ts';
 import { readJson, writeJson } from '../json-files.ts';
 
 /** When a remembered change applies: always, when the app calls another local app, or on one environment. */

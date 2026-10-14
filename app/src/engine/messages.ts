@@ -7,7 +7,7 @@ import path from 'node:path';
 import { flagValue } from '../cli/output.ts';
 import { fail } from '../failure.ts';
 import { tempDir } from '../paths.ts';
-import { runs } from './runs.ts';
+import { runs } from './history.ts';
 import { APP_ID, RUN_ID } from '../ids.ts';
 
 interface Section {

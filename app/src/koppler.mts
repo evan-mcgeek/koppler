@@ -28,21 +28,11 @@ import { recipesCommand } from './engine/recipes.ts';
 import { findCommand } from './engine/research.ts';
 import { run } from './engine/run.ts';
 import { appliedCommand, historyCommand, planCommand, runningNames, sessionCommand } from './engine/runs.ts';
-import {
-  addApps,
-  addOutside,
-  editStack,
-  stackSource,
-  readStackAt,
-  candidateRepos,
-  createStack,
-  init as initStack,
-  removeApp,
-  stacksCommand,
-  sync,
-  updateClones,
-  useCommand,
-} from './engine/sync.ts';
+import { updateClones } from './engine/clones.ts';
+import { candidateRepos } from './engine/repos.ts';
+import { addApps, addOutside, editStack, stackSource, readStackAt, removeApp } from './engine/stack-file.ts';
+import { createStack } from './engine/stacks.ts';
+import { init as initStack, stacksCommand, sync, useCommand } from './engine/sync.ts';
 import { up } from './engine/up.ts';
 import { wire } from './engine/wire.ts';
 import { APP, CODE, configDir, tempDir } from './paths.ts';

@@ -10,7 +10,7 @@ import { defaultPort, detect, of as kindOf, type RepoView } from '../core/kinds.
 import { describePlan, planTunnels } from '../core/ports.ts';
 import { readClones, readStack } from '../data.ts';
 import { tempDir } from '../paths.ts';
-import { hostsByApp } from './sync.ts';
+import { hostsByApp } from './calls.ts';
 import { writeJson } from '../json-files.ts';
 
 /** A port an app listens on locally, and where in its clone that is said. */

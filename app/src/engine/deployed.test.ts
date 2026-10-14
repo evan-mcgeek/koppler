@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
-import { addressOf, assignments, blocks, draftApp, queueUses, readModule, resolve, stackEnv } from './deployed.ts';
+import { addressOf, assignments, blocks, queueUses, readModule, resolve, stackEnv } from '../core/terraform.ts';
+import { draftApp } from './deployed.ts';
 import { test } from 'vitest';
 
 test('Terraform is read into addresses, settings, secret names, calls and queues', async () => {
@@ -237,7 +238,7 @@ resource "aws_lambda_function" "f" {
 
   // A SAM app's deploy domains per samconfig.toml environment.
   {
-    const { samDomains } = await import('./deployed.ts');
+    const { samDomains } = await import('../core/terraform.ts');
     const toml =
       'version = 0.1\n[qa]\n[qa.deploy.parameters]\nparameter_overrides = "Environment=\\"QA\\" HostedZoneName=\\"cdr-qa.example.com\\" CatalogEndpoint=\\"https://other.example.com\\""\n[prod.deploy.parameters]\nparameter_overrides = "DomainName=\\"cdr.example.com\\""\n';
     assert.deepEqual(samDomains(toml), [
@@ -263,7 +264,7 @@ resource "aws_lambda_function" "f" {
 
   // samconfig.toml as people write it: a commented-out line, a list, values without quotes, and hosts that are not the app's own.
   {
-    const { samDomains } = await import('./deployed.ts');
+    const { samDomains } = await import('../core/terraform.ts');
     const hosts = (toml: any) => samDomains(toml).map(x => `${x.token}: ${x.domains.map(d => d.host).join(' ')}`);
     assert.deepEqual(
       hosts(

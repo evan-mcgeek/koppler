@@ -6,7 +6,7 @@ import path from 'node:path';
 import { readClones, readData, readStack } from '../data.ts';
 import { alive, listener, NAME, readRecord, records, sh, sleep, stopOne, uptime } from '../engine/processes.ts';
 import { run } from '../engine/run.ts';
-import { appendNote } from '../engine/runs.ts';
+import { appendNote } from '../engine/history.ts';
 import { CODE, logsDir, tempDir } from '../paths.ts';
 import { redact, scrub } from '../scrub.ts';
 import { confirm, flagValue, positional, table } from './output.ts';
@@ -130,7 +130,7 @@ const unnamed = (line: string) => {
  * latest run log and each named log, all scrubbed of secrets and of everything that names the user or their stack.
  */
 async function debugReport(names: string[]): Promise<void> {
-  const { stacksHere } = await import('../engine/sync.ts');
+  const { stacksHere } = await import('../engine/stacks.ts');
   const stacks = stacksHere().map(stack => read(path.join(stack.dir, 'stack.json')));
   let commit: string | null = null;
   try {
