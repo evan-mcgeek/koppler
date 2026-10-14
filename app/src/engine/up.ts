@@ -562,29 +562,37 @@ async function carryOut(stack: Registry, args: string[]): Promise<void> {
     step: progressOf(board, env),
   };
   announce(up);
-  if (board) {
-    await stopFirst(up, board);
-    switchBranches(up);
-    linkLibraries(up);
-    applyRemembered(up);
-    wireCables(up);
-  }
-  await openTunnels(up);
-  if (board?.queues) await startQueues(up, board.queues);
-  await startApps(up);
-  // What runs now is this board, even while something is left for the agent: the canvas shows it running straight away.
-  if (board) {
+  // What runs now is this board's, as far as it got: written when the run ends, and also when it stops on an error
+  // half-way, so the next plan and Stop compare with what really runs, not with the board before.
+  const live = () => {
+    if (!board) return;
     const { nodes, edges } = runningPart(board);
-    const now = {
+    writeJson(path.join(tempDir(), 'live.json'), {
       id: board.id,
       at: new Date().toISOString(),
       env,
       nodes,
       edges,
       ...(board.queues && { queues: board.queues }),
-    };
-    writeJson(path.join(tempDir(), 'live.json'), now);
+    });
+  };
+  try {
+    if (board) {
+      await stopFirst(up, board);
+      switchBranches(up);
+      linkLibraries(up);
+      applyRemembered(up);
+      wireCables(up);
+    }
+    await openTunnels(up);
+    if (board?.queues) await startQueues(up, board.queues);
+    await startApps(up);
+  } catch (error) {
+    live();
+    throw error;
   }
+  // Even while something is left for the agent: the canvas shows it running straight away.
+  live();
   if (up.left.length) {
     console.log(`\nLeft for the agent:\n${up.left.map(line => `  - ${line}`).join('\n')}`);
     throw new Failure('', 3);

@@ -173,6 +173,33 @@ test('koppler up: a sign-in the stack declares itself (not AWS) is checked the s
   koppler('stop', '--all', '--yes');
 });
 
+test('koppler up --run that fails half-way leaves the live state as it really is: what started runs, the board before is gone.', async () => {
+  const { spawnSync } = await import('node:child_process');
+  const fs = await import('node:fs'), os = await import('node:os'), path = await import('node:path'), { fileURLToPath } = await import('node:url');
+  const [portA, portB] = await freePorts(2);
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-uphalf-'));
+  const env = { ...process.env, KOPPLER_STATE: dir, KOPPLER_TEMP: dir, KOPPLER_CONFIG_DIR: dir };
+  const entry = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'dist', 'koppler.mjs');
+  cleanups.push(() => spawnSync('node', [entry, 'stop', '--all', '--yes'], { env }));
+  const koppler = (...args) => { const r = spawnSync('node', [entry, ...args], { encoding: 'utf8', env }); return { out: (r.stdout + r.stderr).trim(), code: r.status }; };
+  // B, the callee, starts; A crashes at start.
+  const apps = {
+    a: { name: 'A', kind: 'other', start: 'echo boom; exit 1', url: `http://localhost:${portA}`, consumes: { b: { how: 'env', env: 'B_URL' } } },
+    b: { name: 'B', kind: 'other', start: `exec python3 -m http.server ${portB} --bind 127.0.0.1`, url: `http://localhost:${portB}` },
+  };
+  { const stack = { envs: ['qa'], apps }; fs.writeFileSync(path.join(dir, 'registry.json'), JSON.stringify(stack)); allowStack(dir, stack); }
+  fs.writeFileSync(path.join(dir, 'local.json'), JSON.stringify({ apps: { a: { path: dir }, b: { path: dir } } }));
+  // What the board before left as live: nothing of it runs any more.
+  fs.writeFileSync(path.join(dir, 'live.json'), JSON.stringify({ id: 'run000001', env: 'qa', nodes: { old: { run: 'cli' } }, edges: [] }));
+  fs.writeFileSync(path.join(dir, 'history.jsonl'), JSON.stringify({ id: 'run000020', at: 't', kind: 'run', env: 'qa', nodes: { a: { run: 'cli' }, b: { run: 'cli' } }, edges: [{ from: 'a', to: 'b' }], plan: { starts: [{ id: 'a' }, { id: 'b' }], restarts: [], stops: [], keeps: [] } }) + '\n');
+  const r = koppler('up', '--run', 'run000020');
+  assert.notEqual(r.code, 0, r.out);
+  const live = JSON.parse(fs.readFileSync(path.join(dir, 'live.json'), 'utf8'));
+  assert.equal(live.id, 'run000020');
+  assert.deepEqual(Object.keys(live.nodes), ['b']);
+  koppler('stop', '--all', '--yes');
+});
+
 test('koppler up --run: a confirmed Send carried out by Koppler itself; a cable\'s address reaches its caller at start, and the run is done.', async () => {
   const { spawnSync } = await import('node:child_process');
   const fs = await import('node:fs'), os = await import('node:os'), path = await import('node:path'), { fileURLToPath } = await import('node:url');
