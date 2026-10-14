@@ -399,6 +399,12 @@ test('A board is changed from the terminal: kept at once, queued for an open can
   assert.deepEqual(work.edges, [{ from: 'web', to: 'orders' }]);
   assert.equal(read('board-edits').edits.at(-1).create, true);
   assert.equal(koppler('board', 'new', 'Empty one').code, 0);
+  // Arranged: the saved places go, so the canvas lays the board out when it opens it, or at once when it is on screen.
+  const tidy = koppler('board', 'edit', 'Shop', '--add', 'pay', '--arrange');
+  assert.equal(tidy.code, 0, tidy.out);
+  assert.match(tidy.out, /CHANGED Shop: added Pay; arranged/);
+  assert.equal(read('state').presets.find(one => one.name === 'Shop').layout, undefined);
+  assert.equal(read('board-edits').edits.at(-1).edit.arrange, true);
   assert.deepEqual(read('state').presets.find(one => one.name === 'Empty one').nodes, {});
   fs.rmSync(dir, { recursive: true });
 });
