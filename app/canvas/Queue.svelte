@@ -121,42 +121,15 @@
     grid-column: 1 / -1;
     justify-self: start;
     display: inline-flex;
-    gap: 2px;
     margin-top: 4px;
-    padding: 2px;
-    border: 1px solid var(--line);
-    border-radius: 8px;
-    background: color-mix(in oklab, var(--ink) 5%, transparent);
   }
   .seg label {
-    position: relative;
     padding: 2px 10px;
-    border-radius: 6px;
-    color: var(--muted);
-    font-weight: 600;
     font-size: 12px;
-    cursor: pointer;
-  }
-  .seg input {
-    position: absolute;
-    inset: 0;
-    margin: 0;
-    opacity: 0;
-    cursor: pointer;
-  }
-  .seg label:has(input:checked) {
-    background: var(--surface);
-    color: var(--ink);
-    box-shadow: 0 1px 2px rgb(0 0 0 / 0.12);
   }
   .local .seg label:has(input:checked) {
     background: var(--msg);
     color: var(--on-accent);
-  }
-  .seg label[aria-disabled='true'],
-  .seg label[aria-disabled='true'] input {
-    opacity: 0.45;
-    cursor: not-allowed;
   }
   .seg label[aria-disabled='true'] input {
     opacity: 0;

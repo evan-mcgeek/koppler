@@ -32,7 +32,7 @@
   let after = $state(false);
   let busy = $state(false);
   const kept = new SvelteSet<string>();
-  const name = (id = '') => board.apps.find(app => app.id === id)?.name ?? id;
+  const name = (id = '') => board.nameOf(id);
   const usable = (one: Finding) => !one.needs || kept.has(one.needs);
   const count = $derived(findings.filter(one => kept.has(one.id) && usable(one)).length);
 

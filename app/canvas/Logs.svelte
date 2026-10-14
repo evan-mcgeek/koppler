@@ -13,10 +13,18 @@
     koppler: 'KOPPLER',
     start: 'START',
   };
-  const name = (id: string) => board.apps.find(app => app.id === id)?.name ?? id;
+  const name = board.nameOf;
   const active = $derived(logs.active);
   const text = $derived(active ? logs.text(active) : '');
-  const rows = $derived(logs.raw ? [] : parseLog(text));
+  // Keyed by what a row says, so a row keeps its place (and an open list of warnings stays open) as the log scrolls on.
+  const rows = $derived.by(() => {
+    const seen: Record<string, number> = {};
+    return (logs.raw ? [] : parseLog(text)).map(row => {
+      const said = `${row.time} ${row.text}`;
+      const count = (seen[said] = (seen[said] ?? 0) + 1);
+      return { ...row, key: `${said}#${String(count)}` };
+    });
+  });
   let body: HTMLElement | undefined = $state();
   let pane: HTMLElement | undefined = $state();
   // The pane's height as a share of the room it has, remembered; none until it is first changed.
@@ -165,7 +173,7 @@
       {:else if logs.raw}
         {text}
       {:else}
-        {#each rows as row, at (at)}
+        {#each rows as row (row.key)}
           <div class="row" data-level={row.level}>
             <span class="t">{row.time}</span><span class="l">{LABEL[row.level] ?? ''}</span>
             {#if row.items}

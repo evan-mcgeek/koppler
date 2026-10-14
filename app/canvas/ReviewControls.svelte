@@ -5,7 +5,7 @@
   import { runs } from './run.svelte.ts';
 
   const { id }: { id: string } = $props();
-  const app = $derived(board.apps.find(one => one.id === id));
+  const app = $derived(board.app(id));
   const data = $derived(board.nodes.find(node => node.id === id)?.data);
   // The apps it could call, and those that could call it, when it is cabled to none of them.
   const calls = $derived(board.uncabled(id) ? board.cablesOf(id).can : []);

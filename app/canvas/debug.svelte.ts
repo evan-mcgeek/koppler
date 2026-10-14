@@ -2,6 +2,7 @@
 // board, sent to the canvas server in small batches, for tracing a problem later. Typed text is never kept.
 import { board } from './board.svelte.ts';
 import { live } from './live.svelte.ts';
+import { send } from './data.ts';
 
 interface Entry {
   at: string;
@@ -10,14 +11,7 @@ interface Entry {
   detail?: string;
   board: object;
 }
-const token = () => encodeURIComponent(location.pathname.split('/')[2] ?? '');
-const post = (route: string, body: object) =>
-  fetch(`/${route}?token=${token()}`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(body),
-    keepalive: true,
-  }).catch(() => undefined);
+const post = (route: string, body: object) => send(route, body, true);
 /** An element as it reads on screen: what it is, its label, and the card it is on. */
 const describe = (el: Element): string => {
   // Its text is every cable's and card's: a click there would read like a click on the first cable.

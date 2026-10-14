@@ -1,14 +1,9 @@
 // Messages from the agent: questions with choices, results and failures. Answers go back to the agent.
 import { live, type Answered, type Message } from './live.svelte.ts';
 import { toasts } from './toast.svelte.ts';
+import { send } from './data.ts';
 
 export type { Message };
-const send = (route: string, body: object) =>
-  fetch(`/${route}?token=${encodeURIComponent(location.pathname.split('/')[2] ?? '')}`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(body),
-  }).catch(() => null);
 
 class Inbox {
   open = $state(false);
@@ -21,16 +16,16 @@ class Inbox {
   #refused = '';
 
   /** Newest first. */
-  get messages(): Message[] {
-    const all = [...(live.status?.messages ?? [])].reverse();
-    return all
+  readonly messages: Message[] = $derived(
+    [...(live.status?.messages ?? [])]
+      .reverse()
       .map((one): Message => ({ ...one, answered: this.#answered[one.id] ?? one.answered ?? null }))
-      .filter(one => !this.#cleared || (one.kind === 'question' && !one.answered));
-  }
+      .filter(one => !this.#cleared || (one.kind === 'question' && !one.answered)),
+  );
   /** The question still waiting for an answer, if any. */
-  get question(): Message | undefined {
-    return this.messages.find(one => one.kind === 'question' && one.choices?.length && !one.answered);
-  }
+  readonly question: Message | undefined = $derived(
+    this.messages.find(one => one.kind === 'question' && one.choices?.length && !one.answered),
+  );
 
   /** A new question opens the panel by itself; anything else new is announced. Called on each status. */
   follow(): void {

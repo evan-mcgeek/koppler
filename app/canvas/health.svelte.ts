@@ -15,7 +15,7 @@ export interface FlowJob {
   to?: string;
   payload: Payload;
 }
-const name = (id: string) => board.apps.find(app => app.id === id)?.name ?? id;
+const name = board.nameOf;
 const several = (count: number, one: string, many: string) => `${String(count)} ${count === 1 ? one : many}`;
 const label = (job: FlowJob) => (job.to ? `${job.from} to ${job.to}` : job.from);
 const tunnelKey = (tunnel: { host: string; original: number }) => `tunnel:${tunnel.host}:${String(tunnel.original)}`;
@@ -26,15 +26,13 @@ class Health {
   asked = $state(false);
 
   /** The apps of this board that are part of what runs. */
-  get sent(): string[] {
-    return board.nodes.map(node => node.id).filter(id => live.sent(id));
-  }
+  readonly sent: string[] = $derived(board.nodes.map(node => node.id).filter(id => live.sent(id)));
   /** Its process is up but it does not answer yet. */
   starting(id: string): boolean {
     return live.sent(id) && !!live.status?.running?.includes(id) && live.up(id) === false;
   }
   /** What is off on the board without testing anything: apps down or failed, steps that wait, closed tunnels, cables that failed their test. */
-  get items(): { level: 'bad' | 'warn'; id: string; down?: boolean; text: string }[] {
+  readonly items: { level: 'bad' | 'warn'; id: string; down?: boolean; text: string }[] = $derived.by(() => {
     const ids = this.sent;
     const items: Health['items'] = [];
     for (const id of ids) {
@@ -68,13 +66,13 @@ class Health {
       });
     }
     return items;
-  }
+  });
 
   /** Every connection on the board: each app, each cable, each database or cache tunnel. */
   jobs(): FlowJob[] {
     return [
       ...board.nodes
-        .filter(({ id }) => board.apps.find(app => app.id === id)?.serves)
+        .filter(({ id }) => board.app(id)?.serves)
         .map(({ id }): FlowJob => ({ kind: 'app', key: `node:${id}`, id, from: name(id), payload: { node: id } })),
       ...board.edges.map(({ id, source, target }): FlowJob => ({
         kind: 'cable',
@@ -150,7 +148,7 @@ class Health {
   }
 
   /** The one light: its state, what it says, and what resting on it adds. */
-  get chip(): { state: 'bad' | 'busy' | 'warn' | 'idle' | 'ok'; label: string; title: string } {
+  readonly chip: { state: 'bad' | 'busy' | 'warn' | 'idle' | 'ok'; label: string; title: string } = $derived.by(() => {
     const ids = board.nodes.map(node => node.id);
     const run = live.status?.live;
     const runEnv = run?.env && Object.keys(run.nodes ?? {}).length ? run.env : null;
@@ -214,6 +212,6 @@ class Health {
       };
     if (waiting) return { state: 'warn', label: `${String(waiting)} waiting on you`, title: check };
     return { state: 'ok', label: 'All running', title: check };
-  }
+  });
 }
 export const health = new Health();

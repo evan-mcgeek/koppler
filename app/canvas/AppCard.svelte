@@ -49,7 +49,7 @@
   $effect(() => {
     if (!brief && width) fullWidth = width;
   });
-  const app = $derived(board.apps.find(one => one.id === id));
+  const app = $derived(board.app(id));
   const current = $derived(app?.current || 'current branch');
   const uncommitted = $derived(`${String(app?.dirty ?? 0)} uncommitted ${app?.dirty === 1 ? 'change' : 'changes'}`);
   const starts = $derived(!!app?.runIn.some(([value]) => value === 'ide'));
@@ -311,7 +311,7 @@
             <div class="field">
               Tunnels
               <label
-                class="switch"
+                class="toggle"
                 title={data.hideTunnels
                   ? 'Off: only the API runs; calls through its tunnels fail.'
                   : 'On: Koppler opens its tunnels. Turn off when you only need the API.'}
@@ -332,7 +332,7 @@
             <div class="field">
               Queues
               <label
-                class="switch"
+                class="toggle"
                 title={noQueues
                   ? 'Off: it is taken off its queues and keeps the deployed ones. A queue another app uses stays on the board for that app.'
                   : 'On: its queues show on the board, where each can be switched to a local copy.'}
@@ -366,7 +366,7 @@
           {#each app.libraries as library (library.name)}
             {@const on = local.includes(library.name)}
             <label
-              class="switch"
+              class="toggle"
               title={on
                 ? `On: ${data.name} uses your local copy in ${library.path.replace(/^\/Users\/[^/]+/, '~')}`
                 : `Off: ${data.name} uses the published ${library.name}`}
@@ -666,102 +666,20 @@
     font: 12px var(--mono);
   }
   .seg {
-    display: flex;
-    gap: 2px;
     height: 30px;
-    padding: 2px;
-    border: 1px solid var(--line);
-    border-radius: 8px;
-    background: color-mix(in oklab, var(--ink) 5%, transparent);
   }
   .seg label {
-    position: relative;
     flex: 1;
     display: grid;
     place-items: center;
     padding: 0 10px;
-    border-radius: 6px;
-    color: var(--muted);
-    font-weight: 600;
     font-size: 12.5px;
-    cursor: pointer;
   }
-  .seg input {
-    position: absolute;
-    inset: 0;
-    margin: 0;
-    opacity: 0;
-    cursor: pointer;
-  }
-  .seg label:has(input:checked) {
-    background: var(--surface);
-    color: var(--ink);
-    box-shadow:
-      0 0 0 1px var(--line),
-      0 1px 2px rgb(0 0 0 / 0.12);
-  }
-  .seg label:has(input:focus-visible) {
-    outline: 2px solid var(--cable);
-    outline-offset: -2px;
-  }
-  .switch {
-    position: relative;
-    display: flex;
+  .toggle {
     width: fit-content;
-    align-items: center;
-    gap: 8px;
     min-height: 30px;
     color: var(--ink);
-    font-weight: 600;
     font-size: 13px;
-    cursor: pointer;
-  }
-  .switch input {
-    position: absolute;
-    z-index: 1;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    margin: 0;
-    opacity: 0;
-    cursor: pointer;
-  }
-  .track {
-    position: relative;
-    flex: none;
-    width: 28px;
-    height: 16px;
-    border-radius: 999px;
-    background: color-mix(in oklab, var(--ink) 22%, transparent);
-    transition: background 0.15s;
-  }
-  .track::after {
-    content: '';
-    position: absolute;
-    top: 2px;
-    left: 2px;
-    width: 12px;
-    height: 12px;
-    border-radius: 50%;
-    background: var(--surface);
-    box-shadow: 0 1px 2px rgb(0 0 0 / 0.3);
-    transition: transform 0.15s;
-  }
-  .switch input:checked + .track {
-    background: var(--cable);
-  }
-  .switch input:checked + .track::after {
-    transform: translateX(12px);
-  }
-  .switch input:focus-visible + .track {
-    outline: 2px solid var(--cable);
-    outline-offset: 2px;
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .track,
-    .track::after {
-      transition: none;
-    }
   }
   .live {
     flex: none;

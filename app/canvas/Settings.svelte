@@ -35,7 +35,7 @@
 <div class="pop" id="settings" popover aria-label="Settings">
   <div class="row log">
     <label
-      class="switch"
+      class="toggle"
       title={debug.forced
         ? 'Always on while Koppler runs from its source folder, so every problem can be traced.'
         : 'Keeps every click, change and message on this canvas, so a problem can be traced. Nothing you type is kept.'}
@@ -114,66 +114,10 @@
     padding-bottom: 8px;
     border-bottom: 1px solid var(--line);
   }
-  .switch {
-    position: relative;
-    display: flex;
+  .toggle {
     flex: 1;
-    align-items: center;
-    gap: 8px;
     min-height: 28px;
     margin-right: 8px;
-    font-weight: 600;
-    cursor: pointer;
-  }
-  .switch input {
-    position: absolute;
-    z-index: 1;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    margin: 0;
-    opacity: 0;
-    cursor: pointer;
-  }
-  .switch input:disabled {
-    cursor: not-allowed;
-  }
-  .track {
-    position: relative;
-    flex: none;
-    width: 28px;
-    height: 16px;
-    border-radius: 999px;
-    background: color-mix(in oklab, var(--ink) 22%, transparent);
-    transition: background 0.15s;
-  }
-  .track::after {
-    content: '';
-    position: absolute;
-    top: 2px;
-    left: 2px;
-    width: 12px;
-    height: 12px;
-    border-radius: 50%;
-    background: var(--surface);
-    box-shadow: 0 1px 2px rgb(0 0 0 / 0.3);
-    transition: translate 0.15s;
-  }
-  .switch input:checked + .track {
-    background: var(--cable);
-  }
-  .switch input:checked + .track::after {
-    translate: 12px;
-  }
-  .switch input:focus-visible + .track {
-    outline: 2px solid var(--cable);
-    outline-offset: 2px;
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .track,
-    .track::after {
-      transition: none;
-    }
   }
   .row button.text {
     width: auto;

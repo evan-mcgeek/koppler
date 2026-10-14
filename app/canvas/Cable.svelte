@@ -22,7 +22,7 @@
     const [x, y] = SIDES[data.toSide];
     return `translate(${String(b.x + x * 10)} ${String(b.y + y * 10)}) rotate(${String((Math.atan2(-y, -x) * 180) / Math.PI)})`;
   });
-  const name = (app: string) => board.apps.find(one => one.id === app)?.name ?? app;
+  const name = board.nameOf;
   /** The middle of the cable, where the mark to unplug it shows while it is pointed at: measured only then. */
   const middle = $derived.by(() => {
     if (!path || board.hovered !== id) return '';

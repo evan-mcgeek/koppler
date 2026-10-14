@@ -348,14 +348,14 @@ class Board {
   /** A branch other than the clone's is asked for while the clone has uncommitted changes. */
   switchesOver(id: string): boolean {
     const branch = this.nodes.find(node => node.id === id)?.data.branch;
-    const app = this.apps.find(one => one.id === id);
+    const app = this.app(id);
     return !!(branch && app?.current && branch !== app.current && app.dirty);
   }
 
   /** The libraries a card runs with the local copy of, among the ones cloned here. */
   localLibraries(id: string): string[] {
     const chosen = this.nodes.find(node => node.id === id)?.data.libraries ?? [];
-    const here = this.apps.find(one => one.id === id)?.libraries ?? [];
+    const here = this.app(id)?.libraries ?? [];
     return chosen.filter(name => here.some(library => library.name === name));
   }
 
@@ -410,9 +410,9 @@ class Board {
   }
   /** The apps this one still calls in the deployed environment: the calls the stack knows that have no cable. */
   deployedCalls(id: string): StackApp[] {
-    const called = this.apps.find(app => app.id === id)?.calls ?? [];
+    const called = this.app(id)?.calls ?? [];
     return called.flatMap(to => {
-      const app = this.apps.find(one => one.id === to);
+      const app = this.app(to);
       return app && !app.outside && !this.edges.some(edge => edge.id === `${id}>${to}`) ? [app] : [];
     });
   }
@@ -697,7 +697,7 @@ class Board {
       const at = id && id !== from ? this.boxes.get(id) : undefined;
       return id && at ? { id, side: this.nearestSide(at, points.at(-1) ?? flow(ev)), at } : undefined;
     };
-    const app = (id: string) => this.apps.find(one => one.id === id);
+    const app = (id: string) => this.app(id);
     const calls = (caller: string, callee: string) => !!app(caller)?.calls.includes(callee);
     // A cable can land where the caller may call the app, and not against the only direction the code shows.
     const canCall = (to: string) => !app(from)?.outside && !!app(to) && !app(to)?.outside && !!app(to)?.answers;
@@ -991,7 +991,7 @@ class Board {
   /** Set when a board was just opened: once its cards have their sizes it is arranged, or only brought into view. */
   opened = $state<'arrange' | 'fit' | null>(null);
   #facts(): StackFacts {
-    const app = (id: string) => this.apps.find(one => one.id === id);
+    const app = (id: string) => this.app(id);
     return {
       known: id => !!app(id),
       cloned: id => !!app(id)?.cloned,
@@ -1247,7 +1247,7 @@ class Board {
       : [];
     this.infra = this.infra.map(unselected);
     this.nodes = ids.flatMap(id => {
-      const app = this.apps.find(one => one.id === id);
+      const app = this.app(id);
       const node = preset.nodes[id];
       if (!app || !node) return [];
       const chosen = { ...node, hideTunnels: node.tunnels === false, showQueues: node.queues === true };
@@ -1290,6 +1290,11 @@ class Board {
 
   /** Every app of the stack, as the side panel lists it. */
   apps = $state.raw<StackApp[]>([]);
+  /** The stack's apps by id. */
+  readonly #byId = $derived(new Map(this.apps.map(app => [app.id, app])));
+  app = (id: string): StackApp | undefined => this.#byId.get(id);
+  /** An app's name, or the id when the stack has no such app. */
+  nameOf = (id: string): string => this.#byId.get(id)?.name ?? id;
   envs = $state.raw<string[]>([]);
   /** The folders clones are looked for in, for the "not cloned" hint. */
   roots = $state.raw<string[]>([]);
@@ -1437,7 +1442,7 @@ class Board {
 
   /** Puts an app on the board: where it is dropped, its header under the pointer, or else in the first empty spot of what is on screen, scanning rows from the top left. */
   add(id: string, dropped?: Point): void {
-    const app = this.apps.find(one => one.id === id);
+    const app = this.app(id);
     if (!app || app.outside || !app.cloned || this.nodes.some(node => node.id === id)) return;
     if (dropped) {
       const at = this.toFlow(dropped);
@@ -1487,7 +1492,7 @@ class Board {
    * it may call that do not call it; and the apps it is cabled to.
    */
   cablesOf(id: string): { can: StackApp[]; wired: StackApp[] } {
-    const app = (which: string) => this.apps.find(one => one.id === which);
+    const app = (which: string) => this.app(which);
     const others = this.nodes.flatMap(node => (node.id === id ? [] : (app(node.id) ?? [])));
     const wired = others.filter(other => this.edges.some(edge => edge.id === `${id}>${other.id}`));
     const free = others.filter(other => !wired.includes(other));

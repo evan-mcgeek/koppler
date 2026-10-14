@@ -147,7 +147,7 @@
     untrack(() => {
       for (const one of edits.filter(one => !made[one.id])) {
         made[one.id] = true;
-        const name = (id: string) => board.apps.find(app => app.id === id)?.name ?? id;
+        const name = board.nameOf;
         if (board.edit(one.board, one.edit))
           toasts.show(`The agent changed ${one.board}: ${describeEdit(one.edit, name)}.`);
         void post('board-edit-done', { id: one.id });

@@ -3,7 +3,7 @@
 import { describe, plan, type Plan } from '../src/core/plan.ts';
 import { board } from './board.svelte.ts';
 import { openBoard } from './boards.ts';
-import { post, save } from './data.ts';
+import { post, save, send } from './data.ts';
 import { live } from './live.svelte.ts';
 import { dialogs } from './dialogs.svelte.ts';
 import { toasts } from './toast.svelte.ts';
@@ -39,7 +39,7 @@ const VERBS = [
   ['keeps', 'Keeps running'],
 ] as const;
 const newRunId = () => (Date.now().toString(36) + Math.random().toString(36).slice(2, 8)).replace(/[^a-z0-9]/g, '');
-const name = (id: string) => board.apps.find(app => app.id === id)?.name ?? id;
+const name = board.nameOf;
 const several = (count: number, one: string) => `${String(count)} ${one}${count === 1 ? '' : 's'}`;
 
 class Runs {
@@ -53,7 +53,7 @@ class Runs {
     const was = live.status?.live;
     const keep = (id: string) => !restart || id === restart || Object.hasOwn(was?.nodes ?? {}, id);
     const mine = board.nodes.map(({ id, data }) => {
-      const app = board.apps.find(one => one.id === id);
+      const app = board.app(id);
       return {
         id,
         branch: data.branch || null,
@@ -86,7 +86,7 @@ class Runs {
         ]
       : asked;
     const deployed = nodes.flatMap(({ id }) =>
-      (board.apps.find(app => app.id === id)?.calls ?? [])
+      (board.app(id)?.calls ?? [])
         .filter(to => !edges.some(edge => edge.from === id && edge.to === to))
         .map(to => ({ from: id, to })),
     );
@@ -121,7 +121,7 @@ class Runs {
 
   #describe(graph: ReturnType<Runs['graph']> & { mode: string; note?: string }): string {
     const env = graph.env.toUpperCase();
-    const calls = (from: string, to: string) => board.apps.find(app => app.id === from)?.known.includes(to);
+    const calls = (from: string, to: string) => board.app(from)?.known.includes(to);
     return [
       `ENV ${env}`,
       `MODE ${graph.mode === 'manual' ? 'manual: give me a checklist, change nothing' : 'auto: apply the changes and start everything'}`,
@@ -138,7 +138,7 @@ class Runs {
         ];
       }),
       ...graph.edges.map(({ from, to }) => {
-        const found = board.apps.find(app => app.id === from)?.calls.includes(to);
+        const found = board.app(from)?.calls.includes(to);
         const how = calls(from, to)
           ? ''
           : found
@@ -156,19 +156,9 @@ class Runs {
   /** Hands a request to the server, for Koppler or the agent. Copied instead when the server does not take it. */
   /** Hands a request to the server, for Koppler or the agent. Copied instead when the server does not take it. */
   async deliver(text: string, prompt: { tag: string; data: object }, sent: string): Promise<boolean> {
-    const token = location.pathname.split('/')[2] ?? '';
-    try {
-      const answer = await fetch(`/prompt?token=${encodeURIComponent(token)}`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ ...prompt, text }),
-      });
-      if (answer.ok) {
-        toasts.show(sent);
-        return true;
-      }
-    } catch {
-      // Said below.
+    if ((await send('prompt', { ...prompt, text }))?.ok) {
+      toasts.show(sent);
+      return true;
     }
     await navigator.clipboard.writeText(text).catch(() => undefined);
     toasts.show('No agent connection, so the request was copied to your clipboard', 'warning');
@@ -234,7 +224,7 @@ class Runs {
     };
     const notes = (id: string): ReviewItem['notes'] => {
       const node = board.nodes.find(one => one.id === id);
-      const app = board.apps.find(one => one.id === id);
+      const app = board.app(id);
       if (!node || !app) return [];
       const onCurrent = !node.data.branch || node.data.branch === app.current;
       const changes = several(app.dirty, 'change').replace(/^(\d+) /, '$1 uncommitted ');
@@ -325,7 +315,7 @@ class Runs {
                 verb: 'calls',
                 label: `Calls ${board.protected ? env : `deployed ${env}`}`,
                 items: Object.entries(called).map(([to, from]) => {
-                  const callee = board.apps.find(app => app.id === to);
+                  const callee = board.app(to);
                   const can = callee?.cloned && !callee.outside && callee.answers;
                   return {
                     name: name(to),
@@ -468,18 +458,9 @@ class Runs {
 
   /** Asks the server to do something that needs no answer but done or not. */
   async #ask<T>(route: string): Promise<T | null> {
-    const token = location.pathname.split('/')[2] ?? '';
-    try {
-      const answer = await fetch(`/${route}?token=${encodeURIComponent(token)}`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: '{}',
-      });
-      if (!answer.ok) return null;
-      return answer.status === 204 ? ({} as T) : ((await answer.json()) as T);
-    } catch {
-      return null;
-    }
+    const answer = await send(route);
+    if (!answer?.ok) return null;
+    return answer.status === 204 ? ({} as T) : ((await answer.json().catch(() => null)) as T | null);
   }
 
   /** What Koppler started, by the name it runs under. */
@@ -618,14 +599,7 @@ class Runs {
   }
   async #switch(dir: string): Promise<void> {
     this.switching = dir;
-    const token = location.pathname.split('/')[2] ?? '';
-    const said = await fetch(`/stack?token=${encodeURIComponent(token)}`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ use: dir }),
-    })
-      .then(answer => answer.json() as Promise<{ error?: string }>)
-      .catch(() => ({ error: 'Could not reach the canvas server.' }));
+    const said = await post<{ error?: string }>('stack', { use: dir });
     if (!said.error) {
       location.reload();
       return;
