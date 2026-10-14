@@ -141,3 +141,28 @@ test('koppler refresh has an open canvas read the stack and its board again, wit
   await expect(card(page, 'web')).toContainText('Storefront');
   expect(await page.evaluate(() => (window as { stayed?: boolean }).stayed)).toBe(true);
 });
+
+test('a proposed change waits for a yes in the inbox: accepted it is made, declined nothing changes', async ({
+  page,
+  canvas,
+}) => {
+  await expect(card(page, 'web')).toBeVisible();
+  koppler(canvas, 'board', 'edit', 'Shop', '--add', 'payments', '--cable', 'orders:payments', '--propose');
+  expect(Object.keys(state(canvas.temp).presets[0]?.nodes ?? {})).toEqual(['web', 'orders']);
+  const panel = page.getByRole('dialog', { name: 'Messages from the agent' });
+  await expect(panel.getByRole('heading', { level: 3 }).first()).toHaveText('Change Shop?');
+  await expect(panel).toContainText('add Payments API');
+  await expect(panel).toContainText('cable Orders API to Payments API');
+  await expect(card(page, 'payments')).toHaveCount(0);
+  await page.screenshot({ path: 'test-results/next-proposal.png' });
+  await panel.getByRole('button', { name: /Make the change/ }).click();
+  await expect(card(page, 'payments')).toBeVisible();
+  await expect(page.locator('.svelte-flow__edge[data-id="orders>payments"]')).toHaveCount(1);
+
+  koppler(canvas, 'board', 'edit', 'Shop', '--remove', 'web', '--propose');
+  await expect(panel).toContainText('remove Web Shop');
+  await panel.getByRole('button', { name: /Leave it as it is/ }).click();
+  await expect(panel.getByRole('button', { name: /Leave it as it is/ })).toHaveCount(0);
+  await expect(card(page, 'web')).toBeVisible();
+  expect(Object.keys(state(canvas.temp).presets[0]?.nodes ?? {})).toContain('web');
+});

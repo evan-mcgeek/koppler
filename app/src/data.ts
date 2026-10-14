@@ -6,7 +6,7 @@ import type { Stack } from './core/stack.ts';
 import { readJson, writeJson } from './json-files.ts';
 import { tempDir } from './paths.ts';
 
-export type DataName = 'registry' | 'local' | 'repos' | 'state' | 'board-edits';
+export type DataName = 'registry' | 'local' | 'repos' | 'state' | 'board-edits' | 'board-proposals';
 export type Data = Record<string, unknown>;
 
 // Read at each call: the tests, and a stack switch, change where the run folder is while the process lives.
