@@ -476,8 +476,23 @@ async function startApps(up: Up): Promise<void> {
   };
   ids.forEach(visit);
   const yours: string[] = [];
+  // An app whose start failed, and why; the apps that need it are not started, unless a call says to start anyway.
+  const down = new Map<string, string>();
+  const needs = (id: string) => [
+    ...edges
+      .filter(edge => edge.from === id && up.stack.apps[id]?.consumes?.[edge.to]?.ifDown !== 'start')
+      .map(edge => edge.to),
+    ...(up.stack.apps[id]?.after ?? []),
+  ];
   for (const id of order) {
     if (up.skip.has(id)) continue;
+    const missing = needs(id).find(dep => down.has(dep) || up.skip.has(dep));
+    if (missing) {
+      const why = `Not started: ${nameOf(up.stack, missing)} did not start.`;
+      down.set(id, why);
+      step(id, 'Start', 'failed', why);
+      continue;
+    }
     const { run: runIn, platform } = node(id);
     if (runIn === 'ide') yours.push(nameOf(up.stack, id));
     else if (running(id)) {
@@ -487,11 +502,23 @@ async function startApps(up: Up): Promise<void> {
       step(id, 'Start', 'todo', 'Waits for a change in its code that points it at a local app.');
     else {
       const setEnv = up.setEnv[id];
-      await run([id, '--env', env, ...(platform ? ['--device', platform] : [])], setEnv ? { setEnv } : {});
+      try {
+        await run([id, '--env', env, ...(platform ? ['--device', platform] : [])], setEnv ? { setEnv } : {});
+      } catch (error) {
+        if (!(error instanceof Failure)) throw error;
+        console.error(error.message);
+        down.set(id, error.message);
+        step(id, 'Start', 'failed', error.message.split('\n')[0] ?? '');
+        continue;
+      }
       step(id, 'Start', 'done', up.stack.apps[id]?.once ? 'Finished.' : 'Running.');
     }
   }
   if (yours.length) console.log(`Start ${yours.join(', ')} in your IDE.`);
+  if (down.size)
+    throw new Failure(
+      `Not everything started:\n${[...down].map(([id, why]) => `  ${nameOf(up.stack, id)}: ${why.split('\n')[0] ?? ''}`).join('\n')}`,
+    );
 }
 
 /** Carries a run out. Without a confirmed Send (`board`), only tunnels and apps start, and nothing is recorded. */
