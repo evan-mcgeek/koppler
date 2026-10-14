@@ -213,6 +213,14 @@ export const ROUTES: Record<string, Route> = {
     spawn('open', [script], { detached: true, stdio: 'ignore' }).unref();
     return { status: 200, body: { opened: true, command } };
   },
+  // The trace collector, started or stopped by Koppler itself; the status says when it answers.
+  '/traces': body => {
+    spawn(process.execPath, [path.join(CODE, 'koppler.mjs'), 'traces', body['on'] === false ? 'stop' : 'start'], {
+      detached: true,
+      stdio: 'ignore',
+    }).unref();
+    return { status: 200, body: { asked: true } };
+  },
   '/run-pin': body => {
     const id = body['id'];
     if (typeof id !== 'string' || !runs().some(run => run.id === id))

@@ -3,6 +3,7 @@
 import { fail } from '../failure.ts';
 import { appStart } from './app-start.ts';
 import { parseRun, startProcess, type RunOptions } from './processes.ts';
+import { traceEnv, tracing } from './traces.ts';
 
 const USAGE =
   'usage: koppler run <app> | koppler run <name> [--cwd <dir>] [--port <n>] [--bind <address>] [--restart] -- <command...>';
@@ -27,6 +28,8 @@ export async function run(args: string[], extra: Partial<RunOptions> = {}): Prom
     if (port !== undefined) options.port = port;
     if (app.ready) options.ready = app.ready;
     if (app.once) options.once = app.once;
+    // While traces are collected, the app sends its own there, under its id; what the run sets for it comes on top.
+    if (tracing()) options.setEnv = { ...traceEnv(name), ...options.setEnv };
     if (app.device) console.log(`device: ${app.device.name} (${app.device.platform})`);
   }
   if (options.dryRun) {

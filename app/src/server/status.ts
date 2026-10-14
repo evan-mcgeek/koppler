@@ -25,6 +25,8 @@ import { waiting } from './waiting.ts';
 import { APP_ID, RUN_ID } from '../ids.ts';
 import { processState, stateOf, type StateOf } from '../engine/app-state.ts';
 import { pinned, runLogs } from '../engine/run-logs.ts';
+import { traceView, tracing, VIEW_PORT } from '../engine/traces.ts';
+import { listener as answering } from '../engine/processes.ts';
 
 type Loose = Record<string, unknown>;
 interface Step {
@@ -265,6 +267,9 @@ async function snapshot(serving: boolean): Promise<Status> {
   status['messages'] = readMessages();
   status['boardEdits'] = boardEdits();
   // `koppler refresh`: when it last asked an open canvas to read the stack and its board again.
+  status['traces'] = tracing()
+    ? { state: answering(VIEW_PORT) ? 'on' : 'starting', view: traceView() }
+    : { state: 'off' };
   status['refresh'] = (readJsonOr(path.join(tempDir(), 'refresh.json')) as { at?: unknown } | null)?.at ?? null;
   const source = stackSource();
   status['locks'] = source ? lockedPaths(source) : [];
