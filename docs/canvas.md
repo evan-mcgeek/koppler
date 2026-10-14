@@ -11,7 +11,7 @@ Team boards are boards the stack shares with everyone who uses it; one click ope
 A team board you change becomes your own copy.
 **Share** makes your board a team board of the stack.
 **Copy** copies it as JSON, and a board file can be opened, dropped on the page or linked from GitHub.
-`koppler board edit "<name>"` changes a board from the terminal, even one open on the canvas.
+`koppler board new "<name>"` makes a board from the terminal, and `koppler board edit "<name>"` changes one, even one open on the canvas.
 
 ## Cards
 

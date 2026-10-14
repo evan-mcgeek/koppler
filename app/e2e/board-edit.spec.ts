@@ -91,3 +91,18 @@ test('a board that is not on screen is changed where it is kept', async ({ page,
     .poll(() => Object.keys(state(canvas.temp).presets.find(one => one.name === 'Checkout')?.nodes ?? {}))
     .toEqual(['web', 'orders']);
 });
+
+test('a board made from the terminal joins your boards on an open canvas, which says so and keeps it', async ({
+  page,
+  canvas,
+}) => {
+  await expect(card(page, 'web')).toBeVisible();
+  koppler(canvas, 'board', 'new', 'Orders work', '--add', 'orders,payments', '--cable', 'orders:payments');
+  await expect(page.getByRole('status').filter({ hasText: 'The agent made a board, Orders work.' })).toBeVisible();
+  await expect.poll(() => waiting(canvas.temp)).toBe(0);
+  // The board on screen stays as it was; the new one is among the user's, with its apps and cable.
+  await expect(page.locator('.svelte-flow__node-app')).toHaveCount(2);
+  await expect
+    .poll(() => state(canvas.temp).presets.find(one => one.name === 'Orders work')?.nodes)
+    .toEqual({ orders: { run: 'cli' }, payments: { run: 'cli' } });
+});

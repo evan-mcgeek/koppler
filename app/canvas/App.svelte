@@ -151,8 +151,12 @@
       for (const one of edits.filter(one => !made[one.id])) {
         made[one.id] = true;
         const name = board.nameOf;
-        if (board.edit(one.board, one.edit))
-          toasts.show(`The agent changed ${one.board}: ${describeEdit(one.edit, name)}.`);
+        if (board.edit(one.board, one.edit, one.create))
+          toasts.show(
+            one.create
+              ? `The agent made a board, ${one.board}.`
+              : `The agent changed ${one.board}: ${describeEdit(one.edit, name)}.`,
+          );
         void post('board-edit-done', { id: one.id });
       }
     });

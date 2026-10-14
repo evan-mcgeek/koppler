@@ -1369,9 +1369,12 @@ class Board {
   }
 
   /** A change made from the terminal: on the board on screen as if made here, on another board where it is kept. Gives whether anything changed. */
-  edit(name: string, change: BoardEdit): boolean {
+  edit(name: string, change: BoardEdit, create = false): boolean {
     if (this.name !== name) {
-      const stored = this.own.find(one => one.name === name) ?? this.team.find(one => one.name === name);
+      const stored =
+        this.own.find(one => one.name === name) ??
+        this.team.find(one => one.name === name) ??
+        (create ? { name, version: PRESET_VERSION, nodes: {}, edges: [] } : undefined);
       if (!stored) return false;
       const changed = { ...editPreset(stored, change), name };
       if (JSON.stringify(changed) === JSON.stringify(stored)) return false;

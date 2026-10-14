@@ -11,7 +11,7 @@ A change with no command yet is a missing feature: build the command (and the co
 |---|---|---|
 | A fact of the stack | `koppler stack set` / `unset`, `koppler add`, `koppler remove`, `koppler discover --apply` | Settings (the gear) |
 | A lock on a field | `koppler stack lock` / `unlock` | The lock beside the field |
-| A board | `koppler board edit` | The board itself |
+| A board | `koppler board new` / `edit` | The board itself |
 | A change Stop must undo | `koppler actions add` / `clear` | History shows it |
 | A step on a card | `koppler status step` | The card |
 | A message to the user | `koppler say` | The inbox |
