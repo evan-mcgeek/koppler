@@ -35,6 +35,7 @@ interface LooseApp extends LooseEnv {
   envs?: Record<string, LooseEnv | null> | undefined;
   secrets?: ({ env?: string | undefined; fetch?: unknown } | null)[] | undefined;
   localChanges?: unknown;
+  commands?: Record<string, { run?: unknown } | null> | undefined;
 }
 export interface LooseStack {
   name?: string | undefined;
@@ -222,6 +223,7 @@ export function stackCommands(stack: MaybeStack): Command[] {
     const name = app?.name ?? id;
     add('start', name, app?.start);
     for (const [env, own] of Object.entries(app?.envs ?? {})) add(`start on ${env}`, name, own?.start);
+    for (const [key, command] of Object.entries(app?.commands ?? {})) add(`command ${key} of`, name, command?.run);
     const changes = (Array.isArray(app?.localChanges) ? app.localChanges : []) as (Record<string, unknown> | null)[];
     for (const change of changes)
       add(

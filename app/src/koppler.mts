@@ -39,6 +39,7 @@ import { up } from './engine/up.ts';
 import { wait } from './cli/wait.ts';
 import { mcp } from './cli/mcp.ts';
 import { agentCommand } from './cli/agent.ts';
+import { doCommand } from './engine/app-commands.ts';
 import { wire } from './engine/wire.ts';
 import { APP, CODE, configDir, tempDir } from './paths.ts';
 
@@ -548,6 +549,14 @@ const COMMANDS: Command[] = [
     about: 'wait until apps are healthy, up or down; fails on a timeout or an app that exits, naming each state',
     run: wait,
     example: 'koppler wait orders-api payments-api --healthy --timeout 180',
+  },
+  {
+    name: 'do',
+    who: 'agent',
+    args: '<app> <command> [--arg <name>=<value>]... [--env <env>] [--yes]',
+    about: "run one of an app's commands from the stack, such as seed or migrate, in its clone with its secrets",
+    run: doCommand,
+    example: 'koppler do orders-api seed --arg COUNT=50 --yes',
   },
   {
     name: 'down',
