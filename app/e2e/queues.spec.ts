@@ -300,3 +300,21 @@ test.describe('an outside system that reads a queue only one app on the board us
     await page.screenshot({ path: 'test-results/next-queue-reader.png' });
   });
 });
+
+test("the icons in a queue's and a tunnel's buttons sit in the middle of each button", async ({ page }) => {
+  await expect(queue(page)).toHaveCount(2);
+  const off = await page
+    .locator('.svelte-flow__node-queue button.hide, .svelte-flow__node-tunnel button.hide')
+    .evaluateAll(buttons =>
+      buttons.map(button => {
+        const box = button.getBoundingClientRect();
+        const icon = button.querySelector('svg')?.getBoundingClientRect();
+        if (!icon) return 99;
+        const dx = icon.x + icon.width / 2 - (box.x + box.width / 2);
+        const dy = icon.y + icon.height / 2 - (box.y + box.height / 2);
+        return Math.round(Math.max(Math.abs(dx), Math.abs(dy)) * 10) / 10;
+      }),
+    );
+  expect(off.length).toBeGreaterThan(3);
+  for (const by of off) expect(by).toBeLessThanOrEqual(0.5);
+});
