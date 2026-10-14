@@ -42,6 +42,8 @@
   board.toFlow = at => flow.screenToFlowPosition(at, { snapToGrid: false });
   board.zoom = () => flow.getZoom();
   const viewport = useViewport();
+  // How far, on screen, a snap guide runs past the two things it lines up.
+  const GUIDE_PAST = 24;
   let area: HTMLElement | undefined = $state();
   board.area = () => area?.getBoundingClientRect() ?? new DOMRect();
   // Brings a card to the middle of the board, at the zoom the board is at, and picks it.
@@ -565,6 +567,21 @@
         role="group"
         aria-label="Cable ends"
       >
+        <!-- What a dragged card snapped into line with: one hairline, as thin at every zoom, drawn in once. -->
+        {#each board.guides as guide (`${String(guide.x1)},${String(guide.y1)},${String(guide.x2)},${String(guide.y2)}`)}
+          {@const long = Math.hypot(guide.x2 - guide.x1, guide.y2 - guide.y1) || 1}
+          {@const past = GUIDE_PAST / viewport.current.zoom}
+          {@const ux = (guide.x2 - guide.x1) / long}
+          {@const uy = (guide.y2 - guide.y1) / long}
+          <line
+            class="guide"
+            x1={guide.x1 - ux * past}
+            y1={guide.y1 - uy * past}
+            x2={guide.x2 + ux * past}
+            y2={guide.y2 + uy * past}
+            pathLength="1"
+          />
+        {/each}
         {#each board.edges as edge, index (edge.id)}
           {@const a = wiring.endPoint(index, 'from')}
           {@const b = wiring.endPoint(index, 'to')}
@@ -970,6 +987,25 @@
     outline-offset: -2px;
   }
   /* In Live nothing on the board is pulled or unplugged. */
+  .guide {
+    stroke: var(--cable);
+    stroke-width: 1;
+    vector-effect: non-scaling-stroke;
+    stroke-dasharray: 1;
+    pointer-events: none;
+    animation: guide 180ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  @keyframes guide {
+    from {
+      stroke-dashoffset: 1;
+      opacity: 0;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .guide {
+      animation: none;
+    }
+  }
   .ends.still :is(.plug, .socket) {
     pointer-events: none;
   }

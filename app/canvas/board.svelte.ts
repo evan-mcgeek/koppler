@@ -133,6 +133,13 @@ const TUNNEL_SIDES: Side[] = ['bottom', 'right', 'left', 'top'];
 /** How close, on screen, a dragged card's cable must come to straight for the card to snap so it is. */
 const SNAP = 8;
 export type End = 'from' | 'to';
+/** A line that shows a snap: from one point to another on the board. */
+export interface Guide {
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+}
 export interface StackApp {
   id: string;
   name: string;
@@ -749,20 +756,31 @@ class Board {
   fromFlow(drawn: (CardNode | InfraNode)[], brief: string, settled: boolean): boolean {
     // The flow has the cards where they are drawn: one it moved is kept where that is on the full board.
     const kept = new Map([...this.nodes, ...this.infra].map(node => [node.id, node]));
+    const guides: Guide[] = [];
     const all = drawn.map(drawnNode => {
       const at = kept.get(drawnNode.id);
-      // A card being dragged snaps to where one of its cables runs straight, when that is close.
-      const node =
-        (drawnNode.dragging || at?.dragging) && drawnNode.type === 'app'
-          ? { ...drawnNode, position: this.#straight(drawnNode.id, drawnNode.position) }
-          : drawnNode;
-      if (at?.dragging && !drawnNode.dragging && this.snapped.length) this.snapped = [];
+      // A card being dragged snaps: an app to where one of its cables runs straight, a tunnel, queue or outside card
+      // into line with the card it is linked to, when that is close.
+      const moving = drawnNode.dragging || at?.dragging;
+      const node = moving
+        ? {
+            ...drawnNode,
+            position:
+              drawnNode.type === 'app'
+                ? this.#straight(drawnNode.id, drawnNode.position, guides)
+                : this.#align(drawnNode.id, drawnNode.position, guides),
+          }
+        : drawnNode;
       if (at?.dragging && !node.dragging) return { ...node, position: this.dropped(node.id, node.position) };
       const was = at && this.shown(at.position);
       return at && was?.x === node.position.x && was.y === node.position.y
         ? { ...node, position: at.position }
         : { ...node, position: this.stored(node.position) };
     }) as (CardNode | InfraNode)[];
+    // What snapped shows while the drag lasts; a card let go shows nothing.
+    const still = drawn.every(node => !node.dragging);
+    const shown = still ? [] : guides;
+    if (JSON.stringify(shown) !== JSON.stringify(this.guides)) this.guides = shown;
     // An app the library moved (a drag, the arrow keys) takes its tunnel cards along, in the same step.
     const was = new Map(this.nodes.map(node => [node.id, node.position]));
     const grew: Record<string, { bottom: number; by: number }> = {};
@@ -804,7 +822,7 @@ class Board {
   }
 
   /** Where a dragged card goes so that its nearest almost straight cable is straight: each way, the smallest step. */
-  #straight(id: string, to: Point): Point {
+  #straight(id: string, to: Point, guides: Guide[]): Point {
     const box = this.boxes.get(id);
     if (!box) return to;
     const near = SNAP / (this.view?.zoom ?? 1);
@@ -817,10 +835,9 @@ class Board {
       const by = this.ends.offset[`${String(index)}|${which}`] ?? 0;
       return { side, at: SIDES[side][0] === 0 ? { ...at, x: at.x + by } : { ...at, y: at.y + by } };
     };
-    let dx: number | undefined;
-    let dy: number | undefined;
-    let xCable = '';
-    let yCable = '';
+    type Snap = { by: number; from: Point; to: Point };
+    let x: Snap | undefined;
+    let y: Snap | undefined;
     this.cables.forEach((one, index) => {
       const mine = one.from === id ? 'from' : one.to === id ? 'to' : null;
       if (!mine || one.from === one.to) return;
@@ -831,26 +848,79 @@ class Board {
       const there = end(index, theirs, other);
       if (!here || !there) return;
       // A cable leaving sideways is straight when its ends are level; one leaving up or down, when they are in line.
-      if (SIDES[here.side][0] !== 0) {
-        const by = there.at.y - here.at.y;
-        if (Math.abs(by) <= near && (dy === undefined || Math.abs(by) < Math.abs(dy))) {
-          dy = by;
-          yCable = `${one.from}>${one.to}`;
-        }
-      } else {
-        const by = there.at.x - here.at.x;
-        if (Math.abs(by) <= near && (dx === undefined || Math.abs(by) < Math.abs(dx))) {
-          dx = by;
-          xCable = `${one.from}>${one.to}`;
-        }
-      }
+      const level = SIDES[here.side][0] !== 0;
+      const by = level ? there.at.y - here.at.y : there.at.x - here.at.x;
+      const snap = { by, from: here.at, to: there.at };
+      if (Math.abs(by) > near) return;
+      if (level && (!y || Math.abs(by) < Math.abs(y.by))) y = snap;
+      if (!level && (!x || Math.abs(by) < Math.abs(x.by))) x = snap;
     });
-    const snapped = [xCable, yCable].filter(Boolean);
-    if (snapped.join() !== this.snapped.join()) this.snapped = snapped;
-    return { x: to.x + (dx ?? 0), y: to.y + (dy ?? 0) };
+    const dx = x?.by ?? 0;
+    const dy = y?.by ?? 0;
+    for (const snap of [x, y])
+      if (snap) guides.push({ x1: snap.from.x + dx, y1: snap.from.y + dy, x2: snap.to.x, y2: snap.to.y });
+    return { x: to.x + dx, y: to.y + dy };
   }
-  /** The cables a dragged card has snapped straight, lit while the drag lasts so the snap shows. */
-  snapped = $state.raw<string[]>([]);
+  /**
+   * Where a dragged tunnel, queue or outside card goes: into line with a card it is linked to, by their middles or
+   * their edges, whichever is closest, across the way the link runs.
+   */
+  #align(id: string, to: Point, guides: Guide[]): Point {
+    const box = this.infraBoxes.get(id);
+    if (!box) return to;
+    const near = SNAP / (this.view?.zoom ?? 1);
+    const me = { ...box, x: to.x, y: to.y };
+    const partners = [
+      ...this.links.filter(link => link.to === id).map(link => link.from),
+      ...this.flows.flatMap(flow => (flow.from === id ? [flow.to] : flow.to === id ? [flow.from] : [])),
+    ];
+    type Snap = { by: number; at: number; other: Box };
+    let x: Snap | undefined;
+    let y: Snap | undefined;
+    for (const partner of new Set(partners)) {
+      const other = this.boxes.get(partner) ?? this.infraBoxes.get(partner);
+      if (!other || [...this.nodes, ...this.infra].some(node => node.id === partner && node.dragging)) continue;
+      const gapX = Math.max(other.x - (me.x + me.w), me.x - (other.x + other.w));
+      const gapY = Math.max(other.y - (me.y + me.h), me.y - (other.y + other.h));
+      // Above or below the other card it lines up across; beside it, up and down.
+      const stacked = gapY >= gapX;
+      const [start, size, otherStart, otherSize] = stacked
+        ? [me.x, me.w, other.x, other.w]
+        : [me.y, me.h, other.y, other.h];
+      const options = [
+        { by: otherStart + otherSize / 2 - (start + size / 2), at: otherStart + otherSize / 2 },
+        { by: otherStart - start, at: otherStart },
+        { by: otherStart + otherSize - (start + size), at: otherStart + otherSize },
+      ];
+      for (const option of options) {
+        if (Math.abs(option.by) > near) continue;
+        const best = stacked ? x : y;
+        if (best && Math.abs(best.by) <= Math.abs(option.by)) continue;
+        if (stacked) x = { ...option, other };
+        else y = { ...option, other };
+      }
+    }
+    const dx = x?.by ?? 0;
+    const dy = y?.by ?? 0;
+    const placed = { ...me, x: me.x + dx, y: me.y + dy };
+    if (x)
+      guides.push({
+        x1: x.at,
+        y1: Math.min(placed.y, x.other.y),
+        x2: x.at,
+        y2: Math.max(placed.y + placed.h, x.other.y + x.other.h),
+      });
+    if (y)
+      guides.push({
+        x1: Math.min(placed.x, y.other.x),
+        y1: y.at,
+        x2: Math.max(placed.x + placed.w, y.other.x + y.other.w),
+        y2: y.at,
+      });
+    return { x: placed.x, y: placed.y };
+  }
+  /** The lines that show a dragged card has snapped into line, in board coordinates; none outside a drag. */
+  guides = $state.raw<Guide[]>([]);
 
   /** Where the board was left: its zoom and position. Unset until one is known. */
   view = $state.raw<{ x: number; y: number; zoom: number } | undefined>();
