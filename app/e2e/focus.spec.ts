@@ -38,3 +38,16 @@ test('picking an app dims what it does not touch and lights its own cables, unti
   await expect.poll(() => dimmed('web')).toBe(false);
   await expect(cable('web>orders')).not.toHaveClass(/\bdimmed\b/);
 });
+
+test('a picked tunnel card keeps its app bright, and the rest fades', async ({ page }) => {
+  const tunnel = page.locator('.svelte-flow__node-tunnel').first();
+  await expect(tunnel).toBeVisible();
+  await tunnel.click({ position: { x: 20, y: 10 } });
+  const dimmed = (id: string) =>
+    card(page, id)
+      .locator('.card')
+      .evaluate(el => el.classList.contains('dimmed'));
+  await expect.poll(() => dimmed('web')).toBe(true);
+  expect(await dimmed('orders')).toBe(false);
+  await expect(page.locator('.links .link').first()).not.toHaveClass(/dimmed/);
+});

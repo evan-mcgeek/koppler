@@ -430,21 +430,36 @@ class Board {
    * One app card picked: it, the cards its cables and links join, and its own tunnel, queue and outside cards stay
    * bright; the rest of the board is dimmed. Null with nothing or several picked.
    */
-  focus = $derived.by((): { id: string; near: string[] } | null => {
-    const picked = this.nodes.filter(node => node.selected);
-    const [one] = picked;
-    if (picked.length !== 1 || !one || this.infra.some(card => card.selected)) return null;
-    const near = [one.id];
-    for (const { from, to } of [...this.cables, ...this.links, ...this.flows])
-      if (from === one.id || to === one.id) near.push(from, to);
-    return { id: one.id, near };
+  /**
+   * One card picked (an app, a tunnel, a queue or an outside system), or one cable: it and what it joins stay bright,
+   * the rest of the board is dimmed. `id` is the picked card; a picked cable has `cable` and its two ends instead.
+   */
+  focus = $derived.by((): { id: string | null; cable?: [string, string]; near: string[] } | null => {
+    const cards = [...this.nodes, ...this.infra].filter(node => node.selected);
+    const cables = this.edges.filter(edge => edge.selected);
+    const [one] = cards;
+    const [wire] = cables;
+    if (cards.length === 1 && !cables.length && one) {
+      const near = [one.id];
+      for (const { from, to } of [...this.cables, ...this.links, ...this.flows])
+        if (from === one.id || to === one.id) near.push(from, to);
+      return { id: one.id, near };
+    }
+    if (!cards.length && cables.length === 1 && wire)
+      return { id: null, cable: [wire.source, wire.target], near: [wire.source, wire.target] };
+    return null;
   });
   /** Whether a card is dimmed while another is picked. */
   dimmed = (id: string): boolean => !!this.focus && !this.focus.near.includes(id);
-  /** Whether a cable is the picked app's own: drawn as strongly as a picked cable. */
-  lit = (from: string, to: string): boolean => !!this.focus && (from === this.focus.id || to === this.focus.id);
-  /** Whether a cable or link between these two is dimmed while an app is picked: only the picked one's stay bright. */
-  dimmedLink = (from: string, to: string): boolean => !!this.focus && from !== this.focus.id && to !== this.focus.id;
+  /** Whether a cable or link is the picked card's own, or the picked cable itself. */
+  lit = (from: string, to: string): boolean => {
+    const focus = this.focus;
+    if (!focus) return false;
+    if (focus.cable) return focus.cable[0] === from && focus.cable[1] === to;
+    return from === focus.id || to === focus.id;
+  };
+  /** Whether a cable or link is dimmed while something else is picked. */
+  dimmedLink = (from: string, to: string): boolean => !!this.focus && !this.lit(from, to);
 
   /** How much of a card's bottom edge the tunnel cards under it cover, and whether they sit at its right end. */
   #coveredBelow(id: string) {

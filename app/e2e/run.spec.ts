@@ -359,8 +359,9 @@ test('an app cabled to nothing on the board is flagged in the review, and cabled
   await expect(alone).toHaveCount(0);
 
   await review(page).getByRole('button', { name: 'Cancel' }).click();
-  await page.locator('.svelte-flow__edge[data-id="web>catalog"]').click();
-  await page.keyboard.press('Backspace');
+  const cut = page.locator('.svelte-flow__edge[data-id="web>catalog"]');
+  await cut.hover();
+  await cut.locator('.cut').click();
   await page.getByRole('button', { name: 'Run', exact: true }).click();
   await alone.getByRole('button', { name: 'Run it on its own' }).click();
   await expect(alone).toHaveCount(0);

@@ -99,7 +99,7 @@ test('a cable is drawn through waypoints dropped on the empty board, and Escape 
   await expect(page.locator('.svelte-flow__edge')).toHaveCount(5);
 });
 
-test('a cable shows a mark to unplug it under the pointer, and a click unplugs it', async ({ page }) => {
+test('a click picks a cable and lights it; the mark in its middle unplugs it', async ({ page }) => {
   const mark = cable(page, 'web>orders').locator('.cut');
   await expect(mark).toBeHidden();
   // This cable runs straight across: the middle of its box is on it.
@@ -109,13 +109,19 @@ test('a cable shows a mark to unplug it under the pointer, and a click unplugs i
       const box = el.getBoundingClientRect();
       return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
     });
-  await page.mouse.move(at.x, at.y);
-  await expect(mark).toBeVisible();
+  await page.mouse.move(at.x, at.y - 60);
+  await expect(mark).toBeHidden();
   await expect(cable(page, 'web>orders').locator('title')).toHaveText(
-    'Web Shop calls local Orders API. Click to unplug.',
+    'Web Shop calls local Orders API. Click to pick it; the × in its middle unplugs it.',
   );
+  // A click on the cable away from its middle picks it: it stays, lit, and the cards it does not join fade.
+  await page.mouse.click(at.x - 40, at.y);
+  await expect(cable(page, 'web>orders')).toHaveClass(/selected/);
+  await expect(cable(page, 'web>orders').locator('g').first()).toHaveClass(/\blit\b/);
+  await expect(card(page, 'catalog').locator('.card')).toHaveClass(/dimmed/);
+  await expect(mark).toBeVisible();
   await page.screenshot({ path: 'test-results/next-cut.png' });
-  await page.mouse.click(at.x, at.y);
+  await mark.click();
   await expect(cable(page, 'web>orders')).toHaveCount(0);
   await expect(page.locator('.svelte-flow__edge')).toHaveCount(3);
 });

@@ -53,6 +53,8 @@ Every call without a cable goes to the deployed app of the chosen environment.
 - Let go on the empty board to drop a waypoint; click to add more, click a card to finish, press Escape to cancel.
 - Slide a cable's end along its side to reorder the cables on that side.
 - Pull an end away from its side to start a new cable from that port.
+- Click a cable to pick it; the × in its middle, or Delete, unplugs it.
+- Pick a card or a cable to see what it joins: its cables are drawn strong and the rest of the board fades.
 - **Arrange** lays the board out by who calls whom.
 
 Cables are always curves, so any board you see is one you could draw yourself.
