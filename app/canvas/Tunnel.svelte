@@ -1,9 +1,8 @@
 <script lang="ts">
-  import Icon from './Icon.svelte';
   import X from '@lucide/svelte/icons/x';
-  import type { NodeProps } from '@xyflow/svelte';
-  import Cog from './Cog.svelte';
   import Database from '@lucide/svelte/icons/database';
+  import type { NodeProps } from '@xyflow/svelte';
+  import InfraCard, { type CardAction } from './InfraCard.svelte';
   import { openTerminal } from './commands.ts';
   import { dialogs } from './dialogs.svelte.ts';
   import { board, type TunnelNode } from './board.svelte.ts';
@@ -11,122 +10,54 @@
 
   const { id, data, selected }: NodeProps<TunnelNode> = $props();
   const on = $derived(live.tunnel(data.local.split(':').at(-1) ?? '', data.apps));
+  const actions = $derived<CardAction[]>([
+    ...(data.what.startsWith('Database')
+      ? [
+          {
+            label: `Query the ${data.what}`,
+            title: 'Open psql on it in a Terminal window, with the stored connection',
+            icon: Database,
+            run: () => void openTerminal(data.apps[0] ?? '', true),
+          },
+        ]
+      : []),
+    {
+      label: `Settings for the ${data.what} tunnel`,
+      title: 'Settings: the host, its port and how it is opened',
+      icon: 'cog',
+      run: () => void dialogs.settings?.open({ title: `${data.what} tunnel`, path: data.settings }),
+    },
+    {
+      label: 'Run without this tunnel',
+      title:
+        "Turn it off: the tunnel is not opened, so calls to it fail. Turn Tunnels back on on the app's card to bring it back.",
+      icon: X,
+      run: () => {
+        board.hideTunnel(id);
+      },
+    },
+  ]);
 </script>
 
-<div class="tunnel" class:selected class:dimmed={board.dimmed(id)} title={[data.host, ...data.about].join('\n')}>
-  <span
-    class="live"
-    data-on={on}
-    title={on ? 'Tunnel is up' : on === false ? 'Nothing is listening on this port' : 'Not running'}
-  ></span>
-  <span class="what">{data.what}</span>
-  <span class="local" class:moved={data.moved}>{data.local}</span>
-  {#if data.what.startsWith('Database')}
-    <button
-      class="hide nodrag"
-      type="button"
-      aria-label="Query the {data.what}"
-      title="Open psql on it in a Terminal window, with the stored connection"
-      onclick={() => void openTerminal(data.apps[0] ?? '', true)}
-    >
-      <Icon of={Database} size={13} />
-    </button>
-  {/if}
-  <button
-    class="hide nodrag"
-    type="button"
-    aria-label="Settings for the {data.what} tunnel"
-    title="Settings: the host, its port and how it is opened"
-    onclick={() => void dialogs.settings?.open({ title: `${data.what} tunnel`, path: data.settings })}
-  >
-    <Cog size={13} />
-  </button>
-  <button
-    class="hide nodrag"
-    type="button"
-    aria-label="Run without this tunnel"
-    title="Turn it off: the tunnel is not opened, so calls to it fail. Turn Tunnels back on on the app's card to bring it back."
-    onclick={() => {
-      board.hideTunnel(id);
-    }}><Icon of={X} size={14} /></button
-  >
+<InfraCard
+  {id}
+  kind="tunnel"
+  name={data.what}
+  detail={data.local}
+  detailWarn={data.moved}
+  hasDot
+  dot={on}
+  dotTitle={on ? 'Tunnel is up' : on === false ? 'Nothing is listening on this port' : 'Not running'}
+  title={[data.host, ...data.about].join('\n')}
+  {selected}
+  {actions}
+>
   <span class="host">{data.host}</span>
-</div>
+</InfraCard>
 
 <style>
-  .tunnel {
-    display: grid;
-    grid-template-columns: 8px 1fr repeat(4, auto);
-    column-gap: 8px;
-    row-gap: 3px;
-    align-items: baseline;
-    width: max-content;
-    min-width: 200px;
-    max-width: 420px;
-    padding: 10px 10px 12px 14px;
-    border: 1px dashed color-mix(in oklab, var(--muted) 55%, var(--line));
-    border-radius: 10px;
-    background: var(--paper);
-    color: var(--ink);
-    font: 12.5px/1.4 var(--sans);
-    user-select: none;
-    cursor: grab;
-  }
-  .tunnel.selected,
-  :global(.svelte-flow__node:focus-visible) .tunnel {
-    outline: 2px solid var(--cable);
-    /* On the border itself: one frame, not a ring around a frame. */
-    outline-offset: -1px;
-  }
-  .live {
-    align-self: center;
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: var(--line);
-  }
-  .live[data-on='true'] {
-    background: var(--ok);
-  }
-  .live[data-on='false'] {
-    background: var(--bad);
-  }
-  .what {
-    font-weight: 600;
-    white-space: nowrap;
-  }
-  .local {
-    font: 12px var(--mono);
-    color: var(--muted);
-  }
-  .local.moved {
-    color: var(--warn);
-  }
-  .hide {
-    display: grid;
-    place-items: center;
-    align-self: center;
-    width: 24px;
-    height: 24px;
-    margin: -6px -4px -6px 0;
-    padding: 0;
-    border: 0;
-    border-radius: 5px;
-    background: none;
-    color: var(--muted);
-    font-size: 15px;
-    line-height: 1;
-    cursor: pointer;
-  }
-  .hide:hover {
-    background: color-mix(in oklab, var(--ink) 9%, transparent);
-    color: var(--ink);
-  }
   .host {
-    grid-column: 2 / -1;
+    display: block;
     max-width: 34ch;
-    font: 12px var(--mono);
-    color: var(--muted);
-    overflow-wrap: anywhere;
   }
 </style>

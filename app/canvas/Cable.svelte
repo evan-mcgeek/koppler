@@ -43,6 +43,7 @@
     class:idle={!live.up(source) || !live.up(target)}
     class:dimmed={board.dimmedLink(source, target)}
     class:lit={board.lit(source, target)}
+    class:snapped={board.snapped.includes(id)}
     role="presentation"
     onpointerenter={() => (board.hovered = id)}
     onpointerleave={() => (board.hovered = null)}
@@ -142,6 +143,14 @@
   .lit .wire {
     stroke: var(--cable-ink);
     stroke-width: 4;
+  }
+  /* Snapped straight while a card is dragged: the cable goes a shade darker, nothing more. */
+  .snapped .wire {
+    stroke: var(--cable-ink);
+  }
+  .snapped .head {
+    fill: var(--cable-ink);
+    stroke: var(--cable-ink);
   }
   :global(.svelte-flow__edge.selected) .head,
   :global(.svelte-flow__edge:focus-visible) .head,

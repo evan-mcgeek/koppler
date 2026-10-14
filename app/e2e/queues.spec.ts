@@ -338,7 +338,9 @@ test.describe('an outside system that reads a queue one app on the board sends t
 test("the icons in a queue's and a tunnel's buttons sit in the middle of each button", async ({ page }) => {
   await expect(queue(page)).toHaveCount(2);
   const off = await page
-    .locator('.svelte-flow__node-queue button.hide, .svelte-flow__node-tunnel button.hide')
+    .locator(
+      '.svelte-flow__node-queue .acts button, .svelte-flow__node-tunnel .acts button, .svelte-flow__node-outside .acts button',
+    )
     .evaluateAll(buttons =>
       buttons.map(button => {
         const box = button.getBoundingClientRect();
