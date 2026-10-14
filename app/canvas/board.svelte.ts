@@ -2,7 +2,7 @@
 // waypoints, sliding an end along its side). The geometry is core/cables and core/arrange, unchanged.
 import type { Edge, Node } from '@xyflow/svelte';
 import { arrange, sidesFor, squeeze, type Point, type Side } from '../src/core/arrange.ts';
-import { endOffsets, orderSlots, SIDES, type Box, type Cable } from '../src/core/cables.ts';
+import { endOffsets, orderSlots, sidePoint, SIDES, type Box, type Cable } from '../src/core/cables.ts';
 import { of as kindOf } from '../src/core/kinds.ts';
 import { isProtected, LOCAL_QUEUE_TYPES, queuesOf } from '../src/core/plan.ts';
 import { planTunnels, tunnelKind, type Tunnel } from '../src/core/ports.ts';
@@ -130,6 +130,8 @@ const tunnelKey = (tunnel: Tunnel) => `tunnel:${tunnel.host}:${String(tunnel.ori
 /** The room a tunnel card is given before it has been measured, and the gap that keeps it beside its app. */
 const TUNNEL = { w: 230, h: 58, gap: 40 };
 const TUNNEL_SIDES: Side[] = ['bottom', 'right', 'left', 'top'];
+/** How close, on screen, a dragged card's cable must come to straight for the card to snap so it is. */
+const SNAP = 8;
 export type End = 'from' | 'to';
 export interface StackApp {
   id: string;
@@ -745,8 +747,13 @@ class Board {
   fromFlow(drawn: (CardNode | InfraNode)[], brief: string, settled: boolean): boolean {
     // The flow has the cards where they are drawn: one it moved is kept where that is on the full board.
     const kept = new Map([...this.nodes, ...this.infra].map(node => [node.id, node]));
-    const all = drawn.map(node => {
-      const at = kept.get(node.id);
+    const all = drawn.map(drawnNode => {
+      const at = kept.get(drawnNode.id);
+      // A card being dragged snaps to where one of its cables runs straight, when that is close.
+      const node =
+        (drawnNode.dragging || at?.dragging) && drawnNode.type === 'app'
+          ? { ...drawnNode, position: this.#straight(drawnNode.id, drawnNode.position) }
+          : drawnNode;
       if (at?.dragging && !node.dragging) return { ...node, position: this.dropped(node.id, node.position) };
       const was = at && this.shown(at.position);
       return at && was?.x === node.position.x && was.y === node.position.y
@@ -791,6 +798,43 @@ class Board {
     this.nodes = apps;
     this.infra = infra;
     return Object.keys(grew).length > 0;
+  }
+
+  /** Where a dragged card goes so that its nearest almost straight cable is straight: each way, the smallest step. */
+  #straight(id: string, to: Point): Point {
+    const box = this.boxes.get(id);
+    if (!box) return to;
+    const near = SNAP / (this.view?.zoom ?? 1);
+    const moved = { ...box, x: to.x, y: to.y };
+    const end = (index: number, which: 'from' | 'to', card: Box) => {
+      const one = this.cables[index];
+      if (!one) return undefined;
+      const side = one[`${which}Side`];
+      const at = sidePoint(card, side);
+      const by = this.ends.offset[`${String(index)}|${which}`] ?? 0;
+      return { side, at: SIDES[side][0] === 0 ? { ...at, x: at.x + by } : { ...at, y: at.y + by } };
+    };
+    let dx: number | undefined;
+    let dy: number | undefined;
+    this.cables.forEach((one, index) => {
+      const mine = one.from === id ? 'from' : one.to === id ? 'to' : null;
+      if (!mine || one.from === one.to) return;
+      const theirs = mine === 'from' ? 'to' : 'from';
+      const other = this.boxes.get(one[theirs]);
+      if (!other || this.nodes.some(node => node.id === one[theirs] && node.dragging)) return;
+      const here = end(index, mine, moved);
+      const there = end(index, theirs, other);
+      if (!here || !there) return;
+      // A cable leaving sideways is straight when its ends are level; one leaving up or down, when they are in line.
+      if (SIDES[here.side][0] !== 0) {
+        const by = there.at.y - here.at.y;
+        if (Math.abs(by) <= near && (dy === undefined || Math.abs(by) < Math.abs(dy))) dy = by;
+      } else {
+        const by = there.at.x - here.at.x;
+        if (Math.abs(by) <= near && (dx === undefined || Math.abs(by) < Math.abs(dx))) dx = by;
+      }
+    });
+    return { x: to.x + (dx ?? 0), y: to.y + (dy ?? 0) };
   }
 
   /** Where the board was left: its zoom and position. Unset until one is known. */
