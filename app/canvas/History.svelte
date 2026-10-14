@@ -1,4 +1,6 @@
 <script lang="ts">
+  import Icon from './Icon.svelte';
+  import Clock from '@lucide/svelte/icons/clock';
   // Every run and Stop, and how it ended; what stopped outside a run is told among them. Newest first, this session's
   // on top and older ones folded under "Earlier".
   import { VERSION } from '../src/core/presets.ts';
@@ -57,9 +59,7 @@
   title={waiting ? 'A run is waiting for the agent' : 'Every run and Stop, and how it ended'}
   popovertarget={id}
 >
-  <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
-    <circle cx="8" cy="8" r="5.6" /><path d="M8 4.8V8l2.2 1.6" />
-  </svg>
+  <Icon of={Clock} size={16} />
 </button>
 <div
   bind:this={pop}
@@ -135,13 +135,6 @@
     height: 7px;
     border-radius: 50%;
     background: var(--warn);
-  }
-  .open svg {
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 1.4;
-    stroke-linecap: round;
-    stroke-linejoin: round;
   }
   .pop {
     position: fixed;

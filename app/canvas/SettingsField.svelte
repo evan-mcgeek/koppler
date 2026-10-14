@@ -1,4 +1,9 @@
 <script lang="ts">
+  import Icon from './Icon.svelte';
+  import Lock from '@lucide/svelte/icons/lock';
+  import LockOpen from '@lucide/svelte/icons/lock-open';
+  import ChevronRight from '@lucide/svelte/icons/chevron-right';
+  import X from '@lucide/svelte/icons/x';
   // One field of the stack in a settings panel, edited the way it is best edited: picked where Koppler knows what it
   // can be, a row with a sentence where it is one of a list, else by its schema (text, a number, a switch, a group).
   // Each keeps its value through the panel, which checks it; a lock keeps it as it is.
@@ -132,12 +137,6 @@
 </script>
 
 <!-- eslint-disable @typescript-eslint/no-confusing-void-expression -- {@render} of a snippet returns nothing -->
-{#snippet glyph(paths: string[])}
-  <svg class="glyph" viewBox="0 0 24 24" width="15" height="15" aria-hidden="true">
-    {#each paths as d (d)}<path {d} />{/each}
-  </svg>
-{/snippet}
-
 {#snippet acts()}
   <span class="acts" class:fresh={ctx.fresh}>
     {#if drop && !locked}
@@ -150,7 +149,7 @@
         title="Remove"
         onclick={() => void save(undefined)}
       >
-        <svg viewBox="0 0 16 16" width="11" height="11" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" /></svg>
+        <Icon of={X} size={11} />
       </button>
     {/if}
     <button
@@ -164,10 +163,7 @@
         ctx.lock(path, !locked);
       }}
     >
-      <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true">
-        <rect x="3.5" y="7" width="9" height="6.5" rx="1.5" />
-        <path d={locked ? 'M5.5 7V5a2.5 2.5 0 0 1 5 0v2' : 'M5.5 7V5a2.5 2.5 0 0 1 4.8-1'} />
-      </svg>
+      <Icon of={locked ? Lock : LockOpen} size={12} />
     </button>
   </span>
 {/snippet}
@@ -262,7 +258,7 @@
         {#each NEEDS as type (type.id)}
           {@const none = type.id === 'signIn' && !signIns}
           <button type="button" disabled={none} onclick={() => start(type)}>
-            {@render glyph(type.icon)}
+            <span class="glyph"><Icon of={type.icon} size={15} /></span>
             <span class="what">{type.label}</span>
             <span class="about">{none ? 'This stack defines none yet' : type.about}</span>
           </button>
@@ -310,11 +306,11 @@
   <!-- A group with nothing in it stays closed, and so does a row: what it holds is a click away. -->
   <details class="nest" class:rowed={!!row} bind:open={unfolded}>
     <summary title={hint}>
-      <svg class="chev" viewBox="0 0 16 16" width="10" height="10" aria-hidden="true"><path d="M6 4l4 4-4 4" /></svg>
+      <span class="chev"><Icon of={ChevronRight} size={10} /></span>
       {#if row?.kind}
         <KindIcon kind={row.kind} label="" />
       {:else if row?.icon}
-        {@render glyph(row.icon)}
+        <span class="glyph"><Icon of={row.icon} size={15} /></span>
       {/if}
       {#if row}
         <span class="name"><span class="what">{row.label}</span><span class="say">{row.say}</span></span>
@@ -502,12 +498,10 @@
     list-style-position: outside;
   }
   .chev {
+    display: grid;
     flex: none;
+    color: var(--muted);
     margin-left: -2px;
-    fill: none;
-    stroke: var(--muted);
-    stroke-width: 1.8;
-    stroke-linecap: round;
     transition: rotate 0.12s;
   }
   .nest[open] > summary .chev {
@@ -567,12 +561,6 @@
   .icon:hover {
     background: color-mix(in oklab, var(--ink) 8%, transparent);
     color: var(--ink);
-  }
-  .icon svg {
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 1.5;
-    stroke-linecap: round;
   }
   .words {
     padding: 2px 8px;
@@ -669,12 +657,8 @@
     font-size: 12px;
   }
   .glyph {
+    display: grid;
     flex: none;
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 1.8;
-    stroke-linecap: round;
-    stroke-linejoin: round;
     color: var(--muted);
   }
   summary .name {

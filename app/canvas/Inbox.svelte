@@ -1,4 +1,6 @@
 <script lang="ts">
+  import Icon from './Icon.svelte';
+  import X from '@lucide/svelte/icons/x';
   // The agent's messages, beside the board: questions to answer, and what it finished or failed at.
   import Command from './Command.svelte';
   import InboxMessage from './InboxMessage.svelte';
@@ -42,7 +44,9 @@
       {#if list.some(one => !waits(one))}
         <button type="button" onclick={() => void inbox.clear()}>Clear</button>
       {/if}
-      <button class="close" type="button" aria-label="Close" onclick={() => (inbox.open = false)}>×</button>
+      <button class="close" type="button" aria-label="Close" onclick={() => (inbox.open = false)}
+        ><Icon of={X} size={14} /></button
+      >
     </header>
     <div class="list">
       {#if inbox.waiting.length}

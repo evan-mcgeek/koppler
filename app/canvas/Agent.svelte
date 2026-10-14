@@ -1,4 +1,6 @@
 <script lang="ts">
+  import Icon from './Icon.svelte';
+  import Plug from '@lucide/svelte/icons/plug';
   // Whether an agent session takes what the canvas sends, and how to connect one.
   import Command from './Command.svelte';
   import { inbox } from './inbox.svelte.ts';
@@ -85,9 +87,7 @@
       aria-expanded={open}
       popovertarget={id}
     >
-      <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
-        <path d="M13 8a5 5 0 1 1-1.5-3.6M13 2.5v3h-3" />
-      </svg>
+      <Icon of={Plug} size={15} />
     </button>
   {/if}
   <div
@@ -196,13 +196,6 @@
   .how[aria-expanded='true'] {
     border-color: var(--line);
     color: var(--ink);
-  }
-  .how path {
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 1.5;
-    stroke-linecap: round;
-    stroke-linejoin: round;
   }
   .connect {
     position: fixed;

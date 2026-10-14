@@ -1,4 +1,6 @@
 <script lang="ts">
+  import Icon from './Icon.svelte';
+  import X from '@lucide/svelte/icons/x';
   import type { NodeProps } from '@xyflow/svelte';
   import { board, type TunnelNode } from './board.svelte.ts';
   import { live } from './live.svelte.ts';
@@ -22,7 +24,7 @@
     title="Turn it off: the tunnel is not opened, so calls to it fail. Turn Tunnels back on on the app's card to bring it back."
     onclick={() => {
       board.hideTunnel(id);
-    }}>×</button
+    }}><Icon of={X} size={14} /></button
   >
   <span class="host">{data.host}</span>
 </div>

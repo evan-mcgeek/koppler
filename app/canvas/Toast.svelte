@@ -1,4 +1,6 @@
 <script lang="ts">
+  import Icon from './Icon.svelte';
+  import X from '@lucide/svelte/icons/x';
   import { toasts } from './toast.svelte.ts';
 
   let copied = $state(false);
@@ -32,7 +34,7 @@
       aria-label="Dismiss"
       onclick={() => {
         toasts.hide();
-      }}>×</button
+      }}><Icon of={X} size={14} /></button
     >
   </div>
 {/if}

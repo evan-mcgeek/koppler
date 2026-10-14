@@ -1,4 +1,7 @@
 <script lang="ts">
+  import ChevronRight from '@lucide/svelte/icons/chevron-right';
+  import Icon from './Icon.svelte';
+  import X from '@lucide/svelte/icons/x';
   // Settings for one part of the stack (an app, a queue, an outside system, the whole stack), opened from the gear next
   // to it. What it is sits on top; the rest is in tabs, in plain words; every field its schema has is there. Edits are a
   // draft until Save, which checks the whole stack and writes it at once; Discard drops them. A lock keeps a field as it
@@ -247,7 +250,7 @@
         }}>{asked ? 'Asked the agent' : 'Ask the agent to fill in'}</button
       >
     {/if}
-    <button class="x" type="button" aria-label="Close" onclick={close}>×</button>
+    <button class="x" type="button" aria-label="Close" onclick={close}><Icon of={X} size={14} /></button>
   </header>
   {#if schema && draft}
     {#if head.length}
@@ -318,7 +321,9 @@
         {#if others.length}
           <!-- Fields for how other kinds of app start: not this one's, but nothing is hidden. -->
           <details class="others">
-            <summary>Fields for other kinds of app</summary>
+            <summary
+              ><span class="chev"><Icon of={ChevronRight} size={10} /></span>Fields for other kinds of app</summary
+            >
             {#each others as key (key)}
               <SettingsField
                 path={child(at, key)}
@@ -492,9 +497,23 @@
     color: var(--ink);
   }
   .others summary {
+    display: flex;
+    align-items: center;
+    gap: 6px;
     color: var(--muted);
     font-weight: 600;
+    list-style: none;
     cursor: pointer;
+  }
+  .others summary::-webkit-details-marker {
+    display: none;
+  }
+  .chev {
+    display: grid;
+    transition: rotate 0.12s;
+  }
+  .others[open] .chev {
+    rotate: 90deg;
   }
   .apps {
     display: grid;

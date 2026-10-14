@@ -1,4 +1,12 @@
 <script lang="ts">
+  import Check from '@lucide/svelte/icons/check';
+  import Icon from './Icon.svelte';
+  import GripVertical from '@lucide/svelte/icons/grip-vertical';
+  import Logs from '@lucide/svelte/icons/logs';
+  import Play from '@lucide/svelte/icons/play';
+  import RotateCw from '@lucide/svelte/icons/rotate-cw';
+  import Square from '@lucide/svelte/icons/square';
+  import X from '@lucide/svelte/icons/x';
   import Cog from './Cog.svelte';
   import Command from './Command.svelte';
   import BranchPicker from './BranchPicker.svelte';
@@ -123,9 +131,7 @@
         title="Stop this app; its changes stay"
         onclick={() => void runs.stopApp(id)}
       >
-        <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"
-          ><rect class="fill" x="4" y="4" width="8" height="8" rx="1.5" /></svg
-        >
+        <Icon of={Square} size={15} filled />
       </button>
       <button
         type="button"
@@ -135,9 +141,7 @@
           runs.start({ restart: id });
         }}
       >
-        <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"
-          ><path d="M12.5 8a4.5 4.5 0 1 1-1.6-3.4" /><path d="M11.2 2v2.8H8.4" /></svg
-        >
+        <Icon of={RotateCw} size={15} />
       </button>
     {:else}
       <button
@@ -148,9 +152,7 @@
           runs.alone(id);
         }}
       >
-        <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"
-          ><path class="fill" d="M5 3.2v9.6l7.8-4.8z" /></svg
-        >
+        <Icon of={Play} size={15} filled />
       </button>
     {/if}
     {#if live.hasLog(id)}
@@ -162,7 +164,7 @@
           logs.open(id);
         }}
       >
-        <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><path d="M3 4h10M3 8h10M3 12h6" /></svg>
+        <Icon of={Logs} size={15} />
       </button>
     {/if}
     <button
@@ -182,7 +184,7 @@
         board.remove(id);
       }}
     >
-      <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" /></svg>
+      <Icon of={X} size={15} />
     </button>
   </span>
 </NodeToolbar>
@@ -203,9 +205,7 @@
 >
   <header>
     <span class="grip" aria-hidden="true" title="Drag to move">
-      <svg viewBox="0 0 8 14" width="8" height="14">
-        {#each [2.5, 7, 11.5] as cy (cy)}<circle cx="2" {cy} r="1.2" /><circle cx="6" {cy} r="1.2" />{/each}
-      </svg>
+      <Icon of={GripVertical} size={14} />
     </span>
     {#if up !== null}
       <span class="live" data-on={up} role="img" aria-label={up ? 'Running' : 'Not answering'} title={live.about(id)}
@@ -442,7 +442,7 @@
         {#each steps as step, at (at)}
           <li class="step" data-state={step.state}>
             <span class="mark" aria-hidden="true"
-              >{step.state === 'done' ? '✓' : step.state === 'failed' ? '!' : ''}</span
+              >{#if step.state === 'done'}<Icon of={Check} size={11} />{:else if step.state === 'failed'}!{/if}</span
             >
             <span class="what">{step.label}</span>
             {#if step.detail}<span class="detail">{step.detail}</span>{/if}
@@ -615,13 +615,6 @@
   .tools .fill {
     fill: currentColor;
     stroke: none;
-  }
-  .tools svg {
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 1.5;
-    stroke-linecap: round;
-    stroke-linejoin: round;
   }
   .body {
     display: grid;

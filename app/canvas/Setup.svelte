@@ -1,4 +1,6 @@
 <script lang="ts">
+  import Icon from './Icon.svelte';
+  import X from '@lucide/svelte/icons/x';
   // Setting Koppler up with a stack: one the team shares (found on this machine, or from a link on GitHub), or a new
   // one. One choice at a time.
   import { board } from './board.svelte.ts';
@@ -78,7 +80,9 @@
   }}
 >
   {#if pane === 'start'}
-    {#if !board.setup}<button class="x" type="button" aria-label="Close" onclick={() => dialog?.close()}>×</button>{/if}
+    {#if !board.setup}<button class="x" type="button" aria-label="Close" onclick={() => dialog?.close()}
+        ><Icon of={X} size={14} /></button
+      >{/if}
     <h2 id="setup-title">Set up Koppler</h2>
     <p class="sub">
       Koppler runs the apps you pick on this Mac and connects them to each other. Everything else keeps calling the
@@ -190,7 +194,7 @@
             <span class="tag">
               {env}{#if index === 0 && envs.length > 1}<small>default</small>{/if}
               <button type="button" aria-label="Remove {env}" onclick={() => (envs = envs.filter(one => one !== env))}
-                >×</button
+                ><Icon of={X} size={14} /></button
               >
             </span>
           {/each}

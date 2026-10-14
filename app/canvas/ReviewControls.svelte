@@ -170,10 +170,14 @@
   }
   select {
     max-width: 180px;
-    padding: 2px 6px;
+    padding: 2px 24px 2px 8px;
+    appearance: none;
+    background-image: var(--chevron);
+    background-repeat: no-repeat;
+    background-position: right 8px center;
     border: 1px solid var(--line);
     border-radius: 6px;
-    background: var(--paper);
+    background-color: var(--paper);
     color: var(--ink);
     font: 12px var(--sans);
   }

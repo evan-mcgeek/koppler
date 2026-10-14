@@ -1,4 +1,7 @@
 <script lang="ts">
+  import Icon from './Icon.svelte';
+  import ChevronLeft from '@lucide/svelte/icons/chevron-left';
+  import X from '@lucide/svelte/icons/x';
   // A list of short names (environments, settings, paths): each is a chip that can be taken out, and one is typed in to
   // add it. Where their order means something, a chip moves towards the front.
   const {
@@ -44,7 +47,7 @@
             sooner(at);
           }}
         >
-          <svg viewBox="0 0 16 16" width="10" height="10" aria-hidden="true"><path d="M10 4L6 8l4 4" /></svg>
+          <Icon of={ChevronLeft} size={10} />
         </button>
       {/if}
       <span class="word">{one}</span>
@@ -58,7 +61,7 @@
             onchange(value.filter(other => other !== one));
           }}
         >
-          <svg viewBox="0 0 16 16" width="10" height="10" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" /></svg>
+          <Icon of={X} size={10} />
         </button>
       {/if}
     </li>
@@ -134,13 +137,6 @@
   button:hover {
     background: color-mix(in oklab, var(--ink) 10%, transparent);
     color: var(--ink);
-  }
-  svg {
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 1.6;
-    stroke-linecap: round;
-    stroke-linejoin: round;
   }
   .new {
     padding: 0;

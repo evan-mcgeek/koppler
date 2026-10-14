@@ -1,4 +1,6 @@
 <script lang="ts">
+  import Icon from './Icon.svelte';
+  import ChevronDown from '@lucide/svelte/icons/chevron-down';
   // The small menu behind the arrow next to a main button: more ways to do the same thing.
   export interface Item {
     label: string;
@@ -39,7 +41,7 @@
   aria-expanded={open}
   popovertarget={id}
 >
-  <svg viewBox="0 0 12 12" width="12" height="12" aria-hidden="true"><path d="M3 4.5l3 3 3-3" /></svg>
+  <Icon of={ChevronDown} size={12} />
 </button>
 <div
   bind:this={list}
@@ -81,13 +83,6 @@
     border: 1px solid transparent;
     border-radius: 0 8px 8px 0;
     cursor: pointer;
-  }
-  .more path {
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 1.6;
-    stroke-linecap: round;
-    stroke-linejoin: round;
   }
   .more.stop {
     border-color: color-mix(in oklab, var(--prod) 45%, transparent);

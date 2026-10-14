@@ -1,4 +1,6 @@
 <script lang="ts">
+  import Icon from './Icon.svelte';
+  import Check from '@lucide/svelte/icons/check';
   // "Before this runs on PROD": what the user has to do first, worked out live (sign-ins, hosts entries, credentials,
   // what the stack lacks), in the order it can be done, each with its command.
   import Command from './Command.svelte';
@@ -50,12 +52,16 @@
       <li><span class="mark"></span><span class="what">Working out what is needed…</span></li>
     {:else if !steps.length}
       <li class="done">
-        <span class="mark">✓</span><span class="what">Nothing for you to do. Koppler does the rest.</span>
+        <span class="mark"><Icon of={Check} size={13} /></span><span class="what"
+          >Nothing for you to do. Koppler does the rest.</span
+        >
       </li>
     {:else}
       {#each steps as step, at (at)}
         <li class:done={step.done} class:gap={step.gap && !step.done}>
-          <span class="mark">{step.done ? '✓' : step.gap ? '!' : at + 1}</span>
+          <span class="mark"
+            >{#if step.done}<Icon of={Check} size={13} />{:else}{step.gap ? '!' : at + 1}{/if}</span
+          >
           <span class="what">
             {step.title}{#if step.apps?.length}
               <small class="for">({step.apps.join(', ')})</small>{/if}

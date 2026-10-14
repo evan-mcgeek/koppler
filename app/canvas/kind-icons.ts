@@ -1,32 +1,46 @@
-// What kind of app a row is. A technology is shown by its own mark, in the text colour (Simple Icons, CC0): it is
-// recognised faster than an invented symbol. Kinds without one get a plain drawn icon. One 24-unit box for all.
+// What kind of app a row is. A technology is shown by its own mark, in the text colour (Simple Icons): it is
+// recognised faster than an invented symbol. Kinds without one get a drawn icon from the icon library.
+import type { LucideProps } from '@lucide/svelte';
+import AppWindow from '@lucide/svelte/icons/app-window';
+import Box from '@lucide/svelte/icons/box';
+import {
+  siDocker,
+  siDotnet,
+  siFlutter,
+  siGo,
+  siNodedotjs,
+  siOpenjdk,
+  siPhp,
+  siPython,
+  siReact,
+  siRuby,
+  siRust,
+} from 'simple-icons';
+import type { Component } from 'svelte';
+
 export interface KindIcon {
-  /** A filled mark, or the strokes of a drawn icon. */
+  /** A technology's filled mark, in a 24 box. */
   logo?: string;
-  lines?: string[];
+  icon?: Component<LucideProps>;
 }
+// Simple Icons no longer carries AWS marks: this one is kept from the release that did (CC0).
 const LAMBDA =
   'M4.9855 0c-.2941.0031-.5335.2466-.534.5482L4.446 5.456c0 .1451.06.2835.159.3891a.5322.5322 0 0 0 .3806.1562h3.4282l8.197 17.6805a.5365.5365 0 0 0 .4885.3181h5.811c.2969 0 .5426-.2448.5426-.5482V18.544c0-.3035-.2392-.5482-.5425-.5482h-2.0138L12.7394.3153C12.647.124 12.4564 0 12.2452 0h-7.254Zm.5397 1.0907h6.3678l8.16 17.6804a.5365.5365 0 0 0 .4885.3181h1.8178v3.8173H17.437L9.2402 5.226a.536.536 0 0 0-.4885-.318H5.5223Zm2.0137 8.2366c-.2098.0011-.3937.1193-.4857.3096L.6002 23.2133a.5506.5506 0 0 0 .0313.5282.5334.5334 0 0 0 .4544.25h6.169a.5468.5468 0 0 0 .497-.3096l3.38-7.166a.5405.5405 0 0 0-.0029-.4686L8.036 9.637a.5468.5468 0 0 0-.4942-.3096Zm.0057 1.8036 2.488 5.1522-3.1214 6.6206H1.9465Z';
-const OTHER: KindIcon = {
-  lines: [
-    'M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z',
-    'm3.3 7 8.7 5 8.7-5M12 22V12',
-  ],
-};
 const ICONS: Record<string, KindIcon> = {
-  dotnet: {
-    logo: 'M24 8.77h-2.468v7.565h-1.425V8.77h-2.462V7.53H24zm-6.852 7.565h-4.821V7.53h4.63v1.24h-3.205v2.494h2.953v1.234h-2.953v2.604h3.396zm-6.708 0H8.882L4.78 9.863a2.896 2.896 0 0 1-.258-.51h-.036c.032.189.048.592.048 1.21v5.772H3.157V7.53h1.659l3.965 6.32c.167.261.275.442.323.54h.024c-.04-.233-.06-.629-.06-1.185V7.529h1.372zm-8.703-.693a.868.829 0 0 1-.869.829.868.829 0 0 1-.868-.83.868.829 0 0 1 .868-.828.868.829 0 0 1 .869.829Z',
-  },
-  flutter: {
-    logo: 'M14.314 0L2.3 12 6 15.7 21.684.013h-7.357zm.014 11.072L7.857 17.53l6.47 6.47H21.7l-6.46-6.468 6.46-6.46h-7.37z',
-  },
-  node: {
-    logo: 'M11.998,24c-0.321,0-0.641-0.084-0.922-0.247l-2.936-1.737c-0.438-0.245-0.224-0.332-0.08-0.383 c0.585-0.203,0.703-0.25,1.328-0.604c0.065-0.037,0.151-0.023,0.218,0.017l2.256,1.339c0.082,0.045,0.197,0.045,0.272,0l8.795-5.076 c0.082-0.047,0.134-0.141,0.134-0.238V6.921c0-0.099-0.053-0.192-0.137-0.242l-8.791-5.072c-0.081-0.047-0.189-0.047-0.271,0 L3.075,6.68C2.99,6.729,2.936,6.825,2.936,6.921v10.15c0,0.097,0.054,0.189,0.139,0.235l2.409,1.392 c1.307,0.654,2.108-0.116,2.108-0.89V7.787c0-0.142,0.114-0.253,0.256-0.253h1.115c0.139,0,0.255,0.112,0.255,0.253v10.021 c0,1.745-0.95,2.745-2.604,2.745c-0.508,0-0.909,0-2.026-0.551L2.28,18.675c-0.57-0.329-0.922-0.945-0.922-1.604V6.921 c0-0.659,0.353-1.275,0.922-1.603l8.795-5.082c0.557-0.315,1.296-0.315,1.848,0l8.794,5.082c0.57,0.329,0.924,0.944,0.924,1.603 v10.15c0,0.659-0.354,1.273-0.924,1.604l-8.794,5.078C12.643,23.916,12.324,24,11.998,24z M19.099,13.993 c0-1.9-1.284-2.406-3.987-2.763c-2.731-0.361-3.009-0.548-3.009-1.187c0-0.528,0.235-1.233,2.258-1.233 c1.807,0,2.473,0.389,2.747,1.607c0.024,0.115,0.129,0.199,0.247,0.199h1.141c0.071,0,0.138-0.031,0.186-0.081 c0.048-0.054,0.074-0.123,0.067-0.196c-0.177-2.098-1.571-3.076-4.388-3.076c-2.508,0-4.004,1.058-4.004,2.833 c0,1.925,1.488,2.457,3.895,2.695c2.88,0.282,3.103,0.703,3.103,1.269c0,0.983-0.789,1.402-2.642,1.402 c-2.327,0-2.839-0.584-3.011-1.742c-0.02-0.124-0.126-0.215-0.253-0.215h-1.137c-0.141,0-0.254,0.112-0.254,0.253 c0,1.482,0.806,3.248,4.655,3.248C17.501,17.007,19.099,15.91,19.099,13.993z',
-  },
+  dotnet: { logo: siDotnet.path },
+  flutter: { logo: siFlutter.path },
+  node: { logo: siNodedotjs.path },
   lambda: { logo: LAMBDA },
   sam: { logo: LAMBDA },
-  web: {
-    lines: ['M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z', 'M2 9h20M6 6.5h.01M9 6.5h.01'],
-  },
+  web: { icon: AppWindow },
+  reactnative: { logo: siReact.path },
+  go: { logo: siGo.path },
+  rust: { logo: siRust.path },
+  java: { logo: siOpenjdk.path },
+  python: { logo: siPython.path },
+  ruby: { logo: siRuby.path },
+  php: { logo: siPhp.path },
+  compose: { logo: siDocker.path },
 };
-export const iconOf = (kind: string): KindIcon => (Object.hasOwn(ICONS, kind) ? ICONS[kind] : undefined) ?? OTHER;
+export const iconOf = (kind: string): KindIcon =>
+  (Object.hasOwn(ICONS, kind) ? ICONS[kind] : undefined) ?? { icon: Box };

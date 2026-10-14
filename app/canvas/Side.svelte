@@ -1,4 +1,10 @@
 <script lang="ts">
+  import Icon from './Icon.svelte';
+  import ArrowDown from '@lucide/svelte/icons/arrow-down';
+  import Play from '@lucide/svelte/icons/play';
+  import Plus from '@lucide/svelte/icons/plus';
+  import Trash from '@lucide/svelte/icons/trash';
+  import X from '@lucide/svelte/icons/x';
   import Command from './Command.svelte';
   import BoardPicker from './BoardPicker.svelte';
   import KindIcon from './KindIcon.svelte';
@@ -125,7 +131,7 @@
         <span class="count">{onBoard.length} of {board.apps.length} on the board</span>
       {/if}
       <button class="sort" type="button" onclick={toggleSort} title={sortHint} aria-label={sortHint}>
-        <svg viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M6 2v8M3 7l3 3 3-3" /></svg>
+        <Icon of={ArrowDown} size={11} />
         {sort === 'name' ? 'Az' : 'Added'}
       </button>
     </h2>
@@ -171,7 +177,7 @@
                 else board.remove(app.id);
               }}
             >
-              <svg viewBox="0 0 16 16" width="11" height="11" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" /></svg>
+              <Icon of={X} size={11} />
             </button>
           {:else if app.outside}
             <button
@@ -192,9 +198,7 @@
                 askDrop(app);
               }}
             >
-              <svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true"
-                ><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" /></svg
-              >
+              <Icon of={Trash} size={12} />
             </button>
           {:else if !app.cloned}
             <button
@@ -215,9 +219,7 @@
                 askDrop(app);
               }}
             >
-              <svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true"
-                ><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" /></svg
-              >
+              <Icon of={Trash} size={12} />
             </button>
           {:else}
             <button
@@ -243,9 +245,7 @@
                 askDrop(app);
               }}
             >
-              <svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true"
-                ><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" /></svg
-              >
+              <Icon of={Trash} size={12} />
             </button>
             <button
               class="act alone"
@@ -256,9 +256,7 @@
                 runs.alone(app.id);
               }}
             >
-              <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"
-                ><path class="fill" d="M4.5 2.8v10.4l8.6-5.2z" /></svg
-              >
+              <Icon of={Play} size={12} filled />
             </button>
             <button
               class="act add"
@@ -269,7 +267,7 @@
                 board.add(app.id);
               }}
             >
-              <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M8 3v10M3 8h10" /></svg>
+              <Icon of={Plus} size={12} />
             </button>
           {/if}
         </div>
@@ -410,13 +408,6 @@
     background: color-mix(in oklab, var(--ink) 8%, transparent);
     color: var(--ink);
   }
-  svg path {
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 1.6;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-  }
   .search {
     width: 100%;
     height: 32px;
@@ -517,17 +508,6 @@
   .act.remove:hover,
   .act.drop:hover {
     color: var(--bad);
-  }
-  .act.drop path {
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 2;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-  }
-  .act.alone .fill {
-    fill: currentColor;
-    stroke: none;
   }
   .adds {
     display: flex;

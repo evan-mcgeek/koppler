@@ -1,4 +1,7 @@
 <script lang="ts">
+  import Icon from './Icon.svelte';
+  import PanelLeft from '@lucide/svelte/icons/panel-left';
+  import Square from '@lucide/svelte/icons/square';
   import Cog from './Cog.svelte';
   import Command from './Command.svelte';
   import { SvelteFlowProvider } from '@xyflow/svelte';
@@ -251,10 +254,7 @@
     title={side ? 'Hide the side pane' : 'Show the side pane'}
     onclick={toggleSide}
   >
-    <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
-      <rect x="1.5" y="2.5" width="13" height="11" rx="2" />
-      <path d="M6 3v10" />
-    </svg>
+    <Icon of={PanelLeft} size={16} />
   </button>
   <span class="title">Koppler</span>
   {#if board.stack}
@@ -288,9 +288,7 @@
           runs.stop();
         }}
       >
-        <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"
-          ><rect x="3" y="3" width="10" height="10" rx="1.5" /></svg
-        >
+        <Icon of={Square} size={12} filled />
         <span class="words">Stop</span>
       </button>
       <Menu
@@ -538,11 +536,12 @@
     color: var(--muted);
     cursor: not-allowed;
   }
+  .stop:disabled + :global(.more.stop) {
+    border-color: var(--line);
+    color: var(--muted);
+  }
   .stop:not(:disabled):hover {
     background: color-mix(in oklab, var(--prod) 12%, transparent);
-  }
-  .stop rect {
-    fill: currentColor;
   }
   .run {
     background: var(--cable);
@@ -592,16 +591,8 @@
   .side-toggle:hover {
     background: color-mix(in oklab, var(--ink) 7%, transparent);
   }
-  .side-toggle svg {
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 1.4;
-  }
   .gear {
     margin: 0 0 0 -8px;
-  }
-  .side-toggle[aria-expanded='true'] path {
-    stroke-width: 2.6;
   }
   .dropping {
     position: fixed;

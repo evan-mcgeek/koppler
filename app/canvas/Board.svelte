@@ -1,4 +1,13 @@
 <script lang="ts">
+  import Minus from '@lucide/svelte/icons/minus';
+  import Plus from '@lucide/svelte/icons/plus';
+  import Icon from './Icon.svelte';
+  import Hand from '@lucide/svelte/icons/hand';
+  import Maximize from '@lucide/svelte/icons/maximize';
+  import Minimize from '@lucide/svelte/icons/minimize';
+  import MousePointer2 from '@lucide/svelte/icons/mouse-pointer-2';
+  import Redo2 from '@lucide/svelte/icons/redo-2';
+  import Undo2 from '@lucide/svelte/icons/undo-2';
   import {
     Background,
     BackgroundVariant,
@@ -72,16 +81,8 @@
   /** What a drag on the empty board does: select an area, or move the board. Space held moves it either way. */
   let tool = $state<'select' | 'hand'>('select');
   const TOOLS = [
-    [
-      'select',
-      'Select (V): drag on the board to select an area',
-      'M3.5 2.5 L12 8.2 L8.3 8.9 L10.4 13.2 L8.8 14 L6.7 9.7 L3.9 12.2 Z',
-    ],
-    [
-      'hand',
-      'Hand (H): drag to move around. Or hold Space while dragging',
-      'M5 8V3.6a1 1 0 0 1 2 0V7.5M7 7V2.8a1 1 0 0 1 2 0V7M9 7.2V3.6a1 1 0 0 1 2 0V8.5M11 8V5.6a1 1 0 0 1 2 0V9.5c0 2.6-1.8 4.5-4.4 4.5H8c-1.5 0-2.5-.6-3.4-1.8L2.8 9.8a1 1 0 0 1 1.6-1.1L5 9.4',
-    ],
+    ['select', 'Select (V): drag on the board to select an area', MousePointer2],
+    ['hand', 'Hand (H): drag to move around. Or hold Space while dragging', Hand],
   ] as const;
   // A key the system takes over mid-press (a screenshot shortcut) never sends its key-up, and the board would keep
   // selecting instead of moving cards: the mouse says which keys are really held.
@@ -469,7 +470,7 @@
     <Panel position="bottom-right">
       <div class="tools" role="toolbar" aria-label="Board">
         <div class="switch" role="radiogroup" aria-label="Dragging on the board">
-          {#each TOOLS as [name, title, d] (name)}
+          {#each TOOLS as [name, title, icon] (name)}
             <button
               class="tool"
               type="button"
@@ -479,7 +480,7 @@
               {title}
               onclick={() => (tool = name)}
             >
-              <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true" class={name}><path {d} /></svg>
+              <Icon of={icon} size={15} />
             </button>
           {/each}
         </div>
@@ -494,9 +495,7 @@
             board.undo();
           }}
         >
-          <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true" class="line">
-            <path d="M5.5 3.5 2.5 6.5l3 3" /><path d="M2.5 6.5h7a3.5 3.5 0 0 1 0 7H7" />
-          </svg>
+          <Icon of={Undo2} size={15} />
         </button>
         <button
           class="tool"
@@ -508,20 +507,18 @@
             board.redo();
           }}
         >
-          <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true" class="line">
-            <path d="M10.5 3.5l3 3-3 3" /><path d="M13.5 6.5h-7a3.5 3.5 0 0 0 0 7H9" />
-          </svg>
+          <Icon of={Redo2} size={15} />
         </button>
         <span class="sep" aria-hidden="true"></span>
         <button title="Arrange cards by who calls whom, callers on top" onclick={() => void arrange()}>Arrange</button>
         <button title="Zoom to fit all apps (F)" onclick={() => void fit()}>Fit</button>
         <span class="sep" aria-hidden="true"></span>
         <div class="zoom" role="group" aria-label="Zoom">
-          <button aria-label="Zoom out" onclick={zoomBy(1 / 1.2)}>−</button>
+          <button aria-label="Zoom out" onclick={zoomBy(1 / 1.2)}><Icon of={Minus} size={13} /></button>
           <button class="percent" title="Reset to 100%" onclick={() => void flow.setZoom(1, { duration: 200 })}>
             {Math.round(viewport.current.zoom * 100)}%
           </button>
-          <button aria-label="Zoom in" onclick={zoomBy(1.2)}>+</button>
+          <button aria-label="Zoom in" onclick={zoomBy(1.2)}><Icon of={Plus} size={13} /></button>
         </div>
         <span class="sep" aria-hidden="true"></span>
         <button
@@ -532,13 +529,7 @@
           aria-pressed={board.present}
           onclick={() => void present()}
         >
-          <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true" class="line">
-            {#if board.present}
-              <path d="M6 2.5v3.5H2.5M10 2.5v3.5h3.5M6 13.5V10H2.5M10 13.5V10h3.5" />
-            {:else}
-              <path d="M2.5 6V2.5H6M10 2.5h3.5V6M2.5 10v3.5H6M13.5 10v3.5H10" />
-            {/if}
-          </svg>
+          <Icon of={board.present ? Minimize : Maximize} size={15} />
         </button>
         {#if !board.present}
           <span class="sep" aria-hidden="true"></span>
