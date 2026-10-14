@@ -73,8 +73,8 @@ export function serveFile(what: string, url: URL, res: http.ServerResponse): voi
   }
   const asked = DATA_FILE.exec(what)?.[1] as DataName | undefined;
   if (asked) {
-    const value = readData(asked);
-    res.writeHead(value ? 200 : 404, JSON_HEADERS).end(JSON.stringify(value));
+    // One not written yet (no board saved, no stack) is null, not an error the page's console reports.
+    res.writeHead(200, JSON_HEADERS).end(JSON.stringify(readData(asked)));
     return;
   }
   // Where the canvas was while it was built beside the page it replaced.

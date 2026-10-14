@@ -76,6 +76,8 @@ export interface PlanOptions {
   startedOn?: (id: string) => string | undefined;
   /** The queues an app publishes to or reads. */
   queuesOf?: (id: string) => string[];
+  /** The branch an app's clone is on, for an app that runs on whatever that is. */
+  current?: (id: string) => string | undefined;
 }
 
 // A note or a list of changes is text; anything else that arrives in its place is dropped.
@@ -129,7 +131,9 @@ function reasonsToRestart(
   if (next.restart) why.push('you asked to restart it');
   if (envChange) why.push(`the environment changes from ${upper(envChange.from)} to ${upper(envChange.to)}`);
   if (now.branch !== next.branch)
-    why.push(`its branch changes from ${now.branch || 'the current one'} to ${next.branch || 'the current one'}`);
+    why.push(
+      `its branch changes from ${now.branch || o.current?.(id) || 'the current one'} to ${next.branch || 'the current one'}`,
+    );
   if (now.run !== next.run) why.push(`it moves from ${where(now.run)} to ${where(next.run)}`);
   if ((now.platform ?? '') !== (next.platform ?? '') && next.run === 'cli')
     why.push(`its device changes to ${String(next.platform)}`);

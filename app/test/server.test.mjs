@@ -35,6 +35,9 @@ test('The state folder does not exist yet, as on a machine where Koppler never r
     // No inline script is allowed: the page's own files only.
     assert.match(got.headers['content-security-policy'], /script-src 'self';/);
     assert.equal((await call('GET', `/s/${'0'.repeat(48)}/`)).status, 404);
+    // A board not saved yet is no error: the page asks for it on its first visit.
+    const unsaved = await call('GET', `${page.pathname}data/state.json`);
+    assert.deepEqual([unsaved.status, unsaved.body.toString()], [200, 'null']);
 
     // The page and the files it names, and nothing else from its folder.
     const script = /assets\/[\w.-]+\.js/.exec(got.body.toString())[0];
@@ -46,7 +49,7 @@ test('The state folder does not exist yet, as on a machine where Koppler never r
       assert.equal(moved.status, 308);
       assert.equal(moved.headers.location, to);
     }
-    for (const not of ['index.html', 'page/index.html', 'assets/', 'assets/..%2Findex.html', 'assets/%2e%2e/index.html', 'canvas.html', 'fonts/fonts.css', 'temp/registry.js', 'data/secrets.json', 'data/state.json'])
+    for (const not of ['index.html', 'page/index.html', 'assets/', 'assets/..%2Findex.html', 'assets/%2e%2e/index.html', 'canvas.html', 'fonts/fonts.css', 'temp/registry.js', 'data/secrets.json'])
       assert.equal((await call('GET', page.pathname + not)).status, 404, not);
 
     // Another site's name pointed at this machine, or a request another site makes, is refused.

@@ -7,7 +7,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fail } from '../failure.ts';
 import * as kp from '../core/plan.ts';
-import { readData, readStack } from '../data.ts';
+import { readClones, readData, readStack } from '../data.ts';
 import { stateDir, tempDir } from '../paths.ts';
 import { redact } from '../scrub.ts';
 import { alive, records } from './processes.ts';
@@ -68,6 +68,7 @@ export function planFor(board: kp.BoardInput): kp.Plan {
     strays: strays(liveBoard, names, Object.keys(stack?.apps ?? {})),
     startedOn: id => envs[id],
     queuesOf: id => kp.queuesOf(stack, id),
+    current: id => readClones()[id]?.branch ?? undefined,
   });
 }
 /** The plan for the newest Send that has not been applied, worked out again now, and whether it is still what the user confirmed. */
