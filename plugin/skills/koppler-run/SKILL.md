@@ -27,6 +27,7 @@ When invoked with `disconnect`: `koppler listen stop`, and say runs keep working
 
 Compose a local run from a graph: nodes run locally, an edge points a caller at a local callee, every unwired dependency calls the deployed app of the chosen environment (the stack's `envs`).
 Koppler is a separate app that works without an agent; this skill drives it. It needs the `koppler` command on the PATH (`npm i -g koppler`, or `npm link` in `app/` of a Koppler clone): when `koppler --version` fails, tell the user how to install it and stop.
+A released skill has a `VERSION` file beside this one: when `koppler --version` names another version, tell the user both, and that the older one needs updating (`npm i -g koppler`, or `koppler@next` for the QA channel, and the plugin from the same channel).
 `<app>` below means the Koppler app's folder, `"$(dirname "$(realpath "$(command -v koppler)")")/.."` (with `dist/` and `bin/`), and `<state>` Koppler's state folder, `~/.local/state/koppler/run` (the canvas, the agent and `koppler` share it).
 
 ## Operating principles
