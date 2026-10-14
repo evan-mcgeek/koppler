@@ -1,6 +1,7 @@
 <script lang="ts">
   import ChevronRight from '@lucide/svelte/icons/chevron-right';
   import Icon from './Icon.svelte';
+  import WandSparkles from '@lucide/svelte/icons/wand-sparkles';
   import X from '@lucide/svelte/icons/x';
   // Settings for one part of the stack (an app, a queue, an outside system, the whole stack), opened from the gear next
   // to it. What it is sits on top; the rest is in tabs, in plain words; every field its schema has is there. Edits are a
@@ -247,7 +248,7 @@
             Object.keys(shape.properties ?? {}).filter(key => value?.[key] === undefined && key !== 'outside'),
             locks.filter(one => one.startsWith(`apps.${app}.`)),
           );
-        }}>{asked ? 'Asked the agent' : 'Ask the agent to fill in'}</button
+        }}><Icon of={WandSparkles} size={14} />{asked ? 'Asked the agent' : 'Ask the agent to fill in'}</button
       >
     {/if}
     <button class="x" type="button" aria-label="Close" onclick={close}><Icon of={X} size={14} /></button>
@@ -424,16 +425,28 @@
     cursor: pointer;
   }
   .ask {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
     padding: 5px 12px;
-    border: 1px solid var(--line);
+    border: 1px solid transparent;
     border-radius: 7px;
-    background: none;
-    color: var(--ink);
+    background: var(--cable);
+    color: var(--on-accent);
     font: 600 12px var(--sans);
     white-space: nowrap;
     cursor: pointer;
   }
+  .ask:hover:not(:disabled) {
+    background: color-mix(in oklab, var(--cable) 85%, var(--ink));
+  }
+  .ask:focus-visible {
+    outline: 2px solid var(--cable);
+    outline-offset: 2px;
+  }
   .ask:disabled {
+    border-color: var(--line);
+    background: none;
     color: var(--muted);
     cursor: default;
   }
