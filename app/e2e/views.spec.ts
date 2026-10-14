@@ -22,20 +22,36 @@ test('Live shows the same board in the same places as cards to read, and nothing
 }) => {
   await expect(card(page, 'web').locator('.body')).toBeVisible();
   const before = [await corner(page, 'web'), await corner(page, 'orders')];
+  const middles = await Promise.all(
+    ['web', 'orders'].map(async id => {
+      const box = await card(page, id).boundingBox();
+      return Math.round((box?.y ?? 0) + (box?.height ?? 0) / 2);
+    }),
+  );
   await page.getByRole('radio', { name: 'Live' }).check();
   await expect(card(page, 'web').locator('.body')).toHaveCount(0);
   await expect(card(page, 'web').locator('.glance')).toContainText('main');
   await expect(card(page, 'web').getByRole('button', { name: 'Remove Web Shop' })).toBeHidden();
-  expect([await corner(page, 'web'), await corner(page, 'orders')]).toEqual(before);
+  // Short, a card sits in the middle of its full card's room: the cards keep their columns, and their middles
+  // keep the same distance up or down from each other, so the cable between them runs the same way.
+  const middle = async (id: string) => {
+    const box = await card(page, id).boundingBox();
+    return Math.round((box?.y ?? 0) + (box?.height ?? 0) / 2);
+  };
+  expect([(await corner(page, 'web'))[0], (await corner(page, 'orders'))[0]]).toEqual([before[0]?.[0], before[1]?.[0]]);
+  expect(
+    Math.abs((await middle('orders')) - (await middle('web')) - ((middles[1] ?? 0) - (middles[0] ?? 0))),
+  ).toBeLessThanOrEqual(2);
   await page.screenshot({ path: 'test-results/next-live-view.png' });
 
   // A card does not move, and a cable is not unplugged by a click.
-  const [x = 0, y = 0] = before[0] ?? [];
+  const inLive = await corner(page, 'web');
+  const [x = 0, y = 0] = inLive;
   await page.mouse.move(x + 60, y + 20);
   await page.mouse.down();
   await page.mouse.move(x + 200, y + 120, { steps: 6 });
   await page.mouse.up();
-  expect(await corner(page, 'web')).toEqual(before[0]);
+  expect(await corner(page, 'web')).toEqual(inLive);
   const wire = await page
     .locator('.svelte-flow__edge .wire')
     .evaluate(el => [

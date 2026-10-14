@@ -230,7 +230,7 @@ class Board {
     new Map<string, Box>(
       this.infra.map(({ id, position, measured }) => [
         id,
-        { ...this.shown(position), w: measured?.width ?? TUNNEL.w, h: measured?.height ?? TUNNEL.h },
+        { ...this.shown(position, id), w: measured?.width ?? TUNNEL.w, h: measured?.height ?? TUNNEL.h },
       ]),
     ),
   );
@@ -242,6 +242,19 @@ class Board {
   brief = $state(false);
   /** Each card's height in full, as last drawn so: short, the room it needs only then is closed up. */
   fullHeights = $state.raw<Record<string, number>>({});
+  /**
+   * How far down a short card is drawn inside the room its full form takes: centred on the full card's middle, so the
+   * cables on its sides stay where they were when the board is zoomed across.
+   */
+  #insets = $derived(
+    new Map(
+      [...this.nodes, ...this.infra].map(({ id, measured }) => {
+        const height = measured?.height ?? 0;
+        const full = this.fullHeights[id] ?? 0;
+        return [id, this.brief && height && full > height ? (full - height) / 2 : 0] as const;
+      }),
+    ),
+  );
   #squeeze(top: (id: string, at: Point) => number = (_, at) => at.y) {
     const taken: [number, number][] = [];
     const needed: [number, number][] = [];
@@ -249,9 +262,12 @@ class Board {
       const height = measured?.height;
       if (!height) continue;
       const y = top(id, position);
-      taken.push([y, y + height]);
+      const inset = this.#insets.get(id) ?? 0;
+      taken.push([y + inset, y + inset + height]);
       const full = this.fullHeights[id] ?? 0;
-      if (full > height) needed.push([y + height, y + full]);
+      // The room only the full card needs, above and below the short one, is closed up.
+      if (inset) needed.push([y, y + inset]);
+      if (full > height) needed.push([y + inset + height, y + full]);
     }
     return squeeze(this.brief ? taken : [], this.brief ? needed : []);
   }
@@ -262,13 +278,15 @@ class Board {
     this.#squeezed = this.#squeeze();
     return this.#squeezed;
   });
-  /** Where a card kept at this place is drawn, and back. */
-  shown = (at: Point): Point => ({ x: at.x, y: this.squeezed.show(at.y) });
-  stored = (at: Point): Point => ({ x: at.x, y: this.squeezed.back(at.y) });
+  /** Where a card kept at this place is drawn, and back: short, in the middle of its full form's room. */
+  shown = (at: Point, id = ''): Point => ({ x: at.x, y: this.squeezed.show(at.y + (this.#insets.get(id) ?? 0)) });
+  stored = (at: Point, id = ''): Point => ({ x: at.x, y: this.squeezed.back(at.y) - (this.#insets.get(id) ?? 0) });
   /** Where a card let go at this place is kept: counting the room it now takes there, it stays drawn where it was let go. */
   dropped(id: string, at: Point): Point {
-    let y = this.squeezed.back(at.y);
-    for (let tries = 0; tries < 4; tries++) y = this.#squeeze((one, kept) => (one === id ? y : kept.y)).back(at.y);
+    const inset = this.#insets.get(id) ?? 0;
+    let y = this.squeezed.back(at.y) - inset;
+    for (let tries = 0; tries < 4; tries++)
+      y = this.#squeeze((one, kept) => (one === id ? y : kept.y)).back(at.y) - inset;
     return { x: at.x, y };
   }
 
@@ -277,7 +295,7 @@ class Board {
     new Map<string, Box>(
       this.nodes.flatMap(({ id, position, measured }) =>
         measured?.width && measured.height
-          ? [[id, { ...this.shown(position), w: measured.width, h: measured.height }]]
+          ? [[id, { ...this.shown(position, id), w: measured.width, h: measured.height }]]
           : [],
       ),
     ),
@@ -737,8 +755,14 @@ class Board {
 
   /** The cards as the flow draws them: squeezed into view when far away. */
   flowNodes(): (CardNode | InfraNode)[] {
-    return [...this.nodes, ...this.infra].map(node => ({ ...node, position: this.shown(node.position) }));
+    return [...this.nodes, ...this.infra].map(node => {
+      const position = this.shown(node.position, node.id);
+      this.#handed.set(node.id, position);
+      return { ...node, position };
+    });
   }
+  /** Where each card was last handed to the flow: a card still there was not moved, whatever its form now. */
+  #handed = new Map<string, Point>();
   /** Each card's height when last drawn, and in which form (far away, Live): growing in the same form pushes others. */
   #heights: Record<string, { brief: string; height: number } | undefined> = {};
   /**
@@ -765,10 +789,10 @@ class Board {
           }
         : drawnNode;
       if (at?.dragging && !node.dragging) return { ...node, position: this.dropped(node.id, node.position) };
-      const was = at && this.shown(at.position);
+      const was = at && (this.#handed.get(at.id) ?? this.shown(at.position, at.id));
       return at && was?.x === node.position.x && was.y === node.position.y
         ? { ...node, position: at.position }
-        : { ...node, position: this.stored(node.position) };
+        : { ...node, position: this.stored(node.position, node.id) };
     }) as (CardNode | InfraNode)[];
     // What snapped shows while the drag lasts; a card let go shows nothing.
     const shown = drawn.every(node => !node.dragging) ? [] : snapped;
