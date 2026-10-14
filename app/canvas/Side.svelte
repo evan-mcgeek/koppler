@@ -340,41 +340,11 @@
     border-bottom: 1px solid var(--line);
     background: var(--panel);
   }
-  .seg {
-    display: flex;
-    gap: 2px;
-    padding: 2px;
-    border: 1px solid var(--line);
-    border-radius: 8px;
-    background: color-mix(in oklab, var(--ink) 5%, transparent);
-  }
   .seg label {
-    position: relative;
     flex: 1;
     padding: 3px 12px;
-    border-radius: 6px;
-    color: var(--muted);
-    font-weight: 600;
     text-align: center;
     white-space: nowrap;
-  }
-  .seg input {
-    position: absolute;
-    inset: 0;
-    margin: 0;
-    opacity: 0;
-    cursor: pointer;
-  }
-  .seg label:has(input:checked) {
-    background: var(--surface);
-    color: var(--ink);
-    box-shadow:
-      0 0 0 1px var(--line),
-      0 1px 2px rgb(0 0 0 / 0.12);
-  }
-  .seg label:has(input:focus-visible) {
-    outline: 2px solid var(--cable);
-    outline-offset: -2px;
   }
   h2 {
     display: flex;

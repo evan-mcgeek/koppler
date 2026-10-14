@@ -23,7 +23,7 @@
     'stop-all': 'Everything stopped, changes kept',
     'canvas-closed': 'Canvas closed',
   };
-  const name = (app: string) => board.apps.find(one => one.id === app)?.name ?? app;
+  const name = board.nameOf;
   const time = $derived.by(() => {
     const date = new Date(run.at ?? '');
     const today = date.toDateString() === new Date().toDateString();

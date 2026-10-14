@@ -2,6 +2,7 @@
 import type { StoredPreset } from '../src/core/presets.ts';
 import { board } from './board.svelte.ts';
 import { toasts } from './toast.svelte.ts';
+import { post } from './data.ts';
 
 interface Fetched {
   presets?: unknown;
@@ -30,14 +31,7 @@ export async function openFile(file: File | undefined): Promise<void> {
 
 /** The page cannot read a private repo, so the canvas server fetches the link. Gives why it could not be opened. */
 export async function openLink(url: string): Promise<string | null> {
-  const token = encodeURIComponent(location.pathname.split('/')[2] ?? '');
-  const got = await fetch(`/preset?token=${token}`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ url }),
-  })
-    .then(answer => answer.json() as Promise<Fetched>)
-    .catch((): Fetched => ({ error: 'Could not reach the canvas server. Open a file instead.' }));
+  const got: Fetched = await post<Fetched>('preset', { url });
   if (got.error) return got.error;
   const out = board.importBoards(got.presets, url);
   if (out.error !== undefined) return out.error;

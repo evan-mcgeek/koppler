@@ -43,7 +43,7 @@
       : command(check)
         ? `Missing${needed(check) ? `, ${needed(check)}` : ''}. Install it with:`
         : `${check.detail ?? ''}${needed(check) ? ` (${needed(check)})` : ''}`;
-  const appName = (app: string) => board.apps.find(one => one.id === app)?.name ?? app;
+  const appName = board.nameOf;
   const appsIn = (env: string) => [...new Set(gaps.filter(gap => gap.env === env).map(gap => gap.app ?? ''))];
   const gapsOf = (env: string, app?: string) => gaps.filter(gap => gap.env === env && (!app || gap.app === app));
   /** A gap without the app's name, which its heading already says. */

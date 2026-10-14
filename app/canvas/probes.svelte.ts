@@ -3,6 +3,7 @@
 import { board } from './board.svelte.ts';
 import { live } from './live.svelte.ts';
 import { toasts } from './toast.svelte.ts';
+import { send } from './data.ts';
 
 export interface Probe {
   state: 'busy' | 'ok' | 'warn' | 'bad';
@@ -44,7 +45,7 @@ class Probes {
     // An app whose process is up but does not answer yet is starting: its test waits for it instead of failing.
     const target = 'node' in payload ? payload.node : 'to' in payload ? payload.to : null;
     if (target && live.sent(target) && live.status?.running?.includes(target) && !live.up(target)) {
-      const name = board.apps.find(app => app.id === target)?.name ?? target;
+      const name = board.nameOf(target);
       const detail = `${name} is starting. Koppler checks again once it answers.`;
       this.results[key] = { state: 'busy', text: 'Starting', detail };
       this.#starting.set(key, { target, payload });
@@ -52,14 +53,8 @@ class Probes {
       return;
     }
     this.results[key] = { state: 'busy' };
-    const token = location.pathname.split('/')[2] ?? '';
-    const out = await fetch(`/cable-test?token=${encodeURIComponent(token)}`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ env: board.env, ...payload, ...(auto && { auto: true }) }),
-    })
-      .then(async answer => (answer.ok ? ((await answer.json()) as Tested) : CANNOT))
-      .catch(() => CANNOT);
+    const answer = await send('cable-test', { env: board.env, ...payload, ...(auto && { auto: true }) });
+    const out = answer?.ok ? ((await answer.json().catch(() => CANNOT)) as Tested) : CANNOT;
     this.results[key] = { state: out.unsure ? 'warn' : out.ok ? 'ok' : 'bad', text: out.text, detail: out.detail };
     // A test that passes shows on its light; one pressed by hand that fails, or could not be done, says why.
     if (!auto && (!out.ok || out.unsure)) toasts.show(out.detail, 'warning');

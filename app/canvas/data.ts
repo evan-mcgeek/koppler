@@ -57,36 +57,34 @@ export async function load(): Promise<Loaded | null> {
   return stack ? { stack, clones: local?.apps ?? {}, roots: local?.roots ?? [], saved } : null;
 }
 
-/** Hands the board to the server to keep. False when it could not be kept. */
-export async function save(board: SavedBoard, leaving = false): Promise<boolean> {
-  // The page is served under /s/<token>/: the same token lets it save.
+/**
+ * Sends a request to the canvas server, which takes it with the page's own token (the page is served under
+ * /s/<token>/). Null when the server could not be reached. `leaving` lets it go out while the page closes.
+ */
+export async function send(route: string, body: object = {}, leaving = false): Promise<Response | null> {
   const token = location.pathname.split('/')[2] ?? '';
   try {
-    const answer = await fetch(`/state?token=${encodeURIComponent(token)}`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(board),
-      keepalive: leaving,
-    });
-    return answer.ok;
-  } catch {
-    return false;
-  }
-}
-
-/** Asks the canvas server to do something. Gives its answer, or why it was not done. */
-export async function post<T extends object>(route: string, body: object = {}): Promise<T | { error: string }> {
-  const token = location.pathname.split('/')[2] ?? '';
-  try {
-    const answer = await fetch(`/${route}?token=${encodeURIComponent(token)}`, {
+    return await fetch(`/${route}?token=${encodeURIComponent(token)}`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(body),
+      keepalive: leaving,
     });
-    return (await answer.json()) as T | { error: string };
   } catch {
-    return { error: 'Could not reach the canvas server.' };
+    return null;
   }
+}
+
+/** Hands the board to the server to keep. False when it could not be kept. */
+export const save = async (board: SavedBoard, leaving = false): Promise<boolean> =>
+  !!(await send('state', board, leaving))?.ok;
+
+/** Asks the canvas server to do something. Gives its answer, or why it was not done. */
+export async function post<T extends object>(route: string, body: object = {}): Promise<T | { error: string }> {
+  const answer = await send(route, body);
+  if (!answer) return { error: 'Could not reach the canvas server.' };
+  return (await answer.json().catch(() => ({ error: `The canvas server answered ${String(answer.status)}.` }))) as
+    T | { error: string };
 }
 
 /** A clone found on this machine, for the repo picker. */

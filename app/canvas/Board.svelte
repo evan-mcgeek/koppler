@@ -159,7 +159,7 @@
       return [{ key: `${from}>${to}`, from, what: tunnel.what, payload, ...linkPath(app, card), idle: !live.up(from) }];
     }),
   );
-  const name = (id: string) => board.apps.find(app => app.id === id)?.name ?? id;
+  const name = board.nameOf;
   /** What a light says when the pointer rests on it. */
   const about = (probe: Probe | undefined, what: string) =>
     probe?.state === 'busy'

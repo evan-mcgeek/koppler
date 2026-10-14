@@ -12,7 +12,7 @@
     /** The cable that would put it right. */
     cable?: { from: string; to: string };
   }
-  const name = (id: string) => board.apps.find(app => app.id === id)?.name ?? id;
+  const name = board.nameOf;
   const ports = $derived(
     describePlan(board.plan, name)
       .filter(line => !line.includes(' share one '))
