@@ -16,7 +16,8 @@ const newest = dir =>
   );
 const changed = file => fs.statSync(path.join(app, file), { throwIfNoEntry: false })?.mtimeMs ?? 0;
 if (changed('package-lock.json') > changed('node_modules/.package-lock.json')) {
-  const install = spawnSync('npm', ['install', '--no-audit', '--no-fund'], { cwd: app, stdio: ['ignore', 2, 2] });
+  // Exactly what the lockfile says, and never a change to it: a rewritten lockfile blocks the next pull.
+  const install = spawnSync('npm', ['ci', '--no-audit', '--no-fund'], { cwd: app, stdio: ['ignore', 2, 2] });
   if (install.status !== 0) process.exit(install.status ?? 1);
 }
 const built = changed('dist/.built');
