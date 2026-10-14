@@ -154,8 +154,33 @@ export const test = base.extend<{
     expect(errors, 'no script errors on the page').toEqual([]);
   },
 });
-// A person's pace between two edits: the board takes edits less than 0.7 seconds apart as one step to undo.
-export const nextEdit = (page: Page) => page.waitForTimeout(800);
+const clocked = new WeakSet<Page>();
+/**
+ * A person's pace between two edits: the board takes edits less than 0.7 seconds apart as one step to undo. The page's
+ * clock is moved on instead of waited for.
+ */
+export async function nextEdit(page: Page): Promise<void> {
+  if (!clocked.has(page)) {
+    clocked.add(page);
+    await page.clock.install();
+  }
+  await page.clock.fastForward(800);
+}
+/** Long enough for a change to have been saved, or to be sure none was: a save waits for 0.4 seconds of stillness. */
+export const saveSettles = (page: Page) => page.waitForTimeout(800);
+/** An app's card on the board. */
+export const card = (page: Page, id: string) => page.locator(`.svelte-flow__node[data-id="${id}"]`);
+/** A card's place on a saved board, run by Koppler on main. */
+export const at = (x: number, y: number) => ({ x, y, run: 'cli', branch: 'main' });
+/** The next save of the board the server takes. */
+export const saved = (page: Page) =>
+  page.waitForResponse(r => r.url().includes('/state?') && r.request().method() === 'POST' && r.ok());
+/** What the canvas queued for the agent or Koppler. */
+export const sent = (temp: string) => {
+  const file = path.join(temp, 'prompts.jsonl');
+  const lines = fs.existsSync(file) ? fs.readFileSync(file, 'utf8').split('\n').filter(Boolean) : [];
+  return lines.map(line => JSON.parse(line) as { tag: string; text: string; data: Record<string, unknown> });
+};
 export { expect };
 /** A card's action bar, shown while the card is pointed at. */
 export const actions = async (page: Page, id: string) => {

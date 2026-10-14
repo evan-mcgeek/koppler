@@ -1,7 +1,6 @@
 // What is drawn over what: a card on top hides the cable ends of the card under it, and a group pick leaves no box.
-import { test, expect, actions } from './canvas.ts';
+import { actions, at, expect, test } from './canvas.ts';
 
-const at = (x: number, y: number) => ({ x, y, run: 'cli', branch: 'main' });
 test.use({
   board: {
     env: 'qa',

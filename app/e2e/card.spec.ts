@@ -1,9 +1,6 @@
 // The new canvas's app card: what the user chooses on it.
-import type { Page } from '@playwright/test';
-import { test, expect, nextEdit, STACK, actions } from './canvas.ts';
+import { actions, at, card, expect, nextEdit, STACK, test } from './canvas.ts';
 
-const card = (page: Page, id: string) => page.locator(`.svelte-flow__node[data-id="${id}"]`);
-const at = (x: number, y: number) => ({ x, y, run: 'cli', branch: 'main' });
 const mobile = {
   name: 'Mobile App',
   kind: 'flutter',

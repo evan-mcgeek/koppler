@@ -1,17 +1,9 @@
 // The new canvas's Run and Stop: the review of what changes, and what is sent once it is confirmed.
-import fs from 'node:fs';
-import path from 'node:path';
 import type { Page } from '@playwright/test';
-import { test, expect, nextEdit, STACK, actions } from './canvas.ts';
+import { actions, at, expect, nextEdit, sent, STACK, test } from './canvas.ts';
 
-const at = (x: number, y: number) => ({ x, y, run: 'cli', branch: 'main' });
 const review = (page: Page) => page.getByRole('dialog');
 /** What the server took from the page so far, one request a line. */
-const sent = (temp: string) => {
-  const file = path.join(temp, 'prompts.jsonl');
-  const lines = fs.existsSync(file) ? fs.readFileSync(file, 'utf8').split('\n').filter(Boolean) : [];
-  return lines.map(line => JSON.parse(line) as { tag: string; text: string; data: Record<string, unknown> });
-};
 test.use({
   stack: { ...STACK, protected: ['prod'] },
   board: {

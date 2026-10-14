@@ -3,11 +3,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import type { Page } from '@playwright/test';
-import { test, expect } from './canvas.ts';
+import { at, card, expect, test } from './canvas.ts';
 
-const card = (page: Page, id: string) => page.locator(`.svelte-flow__node[data-id="${id}"]`);
-const at = (x: number, y: number) => ({ x, y, run: 'cli', branch: 'main' });
 const layout = { nodes: { web: { x: 0, y: 0 }, orders: { x: 420, y: 0 } } };
 test.use({
   board: {

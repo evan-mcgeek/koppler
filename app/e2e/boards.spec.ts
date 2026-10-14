@@ -1,8 +1,7 @@
 // The new canvas's boards: the one on screen is kept by name, and the team's and the user's own open from the picker.
 import type { Page } from '@playwright/test';
-import { test, expect, nextEdit } from './canvas.ts';
+import { card, expect, saveSettles, test } from './canvas.ts';
 
-const card = (page: Page, id: string) => page.locator(`.svelte-flow__node[data-id="${id}"]`);
 const picker = (page: Page) => page.getByRole('button', { name: /^Board: / });
 const boards = (page: Page) => page.getByRole('dialog', { name: 'Boards' });
 /** The boards the menu lists, each by the button that opens it. */
@@ -35,7 +34,7 @@ test('a team board opens arranged, and changing it makes a copy of your own', as
   // And brought into view whole.
   for (const id of ['web', 'orders', 'payments']) await expect(card(page, id)).toBeInViewport({ ratio: 0.999 });
   await page.screenshot({ path: 'test-results/next-board-opened.png' });
-  await nextEdit(page);
+  await saveSettles(page);
   // Opened and untouched, it stays the team's: nothing of the user's own is kept.
   expect((await kept(page, canvas.url)).presets ?? []).toEqual([]);
 
@@ -59,14 +58,14 @@ test('your own board comes back as you left it, and a new board starts empty', a
   await expect(page.locator('.svelte-flow__node-app')).toHaveCount(2);
   await page.getByRole('button', { name: 'Add Payments API to the board', exact: true }).first().click();
   await expect(picker(page)).toHaveText('Browse (local)');
-  await nextEdit(page);
+  await saveSettles(page);
   const where = await card(page, 'payments').boundingBox();
 
   await picker(page).click();
   await boards(page).getByRole('button', { name: 'New board' }).click();
   await expect(page.locator('.svelte-flow__node-app')).toHaveCount(0);
   await expect(picker(page)).toHaveText('New board');
-  await nextEdit(page);
+  await saveSettles(page);
   // The copy is untouched by the empty board that followed it.
   expect(Object.keys((await kept(page, canvas.url)).presets?.[0]?.nodes ?? {})).toHaveLength(3);
 
@@ -144,7 +143,7 @@ test('a board of your own is renamed, copied, shared, deleted and restored', asy
   await boards(page).getByText('Recently deleted (1)').click();
   await boards(page).getByRole('button', { name: 'Restore Orders work copy' }).click();
   await expect(page.locator('.svelte-flow__node-app')).toHaveCount(2);
-  await nextEdit(page);
+  await saveSettles(page);
   const now = await kept(page, canvas.url);
   expect(now.presets?.map(one => one.name)).toEqual(['Orders work', 'Orders work copy']);
   expect(now.preset).toBe('Orders work copy');
@@ -219,7 +218,7 @@ test('a board of your own is shared with the team: it joins the stack as a team 
   await page.getByRole('button', { name: 'Add Web Shop to the board', exact: true }).first().click();
   await page.getByRole('button', { name: 'Add Orders API to the board', exact: true }).first().click();
   await expect(picker(page)).toHaveText('Web Shop');
-  await nextEdit(page);
+  await saveSettles(page);
   await picker(page).click();
   await boards(page).getByRole('button', { name: 'Share Web Shop with the team' }).click();
   await expect(page.getByRole('status').filter({ hasText: 'Web Shop is a team board now' })).toContainText(

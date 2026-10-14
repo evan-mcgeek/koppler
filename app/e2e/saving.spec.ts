@@ -1,12 +1,8 @@
 // The new canvas keeps the board: what is changed on it comes back after a reload, from the server's copy.
 import type { Page } from '@playwright/test';
-import { test, expect, actions } from './canvas.ts';
+import { actions, at, card, expect, saved, test } from './canvas.ts';
 
-const card = (page: Page, id: string) => page.locator(`.svelte-flow__node[data-id="${id}"]`);
-const saved = (page: Page) =>
-  page.waitForResponse(r => r.url().includes('/state?') && r.request().method() === 'POST' && r.ok());
 const view = (page: Page) => page.locator('.svelte-flow__viewport').evaluate(el => getComputedStyle(el).transform);
-const at = (x: number, y: number) => ({ x, y, run: 'cli', branch: 'main' });
 const board = {
   env: 'qa',
   mode: 'auto',
