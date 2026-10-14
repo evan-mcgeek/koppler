@@ -32,9 +32,14 @@ test('a cable dragged close to straight snaps straight, like a magnet', async ({
   // The drag starts a little late: whatever is left, short of level by a few pixels.
   const left = await ends();
   if (left !== 0) await page.mouse.move(from.x, from.y - off - left + 5, { steps: 4 });
+  // Snapped while still held: the cable lights up, so the snap shows.
+  const lit = page.locator('.svelte-flow__edge[data-id="web>payments"] g.snapped');
+  await expect(lit).toHaveCount(1);
+  await page.waitForTimeout(400);
+  await page.screenshot({ path: 'test-results/next-cable-snap.png' });
   await page.mouse.up();
   await expect.poll(ends).toBe(0);
-  await page.screenshot({ path: 'test-results/next-cable-snap.png' });
+  await expect(lit).toHaveCount(0);
   // Well away from level, it stays where it is put.
   const again = await card(page, 'payments').locator('header').boundingBox();
   if (!again) throw new Error('not on the page');

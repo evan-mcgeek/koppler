@@ -756,6 +756,7 @@ class Board {
         (drawnNode.dragging || at?.dragging) && drawnNode.type === 'app'
           ? { ...drawnNode, position: this.#straight(drawnNode.id, drawnNode.position) }
           : drawnNode;
+      if (at?.dragging && !drawnNode.dragging && this.snapped.length) this.snapped = [];
       if (at?.dragging && !node.dragging) return { ...node, position: this.dropped(node.id, node.position) };
       const was = at && this.shown(at.position);
       return at && was?.x === node.position.x && was.y === node.position.y
@@ -818,6 +819,8 @@ class Board {
     };
     let dx: number | undefined;
     let dy: number | undefined;
+    let xCable = '';
+    let yCable = '';
     this.cables.forEach((one, index) => {
       const mine = one.from === id ? 'from' : one.to === id ? 'to' : null;
       if (!mine || one.from === one.to) return;
@@ -830,14 +833,24 @@ class Board {
       // A cable leaving sideways is straight when its ends are level; one leaving up or down, when they are in line.
       if (SIDES[here.side][0] !== 0) {
         const by = there.at.y - here.at.y;
-        if (Math.abs(by) <= near && (dy === undefined || Math.abs(by) < Math.abs(dy))) dy = by;
+        if (Math.abs(by) <= near && (dy === undefined || Math.abs(by) < Math.abs(dy))) {
+          dy = by;
+          yCable = `${one.from}>${one.to}`;
+        }
       } else {
         const by = there.at.x - here.at.x;
-        if (Math.abs(by) <= near && (dx === undefined || Math.abs(by) < Math.abs(dx))) dx = by;
+        if (Math.abs(by) <= near && (dx === undefined || Math.abs(by) < Math.abs(dx))) {
+          dx = by;
+          xCable = `${one.from}>${one.to}`;
+        }
       }
     });
+    const snapped = [xCable, yCable].filter(Boolean);
+    if (snapped.join() !== this.snapped.join()) this.snapped = snapped;
     return { x: to.x + (dx ?? 0), y: to.y + (dy ?? 0) };
   }
+  /** The cables a dragged card has snapped straight, lit while the drag lasts so the snap shows. */
+  snapped = $state.raw<string[]>([]);
 
   /** Where the board was left: its zoom and position. Unset until one is known. */
   view = $state.raw<{ x: number; y: number; zoom: number } | undefined>();

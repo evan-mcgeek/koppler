@@ -43,6 +43,7 @@
     class:idle={!live.up(source) || !live.up(target)}
     class:dimmed={board.dimmedLink(source, target)}
     class:lit={board.lit(source, target)}
+    class:snapped={board.snapped.includes(id)}
     role="presentation"
     onpointerenter={() => (board.hovered = id)}
     onpointerleave={() => (board.hovered = null)}
@@ -149,5 +150,31 @@
     fill: var(--cable-ink);
     stroke: var(--cable-ink);
     stroke-width: 3;
+  }
+  /* Snapped straight while a card is dragged: the cable lights up, with one short pulse as it snaps. */
+  .snapped .wire,
+  .snapped .head {
+    stroke: var(--cable-ink);
+    stroke-width: 3.5;
+  }
+  .snapped .head {
+    fill: var(--cable-ink);
+  }
+  .snapped .under {
+    stroke: color-mix(in oklab, var(--cable) 45%, transparent);
+    stroke-width: 12;
+    opacity: 1;
+    animation: snap 0.35s ease-out;
+  }
+  @keyframes snap {
+    from {
+      stroke-width: 22;
+      stroke: color-mix(in oklab, var(--cable) 70%, transparent);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .snapped .under {
+      animation: none;
+    }
   }
 </style>
