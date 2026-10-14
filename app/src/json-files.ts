@@ -20,3 +20,20 @@ export function writeJson(file: string, value: unknown): void {
   fs.writeFileSync(beside, `${JSON.stringify(value, null, 2)}\n`, { mode: 0o600 });
   fs.renameSync(beside, file);
 }
+
+/**
+ * `read(file)` again only once the file changed (written anew, or moved into place), else what it gave last time: for a
+ * file read over and over, such as the stack while the canvas runs. What it gives is shared, so it is never changed.
+ */
+export function whenChanged<T>(read: (file: string) => T): (file: string) => T {
+  const seen = new Map<string, { key: string; value: T }>();
+  return file => {
+    const at = fs.statSync(file, { throwIfNoEntry: false });
+    const key = at ? `${String(at.ino)}:${String(at.mtimeMs)}:${String(at.size)}` : 'none';
+    const last = seen.get(file);
+    if (last?.key === key) return last.value;
+    const value = read(file);
+    seen.set(file, { key, value });
+    return value;
+  };
+}

@@ -4,7 +4,8 @@ import fs from 'node:fs';
 import net from 'node:net';
 import path from 'node:path';
 import { of as kindOf } from '../core/kinds.ts';
-import { readStack } from '../data.ts';
+import { dataFile, readStack } from '../data.ts';
+import { whenChanged } from '../json-files.ts';
 import { linkedStatus } from '../engine/linked.ts';
 import { listenerPid } from '../engine/listen.ts';
 import { boardEdits } from '../engine/boards.ts';
@@ -47,6 +48,9 @@ const STEP_STATES = ['done', 'failed', 'user', 'todo'];
 const cut = (value: unknown, most: number) => String(value).slice(0, most);
 const readJson = (file: string): unknown => JSON.parse(fs.readFileSync(file, 'utf8'));
 const procFile = (name: string) => path.join(stateDir(), 'procs', name);
+// The status is put together every 1.5 seconds; the stack is parsed again only when a sync wrote it anew.
+const stackOnce = whenChanged(() => readStack());
+const stackNow = () => stackOnce(dataFile('registry'));
 
 /** The newest of the server's own files: the page reloads itself, but the server's code only takes effect after a restart. */
 const codeVersion = () => {
@@ -82,7 +86,7 @@ const portOpen = (port: number) =>
 
 /** Every tunnel port in the stack, so cards can show whether their database or cache is reachable. */
 function tunnelPorts(): number[] {
-  const stack = readStack();
+  const stack = stackNow();
   if (!stack) return [];
   const needs = Object.values(stack.apps).flatMap(app => [
     ...(app.prereqs ?? []),
@@ -152,7 +156,7 @@ function lastChecks(): object[] | null {
 /** Remembered code changes per app, with how each did on this Mac; the review lists the ones a Send applies. */
 function recipesByApp(): Record<string, object[]> {
   try {
-    const stack = readStack();
+    const stack = stackNow();
     const byApp = Object.keys(stack?.apps ?? {}).map((id): [string, object[]] => [
       id,
       recipesFor(stack, id)
@@ -223,7 +227,7 @@ async function snapshot(serving: boolean): Promise<Status> {
   }
   addProgress(status);
   // A mobile app on the applied board is looked for on the simulators and devices too, even when started from the IDE.
-  const stack = readStack();
+  const stack = stackNow();
   for (const id of Object.keys(live()?.nodes ?? {}))
     if (!status.apps[id] && stack?.apps[id] && kindOf(stack.apps[id]).platforms) status.apps[id] = {};
   await refreshMobile(Object.keys(status.apps));
@@ -278,7 +282,7 @@ async function snapshot(serving: boolean): Promise<Status> {
 let shown: string | null = null;
 /** The stack the page is told about: one just switched to is named once its data is loaded, never half way. */
 function loadedStack(inUse: string | null): string | null {
-  const registry = readStack();
+  const registry = stackNow();
   if (!inUse || (registry?.source === path.join(inUse, 'stack.json') && registry.found)) shown = inUse;
   return shown;
 }
