@@ -13,6 +13,7 @@
   import { Handle, NodeToolbar, Position, useViewport, type NodeProps } from '@xyflow/svelte';
   import type { Side } from '../src/core/arrange.ts';
   import { board, FAR_ZOOM, type CardNode } from './board.svelte.ts';
+  import { wiring } from './wiring.svelte.ts';
   import { live, progress } from './live.svelte.ts';
   import { logs } from './logs.svelte.ts';
   import { runs } from './run.svelte.ts';
@@ -195,9 +196,9 @@
   class:short={brief}
   class:far
   class:reading={board.live}
-  class:drop-ok={board.drop?.id === id && board.drop.ok}
-  class:drop-bad={board.drop?.id === id && !board.drop.ok}
-  class:wiring={!!board.draft}
+  class:drop-ok={wiring.drop?.id === id && wiring.drop.ok}
+  class:drop-bad={wiring.drop?.id === id && !wiring.drop.ok}
+  class:wiring={!!wiring.draft}
   bind:offsetWidth={width}
   onpointerenter={show}
   onpointerleave={hide}
@@ -499,7 +500,7 @@
       onpointerdown={ev => {
         if (ev.button !== 0) return;
         ev.stopPropagation();
-        board.startWire(id, side);
+        wiring.start(id, side);
       }}
     ></button>
   {/each}

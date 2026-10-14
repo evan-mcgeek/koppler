@@ -29,6 +29,7 @@
   import StackPicker from './StackPicker.svelte';
   import Toast from './Toast.svelte';
   import { board } from './board.svelte.ts';
+  import { undo } from './undo.svelte.ts';
   import { openFile } from './boards.ts';
   import { dialogs } from './dialogs.svelte.ts';
   import { load, post, save } from './data.ts';
@@ -156,7 +157,7 @@
     });
   });
   $effect(() => {
-    if (board.stack) board.record();
+    if (board.stack) undo.record();
   });
   // A change only restarts the wait: the board is put together once, when it has been still for a moment.
   $effect(() => {
