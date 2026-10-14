@@ -111,49 +111,50 @@ function orderLayers(layers: string[][], edges: Edge[]): number {
 }
 
 /**
- * Which layer each card sits in: callers above callees. Apps that call each other in a loop (directly or through
- * others) share a layer, so a loop cannot push everything after it into one long line.
+ * Each card's layer, top down. The walk starts at the ways in (cards nothing leads to, the one reaching the most first);
+ * a link that closes a loop runs back up and does not decide the layers, so a loop reads in its own order. A card sits
+ * one layer under the furthest card leading to it, then moves down to just above the nearest card it leads to: a card
+ * that only feeds a queue sits right over it, not up with the way in.
  */
 export function layerDepths(ids: string[], edges: Edge[]): Record<string, number> {
   const out: Record<string, string[]> = Object.fromEntries(ids.map(id => [id, []]));
   for (const { from, to } of edges) if (from in out && to in out && from !== to) out[from]?.push(to);
-  // Tarjan: groups of cards that can all reach each other.
-  const index: Record<string, number> = {};
-  const low: Record<string, number> = {};
-  const group: Record<string, number> = {};
-  const stack: string[] = [];
-  const on = new Set<string>();
-  let next = 0;
-  let groups = 0;
-  const visit = (id: string) => {
-    index[id] = low[id] = next++;
-    stack.push(id);
-    on.add(id);
-    for (const callee of out[id] ?? []) {
-      if (!(callee in index)) {
-        visit(callee);
-        low[id] = Math.min(get(low, id), get(low, callee));
-      } else if (on.has(callee)) low[id] = Math.min(get(low, id), get(index, callee));
-    }
-    if (low[id] !== index[id]) return;
-    let member: string | undefined;
-    do {
-      member = stack.pop();
-      if (member === undefined) break;
-      on.delete(member);
-      group[member] = groups;
-    } while (member !== id);
-    groups++;
+  const reach = (start: string) => {
+    const seen = [start];
+    for (let at = 0; at < seen.length; at++)
+      for (const next of out[seen[at] ?? ''] ?? []) if (!seen.includes(next)) seen.push(next);
+    return seen.length;
   };
-  for (const id of ids) if (!(id in index)) visit(id);
-  // Longest path between groups; the groups form no loops, so this settles.
-  const depthOf = Array<number>(groups).fill(0);
-  const depth = (id: string) => depthOf[get(group, id)] ?? 0;
-  for (let pass = 0; pass < groups; pass++)
-    for (const id of ids)
-      for (const callee of out[id] ?? [])
-        if (group[id] !== group[callee] && depth(callee) < depth(id) + 1) depthOf[get(group, callee)] = depth(id) + 1;
-  return Object.fromEntries(ids.map(id => [id, depth(id)]));
+  const led = new Set(Object.values(out).flat());
+  const starts = [
+    ...ids.filter(id => !led.has(id)).sort((a, b) => reach(b) - reach(a)),
+    ...[...ids].sort((a, b) => reach(b) - reach(a)),
+  ];
+  // Depth first from the ways in: a link to a card still on the path closes a loop and is left out.
+  const forward: Record<string, string[]> = Object.fromEntries(ids.map(id => [id, []]));
+  const done: string[] = [];
+  const state: Record<string, 'open' | 'done'> = {};
+  const visit = (id: string) => {
+    state[id] = 'open';
+    for (const next of out[id] ?? []) {
+      if (state[next] === 'open') continue;
+      forward[id]?.push(next);
+      if (!state[next]) visit(next);
+    }
+    state[id] = 'done';
+    done.push(id);
+  };
+  for (const id of starts) if (!state[id]) visit(id);
+  // `done` ends with the ways in: read backwards, every card comes after all that lead to it.
+  const order = [...done].reverse();
+  const depth: Record<string, number> = Object.fromEntries(ids.map(id => [id, 0]));
+  for (const id of order)
+    for (const next of forward[id] ?? []) depth[next] = Math.max(get(depth, next), get(depth, id) + 1);
+  for (const id of done) {
+    const below = (forward[id] ?? []).map(next => get(depth, next));
+    if (below.length) depth[id] = Math.max(get(depth, id), Math.min(...below) - 1);
+  }
+  return depth;
 }
 
 /** Where each card's top left corner goes. `mirror` gives the same layout read the other way round. */

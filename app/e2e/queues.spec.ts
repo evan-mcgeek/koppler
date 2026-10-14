@@ -220,3 +220,25 @@ test.describe('an outside system none of whose apps is on the board', () => {
     await expect(outside(page)).toHaveCount(0);
   });
 });
+
+test('an app dragged takes its tunnel cards along, and leaves its queue cards where they are', async ({ page }) => {
+  const events = queue(page).filter({ hasText: 'Order events' });
+  const tunnel = page.locator('.svelte-flow__node-tunnel').first();
+  await expect(events).toBeVisible();
+  const [queueBefore, tunnelBefore, app] = await Promise.all([
+    events.boundingBox(),
+    tunnel.boundingBox(),
+    card(page, 'orders').boundingBox(),
+  ]);
+  if (!queueBefore || !tunnelBefore || !app) throw new Error('not on the page');
+  await page.mouse.move(app.x + 80, app.y + 14);
+  await page.mouse.down();
+  await page.mouse.move(app.x + 80, app.y + 114, { steps: 8 });
+  await page.mouse.up();
+  const moved = async () => Math.round(((await card(page, 'orders').boundingBox())?.y ?? 0) - app.y);
+  await expect.poll(moved).toBeGreaterThan(40);
+  await expect
+    .poll(async () => Math.round(((await tunnel.boundingBox())?.y ?? 0) - tunnelBefore.y))
+    .toBe(await moved());
+  expect(await events.boundingBox()).toEqual(queueBefore);
+});
