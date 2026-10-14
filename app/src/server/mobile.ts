@@ -4,7 +4,8 @@ import { execFile } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { readClones, readStack } from '../data.ts';
-import { runningNames, live } from '../engine/runs.ts';
+import { runningNames } from '../engine/runs.ts';
+import { live } from '../engine/history.ts';
 import { CODE, stateDir } from '../paths.ts';
 
 /** A mobile app found running on a simulator, emulator or phone. */

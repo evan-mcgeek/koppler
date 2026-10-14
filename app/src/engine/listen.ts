@@ -10,7 +10,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { tempDir } from '../paths.ts';
 import { Failure } from '../failure.ts';
-import { pickPrompts } from './runs.ts';
+import type { Prompt } from './history.ts';
 import { writeJson } from '../json-files.ts';
 
 /** Who is connected to the canvas, as temp/listener.json has it. */
@@ -200,4 +200,27 @@ export async function listen(argv: string[]): Promise<void> {
       return true;
     });
   while (!take()) await new Promise(done => setTimeout(done, 1000));
+}
+
+/**
+ * What a listener hands the agent from the queue: of the Sends and Stops only the newest (it replaces the rest, which
+ * then show as replaced), every other prompt as it is; each with the minutes it waited, so a stale one is asked about first.
+ */
+export function pickPrompts(lines: string[], now = Date.now()): (Prompt & { waited: number })[] {
+  const all = lines.flatMap(line => {
+    try {
+      const prompt = JSON.parse(line) as Prompt | null;
+      return prompt ? [prompt] : [];
+    } catch {
+      return [];
+    }
+  });
+  const boards = all.filter(prompt => prompt.tag === 'koppler' || prompt.tag === 'koppler-stop');
+  const newest = boards.at(-1);
+  return all
+    .filter(prompt => !boards.includes(prompt) || prompt === newest)
+    .map(prompt => ({
+      ...prompt,
+      waited: Math.max(0, Math.round((now - Date.parse(prompt.at ?? '')) / 60000)) || 0,
+    }));
 }

@@ -5,7 +5,7 @@ import type { Edge } from '../core/plan.ts';
 import { readClones, readData, readStack, writeData } from '../data.ts';
 import { fail } from '../failure.ts';
 import { alive, readRecord } from './processes.ts';
-import { currentStack } from './sync.ts';
+import { currentStack } from './stacks.ts';
 
 export interface QueuedEdit {
   id: string;

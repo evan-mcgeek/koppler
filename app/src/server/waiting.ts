@@ -3,7 +3,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { readStack } from '../data.ts';
-import { appendEvent, runs } from '../engine/runs.ts';
+import { appendEvent, runs } from '../engine/history.ts';
 import { tempDir } from '../paths.ts';
 
 const PROMPTS = path.join(tempDir(), 'prompts.jsonl');

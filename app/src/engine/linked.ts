@@ -4,7 +4,7 @@
 import path from 'node:path';
 import { validateStack } from '../core/stack.ts';
 import { fileUrl, githubFile, proposeFile, readFile, type GithubFile } from '../github.ts';
-import { setStack } from './sync.ts';
+import { setStack } from './stacks.ts';
 import { configDir } from '../paths.ts';
 import { readJson, writeJson } from '../json-files.ts';
 

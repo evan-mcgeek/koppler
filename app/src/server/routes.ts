@@ -10,21 +10,18 @@ import { discardChanges, linkStack, proposeChanges, updateStack } from '../engin
 import { listenerPid } from '../engine/listen.ts';
 import { setLock } from '../engine/locks.ts';
 import { appendAnswer, appendMessage, clearMessages, readMessages, refusal } from '../engine/messages.ts';
-import { appendNote, appendRun, runRecord, type RunRecord } from '../engine/runs.ts';
+import { appendNote, appendRun, runRecord, type RunRecord } from '../engine/history.ts';
 import {
   addApps,
   addOutside,
-  createStack,
   editStack,
-  currentStack,
-  forgetStacks,
   removeApp,
   refreshRegistry,
   replaceStack,
   saveStack,
   stackSource,
-  useStack,
-} from '../engine/sync.ts';
+} from '../engine/stack-file.ts';
+import { createStack, currentStack, forgetStacks, useStack } from '../engine/stacks.ts';
 import { CODE, tempDir } from '../paths.ts';
 import { cableTest } from './cable-test.ts';
 import { appendDebugLog, clearDebugLog, tail } from './logs.ts';
