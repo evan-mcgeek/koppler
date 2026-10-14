@@ -316,7 +316,8 @@ export const ROUTES: Record<string, Route> = {
   // With an app, only that one.
   '/stop-apps': async body => {
     const app = body['app'];
-    if (app !== undefined && !isApp(app)) return { status: 400, body: { error: 'Not an app' } };
+    // A name that could not be one of Koppler's processes stops nothing.
+    if (app !== undefined && !isApp(app)) return { status: 200, body: { stopped: [] } };
     const { failed, out } = await koppler(app ? ['stop', app] : ['stop', '--all', '--yes'], 60000);
     const stopped = out
       .trim()
