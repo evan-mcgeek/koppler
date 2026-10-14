@@ -6,7 +6,7 @@ import path from 'node:path';
 import { readClones, readData, readStack } from '../data.ts';
 import { alive, listener, NAME, readRecord, records, sh, sleep, stopOne, uptime } from '../engine/processes.ts';
 import { run } from '../engine/run.ts';
-import { appendNote } from '../engine/history.ts';
+import { appendNote, live } from '../engine/history.ts';
 import { CODE, logsDir, tempDir } from '../paths.ts';
 import { redact, scrub } from '../scrub.ts';
 import { confirm, flagValue, positional, table } from './output.ts';
@@ -176,6 +176,7 @@ export async function status(args: string[] = []): Promise<void> {
     await debugReport(positional(args));
     return;
   }
+  const { processState, stateOf } = await import('../engine/app-state.ts');
   const processes = records().map(record => {
     const up = alive(record);
     return {
@@ -203,7 +204,33 @@ export async function status(args: string[] = []): Promise<void> {
       };
     });
   if (args.includes('--json')) {
-    console.log(JSON.stringify({ processes, ...(apps && { stack: stack.name ?? null, apps }) }, null, 2));
+    // In words, as the canvas shows them: with the run's steps and, for the stack's apps, the secrets they lack.
+    type Steps = Record<string, { label: string; state: string; detail?: string }[] | undefined>;
+    const steps = (read(path.join(tempDir(), 'progress.json')) as { apps?: Steps } | null)?.apps ?? {};
+    const detailed = await Promise.all(
+      processes.map(async one => ({ ...one, status: stateOf(await processState(one.name), steps[one.name]) })),
+    );
+    let missing: Record<string, string[]> = {};
+    if (stack) {
+      const { secretsStatus } = await import('../server/secrets.ts');
+      const env = live()?.env ?? stack.envs[0] ?? '';
+      const declared = await secretsStatus().catch(() => ({}));
+      missing = Object.fromEntries(
+        Object.entries(declared).map(([id, envs]) => [
+          id,
+          (envs[env] ?? []).filter(secret => !secret.stored).map(secret => secret.name),
+        ]),
+      );
+    }
+    const withState = await Promise.all(
+      (apps ?? []).map(async app => ({
+        ...app,
+        status: stateOf(await processState(app.id), steps[app.id], missing[app.id]),
+      })),
+    );
+    console.log(
+      JSON.stringify({ processes: detailed, ...(apps && { stack: stack.name ?? null, apps: withState }) }, null, 2),
+    );
     return;
   }
   if (stack && apps) {

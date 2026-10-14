@@ -484,6 +484,17 @@ async function startApps(up: Up): Promise<void> {
       .map(edge => edge.to),
     ...(up.stack.apps[id]?.after ?? []),
   ];
+  // Every app still to start shows what it waits for, until its turn comes.
+  for (const id of order) {
+    if (up.skip.has(id) || node(id).run === 'ide' || running(id) || up.waits.has(id)) continue;
+    const first = needs(id).filter(dep => ids.includes(dep) && !running(dep));
+    step(
+      id,
+      'Start',
+      'todo',
+      first.length ? `Waiting for ${first.map(dep => nameOf(up.stack, dep)).join(' and ')}.` : 'Waiting its turn.',
+    );
+  }
   for (const id of order) {
     if (up.skip.has(id)) continue;
     const missing = needs(id).find(dep => down.has(dep) || up.skip.has(dep));

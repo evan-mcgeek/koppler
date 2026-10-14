@@ -69,7 +69,7 @@ test('apps of the run in progress show whether they answer, with their steps; th
   });
   try {
     await expect(card(page, 'orders').getByRole('img', { name: 'Running' })).toBeVisible();
-    await expect(card(page, 'payments').getByRole('img', { name: 'Not answering' })).toBeVisible();
+    await expect(card(page, 'payments').getByRole('img', { name: 'Failed to start' })).toBeVisible();
     await expect(page.getByRole('complementary').getByRole('img', { name: 'Running' })).toHaveCount(2);
     await expect(page.getByRole('complementary').getByRole('img', { name: 'Not answering' })).toHaveCount(1);
     // The cable between the two that answer is solid; the one to the app that does not stays dashed.

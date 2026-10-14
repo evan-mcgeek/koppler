@@ -1,6 +1,6 @@
 // `koppler wait`: blocks until apps Koppler runs are up, healthy or down, for agents and scripts.
-import { readStack } from '../data.ts';
-import { alive, listener, NAME, readRecord, sleep, statusOf, tailOf } from '../engine/processes.ts';
+import { processState } from '../engine/app-state.ts';
+import { NAME, readRecord, sleep, tailOf } from '../engine/processes.ts';
 import { fail } from '../failure.ts';
 import { flagValue, positional } from './output.ts';
 
@@ -8,27 +8,18 @@ const USAGE = 'usage: koppler wait <app...> --healthy|--up|--down [--timeout <se
 const GOALS = ['healthy', 'up', 'down'] as const;
 type Goal = (typeof GOALS)[number];
 /** An app's state, as `koppler wait` names it. */
-export type WaitState = 'not started' | 'exited' | 'starting' | 'unhealthy' | 'healthy';
-
-/** Where an app is now: started, answering on its port, and passing its own ready check when the stack gives one. */
-export async function waitState(name: string): Promise<WaitState> {
-  const record = readRecord(name);
-  if (!record) return 'not started';
-  if (!alive(record)) return 'exited';
-  if (record.port && !listener(record.port, record.bind)) return 'starting';
-  const app = readStack()?.apps[name];
-  if (!app?.ready || !app.url) return 'healthy';
-  const status = await statusOf(new URL(app.ready.path, app.url));
-  const ok = status !== null && (app.ready.status === undefined ? status < 400 : status === app.ready.status);
-  return ok ? 'healthy' : 'unhealthy';
-}
+export type WaitState = 'not started' | 'exited' | 'building' | 'unhealthy' | 'running';
+const waitState = async (name: string): Promise<WaitState> => {
+  const now = await processState(name);
+  return (now?.state as WaitState | undefined) ?? 'not started';
+};
 
 const met = (goal: Goal, state: WaitState) =>
   goal === 'down'
     ? state === 'not started' || state === 'exited'
     : goal === 'up'
       ? state !== 'not started' && state !== 'exited'
-      : state === 'healthy';
+      : state === 'running';
 
 /** Waits for every named app to reach the goal; exits 1 on a timeout or an app that exits, naming each app's state. */
 export async function wait(args: string[]): Promise<void> {

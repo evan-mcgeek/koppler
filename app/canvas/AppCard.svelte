@@ -14,7 +14,7 @@
   import type { Side } from '../src/core/arrange.ts';
   import { board, FAR_ZOOM, type CardNode } from './board.svelte.ts';
   import { wiring } from './wiring.svelte.ts';
-  import { live, progress } from './live.svelte.ts';
+  import { live, progress, STATE_NAMES } from './live.svelte.ts';
   import { logs } from './logs.svelte.ts';
   import { runs } from './run.svelte.ts';
   import { dialogs } from './dialogs.svelte.ts';
@@ -77,6 +77,8 @@
   let noting = $state(false);
   const up = $derived(live.up(id));
   const where = $derived(live.where(id));
+  const now = $derived(live.state(id));
+  const stateSaid = $derived(live.stateSaid(id));
   const steps = $derived(live.steps(id));
   const [tone, said] = $derived(steps.length ? progress(steps) : ['todo', '']);
   const failed = $derived(steps.find(step => step.state === 'failed'));
@@ -209,8 +211,14 @@
     <span class="grip" aria-hidden="true" title="Drag to move">
       <Icon of={GripVertical} size={14} />
     </span>
-    {#if up !== null}
-      <span class="live" data-on={up} role="img" aria-label={up ? 'Running' : 'Not answering'} title={live.about(id)}
+    {#if up !== null || now}
+      <span
+        class="live"
+        data-on={up}
+        data-state={now?.state}
+        role="img"
+        aria-label={now ? STATE_NAMES[now.state] : up ? 'Running' : 'Not answering'}
+        title={stateSaid || live.about(id)}
       ></span>
     {/if}
     <span class="name" title={data.name}>{data.name}</span>
@@ -429,7 +437,8 @@
       {/if}
     </div>
   {/if}
-  {#if where}<p class="where nodrag" data-on={up ?? 'other'}>{where}</p>{/if}
+  {#if where}<p class="where nodrag" data-on={up ?? 'other'}>{where}</p>
+  {:else if stateSaid}<p class="where nodrag" data-state={now?.state}>{stateSaid}</p>{/if}
   {#if steps.length}
     <button class="progress nodrag" type="button" data-tone={tone} aria-expanded={open} onclick={() => (open = !open)}>
       <span class="marks">
@@ -690,8 +699,20 @@
     border-radius: 50%;
     background: var(--bad);
   }
-  .live[data-on='true'] {
+  .live[data-on='true'],
+  .live[data-state='running'] {
     background: var(--ok);
+  }
+  .live:is([data-state='waiting'], [data-state='building']) {
+    background: var(--warn);
+  }
+  .live:is(
+    [data-state='unhealthy'],
+    [data-state='exited'],
+    [data-state='failed-to-start'],
+    [data-state='secret-missing']
+  ) {
+    background: var(--bad);
   }
   .where {
     contain: inline-size;
@@ -704,6 +725,14 @@
   }
   .where[data-on='true'] {
     color: var(--ok);
+  }
+  .where:is(
+    [data-state='unhealthy'],
+    [data-state='exited'],
+    [data-state='failed-to-start'],
+    [data-state='secret-missing']
+  ) {
+    color: var(--bad);
   }
   .progress {
     contain: inline-size;
