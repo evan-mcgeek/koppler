@@ -93,3 +93,20 @@ test('ends that Arrange moved off the middle stay on a side that has become too 
   const cables: Cable[] = [{ ...down('web', 'orders'), fromShift: 500 }];
   expect(endOffsets(cables, { cardOf }).offset['0|from']).toBe(84);
 });
+
+test('Arrange orders the ends on a side by the way each cable comes in, so they do not cross by the card', () => {
+  const boxes: Record<string, Box> = {
+    wallet: { x: 600, y: 300, w: 260, h: 300 },
+    // Its cable drops straight down from just above Wallet's left side.
+    above: { x: 460, y: -500, w: 200, h: 500 },
+    // Its cable comes from far up and to the left, though its card's middle sits higher.
+    far: { x: -200, y: -800, w: 260, h: 100 },
+  };
+  const into = (from: string): Cable => ({ from, to: 'wallet', fromSide: 'bottom', toSide: 'left' });
+  const cables = [into('far'), into('above')];
+  orderSlots(cables, id => boxes[id] as Box);
+  expect(cables.map(cable => [cable.from, cable.toSlot])).toEqual([
+    ['far', 1],
+    ['above', 0],
+  ]);
+});

@@ -98,7 +98,7 @@ const facingCard = (list: Ends): string | undefined =>
     : undefined;
 
 /**
- * Arrange's order of the cables along each side of a card, by where their other end sits, and where it centres them.
+ * Arrange's order of the cables along each side of a card, by the way each comes in, and where it centres them.
  * Cables that all go to one card, onto the side facing this one, are centred on the stretch both cards share, so they
  * run straight across. Sets each cable's slots and shifts: they stay as set, whatever moves, until the next Arrange.
  */
@@ -117,8 +117,17 @@ export function orderSlots(cables: Cable[], boxOf: (id: string) => Box): void {
       const step = Math.min(spread(lengthOf(card), list.length), spread(lengthOf(boxOf(other)), list.length));
       if (high - low >= step * (list.length - 1) + 32) shift = Math.round((low + high) / 2 - middle(card));
     }
+    // By the way each cable comes in: the angle from this side's middle to where it leaves the other card. Ends in that
+    // order cannot cross next to the card, as ordering by the other card's middle can when that card is tall.
+    const port = sidePoint(card, side);
+    const [nx, ny] = SIDES[side];
+    const comesIn = ({ cable, end, other: id }: (typeof list)[number]) => {
+      const from = sidePoint(boxOf(id), end === 'from' ? cable.toSide : cable.fromSide);
+      const [dx, dy] = [from.x - port.x, from.y - port.y];
+      return Math.atan2(along === 'x' ? dx : dy, dx * nx + dy * ny);
+    };
     list
-      .sort((a, b) => middle(boxOf(a.other)) - middle(boxOf(b.other)))
+      .sort((a, b) => comesIn(a) - comesIn(b) || middle(boxOf(a.other)) - middle(boxOf(b.other)))
       .forEach(({ cable, end }, slot) => {
         cable[`${end}Slot`] = slot;
         if (shift) cable[`${end}Shift`] = shift;
