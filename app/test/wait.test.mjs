@@ -27,7 +27,7 @@ test('wait holds until an app answers on its port, then until it is down', async
   const started = spawn('node', [entry, 'run', 'web', '--port', String(port), '--', 'node', '-e', server], { env, stdio: 'ignore' });
   const waited = koppler('wait', 'web', '--healthy', '--timeout', '30', '--json');
   assert.equal(waited.status, 0, waited.stderr);
-  assert.deepEqual(JSON.parse(waited.stdout), { goal: 'healthy', met: true, why: null, apps: { web: 'healthy' } });
+  assert.deepEqual(JSON.parse(waited.stdout), { goal: 'healthy', met: true, why: null, apps: { web: 'running' } });
   await new Promise(resolve => started.once('exit', resolve));
   koppler('stop', 'web');
   const down = koppler('wait', 'web', '--down', '--timeout', '10');

@@ -23,6 +23,7 @@ import { mobileState, refreshMobile, type MobileApp } from './mobile.ts';
 import { secretsStatus } from './secrets.ts';
 import { waiting } from './waiting.ts';
 import { APP_ID, RUN_ID } from '../ids.ts';
+import { processState, stateOf, type StateOf } from '../engine/app-state.ts';
 
 type Loose = Record<string, unknown>;
 interface Step {
@@ -38,6 +39,7 @@ interface AppStatus extends Loose {
   listening?: boolean;
   running?: MobileApp[];
   logTail?: string | null;
+  state?: StateOf;
 }
 type Status = Loose & { apps: Record<string, AppStatus> };
 
@@ -237,6 +239,15 @@ async function snapshot(serving: boolean): Promise<Status> {
     app.logTail = tail(logFile(id, app.log));
     delete app.log;
   }
+  // Each app's state in words, checked side by side: a ready check can take a few seconds to answer. One started
+  // outside Koppler (by the agent, in the IDE, on a simulator) runs while it answers.
+  await Promise.all(
+    Object.entries(status.apps).map(async ([id, app]) => {
+      const outside = app.listening || app.running?.length ? ({ state: 'running', detail: '' } as const) : null;
+      const state = stateOf((await processState(id)) ?? outside, app.steps);
+      if (state) app.state = state;
+    }),
+  );
   const ports = await Promise.all(
     tunnelPorts().map(async (port): Promise<[number, boolean]> => [port, await portOpen(port)]),
   );

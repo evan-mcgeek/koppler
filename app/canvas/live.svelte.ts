@@ -18,11 +18,36 @@ interface Running {
   flavor?: string;
   source?: string;
 }
+/** An app's state, and what to say about it. */
+export interface AppState {
+  state: 'waiting' | 'building' | 'running' | 'unhealthy' | 'exited' | 'failed-to-start' | 'secret-missing';
+  detail: string;
+}
+export const STATE_NAMES: Record<AppState['state'], string> = {
+  waiting: 'Waiting',
+  building: 'Building',
+  running: 'Running',
+  unhealthy: 'Unhealthy',
+  exited: 'Exited',
+  'failed-to-start': 'Failed to start',
+  'secret-missing': 'Secret missing',
+};
+const SAID: Record<AppState['state'], (detail: string) => string> = {
+  waiting: detail => detail || 'Waiting.',
+  building: detail => `Building. ${detail}`,
+  running: () => '',
+  unhealthy: detail => `Unhealthy: ${detail}`,
+  exited: detail => `Exited. ${detail}`,
+  'failed-to-start': detail => `Failed to start: ${detail}`,
+  'secret-missing': detail => `Secret missing: ${detail}. Set it under Credentials.`,
+};
 interface AppStatus {
   port?: number;
   listening?: boolean;
   /** A mobile app: the simulators and devices it runs on. */
   running?: Running[];
+  /** Its state in words, as the server works it out. */
+  state?: AppState;
   steps?: Step[];
   /** The last lines of its log. */
   logTail?: string | null;
@@ -185,6 +210,19 @@ class Live {
     if (!info) return null;
     if (info.running) return info.running.length > 0;
     return info.listening ?? null;
+  }
+  /** A sent app's state: the server's word for it, or a secret it lacks on this board's environment. */
+  state(id: string): AppState | null {
+    const info = this.#info(id);
+    if (info?.state) return info.state;
+    if (!this.sent(id) || this.up(id)) return null;
+    const missing = (this.status?.secrets?.[id]?.[board.env] ?? []).filter(one => !one.stored).map(one => one.name);
+    return missing.length ? { state: 'secret-missing', detail: missing.join(', ') } : null;
+  }
+  /** That state in a sentence; nothing while it runs. */
+  stateSaid(id: string): string {
+    const now = this.state(id);
+    return now ? SAID[now.state](now.detail).trim() : '';
   }
   /** What the live dot says in words. */
   about(id: string): string {
