@@ -97,6 +97,11 @@ test('another environment, branch or note restarts what stays', () => {
   expect(plan(live, withNode('db-api', { branch: 'feat/x' }), { running }).restarts).toEqual([
     { id: 'db-api', why: ['its branch changes from main to feat/x'] },
   ]);
+  // An app that ran on whatever its clone was on: that branch is named.
+  const current = (id: string) => (id === 'api' ? 'develop' : undefined);
+  expect(plan(live, withNode('api', { branch: 'feat/y' }), { running, current }).restarts).toEqual([
+    { id: 'api', why: ['its branch changes from develop to feat/y'] },
+  ]);
   expect(plan(live, withNode('api', { note: 'flag on' }), { running }).restarts).toEqual([
     { id: 'api', why: ['its note changed'] },
   ]);

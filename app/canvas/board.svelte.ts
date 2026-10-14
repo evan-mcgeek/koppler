@@ -1290,9 +1290,23 @@ class Board {
           y + PLACE.h + PLACE.gap <= box.y ||
           box.y + box.h + PLACE.gap <= y,
       );
+    // In line with the cards already there and a gap after one, before the rest of the screen.
+    const grid = (start: number, end: number, size: number) =>
+      Array.from(
+        { length: Math.max(0, Math.floor((end - size - start - 40) / 40) + 1) },
+        (_, at) => start + 40 + at * 40,
+      );
+    const rows = [...new Set([...taken.map(box => box.y), ...grid(from.y, to.y, PLACE.h)])].filter(
+      y => y >= from.y && y + PLACE.h <= to.y,
+    );
+    const columns = [...new Set([...taken.map(box => box.x + box.w + PLACE.gap), ...grid(from.x, to.x, PLACE.w)])]
+      .filter(x => x >= from.x && x + PLACE.w <= to.x)
+      .sort((a, b) => a - b);
     let spot: Point | undefined;
-    for (let y = from.y + 40; !spot && y + PLACE.h <= to.y; y += 40)
-      for (let x = from.x + 40; !spot && x + PLACE.w <= to.x; x += 40) if (free(x, y)) spot = { x, y };
+    for (const y of rows) {
+      spot = columns.filter(x => free(x, y)).map(x => ({ x, y }))[0];
+      if (spot) break;
+    }
     const step = this.nodes.length * 32;
     this.#addOnly(this.#card(app, this.stored(spot ?? { x: from.x + 48 + step, y: from.y + 48 + step })));
   }

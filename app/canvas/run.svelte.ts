@@ -107,6 +107,7 @@ class Runs {
       strays: (running ?? []).filter(id => board.apps.some(app => app.id === id) && !status?.live?.nodes?.[id]),
       startedOn: id => status?.runningEnvs?.[id],
       queuesOf: id => board.queuesOf(id),
+      current: id => board.app(id)?.current,
     });
   }
 

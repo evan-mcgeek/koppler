@@ -53,10 +53,16 @@ class Wiring {
     const a = sidePoint(box, fromSide);
     const points: Point[] = [];
     const flow = (ev: PointerEvent) => board.toFlow({ x: ev.clientX, y: ev.clientY });
+    // Let go on a port, the cable goes into that port; anywhere else on the card, into the side facing where it comes from.
     const target = (ev: PointerEvent) => {
       const id = cardAt(ev.clientX, ev.clientY);
       const at = id && id !== from ? board.boxes.get(id) : undefined;
-      return id && at ? { id, side: this.nearestSide(at, points.at(-1) ?? flow(ev)), at } : undefined;
+      if (!id || !at) return undefined;
+      const pointer = flow(ev);
+      const onPort = (Object.keys(SIDES) as Side[]).find(
+        side => Math.hypot(sidePoint(at, side).x - pointer.x, sidePoint(at, side).y - pointer.y) <= 16 / board.zoom(),
+      );
+      return { id, side: onPort ?? this.nearestSide(at, points.at(-1) ?? a), at };
     };
     const app = (id: string) => board.app(id);
     const calls = (caller: string, callee: string) => !!app(caller)?.calls.includes(callee);
