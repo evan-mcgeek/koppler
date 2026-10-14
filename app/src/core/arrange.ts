@@ -19,6 +19,8 @@ export interface Spacing {
   pad: number;
   /** Packs tighter: cards for reading, not for wiring. */
   tight?: boolean;
+  /** Where along its layer a card's cables meet it, when its room is more than the card (its own queues under it). */
+  anchor?: (id: string) => number | undefined;
 }
 
 const GAP_X = 80;
@@ -157,6 +159,77 @@ export function layerDepths(ids: string[], edges: Edge[]): Record<string, number
   return depth;
 }
 
+/**
+ * Moves each card along its layer towards the cards it is cabled to, so cables run as straight as they can: a chain
+ * lines up, a card called by two sits between them. Each layer in turn takes the places that make its cables shortest
+ * while its cards keep their order and gaps (pooled adjacent averages, each card weighed by its cables), until nothing
+ * moves.
+ */
+function straighten(
+  layers: string[][],
+  edges: Edge[],
+  at: Record<string, number>,
+  size: (id: string) => number,
+  gap: number,
+  anchor: (id: string) => number,
+): void {
+  const layerOf: Record<string, number> = {};
+  layers.forEach((layer, n) => {
+    for (const id of layer) layerOf[id] = n;
+  });
+  const near: Record<string, string[]> = {};
+  for (const { from, to } of edges) {
+    if (!(from in layerOf) || !(to in layerOf) || layerOf[from] === layerOf[to]) continue;
+    (near[from] ??= []).push(to);
+    (near[to] ??= []).push(from);
+  }
+  // Worked out on where cables meet each card, its anchor, rather than on its corner.
+  const mid: Record<string, number> = Object.fromEntries(
+    Object.keys(layerOf).map(id => [id, get(at, id) + anchor(id)]),
+  );
+  for (let sweep = 0, moved = Infinity; sweep < 500 && moved > 0.01; sweep++) {
+    moved = 0;
+    for (const layer of sweep % 2 ? [...layers].reverse() : layers) {
+      // How far each card's anchor must at least be from the first one's, for the cards before it to fit.
+      const offsets: number[] = [];
+      layer.forEach((id, n) => {
+        const before = layer[n - 1];
+        offsets.push(
+          before === undefined ? 0 : (offsets[n - 1] ?? 0) + size(before) - anchor(before) + gap + anchor(id),
+        );
+      });
+      const blocks: { sum: number; weight: number; count: number }[] = [];
+      layer.forEach((id, n) => {
+        const others = near[id] ?? [];
+        // A card with no cables stays where it is, unless others need its room.
+        const weight = others.length || 1e-3;
+        const want = others.length
+          ? others.reduce((sum, other) => sum + get(mid, other), 0) / others.length
+          : get(mid, id);
+        blocks.push({ sum: (want - (offsets[n] ?? 0)) * weight, weight, count: 1 });
+        for (;;) {
+          const last = blocks.at(-1);
+          const before = blocks.at(-2);
+          if (!last || !before || before.sum / before.weight <= last.sum / last.weight) break;
+          blocks.pop();
+          before.sum += last.sum;
+          before.weight += last.weight;
+          before.count += last.count;
+        }
+      });
+      let n = 0;
+      for (const block of blocks)
+        for (let k = 0; k < block.count; k++, n++) {
+          const id = layer[n] ?? '';
+          const next = block.sum / block.weight + (offsets[n] ?? 0);
+          moved = Math.max(moved, Math.abs(next - get(mid, id)));
+          mid[id] = next;
+        }
+    }
+  }
+  for (const id of Object.keys(mid)) at[id] = get(mid, id) - anchor(id);
+}
+
 /** Where each card's top left corner goes. `mirror` gives the same layout read the other way round. */
 export function arrange(
   ids: string[],
@@ -164,7 +237,7 @@ export function arrange(
   sizeOf: (id: string) => Size,
   dir: Direction = 'down',
   mirror = false,
-  { pad, tight = false }: Spacing = { pad: 0 },
+  { pad, tight = false, anchor }: Spacing = { pad: 0 },
 ): Record<string, Point> {
   const depth = layerDepths(ids, edges);
   const layers: string[][] = [];
@@ -188,15 +261,32 @@ export function arrange(
   const length = (layer: string[]) =>
     layer.reduce((sum, id) => sum + get(sizes, id)[along], 0) + gapAlong * (layer.length - 1);
   const longest = Math.max(...filled.map(length));
-  const pos: Record<string, Point> = {};
+  const alongAt: Record<string, number> = {};
+  const acrossOf: Record<string, number> = {};
   let acrossAt = pad + 40;
   for (const layer of filled) {
-    let alongAt = pad + 40 + (longest - length(layer)) / 2;
+    let at = pad + 40 + (longest - length(layer)) / 2;
     for (const id of layer) {
-      pos[id] = down ? { x: alongAt, y: acrossAt } : { x: acrossAt, y: alongAt };
-      alongAt += get(sizes, id)[along] + gapAlong;
+      alongAt[id] = at;
+      acrossOf[id] = acrossAt;
+      at += get(sizes, id)[along] + gapAlong;
     }
     acrossAt += Math.max(...layer.map(id => get(sizes, id)[across])) + gapAcross;
+  }
+  straighten(
+    filled,
+    edges,
+    alongAt,
+    id => get(sizes, id)[along],
+    gapAlong,
+    id => anchor?.(id) ?? get(sizes, id)[along] / 2,
+  );
+  // The board starts where it did: the card furthest up (or left) at the margin.
+  const first = Math.min(...Object.values(alongAt));
+  const pos: Record<string, Point> = {};
+  for (const id of ids) {
+    const at = Math.round(get(alongAt, id) - first + pad + 40);
+    pos[id] = down ? { x: at, y: get(acrossOf, id) } : { x: get(acrossOf, id), y: at };
   }
   return pos;
 }

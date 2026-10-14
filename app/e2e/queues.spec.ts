@@ -318,3 +318,32 @@ test("the icons in a queue's and a tunnel's buttons sit in the middle of each bu
   expect(off.length).toBeGreaterThan(3);
   for (const by of off) expect(by).toBeLessThanOrEqual(0.5);
 });
+
+test('in every layout Arrange gives, no card covers another, an app’s own queue and tunnel included', async ({
+  page,
+}) => {
+  await expect(queue(page)).toHaveCount(2);
+  for (let press = 0; press < 4; press++) {
+    await page.getByRole('button', { name: /^Arrange/ }).click();
+    await expect
+      .poll(async () => {
+        const boxes = await page.locator('.svelte-flow__node').evaluateAll(nodes =>
+          nodes.map(node => {
+            const box = node.getBoundingClientRect();
+            return { id: node.getAttribute('data-id'), x: box.x, y: box.y, w: box.width, h: box.height };
+          }),
+        );
+        return boxes.flatMap((a, n) =>
+          boxes
+            .slice(n + 1)
+            .filter(
+              b =>
+                Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x) > 1 &&
+                Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y) > 1,
+            )
+            .map(b => `${String(a.id)} on ${String(b.id)}`),
+        );
+      })
+      .toEqual([]);
+  }
+});

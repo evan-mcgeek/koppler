@@ -94,3 +94,67 @@ test('the room only full cards need is closed up, what anything else covers stay
   expect(back(250)).toBe(400);
   expect(squeeze([], []).show(40)).toBe(40);
 });
+
+test('cards in a chain line up, so their cables run straight, whatever their sizes', () => {
+  const sizes: Record<string, { w: number; h: number }> = {
+    app: { w: 200, h: 80 },
+    api: { w: 240, h: 300 },
+    pay: { w: 200, h: 120 },
+    wallet: { w: 200, h: 90 },
+  };
+  const size = (id: string) => sizes[id] ?? card();
+  // The api also calls a customer service, so the pay column has two cards and the wallet's has one.
+  const ids = ['app', 'api', 'pay', 'customer', 'wallet'];
+  const pos = arrange(ids, calls('app>api', 'api>pay', 'api>customer', 'pay>wallet'), size, 'right', false, {
+    pad: 0,
+  });
+  const middle = (id: string) => (pos[id]?.y ?? 0) + size(id).h / 2;
+  expect(middle('app')).toBe(middle('api'));
+  expect(middle('pay')).toBe(middle('wallet'));
+  expect(middle('api')).toBe((middle('pay') + middle('customer')) / 2);
+});
+
+test('a card lines up on its own middle, not on the room kept beside it', () => {
+  // The api's queue stacks under it: it is given that room, and lines up by the card itself.
+  const size = (id: string) => (id === 'api' ? { w: 200, h: 260 } : card());
+  const pos = arrange(['web', 'api'], calls('web>api'), size, 'right', false, { pad: 0, anchor: () => 50 });
+  expect(pos['web']?.y).toBe(pos['api']?.y);
+});
+
+test('a card called by two sits between them, and no two cards ever overlap', () => {
+  const pos = arrange(['a', 'b', 'c'], calls('a>c', 'b>c'), card, 'right', false, { pad: 0 });
+  const middle = (id: string) => (pos[id]?.y ?? 0) + 50;
+  expect(middle('c')).toBe((middle('a') + middle('b')) / 2);
+  // Boards of every shape, in every layout: cards of their own sizes never cover one another.
+  let seed = 7;
+  const random = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  for (let board = 0; board < 60; board++) {
+    const ids = Array.from({ length: 4 + Math.floor(random() * 12) }, (_, n) => `c${String(n)}`);
+    const sizes = Object.fromEntries(
+      ids.map(id => [id, { w: 120 + Math.round(random() * 200), h: 50 + Math.round(random() * 250) }]),
+    );
+    const edges = ids.flatMap((from, n) =>
+      ids
+        .slice(n + 1)
+        .filter(() => random() < 0.25)
+        .map(to => ({ from, to })),
+    );
+    for (const [dir, mirror] of [
+      ['down', false],
+      ['down', true],
+      ['right', false],
+      ['right', true],
+    ] as const) {
+      const at = arrange(ids, edges, id => sizes[id] ?? card(), dir, mirror, { pad: 24 });
+      for (const [n, a] of ids.entries())
+        for (const b of ids.slice(n + 1)) {
+          const p = at[a] as Point;
+          const q = at[b] as Point;
+          const s = sizes[a] ?? card();
+          const t = sizes[b] ?? card();
+          const apart = p.x + s.w <= q.x || q.x + t.w <= p.x || p.y + s.h <= q.y || q.y + t.h <= p.y;
+          expect(apart, `${a} and ${b} overlap (${dir}${mirror ? ', mirrored' : ''})`).toBe(true);
+        }
+    }
+  }
+});

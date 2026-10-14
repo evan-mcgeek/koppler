@@ -160,6 +160,8 @@ export interface StackApp {
   libraries: { name: string; path: string }[];
 }
 const PAD = 24;
+// The height of an app card's header, the part its full and short forms share.
+const HEADER = 44;
 /** The room a new card is given before it has been measured. */
 const PLACE = { w: 300, h: 240, gap: 32 };
 export const cable = (from: string, to: string, data: CableData): CableEdge => ({
@@ -511,12 +513,13 @@ class Board {
     cards: InfraNode[],
     size: Size = this.boxes.get(id) ?? { w: 260, h: 200 },
     ownOnly = false,
+    at?: Side,
   ): InfraNode[] {
     const app = this.nodes.find(node => node.id === id);
     const led = new Set(ownOnly ? this.ownedBy(id) : this.ledBy(id));
     if (!app || !led.size) return cards;
     const box = { ...app.position, ...size };
-    const side = this.infraSide(id);
+    const side = at ?? this.infraSide(id);
     let y = side === 'bottom' ? box.y + box.h + TUNNEL.gap / 2 : side === 'top' ? box.y - TUNNEL.gap / 2 : box.y;
     return cards.map(card => {
       if (!led.has(card.id)) return card;
@@ -1499,7 +1502,10 @@ class Board {
 
   #place(card: (id: string) => Size, dir: 'down' | 'right', mirror: boolean): void {
     const links = this.cables.map(({ from, to }) => ({ from, to }));
-    // An app is given the room of its tunnel cards too: top-down beside it when it calls others, else under it.
+    // An app is given the room of its tunnel cards too: top-down beside it when it calls others, else under it. Its
+    // cables keep off that side, and the cards go exactly there.
+    const reserved = (id: string): Side =>
+      dir === 'down' && links.some(link => link.from === id) ? 'right' : 'bottom';
     const size = (id: string) => {
       const led = this.ledBy(id)
         .filter(key => this.ownedBy(id).includes(key))
@@ -1528,9 +1534,14 @@ class Board {
       id => (joined.includes(id) ? (this.infraBoxes.get(id) ?? { w: 220, h: 70 }) : size(id)),
       dir,
       mirror,
-      { pad: PAD },
+      // Lined up by the card's header, which reads the same in its full and short forms: not by the room kept for its
+      // own cards beside it.
+      { pad: PAD, anchor: id => (joined.includes(id) ? undefined : dir === 'down' ? card(id).w / 2 : HEADER / 2) },
     );
-    const cables: Cable[] = links.map(link => ({ ...link, ...sidesFor(placed, link, dir, card) }));
+    const keep = Object.fromEntries(
+      this.nodes.filter(node => this.ownedBy(node.id).length).map(node => [node.id, reserved(node.id)]),
+    );
+    const cables: Cable[] = links.map(link => ({ ...link, ...sidesFor(placed, link, dir, card, keep) }));
     orderSlots(cables, id => ({ ...(placed[id] ?? { x: 0, y: 0 }), ...card(id) }));
     this.nodes = this.nodes.map(node => ({ ...node, position: placed[node.id] ?? node.position }));
     this.edges = cables.map(({ from, to, ...data }) => cable(from, to, data));
@@ -1538,7 +1549,7 @@ class Board {
       const at = placed[one.id];
       return at ? { ...one, position: at } : one;
     });
-    for (const node of this.nodes) cards = this.#beside(node.id, cards, card(node.id), true);
+    for (const node of this.nodes) cards = this.#beside(node.id, cards, card(node.id), true, keep[node.id]);
     this.infra = cards;
   }
 }
