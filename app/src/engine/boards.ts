@@ -29,7 +29,7 @@ export function editDone(id: unknown): void {
 }
 
 const CHANGES =
-  '[--add <app,...>] [--remove <app,...>] [--cable <caller>:<callee>]... [--uncable <caller>:<callee>]... [--branch <app>=<branch>]... [--note <app>="<note>"]...';
+  '[--add <app,...>] [--remove <app,...>] [--cable <caller>:<callee>]... [--uncable <caller>:<callee>]... [--branch <app>=<branch>]... [--note <app>="<note>"]... [--arrange]';
 const USAGE = `usage: koppler board new "<name>" ${CHANGES}\n       koppler board edit "<name>" ${CHANGES}`;
 
 export function boardCommand(args: string[]): void {
@@ -59,6 +59,7 @@ export function boardCommand(args: string[]): void {
     uncable: cables('--uncable'),
     branch: Object.fromEntries(pairs('--branch', '=')),
     note: Object.fromEntries(pairs('--note', '=')),
+    ...(args.includes('--arrange') && { arrange: true }),
   };
 
   const state = readData('state') ?? {};

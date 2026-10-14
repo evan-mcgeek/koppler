@@ -106,3 +106,22 @@ test('a board made from the terminal joins your boards on an open canvas, which 
     .poll(() => state(canvas.temp).presets.find(one => one.name === 'Orders work')?.nodes)
     .toEqual({ orders: { run: 'cli' }, payments: { run: 'cli' } });
 });
+
+test('an edit with --arrange lays the board on screen out along its calls, as Arrange does', async ({
+  page,
+  canvas,
+}) => {
+  await expect(card(page, 'web')).toBeVisible();
+  koppler(canvas, 'board', 'edit', 'Shop', '--add', 'payments', '--cable', 'orders:payments', '--arrange');
+  await expect(card(page, 'payments')).toBeVisible();
+  await expect.poll(() => waiting(canvas.temp)).toBe(0);
+  // Web calls Orders, which calls Payments: laid out top-down in that order, each card clear of the one above.
+  await expect
+    .poll(async () => {
+      const [web, orders, payments] = await Promise.all(
+        ['web', 'orders', 'payments'].map(async id => card(page, id).boundingBox()),
+      );
+      return !!web && !!orders && !!payments && web.y + web.height < orders.y && orders.y + orders.height < payments.y;
+    })
+    .toBe(true);
+});

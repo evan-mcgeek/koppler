@@ -171,6 +171,8 @@ export interface BoardEdit {
   branch?: Record<string, string>;
   /** An empty note takes the note off. */
   note?: Record<string, string>;
+  /** Laid out afresh, as Arrange does: the saved places go. */
+  arrange?: boolean;
 }
 
 const isPoint = (value: unknown): value is { x: number; y: number } =>
@@ -202,7 +204,10 @@ export function editPreset(preset: StoredPreset, edit: BoardEdit): StoredPreset 
     .filter(isEdge)
     .filter(edge => !gone.has(edge.from) && !gone.has(edge.to) && !(edit.uncable ?? []).some(same(edge)));
   for (const edge of edit.cable ?? []) if (!edges.some(same(edge))) edges.push({ from: edge.from, to: edge.to });
-  if (!layout) return { ...preset, nodes, edges };
+  if (!layout || edit.arrange) {
+    const { layout: _, ...rest } = preset;
+    return { ...rest, nodes, edges };
+  }
   const wired = new Set(edges.map(edge => `${edge.from}>${edge.to}`));
   const sides = Object.fromEntries(
     Object.entries(isObject(layout['sides']) ? layout['sides'] : {}).filter(([key]) => wired.has(key)),
@@ -223,6 +228,7 @@ export function describeEdit(edit: BoardEdit, name: (id: string) => string = id 
     ...Object.entries(edit.note ?? {}).map(([id, note]) =>
       note.trim() ? `a note on ${name(id)}` : `no note on ${name(id)}`,
     ),
+    edit.arrange && 'arranged',
   ]
     .filter(Boolean)
     .join('; ');

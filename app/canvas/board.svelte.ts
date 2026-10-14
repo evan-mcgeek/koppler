@@ -1391,7 +1391,9 @@ class Board {
     for (const { from, to } of change.uncable ?? []) this.cut(from, to);
     for (const { from, to } of change.cable ?? [])
       if (on(from) && on(to) && !this.edges.some(edge => edge.id === `${from}>${to}`)) this.connect(from, to);
-    return this.content() !== before;
+    // Laid out once the cards have their sizes, as a board opened with no places is.
+    if (change.arrange) this.opened = 'arrange';
+    return this.content() !== before || !!change.arrange;
   }
 
   #arranged = { key: '', version: 0 };

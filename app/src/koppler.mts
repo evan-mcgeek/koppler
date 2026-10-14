@@ -566,7 +566,7 @@ const COMMANDS: Command[] = [
   {
     name: 'board',
     who: 'agent',
-    args: 'new|edit "<name>" [--add <app,...>] [--remove <app,...>] [--cable <caller>:<callee>]... [--uncable <caller>:<callee>]... [--branch <app>=<branch>]... [--note <app>="<note>"]...',
+    args: 'new|edit "<name>" [--add <app,...>] [--remove <app,...>] [--cable <caller>:<callee>]... [--uncable <caller>:<callee>]... [--branch <app>=<branch>]... [--note <app>="<note>"]... [--arrange]',
     forms: [
       [
         'new "<name>" [--add <app,...>] [--cable <caller>:<callee>]...',
@@ -578,6 +578,7 @@ const COMMANDS: Command[] = [
       ],
       ['edit "<name>" [--cable <caller>:<callee>]... [--uncable <caller>:<callee>]...', 'add or take off cables'],
       ['edit "<name>" [--branch <app>=<branch>]... [--note <app>="<note>"]...', "set an app's branch or note"],
+      ['new|edit "<name>" ... --arrange', 'lay the board out afresh, as Arrange on the canvas does'],
     ],
     about: 'make a board, or change one even while it is open on the canvas, which shows the change',
     run: boardCommand,
