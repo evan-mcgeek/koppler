@@ -2,6 +2,7 @@
 // can never undo, so the log is written whole (a temporary file, then a rename), under a lock, and a log that cannot
 // be read is never taken as empty: Koppler keeps a copy and stops, so a person can repair it first.
 import fs from 'node:fs';
+import path from 'node:path';
 import { writeJson } from '../json-files.ts';
 
 /** A piece of text in a file was replaced by another. */
@@ -151,4 +152,25 @@ export function updateActions<T>(file: string, change: (list: Action[]) => T): T
   } finally {
     fs.rmSync(lock, { recursive: true, force: true });
   }
+}
+
+/**
+ * Writes a whole file Stop puts back: the text before the first write of the run is logged (null when there was no
+ * file, which Stop then takes away), and the text written last, so Stop leaves alone a file changed since.
+ */
+export function writeLogged(logFile: string, app: string, file: string, text: string): void {
+  let before: string | null = null;
+  try {
+    before = fs.readFileSync(file, 'utf8');
+  } catch {
+    // No file yet.
+  }
+  const logged = (action: Action): action is FileAction => action.kind === 'file' && action.file === file;
+  updateActions(logFile, list => {
+    const entry = list.find(logged);
+    if (entry) entry.after = text;
+    else list.push({ kind: 'file', app, file, before, after: text });
+  });
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, text, { mode: 0o600 });
 }

@@ -120,6 +120,8 @@ function print(caller: App, callee: App, wiring: Wiring): void {
   if (call.how === 'env') console.log(`  set in ${wiring.profile ?? ''}: ${settings}`);
   else if (call.how === 'edit')
     console.log(`  edit ${call.file ?? ''}: ${call.key ?? ''} (mark it "koppler: do not commit")`);
+  else if (call.how === 'secret')
+    console.log(`  set over its secret when it starts: ${call.key ?? ''}=${value} (Stop takes it back)`);
   else if (call.how === 'env-file')
     console.log(
       `  write to ${wiring.file ?? ''} (git-ignored, read on top of .env): ${(wiring.lines ?? []).join(', ')}`,

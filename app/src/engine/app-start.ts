@@ -10,7 +10,7 @@ import type { App, Secret } from '../core/stack.ts';
 import { readClones, readStack } from '../data.ts';
 import { repoFiles } from './investigate.ts';
 import { readJson } from '../json-files.ts';
-import { BIN, CODE } from '../paths.ts';
+import { BIN, CODE, tempDir } from '../paths.ts';
 import { resolveDevice, type RunDevice } from './devices.ts';
 import { sh, type Ready, type RunOptions } from './processes.ts';
 import { appOn, storeOf } from '../core/stack.ts';
@@ -27,6 +27,9 @@ export interface AppStart {
   env: string;
   ready?: Ready;
 }
+
+/** The file a run writes for a Lambda: the keys of its secret that point at local apps. */
+export const lambdaOverrides = (id: string): string => path.join(tempDir(), `lambda-${id}.json`);
 
 /** A .NET app's launch profiles, from its clone. */
 export function profilesOf(app: Partial<App>, repo: string | undefined): LaunchProfiles {
@@ -75,6 +78,7 @@ function contextFor(
     env,
     id,
     engine: CODE,
+    lambdaOverrides: lambdaOverrides(id),
     override: Object.keys(options.setEnv ?? {}),
     envNames: [env, ...aliases],
   };

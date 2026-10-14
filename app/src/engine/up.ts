@@ -14,7 +14,8 @@ import { signInOf, type SignIn } from '../core/sign-in.ts';
 import type { Prereq } from '../core/stack.ts';
 import { readClones, readData, readStack, type Clone, type Registry } from '../data.ts';
 import { tempDir } from '../paths.ts';
-import { readActions, type Action } from './actions.ts';
+import { readActions, writeLogged, type Action } from './actions.ts';
+import { lambdaOverrides } from './app-start.ts';
 import { switchTo, type Carry } from './branch.ts';
 import { APPROVE, approved, missingTunnels, startsFromStack } from './checks.ts';
 import { link } from './libraries.ts';
@@ -304,6 +305,8 @@ function pointsAt(up: Up, app: string, address: string, file: string | undefined
 /** Each cable: the caller gets its local callee's address at start, or a remembered change already points it there. */
 function wireCables(up: Up): void {
   const { stack, env, left } = up;
+  // A Lambda that finds a callee's address in its secret: those keys are set over the secret when it starts.
+  const secretKeys: Record<string, Record<string, string>> = {};
   for (const { from, to } of up.edges) {
     const wired = wireInfo(stack, up.clones, from, to, env, up.node(from).platform);
     const viaRecipe = recipesFor(stack, from).some(
@@ -315,6 +318,7 @@ function wireCables(up: Up): void {
     }
     if (wired.how === 'env' && !kindOf(stack.apps[from]).platforms)
       for (const name of [wired.call.env ?? []].flat()) settingsFor(up, from)[name] = wired.value;
+    else if (wired.how === 'secret' && wired.call.key) (secretKeys[from] ??= {})[wired.call.key] = wired.value;
     else if (!viaRecipe && !pointsAt(up, from, wired.value, wired.file ?? wired.call.file)) {
       const where = wired.call.file ? ` in ${wired.call.file}` : '';
       const how =
@@ -330,6 +334,8 @@ function wireCables(up: Up): void {
       up.waits.add(from);
     }
   }
+  for (const [app, set] of Object.entries(secretKeys))
+    writeLogged(up.logFile, app, lambdaOverrides(app), `${JSON.stringify({ set }, null, 2)}\n`);
 }
 
 /** Tunnels first; the board's "no tunnels" choice is kept. */
