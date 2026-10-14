@@ -36,6 +36,9 @@ if (!config?.handler || !config.runtime || !port) {
 const emulator = port + 1;
 const name = `koppler-lambda-${String(port)}`;
 const endpoint = `http://127.0.0.1:${String(emulator)}`;
+// The emulator image by version and digest, so a new upstream push never changes what runs here unseen. To update:
+// read the digest of the new version tag on Docker Hub, then change both together.
+const EMULATOR_IMAGE = 'floci/floci:2.2.0@sha256:e97cd0c1dc2aa14e7697fb5ef5018404c4d6345169dbd276315f0bed2c7b0520';
 const arch = os.arch() === 'arm64' ? 'arm64' : 'x86_64';
 const work = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-lambda-'));
 const state = process.env['KOPPLER_STATE'] || path.join(os.homedir(), '.local', 'state', 'koppler');
@@ -160,7 +163,7 @@ try {
     // None left over.
   }
   const published = ['-p', `127.0.0.1:${String(emulator)}:4566`, '-v', '/var/run/docker.sock:/var/run/docker.sock'];
-  run('docker', ['run', '-d', '--name', name, ...published, 'floci/floci:latest']);
+  run('docker', ['run', '-d', '--name', name, ...published, EMULATOR_IMAGE]);
   for (let tries = 0; ; tries++) {
     try {
       await fetch(`${endpoint}/_floci/health`);
