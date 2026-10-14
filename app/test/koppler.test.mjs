@@ -173,6 +173,33 @@ test('koppler up: a sign-in the stack declares itself (not AWS) is checked the s
   koppler('stop', '--all', '--yes');
 });
 
+test('a Lambda that finds a callee in its secret is pointed at the local one by a cable, and Stop takes that back.', async () => {
+  const { spawnSync } = await import('node:child_process');
+  const fs = await import('node:fs'), os = await import('node:os'), path = await import('node:path'), { fileURLToPath } = await import('node:url');
+  const [portA, portB] = await freePorts(2);
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-secretcable-'));
+  const env = { ...process.env, KOPPLER_STATE: dir, KOPPLER_TEMP: dir, KOPPLER_CONFIG_DIR: dir };
+  const entry = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'dist', 'koppler.mjs');
+  cleanups.push(() => spawnSync('node', [entry, 'stop', '--all', '--yes'], { env }));
+  const koppler = (...args) => { const r = spawnSync('node', [entry, ...args], { encoding: 'utf8', env }); return { out: (r.stdout + r.stderr).trim(), code: r.status }; };
+  const apps = {
+    // Started from the IDE here, so the test needs no Docker: what matters is what its start would read.
+    a: { name: 'Retry', kind: 'lambda', url: `http://localhost:${portA}`, lambda: { handler: 'h', runtime: 'dotnet8' }, consumes: { b: { how: 'secret', key: 'WalletApiUrl' } } },
+    b: { name: 'Wallet', kind: 'other', start: `exec python3 -m http.server ${portB} --bind 127.0.0.1`, url: `http://localhost:${portB}` },
+  };
+  { const stack = { envs: ['qa'], apps }; fs.writeFileSync(path.join(dir, 'registry.json'), JSON.stringify(stack)); allowStack(dir, stack); }
+  fs.writeFileSync(path.join(dir, 'local.json'), JSON.stringify({ apps: { a: { path: dir }, b: { path: dir } } }));
+  fs.writeFileSync(path.join(dir, 'history.jsonl'), JSON.stringify({ id: 'run000030', at: 't', kind: 'run', env: 'qa', nodes: { a: { run: 'ide' }, b: { run: 'cli' } }, edges: [{ from: 'a', to: 'b' }], plan: { starts: [{ id: 'b' }], restarts: [], stops: [], keeps: [] } }) + '\n');
+  const r = koppler('up', '--run', 'run000030');
+  assert.equal(r.code, 0, r.out);
+  const overrides = path.join(dir, 'lambda-a.json');
+  assert.deepEqual(JSON.parse(fs.readFileSync(overrides, 'utf8')), { set: { WalletApiUrl: `http://localhost:${portB}` } });
+  const down = koppler('down', '--yes');
+  assert.equal(down.code, 0, down.out);
+  assert.equal(fs.existsSync(overrides), false);
+  koppler('stop', '--all', '--yes');
+});
+
 test('koppler up --run that fails half-way leaves the live state as it really is: what started runs, the board before is gone.', async () => {
   const { spawnSync } = await import('node:child_process');
   const fs = await import('node:fs'), os = await import('node:os'), path = await import('node:path'), { fileURLToPath } = await import('node:url');

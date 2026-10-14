@@ -374,12 +374,14 @@ export const HOWS: Option[] = [
   { value: 'env', label: 'A setting' },
   { value: 'env-file', label: 'A line in a settings file' },
   { value: 'edit', label: 'An edit to its code' },
+  { value: 'secret', label: 'A key in its Lambda secret' },
   { value: 'unknown', label: 'Not known yet' },
 ];
 const CALL_FIELDS: Record<string, string[]> = {
   env: ['how', 'env', 'path', 'value', 'deployed', 'note'],
   'env-file': ['how', 'file', 'key', 'path', 'value', 'deployed', 'note'],
   edit: ['how', 'file', 'key', 'value', 'deployed', 'note'],
+  secret: ['how', 'key', 'path', 'deployed', 'note'],
   unknown: ['how', 'found', 'deployed', 'note'],
 };
 const callSaid = (call: Fields) => {
@@ -388,6 +390,7 @@ const callSaid = (call: Fields) => {
   if (call['how'] === 'env') return names ? `found by the setting ${names}` : 'found by a setting, not named yet';
   if (call['how'] === 'env-file') return `found by ${said(call['key']) || 'a line'} in ${file || 'a settings file'}`;
   if (call['how'] === 'edit') return `found by an edit to ${file || 'its code'}`;
+  if (call['how'] === 'secret') return `found by ${said(call['key']) || 'a key'} in its secret`;
   return 'how it finds it is not known yet';
 };
 

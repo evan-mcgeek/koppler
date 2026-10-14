@@ -33,6 +33,8 @@ export interface StartContext {
   /** The app's plain http port. */
   httpPort?: number | undefined;
   device?: (Device & { id: string }) | null | undefined;
+  /** Where a run keeps what a Lambda's secret holds for this start: local addresses of the apps it calls. */
+  lambdaOverrides?: string;
   /** The stack, for the kinds it adds. */
   stack?: { kinds?: unknown };
   platform?: string | undefined;
@@ -167,7 +169,7 @@ function startLambda(app: App, ctx: StartContext): Start {
   if (!app.lambda?.handler || !app.lambda.runtime || !port)
     return { error: 'needs url and lambda { handler, runtime } in stack.json' };
   const engine = ctx.engine ?? '';
-  const overrides = `${engine}/temp/lambda-${ctx.id ?? ''}.json`;
+  const overrides = ctx.lambdaOverrides ?? `${engine}/temp/lambda-${ctx.id ?? ''}.json`;
   return {
     cwd: ctx.repo,
     port,
