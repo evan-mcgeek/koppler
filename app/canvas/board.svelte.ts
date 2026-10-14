@@ -1396,6 +1396,13 @@ class Board {
     const step = this.nodes.length * 32;
     this.#addOnly(this.#card(app, this.stored(spot ?? { x: from.x + 48 + step, y: from.y + 48 + step })));
   }
+  /** Selects every card on the board, apps and the cards beside them, so they move or go together. */
+  selectAll(): void {
+    const all = <T extends { selected?: boolean }>(one: T): T => (one.selected ? one : { ...one, selected: true });
+    this.nodes = this.nodes.map(all);
+    this.infra = this.infra.map(all);
+    this.edges = this.edges.map(unselected);
+  }
   /** Selects this card alone, app or tunnel, so a drag moves only it. */
   pick(id: string): void {
     const only = <T extends { id: string; selected?: boolean }>(one: T): T =>
