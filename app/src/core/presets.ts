@@ -218,19 +218,26 @@ export function editPreset(preset: StoredPreset, edit: BoardEdit): StoredPreset 
 }
 
 /** The edit in words, e.g. "added Orders; cabled Web to Orders". */
-export function describeEdit(edit: BoardEdit, name: (id: string) => string = id => id): string {
+export function describeEdit(
+  edit: BoardEdit,
+  name: (id: string) => string = id => id,
+  /** Said of a change not made yet: "add", not "added". */
+  proposed = false,
+): string {
   const list = (ids: string[] = []) => ids.map(name).join(', ');
   const cables = (edges: Edge[] = []) => edges.map(edge => `${name(edge.from)} to ${name(edge.to)}`).join(', ');
   return [
-    edit.add?.length && `added ${list(edit.add)}`,
-    edit.remove?.length && `removed ${list(edit.remove)}`,
-    edit.cable?.length && `cabled ${cables(edit.cable)}`,
-    edit.uncable?.length && `took the cable off ${cables(edit.uncable)}`,
-    ...Object.entries(edit.branch ?? {}).map(([id, branch]) => `${name(id)} on ${branch}`),
+    edit.add?.length && `${proposed ? 'add' : 'added'} ${list(edit.add)}`,
+    edit.remove?.length && `${proposed ? 'remove' : 'removed'} ${list(edit.remove)}`,
+    edit.cable?.length && `${proposed ? 'cable' : 'cabled'} ${cables(edit.cable)}`,
+    edit.uncable?.length && `${proposed ? 'take the cable off' : 'took the cable off'} ${cables(edit.uncable)}`,
+    ...Object.entries(edit.branch ?? {}).map(([id, branch]) => `${proposed ? 'put ' : ''}${name(id)} on ${branch}`),
     ...Object.entries(edit.note ?? {}).map(([id, note]) =>
-      note.trim() ? `a note on ${name(id)}` : `no note on ${name(id)}`,
+      note.trim()
+        ? `${proposed ? 'add ' : ''}a note on ${name(id)}`
+        : `${proposed ? 'take the ' : 'no '}note${proposed ? ' off ' : ' on '}${name(id)}`,
     ),
-    edit.arrange && 'arranged',
+    edit.arrange && (proposed ? 'lay it out afresh' : 'arranged'),
   ]
     .filter(Boolean)
     .join('; ');

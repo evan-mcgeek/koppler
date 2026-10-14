@@ -55,6 +55,7 @@ You can run these yourself too; the agent uses them to do its part.
 | `koppler board new "<name>" [--add <app,...>] [--cable <caller>:<callee>]...` | Make a board of your own, with its apps and cables; an open canvas adds it to your boards |
 | `koppler board share "<name>"` | Propose one of your boards to the team: a pull request on the stack's repo on GitHub; a stack not on GitHub keeps it in its file to commit |
 | `koppler board new\|edit "<name>" ... --arrange` | Lay the board out afresh, as Arrange on the canvas does: at once when it is on screen, else when it is next opened |
+| `koppler board new\|edit "<name>" ... --propose` | Ask the user first: the change shows in the canvas inbox, and is made only when they say yes |
 | `koppler board edit "<name>" [--add <app,...>] [--remove <app,...>] [--cable <caller>:<callee>]... [--uncable <caller>:<callee>]... [--branch <app>=<branch>]... [--note <app>="<note>"]...` | Change a board, even one open on the canvas: the canvas shows the change and keeps it; cards it does not touch stay put |
 | `koppler stack get [<path>]` \| `set <path> <value>` \| `unset <path>` | Read or change any field of the stack, such as `apps.orders.url` or `apps.orders.envs.prod.prereqs`; each change is checked before it is kept. With the canvas's settings, the only way to change `stack.json` |
 | `koppler stack lock <path>` \| `unlock <path>` \| `locks` | `lock` keeps a field as it is for commands, the canvas and the agent; `unlock` asks you in the terminal, so an agent cannot; `locks` lists them |

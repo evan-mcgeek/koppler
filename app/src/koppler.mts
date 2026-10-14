@@ -638,7 +638,7 @@ const COMMANDS: Command[] = [
   {
     name: 'board',
     who: 'agent',
-    args: 'new|edit "<name>" [--add <app,...>] [--remove <app,...>] [--cable <caller>:<callee>]... [--uncable <caller>:<callee>]... [--branch <app>=<branch>]... [--note <app>="<note>"]... [--arrange]',
+    args: 'new|edit "<name>" [--add <app,...>] [--remove <app,...>] [--cable <caller>:<callee>]... [--uncable <caller>:<callee>]... [--branch <app>=<branch>]... [--note <app>="<note>"]... [--arrange] [--propose]',
     forms: [
       [
         'new "<name>" [--add <app,...>] [--cable <caller>:<callee>]...',
@@ -651,6 +651,10 @@ const COMMANDS: Command[] = [
       ['edit "<name>" [--cable <caller>:<callee>]... [--uncable <caller>:<callee>]...', 'add or take off cables'],
       ['edit "<name>" [--branch <app>=<branch>]... [--note <app>="<note>"]...', "set an app's branch or note"],
       ['new|edit "<name>" ... --arrange', 'lay the board out afresh, as Arrange on the canvas does'],
+      [
+        'new|edit "<name>" ... --propose',
+        'ask the user first, in the canvas inbox; nothing changes until they say yes',
+      ],
       ['share "<name>"', "propose one of your boards to the team: a pull request on the stack's repo on GitHub"],
     ],
     about: 'make, change or share a board, even one open on the canvas, which shows the change',

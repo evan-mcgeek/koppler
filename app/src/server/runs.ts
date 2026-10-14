@@ -4,6 +4,7 @@ import { execFile, spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { appendRun, runRecord, type RunRecord } from '../engine/history.ts';
+import { answerProposal } from '../engine/boards.ts';
 import { appendAnswer, appendMessage, readMessages, refusal } from '../engine/messages.ts';
 import { CODE, tempDir } from '../paths.ts';
 import { tail } from './logs.ts';
@@ -83,6 +84,17 @@ export function prompted(body: Loose): Answer {
       ...(said && { text: said }),
     };
     appendAnswer(message.id, { ...(choice && { choice: choice.id }), ...(said && { text: said }) });
+    // A board change the agent proposed: made as soon as the user says yes, so the agent only hears how it went.
+    if (choice) {
+      let done: string | null;
+      try {
+        done = answerProposal(message.id, choice.id === 'accept');
+      } catch (error) {
+        done = `It could not be made: ${(error as Error).message}`;
+        appendMessage({ kind: 'failure', title: done.slice(0, 120) });
+      }
+      if (done) prompt.data['result'] = done;
+    }
   }
   // Kept as a run from the moment it is sent, so a Send nobody picked up still shows on the canvas.
   const record = runRecord(prompt);

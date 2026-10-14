@@ -4,6 +4,7 @@ import { describeEdit, editPreset, VERSION, type BoardEdit, type StoredPreset } 
 import type { Edge } from '../core/plan.ts';
 import { readClones, readData, readStack, writeData } from '../data.ts';
 import { fail } from '../failure.ts';
+import { appendMessage } from './messages.ts';
 import { alive, readRecord } from './processes.ts';
 import { shareBoard } from './share.ts';
 import { currentStack } from './stacks.ts';
@@ -30,7 +31,7 @@ export function editDone(id: unknown): void {
 }
 
 const CHANGES =
-  '[--add <app,...>] [--remove <app,...>] [--cable <caller>:<callee>]... [--uncable <caller>:<callee>]... [--branch <app>=<branch>]... [--note <app>="<note>"]... [--arrange]';
+  '[--propose] [--add <app,...>] [--remove <app,...>] [--cable <caller>:<callee>]... [--uncable <caller>:<callee>]... [--branch <app>=<branch>]... [--note <app>="<note>"]... [--arrange]';
 const USAGE = `usage: koppler board new "<name>" ${CHANGES}\n       koppler board edit "<name>" ${CHANGES}\n       koppler board share "<name>"`;
 
 /** Your own board, by name, as kept for this stack. */
@@ -57,7 +58,6 @@ export function boardCommand(args: string[]): void | Promise<void> {
   if (what === 'share' && name && !name.startsWith('-')) return share(name);
   if ((what !== 'edit' && what !== 'new') || !name?.trim() || name.startsWith('-')) fail(USAGE);
   const create = what === 'new';
-  const stack = readStack() ?? fail('no stack loaded (koppler init)');
   const values = (flag: string) => args.filter((_, at) => args[at - 1] === flag);
   const ids = (flag: string) =>
     values(flag).flatMap(value =>
@@ -82,7 +82,34 @@ export function boardCommand(args: string[]): void | Promise<void> {
     note: Object.fromEntries(pairs('--note', '=')),
     ...(args.includes('--arrange') && { arrange: true }),
   };
+  for (const line of changeBoard(name, edit, create, args.includes('--propose'))) console.log(line);
+}
 
+/** A change an agent proposed, waiting for the user's answer in the inbox. */
+interface Proposal {
+  message: string;
+  stack: string | null;
+  board: string;
+  edit: BoardEdit;
+  create?: true;
+}
+const proposals = () => (readData('board-proposals')?.['proposals'] ?? []) as Proposal[];
+
+/**
+ * The user answered a proposal: the change is made as `koppler board edit` makes it, or left. Null when the message
+ * was no proposal.
+ */
+export function answerProposal(message: string, accepted: boolean): string | null {
+  const proposal = proposals().find(one => one.message === message);
+  if (!proposal) return null;
+  writeData('board-proposals', { proposals: proposals().filter(one => one !== proposal && one.message !== message) });
+  if (!accepted) return `Left ${proposal.board} as it is.`;
+  return changeBoard(proposal.board, proposal.edit, !!proposal.create, false).join(' ');
+}
+
+/** Checks a change to a board and makes it, or, proposed, asks the user in the inbox first and changes nothing. */
+export function changeBoard(name: string, edit: BoardEdit, create: boolean, propose: boolean): string[] {
+  const stack = readStack() ?? fail('no stack loaded (koppler init)');
   const state = readData('state') ?? {};
   const own = (state['presets'] ?? []) as StoredPreset[];
   const team = (stack.presets ?? []) as StoredPreset[];
@@ -115,9 +142,29 @@ export function boardCommand(args: string[]): void | Promise<void> {
   }
 
   const changed = { ...editPreset(board, edit), name: board.name };
-  if (!create && JSON.stringify(changed) === JSON.stringify(board)) {
-    console.log(`Nothing to change on ${board.name}.`);
-    return;
+  if (!create && JSON.stringify(changed) === JSON.stringify(board)) return [`Nothing to change on ${board.name}.`];
+  const named = (id: string) => app(id)?.name ?? id;
+  if (propose) {
+    const asked = appendMessage({
+      kind: 'question',
+      title: create ? `Make the board ${board.name}?` : `Change ${board.name}?`,
+      summary: 'The agent proposes this. Nothing changes until you say yes.',
+      sections: [{ title: 'It would', items: describeEdit(edit, named, true).split('; ').filter(Boolean) }],
+      choices: [
+        { id: 'accept', label: create ? 'Make it' : 'Make the change' },
+        { id: 'reject', label: 'Leave it as it is' },
+      ],
+    });
+    writeData('board-proposals', {
+      proposals: [
+        ...proposals(),
+        { message: asked.id, stack: currentStack(), board: board.name, edit, ...(create && { create: true as const }) },
+      ],
+    });
+    return [
+      `PROPOSED ${board.name}: ${describeEdit(edit, named)}`,
+      'The user answers in the canvas inbox; the answer comes back as a koppler-reply prompt.',
+    ];
   }
   const mine = own.some(one => one.name === board.name);
   writeData('state', {
@@ -137,11 +184,11 @@ export function boardCommand(args: string[]): void | Promise<void> {
     edits: [...queued().filter(one => now - Date.parse(one.at) < DAY), entry],
   });
   const canvas = readRecord('canvas');
-  const said = describeEdit(edit, id => app(id)?.name ?? id);
-  console.log(`${create ? 'MADE' : 'CHANGED'} ${board.name}${said ? `: ${said}` : ''}`);
-  console.log(
+  const said = describeEdit(edit, named);
+  return [
+    `${create ? 'MADE' : 'CHANGED'} ${board.name}${said ? `: ${said}` : ''}`,
     canvas && alive(canvas)
       ? 'An open canvas shows the change as soon as it is in view.'
       : 'The canvas shows the change when it is opened.',
-  );
+  ];
 }
