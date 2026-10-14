@@ -27,13 +27,13 @@
   <button
     type="button"
     title="Apps: on the board, and the rest of the stack"
-    aria-label="Apps: {board.nodes.length} of {board.apps.length} on the board"
+    aria-label="Apps: {board.cards.length} of {board.apps.length} on the board"
     onclick={() => {
       open();
     }}
   >
     <Icon of={ListChecks} size={16} />
-    <span>{board.nodes.length}/{board.apps.length}</span>
+    <span>{board.cards.length}/{board.apps.length}</span>
   </button>
   <div class="foot">
     {#if needs}

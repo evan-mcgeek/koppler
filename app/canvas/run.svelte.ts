@@ -384,6 +384,7 @@ class Runs {
             .map(line => `  ${line}`)
             .join('\n');
         // What is confirmed is the board as it was reviewed.
+        board.commit();
         const layout = board.saved();
         void save(layout);
         const data = { ...graph, id: newRunId(), plan: confirmed, layout };

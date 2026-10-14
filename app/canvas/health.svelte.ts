@@ -26,7 +26,7 @@ class Health {
   asked = $state(false);
 
   /** The apps of this board that are part of what runs. */
-  readonly sent: string[] = $derived(board.nodes.map(node => node.id).filter(id => live.sent(id)));
+  readonly sent: string[] = $derived(board.cards.map(node => node.id).filter(id => live.sent(id)));
   /** Its process is up but it does not answer yet. */
   starting(id: string): boolean {
     return live.sent(id) && !!live.status?.running?.includes(id) && live.up(id) === false;
@@ -71,7 +71,7 @@ class Health {
   /** Every connection on the board: each app, each cable, each database or cache tunnel. */
   jobs(): FlowJob[] {
     return [
-      ...board.nodes
+      ...board.cards
         .filter(({ id }) => board.app(id)?.serves)
         .map(({ id }): FlowJob => ({ kind: 'app', key: `node:${id}`, id, from: name(id), payload: { node: id } })),
       ...board.edges.map(({ id, source, target }): FlowJob => ({
@@ -149,7 +149,7 @@ class Health {
 
   /** The one light: its state, what it says, and what resting on it adds. */
   readonly chip: { state: 'bad' | 'busy' | 'warn' | 'idle' | 'ok'; label: string; title: string } = $derived.by(() => {
-    const ids = board.nodes.map(node => node.id);
+    const ids = board.cards.map(node => node.id);
     const run = live.status?.live;
     const runEnv = run?.env && Object.keys(run.nodes ?? {}).length ? run.env : null;
     const otherEnv = runEnv && runEnv !== board.env ? runEnv.toUpperCase() : null;

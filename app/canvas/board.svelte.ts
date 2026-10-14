@@ -193,6 +193,19 @@ class Board {
   known = $state.raw<KnownStack[]>([]);
   env = $state('');
   nodes = $state.raw<CardNode[]>([]);
+  #cards: CardNode[] = [];
+  /**
+   * The cards as far as anything but their places goes: the same list while cards only move, so a drag recomputes what
+   * depends on where cards are (boxes, cable ends) and nothing else. Never read a position from it.
+   */
+  cards = $derived.by(() => {
+    const now = this.nodes;
+    const same =
+      now.length === this.#cards.length &&
+      now.every((node, at) => node.id === this.#cards[at]?.id && node.data === this.#cards[at].data);
+    if (!same) this.#cards = now;
+    return this.#cards;
+  });
   edges = $state.raw<CableEdge[]>([]);
   /** The cable being drawn. */
   draft = $state.raw<Draft | null>(null);
@@ -295,7 +308,7 @@ class Board {
   }
   /** The tunnels for everything on the board, planned together so none clash: shared, moved, or on an address of its own. */
   plan = $derived.by(() => {
-    const shown = this.nodes.filter(node => !node.data.hideTunnels);
+    const shown = this.cards.filter(node => !node.data.hideTunnels);
     const needs = shown.flatMap(({ id }) =>
       this.tunnelsOf(id).map(need => ({
         app: id,
@@ -306,7 +319,7 @@ class Board {
         connectsAs: need.connectsAs,
       })),
     );
-    const taken = this.nodes.flatMap(({ id }) => {
+    const taken = this.cards.flatMap(({ id }) => {
       const port = Number(new URL(this.#registry?.apps[id]?.url ?? 'http://none').port);
       return port ? [port] : [];
     });
@@ -319,9 +332,9 @@ class Board {
       ...this.boardQueues.filter(queue => this.#leadOf(queue) === id).map(queue => `queue:${queue.id}`),
     ];
   }
-  #onBoard = $derived(new Set(this.nodes.map(node => node.id)));
+  #onBoard = $derived(new Set(this.cards.map(node => node.id)));
   /** The apps on the board that are still on their queues. */
-  #onQueues = $derived(new Set(this.nodes.filter(node => node.data.showQueues).map(node => node.id)));
+  #onQueues = $derived(new Set(this.cards.filter(node => node.data.showQueues).map(node => node.id)));
   #outside(id: string): boolean {
     return !!this.#registry?.apps[id]?.outside;
   }
@@ -347,14 +360,14 @@ class Board {
   }
   /** A branch other than the clone's is asked for while the clone has uncommitted changes. */
   switchesOver(id: string): boolean {
-    const branch = this.nodes.find(node => node.id === id)?.data.branch;
+    const branch = this.cards.find(node => node.id === id)?.data.branch;
     const app = this.app(id);
     return !!(branch && app?.current && branch !== app.current && app.dirty);
   }
 
   /** The libraries a card runs with the local copy of, among the ones cloned here. */
   localLibraries(id: string): string[] {
-    const chosen = this.nodes.find(node => node.id === id)?.data.libraries ?? [];
+    const chosen = this.cards.find(node => node.id === id)?.data.libraries ?? [];
     const here = this.app(id)?.libraries ?? [];
     return chosen.filter(name => here.some(library => library.name === name));
   }
@@ -367,7 +380,7 @@ class Board {
     if (this.env === this.envs[0]) return false;
     const app = this.#registry?.apps[id];
     const own = app?.envs?.[this.env]?.prereqs ?? [];
-    const hidden = this.nodes.find(node => node.id === id)?.data.hideTunnels;
+    const hidden = this.cards.find(node => node.id === id)?.data.hideTunnels;
     return (['sso', 'signIn', 'tunnel', 'hosts'] as const).some(
       kind =>
         (app?.prereqs ?? []).some(need => need[kind]) &&
@@ -388,7 +401,7 @@ class Board {
         ...pubs.map(app => ({ from: card(app), to: `queue:${id}`, queue: id })),
         ...reads.map(app => ({ from: `queue:${id}`, to: card(app), queue: id })),
       ]),
-      ...this.nodes.flatMap(({ id }) =>
+      ...this.cards.flatMap(({ id }) =>
         Object.keys(this.#registry?.apps[id]?.consumes ?? {})
           .filter(app => this.#outside(app))
           .map(app => ({ from: id, to: `outside:${app}` })),
@@ -397,7 +410,7 @@ class Board {
       ...Object.entries(this.#registry?.apps ?? {}).flatMap(([id, app]) =>
         this.#outside(id)
           ? Object.keys(app.consumes ?? {})
-              .filter(to => this.nodes.some(node => node.id === to))
+              .filter(to => this.cards.some(node => node.id === to))
               .map(to => ({ from: `outside:${id}`, to }))
           : [],
       ),
@@ -889,6 +902,7 @@ class Board {
   /** Shows the board as it runs. What Edit holds (the cards beside a card that changes size, the undo history) is put aside untouched. */
   goLive(): void {
     if (this.live) return;
+    this.commit();
     this.#keptEdit = this.saved();
     this.#edit = this.content();
     this.live = true;
@@ -1392,12 +1406,38 @@ class Board {
     this.view = zoom && pan ? { x: pan.x, y: pan.y, zoom } : undefined;
   }
 
+  /** Keeps the board on screen among the user's boards (a changed team board becomes their copy), before it is saved. */
+  commit(): void {
+    // Mid-drag the board is not kept yet: letting go is the change.
+    if (!this.live && !this.nodes.some(node => node.dragging)) this.#keep();
+  }
+  /** Everything the saved board is made of, read to hear of a change without putting the board together. */
+  get changes(): readonly unknown[] {
+    return [
+      this.#registry,
+      this.live,
+      this.env,
+      this.name,
+      this.scratch,
+      this.view,
+      this.nodes,
+      this.edges,
+      this.infra,
+      this.own,
+      this.trash,
+      this.recent,
+      this.dismissed,
+      this.fullHeights,
+      this.queues,
+      this.hiddenQueues,
+      this.pinned,
+    ];
+  }
   /** The board as the server keeps it: what is on screen, over everything it kept that the canvas does not show yet. */
   saved(): SavedBoard {
     // Cards change size in Live, which nudges the cards stacked under them: what is kept is the board as Edit left it.
     if (this.live) return { ...this.#keptEdit, env: this.env };
     const before = this.#kept.nodes ?? {};
-    this.#keep();
     return {
       mode: 'auto',
       ...this.#kept,
@@ -1493,7 +1533,7 @@ class Board {
    */
   cablesOf(id: string): { can: StackApp[]; wired: StackApp[] } {
     const app = (which: string) => this.app(which);
-    const others = this.nodes.flatMap(node => (node.id === id ? [] : (app(node.id) ?? [])));
+    const others = this.cards.flatMap(node => (node.id === id ? [] : (app(node.id) ?? [])));
     const wired = others.filter(other => this.edges.some(edge => edge.id === `${id}>${other.id}`));
     const free = others.filter(other => !wired.includes(other));
     const known = free.filter(other => app(id)?.calls.includes(other.id));
@@ -1503,7 +1543,7 @@ class Board {
 
   /** On a board with other apps, but cabled to none of them. */
   uncabled(id: string): boolean {
-    return this.nodes.length > 1 && !this.edges.some(edge => edge.source === id || edge.target === id);
+    return this.cards.length > 1 && !this.edges.some(edge => edge.source === id || edge.target === id);
   }
 
   /** A cable between two cards, on the sides that face each other. */
@@ -1537,7 +1577,7 @@ class Board {
       return true;
     }
     const before = this.content();
-    const on = (id: string) => this.nodes.some(node => node.id === id);
+    const on = (id: string) => this.cards.some(node => node.id === id);
     for (const id of change.remove ?? []) this.remove(id);
     for (const id of change.add ?? []) this.add(id);
     for (const [id, branch] of Object.entries(change.branch ?? {})) this.set(id, { branch });

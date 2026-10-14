@@ -19,10 +19,10 @@
       .map((text): Note => ({ key: `ports:${text}`, text })),
   );
   const unwired = $derived(
-    board.nodes.flatMap(({ id }) =>
+    board.cards.flatMap(({ id }) =>
       board
         .deployedCalls(id)
-        .filter(to => board.nodes.some(node => node.id === to.id))
+        .filter(to => board.cards.some(node => node.id === to.id))
         .map((to): Note => ({
           key: `unwired:${id}>${to.id}`,
           text: `${to.name} is on your board, but ${name(id)} still calls the ${board.env.toUpperCase()} one.`,
