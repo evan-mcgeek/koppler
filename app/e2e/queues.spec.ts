@@ -254,3 +254,49 @@ test('an app dragged takes its own cards along (tunnel, a queue only it uses), a
   await expect.poll(async () => Math.round(((await own.boundingBox())?.y ?? 0) - ownBefore.y)).toBe(by);
   expect(await shared.boundingBox()).toEqual(sharedBefore);
 });
+
+test.describe('an outside system that reads a queue only one app on the board uses', () => {
+  test.use({
+    stack: {
+      ...stack,
+      apps: {
+        ...stack.apps,
+        warehouse: { name: 'Warehouse Feed', kind: 'other', outside: 'a hosted connector', reads: { receipts: {} } },
+      },
+    },
+    board: {
+      env: 'qa',
+      mode: 'auto',
+      zoom: 0.6,
+      pan: { x: 40, y: 40 },
+      nodes: { web: at(0, 0), orders: at(500, 0), payments: at(1000, 0) },
+      edges: [{ from: 'web', to: 'orders', fromSide: 'right', toSide: 'left' }],
+      outside: ['warehouse'],
+    },
+  });
+
+  test('Arrange puts it after the queue it reads, not at the start of the flow', async ({ page }) => {
+    await expect(outside(page).filter({ hasText: 'Warehouse Feed' })).toBeVisible();
+    await page.getByRole('button', { name: /^Arrange/ }).click();
+    const at = async (locator: ReturnType<typeof outside>) => {
+      const box = await locator.boundingBox();
+      if (!box) throw new Error('not on the page');
+      return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+    };
+    await expect
+      .poll(async () => {
+        const [web, orders, feed] = await Promise.all([
+          at(card(page, 'web')),
+          at(card(page, 'orders')),
+          at(outside(page).filter({ hasText: 'Warehouse Feed' })),
+        ]);
+        // Along the way the flow runs, Web Shop to Orders API: the feed comes after Orders API.
+        const across = Math.abs(orders.x - web.x) > Math.abs(orders.y - web.y);
+        const step = across ? orders.x - web.x : orders.y - web.y;
+        const feedStep = across ? feed.x - orders.x : feed.y - orders.y;
+        return Math.sign(step) === Math.sign(feedStep) && feedStep !== 0;
+      })
+      .toBe(true);
+    await page.screenshot({ path: 'test-results/next-queue-reader.png' });
+  });
+});

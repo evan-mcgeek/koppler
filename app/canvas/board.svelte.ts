@@ -1514,10 +1514,14 @@ class Board {
     };
     // Queues and outside systems take their place in the flow: who sends, the queue, who reads; who calls out.
     // An app's own queues stay in its stack, as its tunnels do.
-    const owned = new Set(this.nodes.flatMap(node => this.ownedBy(node.id)));
-    const joined = this.infra.filter(one => one.type !== 'tunnel' && !owned.has(one.id)).map(one => one.id);
+    const owner = new Map(this.nodes.flatMap(node => this.ownedBy(node.id).map(key => [key, node.id] as const)));
+    const joined = this.infra.filter(one => one.type !== 'tunnel' && !owner.has(one.id)).map(one => one.id);
     const onBoard = (id: string) => joined.includes(id) || this.cards.some(node => node.id === id);
-    const flows = this.flows.filter(({ from, to }) => onBoard(from) && onBoard(to));
+    // A link to or from an app's own queue is the app's: whoever reads that queue comes after the app.
+    const via = (id: string) => owner.get(id) ?? id;
+    const flows = this.flows
+      .map(({ from, to }) => ({ from: via(from), to: via(to) }))
+      .filter(({ from, to }) => from !== to && onBoard(from) && onBoard(to));
     const placed = arrange(
       [...this.nodes.map(node => node.id), ...joined],
       [...links, ...flows],
