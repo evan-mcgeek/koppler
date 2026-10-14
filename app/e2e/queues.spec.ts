@@ -255,7 +255,7 @@ test('an app dragged takes its own cards along (tunnel, a queue only it uses), a
   expect(await shared.boundingBox()).toEqual(sharedBefore);
 });
 
-test.describe('an outside system that reads a queue only one app on the board uses', () => {
+test.describe('an outside system that reads a queue one app on the board sends to', () => {
   test.use({
     stack: {
       ...stack,
@@ -298,6 +298,21 @@ test.describe('an outside system that reads a queue only one app on the board us
       })
       .toBe(true);
     await page.screenshot({ path: 'test-results/next-queue-reader.png' });
+  });
+
+  test('the queue is shared with it, so it stays put when the app is dragged', async ({ page }) => {
+    const receipts = queue(page).filter({ hasText: 'Receipts' });
+    await expect(receipts).toBeVisible();
+    const [before, app] = await Promise.all([receipts.boundingBox(), card(page, 'orders').boundingBox()]);
+    if (!before || !app) throw new Error('not on the page');
+    await page.mouse.move(app.x + 80, app.y + 14);
+    await page.mouse.down();
+    await page.mouse.move(app.x + 80, app.y + 114, { steps: 8 });
+    await page.mouse.up();
+    await expect
+      .poll(async () => Math.round(((await card(page, 'orders').boundingBox())?.y ?? 0) - app.y))
+      .toBeGreaterThan(40);
+    expect(await receipts.boundingBox()).toEqual(before);
   });
 });
 
