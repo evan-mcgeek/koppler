@@ -36,6 +36,7 @@ import { addApps, addOutside, editStack, stackSource, readStackAt, removeApp } f
 import { createStack } from './engine/stacks.ts';
 import { init as initStack, stacksCommand, sync, useCommand } from './engine/sync.ts';
 import { up } from './engine/up.ts';
+import { wait } from './cli/wait.ts';
 import { wire } from './engine/wire.ts';
 import { APP, CODE, configDir, tempDir } from './paths.ts';
 
@@ -537,6 +538,14 @@ const COMMANDS: Command[] = [
     about: 'start a run, recorded like Run on the canvas: tunnels, local queues, then apps, callees first',
     run: up,
     example: 'koppler up orders-api payments-api --cable orders-api:payments-api --env qa',
+  },
+  {
+    name: 'wait',
+    who: 'agent',
+    args: '<app...> --healthy|--up|--down [--timeout <seconds>] [--json]',
+    about: 'wait until apps are healthy, up or down; fails on a timeout or an app that exits, naming each state',
+    run: wait,
+    example: 'koppler wait orders-api payments-api --healthy --timeout 180',
   },
   {
     name: 'down',

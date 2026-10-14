@@ -215,7 +215,7 @@ async function waitForPort(record: ProcessRecord, port: number): Promise<void> {
   );
 }
 
-const statusOf = (url: URL) =>
+export const statusOf = (url: URL) =>
   new Promise<number | null>(resolve => {
     const get = url.protocol === 'https:' ? https.get : http.get;
     // Its own development certificate is not one this process trusts; the address is on this machine.
