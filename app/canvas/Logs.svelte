@@ -1,4 +1,6 @@
 <script lang="ts">
+  import Icon from './Icon.svelte';
+  import X from '@lucide/svelte/icons/x';
   import { parseLog } from '../src/core/logfmt.ts';
   import { board } from './board.svelte.ts';
   import { live } from './live.svelte.ts';
@@ -126,7 +128,7 @@
               aria-label="Close {name(id)} log"
               onclick={() => {
                 logs.close(id);
-              }}>×</button
+              }}><Icon of={X} size={14} /></button
             >
           </span>
         {/each}
@@ -338,8 +340,7 @@
     display: grid;
     grid-template-columns: 64px 50px minmax(0, 1fr);
     column-gap: 10px;
-    padding: 2px 14px 2px 0;
-    border-left: 2px solid transparent;
+    padding: 2px 14px 2px 2px;
   }
   .row + .row {
     border-top: 1px solid color-mix(in oklab, var(--line) 45%, transparent);
@@ -389,14 +390,12 @@
     color: var(--muted);
   }
   .row[data-level='warn'] {
-    border-left-color: var(--warn);
     background: color-mix(in oklab, var(--warn) 6%, transparent);
   }
   .row[data-level='warn'] .l {
     color: var(--warn);
   }
   .row[data-level='error'] {
-    border-left-color: var(--bad);
     background: color-mix(in oklab, var(--bad) 9%, transparent);
   }
   .row[data-level='error'] .l {

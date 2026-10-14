@@ -1,4 +1,6 @@
 <script lang="ts">
+  import Icon from './Icon.svelte';
+  import X from '@lucide/svelte/icons/x';
   // The repo picker: which of the clones found on this machine belong to the stack. Only the ticked ones are added,
   // as apps that are not set up yet.
   import { SvelteMap } from 'svelte/reactivity';
@@ -67,7 +69,7 @@
     if (picks.size) ev.preventDefault();
   }}
 >
-  <button class="x" type="button" aria-label="Close" onclick={() => dialog?.close()}>×</button>
+  <button class="x" type="button" aria-label="Close" onclick={() => dialog?.close()}><Icon of={X} size={14} /></button>
   <h2 id="repos-title">{board.apps.length ? 'Add repos to' : 'Add your repos to'} {board.stack}</h2>
   <p class="sub">
     {#if found}

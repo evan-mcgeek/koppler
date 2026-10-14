@@ -1,4 +1,6 @@
 <script lang="ts">
+  import Icon from './Icon.svelte';
+  import X from '@lucide/svelte/icons/x';
   // An outside system: something that never runs here (a SaaS API, a managed service). It joins the stack with the apps
   // that call it and the apps it calls (a webhook), and shows as a dashed card next to them.
   import { board } from './board.svelte.ts';
@@ -45,7 +47,7 @@
 </script>
 
 <dialog bind:this={dialog} aria-labelledby="outside-title">
-  <button class="x" type="button" aria-label="Close" onclick={() => dialog?.close()}>×</button>
+  <button class="x" type="button" aria-label="Close" onclick={() => dialog?.close()}><Icon of={X} size={14} /></button>
   <h2 id="outside-title">Add an outside system</h2>
   <p class="sub">
     A service that never runs on this Mac, such as a payment provider or a SaaS API: your apps call it, or it calls them

@@ -1,4 +1,6 @@
 <script lang="ts">
+  import Icon from './Icon.svelte';
+  import X from '@lucide/svelte/icons/x';
   import Cog from './Cog.svelte';
   import type { NodeProps } from '@xyflow/svelte';
   import { board, type QueueNode } from './board.svelte.ts';
@@ -27,7 +29,7 @@
     title="Hide this queue: its apps use the deployed one. Bring it back from Queues on an app's card."
     onclick={() => {
       board.showQueues([data.queue], false);
-    }}>×</button
+    }}><Icon of={X} size={14} /></button
   >
   <span class="seg nodrag" role="radiogroup" aria-label="Which {data.name} its apps use">
     <label title="The {env} queue">

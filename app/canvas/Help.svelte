@@ -1,4 +1,6 @@
 <script lang="ts">
+  import Icon from './Icon.svelte';
+  import CircleHelp from '@lucide/svelte/icons/circle-question-mark';
   let sheet: HTMLElement | undefined = $state();
   const shortcut = (ev: KeyboardEvent) => {
     if (ev.key !== '?' || (ev.target as Element).closest('input, select, textarea')) return;
@@ -15,11 +17,7 @@
   aria-label="Shortcuts and legend"
   title="Shortcuts and legend (?)"
 >
-  <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
-    <circle cx="8" cy="8" r="6.2" />
-    <path d="M6.3 6.3a1.8 1.8 0 1 1 2.4 1.7c-.5.2-.7.6-.7 1.1v.3" />
-    <circle class="dot" cx="8" cy="11.4" r=".4" />
-  </svg>
+  <Icon of={CircleHelp} size={16} />
 </button>
 <div class="sheet" id="help" popover bind:this={sheet} aria-label="Shortcuts and legend">
   <h2>Shortcuts</h2>
@@ -81,15 +79,6 @@
   }
   .open:hover {
     background: color-mix(in oklab, var(--ink) 7%, transparent);
-  }
-  .open svg {
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 1.4;
-    stroke-linecap: round;
-  }
-  .open .dot {
-    fill: currentColor;
   }
   .sheet {
     inset: 60px 16px auto auto;

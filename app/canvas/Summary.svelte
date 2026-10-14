@@ -1,4 +1,6 @@
 <script lang="ts">
+  import Icon from './Icon.svelte';
+  import X from '@lucide/svelte/icons/x';
   // What is worth knowing about the board before it runs: tunnels the plan moved, and apps on the board that are
   // still called in the deployed environment. Each note is dismissed for this board.
   import { describePlan } from '../src/core/ports.ts';
@@ -43,7 +45,7 @@
           aria-label="Dismiss this note"
           onclick={() => {
             board.dismissed = [...board.dismissed, note.key];
-          }}>×</button
+          }}><Icon of={X} size={14} /></button
         >
         {#if cable}
           <button

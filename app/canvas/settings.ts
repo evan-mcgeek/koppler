@@ -1,4 +1,14 @@
 // The settings panels: how a field of the stack is shown, read from the stack's own schema, so every field is there.
+import type { LucideProps } from '@lucide/svelte';
+import ArrowLeftRight from '@lucide/svelte/icons/arrow-left-right';
+import CircleQuestionMark from '@lucide/svelte/icons/circle-question-mark';
+import Cloud from '@lucide/svelte/icons/cloud';
+import KeyRound from '@lucide/svelte/icons/key-round';
+import Laptop from '@lucide/svelte/icons/laptop';
+import LogIn from '@lucide/svelte/icons/log-in';
+import Package from '@lucide/svelte/icons/package';
+import ShieldCheck from '@lucide/svelte/icons/shield-check';
+import type { Component } from 'svelte';
 
 /** A part of the stack's JSON schema, as the server hands it over. */
 export interface Schema {
@@ -247,29 +257,18 @@ const fieldsOf = (value: unknown): Fields =>
   typeof value === 'object' && value !== null && !Array.isArray(value) ? (value as Fields) : {};
 const said = (value: unknown) => (typeof value === 'string' || typeof value === 'number' ? String(value) : '');
 
-/** Drawn icons for the rows, in a 24 box, stroked. */
 const ICON = {
-  tunnel: ['M8 3 4 7l4 4', 'M4 7h16', 'm16 21 4-4-4-4', 'M20 17H4'],
-  cloud: ['M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z'],
-  laptop: [
-    'M20 16V7a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v9m16 0H4m16 0 1.28 2.55a1 1 0 0 1-.9 1.45H3.62a1 1 0 0 1-.9-1.45L4 16',
-  ],
-  signIn: ['M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4', 'm10 17 5-5-5-5', 'M15 12H3'],
-  shield: [
-    'M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z',
-    'm9 12 2 2 4-4',
-  ],
-  box: [
-    'M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z',
-    'M12 22V12',
-    'm3.3 7 8.7 5 8.7-5',
-  ],
-  key: [
-    'M2.586 17.414A2 2 0 0 0 2 18.828V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.172a2 2 0 0 0 1.414-.586l.814-.814a6.5 6.5 0 1 0-4-4z',
-    'M16.5 7.5h.01',
-  ],
-  other: ['M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z', 'M12 8v4', 'M12 16h.01'],
+  tunnel: ArrowLeftRight,
+  cloud: Cloud,
+  laptop: Laptop,
+  signIn: LogIn,
+  shield: ShieldCheck,
+  box: Package,
+  key: KeyRound,
+  other: CircleQuestionMark,
 };
+/** A drawn icon, from the icon library. */
+export type IconOf = Component<LucideProps>;
 
 /** A row of a list, said in a sentence: what it is, and only its own fields when it is opened. */
 export interface Row {
@@ -277,7 +276,7 @@ export interface Row {
   label: string;
   /** The rest of the sentence. */
   say: string;
-  icon?: string[];
+  icon?: IconOf;
   /** An app kind, for its icon. */
   kind?: string;
   /** The fields shown when it is opened; any other it holds comes after them. */
@@ -293,7 +292,7 @@ export interface NeedType {
   id: string;
   label: string;
   about: string;
-  icon: string[];
+  icon: IconOf;
   fields: string[];
   /** What a new one starts with. */
   start: Fields;

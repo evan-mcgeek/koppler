@@ -1,4 +1,9 @@
 <script lang="ts">
+  import Info from '@lucide/svelte/icons/info';
+  import Icon from './Icon.svelte';
+  import KeyRound from '@lucide/svelte/icons/key-round';
+  import Lock from '@lucide/svelte/icons/lock';
+  import X from '@lucide/svelte/icons/x';
   // Credentials: what the apps on the board need stored for this environment. The page can set, test and remove a
   // value, never read one.
   import Command from './Command.svelte';
@@ -105,9 +110,7 @@
     : 'What the apps on the board need stored'}
   popovertarget={id}
 >
-  <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
-    <circle cx="5.2" cy="10.8" r="2.7" /><path d="M7.2 8.8l5.6-5.6M10.6 5.4l1.8 1.8M12.2 3.8l1.3 1.3" />
-  </svg>
+  <Icon of={KeyRound} size={16} />
 </button>
 <div
   bind:this={pop}
@@ -140,7 +143,7 @@
                 aria-expanded={!!mine.info}
                 aria-label="When {one.name} is needed and where to get it"
                 title="{always(one) ? '' : 'Only needed in some setups. '}When it is needed and where to get it"
-                onclick={() => put(app.id, one.name, { info: !mine.info })}>i</button
+                onclick={() => put(app.id, one.name, { info: !mine.info })}><Icon of={Info} size={14} /></button
               >
             {/if}
             <span class="state" data-state={now}>{WORDS[now]}</span>
@@ -164,7 +167,8 @@
                 }}
               />
               <button class="go" type="submit">Save</button>
-              <button type="button" aria-label="Cancel" onclick={() => put(app.id, one.name, { form: false })}>×</button
+              <button type="button" aria-label="Cancel" onclick={() => put(app.id, one.name, { form: false })}
+                ><Icon of={X} size={14} /></button
               >
             </form>
           {:else}
@@ -226,9 +230,7 @@
     <p class="none">No app on the board needs a stored credential on {env}.</p>
   {/each}
   <p class="lock">
-    <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true">
-      <rect x="3" y="7" width="10" height="7" rx="1.6" /><path d="M5.2 7V5a2.8 2.8 0 0 1 5.6 0v2" />
-    </svg>
+    <Icon of={Lock} size={13} />
     Kept in your Mac's Keychain. Nobody sees them again.
   </p>
 </div>
@@ -261,13 +263,6 @@
     height: 7px;
     border-radius: 50%;
     background: var(--warn);
-  }
-  .open svg {
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 1.4;
-    stroke-linecap: round;
-    stroke-linejoin: round;
   }
   .pop {
     position: fixed;
@@ -336,13 +331,12 @@
     width: 18px;
     height: 18px;
     padding: 0;
-    border: 1px solid var(--line);
+    display: grid;
+    place-items: center;
+    border: 0;
     border-radius: 50%;
     background: none;
     color: var(--muted);
-    font:
-      italic 600 11px/1 Georgia,
-      serif;
     cursor: pointer;
   }
   .result,
@@ -418,16 +412,5 @@
     margin-top: 12px;
     padding-top: 10px;
     border-top: 1px solid var(--line);
-  }
-  .lock svg {
-    flex: none;
-  }
-  .lock rect {
-    fill: currentColor;
-  }
-  .lock path {
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 1.5;
   }
 </style>

@@ -1,4 +1,6 @@
 <script lang="ts">
+  import Icon from './Icon.svelte';
+  import X from '@lucide/svelte/icons/x';
   // The board on screen, by name: a menu of the team's boards and the user's own, to open, rename, copy, share or
   // delete one, start a new one, or open one from a file or a link.
   import type { StoredPreset } from '../src/core/presets.ts';
@@ -185,7 +187,7 @@
             title="Delete"
             onclick={() => {
               askDelete(preset);
-            }}>×</button
+            }}><Icon of={X} size={14} /></button
           >
         {/if}
       </div>

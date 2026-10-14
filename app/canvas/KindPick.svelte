@@ -1,4 +1,6 @@
 <script lang="ts">
+  import Icon from './Icon.svelte';
+  import ChevronDown from '@lucide/svelte/icons/chevron-down';
   // What an app is built with, picked from the kinds Koppler knows and the stack's own, each by its icon.
   import KindIcon from './KindIcon.svelte';
   import type { Option } from './settings.ts';
@@ -77,7 +79,7 @@
     {:else}
       <span class="label unset">Choose a kind…</span>
     {/if}
-    <svg class="chev" viewBox="0 0 16 16" width="10" height="10" aria-hidden="true"><path d="M4 6l4 4 4-4" /></svg>
+    <span class="chev"><Icon of={ChevronDown} size={10} /></span>
   </button>
   {#if open}
     <div class="list" role="listbox" aria-label="Kind">
@@ -139,12 +141,9 @@
     color: var(--muted);
   }
   .chev {
+    display: grid;
     flex: none;
-    fill: none;
-    stroke: var(--muted);
-    stroke-width: 1.8;
-    stroke-linecap: round;
-    stroke-linejoin: round;
+    color: var(--muted);
   }
   .list {
     position: absolute;
