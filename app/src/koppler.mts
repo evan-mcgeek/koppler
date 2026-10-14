@@ -38,6 +38,7 @@ import { init as initStack, stacksCommand, sync, useCommand } from './engine/syn
 import { up } from './engine/up.ts';
 import { wait } from './cli/wait.ts';
 import { mcp } from './cli/mcp.ts';
+import { agentCommand } from './cli/agent.ts';
 import { wire } from './engine/wire.ts';
 import { APP, CODE, configDir, tempDir } from './paths.ts';
 
@@ -664,6 +665,14 @@ const COMMANDS: Command[] = [
     about: 'serve MCP on stdio: status, logs, doctor, plan, history, wait and say as tools for any agent',
     run: () => mcp(version()),
     example: 'claude mcp add koppler -- koppler mcp',
+  },
+  {
+    name: 'agent',
+    who: 'agent',
+    args: 'init [--agent claude,copilot,vscode,opencode] [--dry-run]',
+    about: 'link the skill into each agent on this Mac and register koppler mcp with it',
+    run: agentCommand,
+    example: 'koppler agent init',
   },
 ];
 const named = (name: string | undefined) => COMMANDS.find(command => command.name === name);

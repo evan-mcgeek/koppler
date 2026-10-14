@@ -49,7 +49,8 @@ In Claude Code, add the plugin:
 /plugin install koppler@koppler
 ```
 
-Another agent that reads [Agent Skills](https://agentskills.io) can use [`plugin/skills/koppler-run`](plugin/skills/koppler-run) directly.
+For any other agent (GitHub Copilot CLI, VS Code, OpenCode), or Claude Code without the plugin, run `koppler agent init`.
+It links the [skill](plugin/skills/koppler-run) into each agent it finds and registers `koppler mcp`, its MCP server.
 Either way, the agent drives the `koppler` command, so install the app first.
 
 ## Requirements
