@@ -161,7 +161,9 @@ const App = z.looseObject(
         { error: 'an object' },
       )
       .optional()
-      .describe('It runs to completion, like a migration: the exit code it must end with (0) and the seconds it may take'),
+      .describe(
+        'It runs to completion, like a migration: the exit code it must end with (0) and the seconds it may take',
+      ),
     after: z
       .array(z.string(), { error: 'a list of app ids' })
       .optional()

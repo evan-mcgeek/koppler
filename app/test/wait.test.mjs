@@ -12,7 +12,7 @@ const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-wait-'));
 const env = { ...process.env, KOPPLER_STATE: dir, KOPPLER_TEMP: dir, KOPPLER_CONFIG_DIR: dir };
 const koppler = (...args) => spawnSync('node', [entry, ...args], { encoding: 'utf8', env });
 process.on('exit', () => koppler('stop', '--all', '--yes'));
-const [port] = await freePorts(1);
+const [port, never] = await freePorts(2);
 const server = `setTimeout(() => require('http').createServer((q, s) => s.end('ok')).listen(${port}), 1500)`;
 
 test('wait names each app that is not there yet, and fails at its timeout', () => {
@@ -35,12 +35,14 @@ test('wait holds until an app answers on its port, then until it is down', async
   assert.match(down.stdout, /web: (exited|not started)/);
 });
 
-test('an app that exits while waited for fails the wait at once, with its last lines', () => {
-  assert.equal(koppler('run', 'crashy', '--', 'sh', '-c', 'sleep 1; echo boom; exit 1').status, 0);
+test('an app that exits while waited for fails the wait at once, with its last lines', async () => {
+  // It never answers on its port, and exits while the wait is on.
+  const started = spawn('node', [entry, 'run', 'crashy', '--port', String(never), '--', 'sh', '-c', 'sleep 4; echo boom; exit 1'], { env, stdio: 'ignore' });
   const begun = Date.now();
   const waited = koppler('wait', 'crashy', '--healthy', '--timeout', '60');
   assert.equal(waited.status, 1);
   assert.ok(Date.now() - begun < 15000);
   assert.match(waited.stdout, /crashy: exited/);
   assert.match(waited.stderr, /not healthy: crashy exited[\s\S]*boom/);
+  await new Promise(resolve => started.once('exit', resolve));
 });
