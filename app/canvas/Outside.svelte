@@ -1,13 +1,13 @@
 <script lang="ts">
   import Cog from './Cog.svelte';
   import type { NodeProps } from '@xyflow/svelte';
-  import type { OutsideNode } from './board.svelte.ts';
+  import { board, type OutsideNode } from './board.svelte.ts';
   import { dialogs } from './dialogs.svelte.ts';
 
   const { id, data, selected }: NodeProps<OutsideNode> = $props();
 </script>
 
-<div class="outside" class:selected title={data.about.join('\n')}>
+<div class="outside" class:selected class:dimmed={board.dimmed(id)} title={data.about.join('\n')}>
   <span class="what">{data.name}</span>
   <button
     class="gear nodrag"

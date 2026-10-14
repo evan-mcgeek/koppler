@@ -193,6 +193,7 @@
 <article
   class="card kind-{data.kind}"
   class:selected
+  class:dimmed={board.dimmed(id)}
   class:short={brief}
   class:far
   class:reading={board.live}

@@ -9,7 +9,7 @@
   const on = $derived(live.tunnel(data.local.split(':').at(-1) ?? '', data.apps));
 </script>
 
-<div class="tunnel" class:selected title={[data.host, ...data.about].join('\n')}>
+<div class="tunnel" class:selected class:dimmed={board.dimmed(id)} title={[data.host, ...data.about].join('\n')}>
   <span
     class="live"
     data-on={on}

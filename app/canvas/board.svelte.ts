@@ -426,6 +426,25 @@ class Board {
   }
   /** Which apps each tunnel card is linked to. */
   links = $derived(this.plan.flatMap(tunnel => tunnel.apps.map(app => ({ from: app, to: tunnelKey(tunnel), tunnel }))));
+  /**
+   * One app card picked: it, the cards its cables and links join, and its own tunnel, queue and outside cards stay
+   * bright; the rest of the board is dimmed. Null with nothing or several picked.
+   */
+  focus = $derived.by((): { id: string; near: string[] } | null => {
+    const picked = this.nodes.filter(node => node.selected);
+    const [one] = picked;
+    if (picked.length !== 1 || !one || this.infra.some(card => card.selected)) return null;
+    const near = [one.id];
+    for (const { from, to } of [...this.cables, ...this.links, ...this.flows])
+      if (from === one.id || to === one.id) near.push(from, to);
+    return { id: one.id, near };
+  });
+  /** Whether a card is dimmed while another is picked. */
+  dimmed = (id: string): boolean => !!this.focus && !this.focus.near.includes(id);
+  /** Whether a cable is the picked app's own: drawn as strongly as a picked cable. */
+  lit = (from: string, to: string): boolean => !!this.focus && (from === this.focus.id || to === this.focus.id);
+  /** Whether a cable or link between these two is dimmed while an app is picked: only the picked one's stay bright. */
+  dimmedLink = (from: string, to: string): boolean => !!this.focus && from !== this.focus.id && to !== this.focus.id;
 
   /** How much of a card's bottom edge the tunnel cards under it cover, and whether they sit at its right end. */
   #coveredBelow(id: string) {

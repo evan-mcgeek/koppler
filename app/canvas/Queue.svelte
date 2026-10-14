@@ -6,11 +6,17 @@
   import { board, type QueueNode } from './board.svelte.ts';
   import { dialogs } from './dialogs.svelte.ts';
 
-  const { data, selected }: NodeProps<QueueNode> = $props();
+  const { id, data, selected }: NodeProps<QueueNode> = $props();
   const env = $derived(board.env.toUpperCase());
 </script>
 
-<div class="queue" class:local={data.local} class:selected title={data.about.join('\n')}>
+<div
+  class="queue"
+  class:local={data.local}
+  class:selected
+  class:dimmed={board.dimmed(id)}
+  title={data.about.join('\n')}
+>
   <span class="what">{data.name}</span>
   <span class="kind">{data.kind}</span>
   <button

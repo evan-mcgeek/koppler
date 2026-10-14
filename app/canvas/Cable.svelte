@@ -38,6 +38,8 @@
   <!-- One group, so that the title in it is the SVG one: a cable that starts with <title> is taken for HTML. -->
   <g
     class:idle={!live.up(source) || !live.up(target)}
+    class:dimmed={board.dimmedLink(source, target)}
+    class:lit={board.lit(source, target)}
     role="presentation"
     onpointerenter={() => (board.hovered = id)}
     onpointerleave={() => (board.hovered = null)}
@@ -117,12 +119,14 @@
     stroke-width: 1.5;
   }
   :global(.svelte-flow__edge.selected) .wire,
-  :global(.svelte-flow__edge:focus-visible) .wire {
+  :global(.svelte-flow__edge:focus-visible) .wire,
+  .lit .wire {
     stroke: var(--cable-ink);
     stroke-width: 4;
   }
   :global(.svelte-flow__edge.selected) .head,
-  :global(.svelte-flow__edge:focus-visible) .head {
+  :global(.svelte-flow__edge:focus-visible) .head,
+  .lit .head {
     fill: var(--cable-ink);
     stroke: var(--cable-ink);
     stroke-width: 3;
