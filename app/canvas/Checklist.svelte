@@ -30,8 +30,8 @@
     failed = '';
     asked = false;
     dialog?.showModal();
-    const apps = board.nodes.map(node => node.id);
-    const noTunnels = board.nodes.filter(node => node.data.hideTunnels).map(node => node.id);
+    const apps = board.cards.map(node => node.id);
+    const noTunnels = board.cards.filter(node => node.data.hideTunnels).map(node => node.id);
     const said = await post<{ steps?: Step[] }>('needs', { env: board.env, apps, noTunnels });
     if ('error' in said) failed = said.error;
     else steps = said.steps ?? [];

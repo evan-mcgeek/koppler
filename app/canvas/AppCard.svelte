@@ -471,7 +471,7 @@
     <div class="calls nodrag nopan">
       <span class="calls-label">Calls {board.env.toUpperCase()}</span>
       {#each calls as other (other.id)}
-        {@const onBoard = board.nodes.some(node => node.id === other.id)}
+        {@const onBoard = board.cards.some(node => node.id === other.id)}
         {@const can = onBoard || other.cloned}
         <button
           class="chip"

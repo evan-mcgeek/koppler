@@ -106,6 +106,7 @@
   let waiting: ReturnType<typeof setTimeout> | undefined;
   const keep = (leaving = false) => {
     clearTimeout(waiting);
+    board.commit();
     const now = board.saved();
     const text = JSON.stringify(now);
     if (text === sent || text === sending) return;
@@ -126,7 +127,7 @@
       board.queues,
       board.hiddenQueues,
       board.pinned,
-      board.nodes.map(node => [node.id, node.data.hideTunnels, node.data.showQueues]),
+      board.cards.map(node => [node.id, node.data.hideTunnels, node.data.showQueues]),
     ]),
   );
   $effect(() => {
@@ -157,12 +158,15 @@
   $effect(() => {
     if (board.stack) board.record();
   });
+  // A change only restarts the wait: the board is put together once, when it has been still for a moment.
   $effect(() => {
-    const now = JSON.stringify(board.saved());
-    if (!board.stack) return;
-    // What the server handed over is what it has.
-    if (!sent) sent = now;
-    else if (now !== sent && now !== sending) waiting = setTimeout(keep, 400);
+    if (!board.changes.length || !board.stack) return;
+    untrack(() => {
+      board.commit();
+      // What the server handed over is what it has.
+      if (!sent) sent = JSON.stringify(board.saved());
+      else waiting = setTimeout(keep, 400);
+    });
     return () => {
       clearTimeout(waiting);
     };

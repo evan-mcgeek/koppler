@@ -6,12 +6,12 @@
 
   const { id }: { id: string } = $props();
   const app = $derived(board.app(id));
-  const data = $derived(board.nodes.find(node => node.id === id)?.data);
+  const data = $derived(board.cards.find(node => node.id === id)?.data);
   // The apps it could call, and those that could call it, when it is cabled to none of them.
   const calls = $derived(board.uncabled(id) ? board.cablesOf(id).can : []);
   const callers = $derived(
     board.uncabled(id)
-      ? board.nodes.flatMap(node =>
+      ? board.cards.flatMap(node =>
           node.id !== id && board.cablesOf(node.id).can.some(one => one.id === id)
             ? board.apps.filter(one => one.id === node.id)
             : [],

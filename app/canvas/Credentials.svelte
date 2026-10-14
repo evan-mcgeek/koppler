@@ -42,7 +42,7 @@
     return mine.until && mine.until > Date.now() ? !!mine.stored : !!one.stored;
   };
   const apps = $derived(
-    board.nodes
+    board.cards
       .map(node => ({ id: node.id, name: node.data.name, list: live.status?.secrets?.[node.id]?.[board.env] ?? [] }))
       .filter(app => app.list.length),
   );

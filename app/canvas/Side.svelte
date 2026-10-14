@@ -29,7 +29,7 @@
   let sort = $state(remembered());
   let search = $state('');
   let copied = $state('');
-  const onBoard = $derived([...board.nodes.map(node => node.id), ...board.pinned]);
+  const onBoard = $derived([...board.cards.map(node => node.id), ...board.pinned]);
   /** An app matches by any part of its name, or by the start of its kind: "pay", ".net", "lam". */
   const matches = (app: StackApp) => {
     const asked = search.trim().toLowerCase();
