@@ -103,6 +103,8 @@
     color: var(--warn);
   }
   .hide {
+    display: grid;
+    place-items: center;
     align-self: center;
     width: 24px;
     height: 24px;
