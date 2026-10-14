@@ -2,6 +2,7 @@
 // can never undo, so the log is written whole (a temporary file, then a rename), under a lock, and a log that cannot
 // be read is never taken as empty: Koppler keeps a copy and stops, so a person can repair it first.
 import fs from 'node:fs';
+import { writeJson } from '../json-files.ts';
 
 /** A piece of text in a file was replaced by another. */
 export interface EditAction {
@@ -118,12 +119,6 @@ export function readActions(file: string): Action[] {
   );
 }
 
-function writeActions(file: string, list: Action[]): void {
-  const beside = `${file}.${String(process.pid)}.tmp`;
-  fs.writeFileSync(beside, `${JSON.stringify(list, null, 2)}\n`, { mode: 0o600 });
-  fs.renameSync(beside, file);
-}
-
 /**
  * Reads the log, lets `change` edit it, and writes it back, with no other writer in between. Returns what `change`
  * returned. A lock left by a process that died is taken over after 10 seconds.
@@ -151,7 +146,7 @@ export function updateActions<T>(file: string, change: (list: Action[]) => T): T
   try {
     const list = readActions(file);
     const result = change(list);
-    writeActions(file, list);
+    writeJson(file, list);
     return result;
   } finally {
     fs.rmSync(lock, { recursive: true, force: true });

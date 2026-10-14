@@ -25,7 +25,7 @@ import {
   stackSource,
   useStack,
 } from '../engine/sync.ts';
-import { CODE, TEMP } from '../paths.ts';
+import { CODE, tempDir } from '../paths.ts';
 import { cableTest } from './cable-test.ts';
 import { appendDebugLog, clearDebugLog, tail } from './logs.ts';
 import { fetchPresets, sanitizeLayout, sanitizePrompt, type Prompt } from './sanitize.ts';
@@ -42,7 +42,7 @@ export interface Answer {
 }
 type Route = (body: Loose) => Answer | Promise<Answer>;
 
-const PROMPTS = path.join(TEMP, 'prompts.jsonl');
+const PROMPTS = path.join(tempDir(), 'prompts.jsonl');
 // Never starts with a dash: an id is passed to `koppler` as an argument, and must not read as a flag.
 const isApp = (value: unknown): value is string => typeof value === 'string' && APP_ID.test(value);
 const stamp = () => new Date().toISOString();
@@ -69,9 +69,9 @@ async function reload(unloaded: string, done: unknown = { ok: true }): Promise<A
 
 /** A confirmed Send (koppler up) or Stop and revert (koppler down), carried out by Koppler itself; leftovers go to the agent. */
 function startRun(prompt: Prompt, record: RunRecord, command: 'up' | 'down'): void {
-  const log = path.join(TEMP, `up-${record.id}.log`);
+  const log = path.join(tempDir(), `up-${record.id}.log`);
   const out = fs.openSync(log, 'w', 0o600);
-  appendLine(path.join(TEMP, 'history.jsonl'), { id: record.id, event: 'picked', at: stamp() });
+  appendLine(path.join(tempDir(), 'history.jsonl'), { id: record.id, event: 'picked', at: stamp() });
   const entry = path.join(CODE, 'koppler.mjs');
   const child = spawn(process.execPath, [entry, command, '--run', record.id], {
     stdio: ['ignore', out, out],
@@ -331,7 +331,7 @@ export const ROUTES: Record<string, Route> = {
     status: 204,
     after: () => {
       appendNote('canvas-closed');
-      const listener = path.join(TEMP, 'listener.json');
+      const listener = path.join(tempDir(), 'listener.json');
       try {
         const pid = listenerPid(JSON.parse(fs.readFileSync(listener, 'utf8')) as Parameters<typeof listenerPid>[0]);
         if (pid) process.kill(pid, 'SIGTERM');

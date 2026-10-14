@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { flagValue } from '../cli/output.ts';
 import { fail } from '../failure.ts';
-import { TEMP } from '../paths.ts';
+import { tempDir } from '../paths.ts';
 import { runs } from './runs.ts';
 import { APP_ID, RUN_ID } from '../ids.ts';
 
@@ -42,7 +42,7 @@ interface Answer {
 export type Shown = Message & { id: string; at: string; answered?: Answer & { at: string | undefined } };
 type Loose = Record<string, unknown>;
 
-const file = () => path.join(process.env['KOPPLER_TEMP'] || TEMP, 'messages.jsonl');
+const file = () => path.join(tempDir(), 'messages.jsonl');
 const text = (value: unknown, max: number) => (typeof value === 'string' ? value.trim().slice(0, max) : '');
 const listOf = (value: unknown) => (Array.isArray(value) ? (value as unknown[]) : []);
 const texts = (value: unknown, most: number, max: number) =>

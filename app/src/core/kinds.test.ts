@@ -1,10 +1,6 @@
-import { afterEach, expect, test } from 'vitest';
-import { defaultPort, detect, KINDS, of, register } from './kinds.ts';
+import { expect, test } from 'vitest';
+import { defaultPort, detect, KINDS, kindsFor, of } from './kinds.ts';
 import { CLONES, repoOf } from './testing/repo.ts';
-
-afterEach(() => {
-  register({});
-});
 
 test('every kind has a label; one nobody defined is called by its own name', () => {
   expect(of({ kind: 'flutter' }).label).toBe('Flutter');
@@ -43,19 +39,22 @@ test('the usual port comes from what the repo holds', () => {
   expect(defaultPort('dotnet', repoOf({}))).toBeNull();
 });
 
-test("a stack's own kind is recognised first, cannot replace a built-in one, and goes away with the stack", () => {
-  register({
-    elixir: { label: 'Elixir', detect: ['mix.exs'], start: 'mix phx.server', port: 4000 },
-    go: { label: 'Not Go' },
-    'Bad Id': { label: 'x' },
-    broken: null,
-  });
-  expect(of({ kind: 'elixir' })).toMatchObject({ label: 'Elixir', custom: true });
-  expect(of({ kind: 'go' }).label).toBe('Go');
-  expect(Object.hasOwn(KINDS, 'Bad Id') || Object.hasOwn(KINDS, 'broken')).toBe(false);
-  expect(detect(repoOf({ 'mix.exs': '', 'package.json': '{}' }))).toBe('elixir');
-  expect(defaultPort('elixir', repoOf({}))).toBe(4000);
-  register({});
+test("a stack's own kind is recognised first, cannot replace a built-in one, and belongs to that stack alone", () => {
+  const stack = {
+    kinds: {
+      elixir: { label: 'Elixir', detect: ['mix.exs'], start: 'mix phx.server', port: 4000 },
+      go: { label: 'Not Go' },
+      'Bad Id': { label: 'x' },
+      broken: null,
+    },
+  };
+  expect(of({ kind: 'elixir' }, stack)).toMatchObject({ label: 'Elixir', custom: true });
+  expect(of({ kind: 'go' }, stack).label).toBe('Go');
+  expect(Object.keys(kindsFor(stack)).filter(id => !Object.hasOwn(KINDS, id))).toEqual(['elixir']);
+  expect(detect(repoOf({ 'mix.exs': '', 'package.json': '{}' }), stack)).toBe('elixir');
+  expect(defaultPort('elixir', repoOf({}), stack)).toBe(4000);
+  expect(kindsFor(stack)).toBe(kindsFor(stack));
   expect(of({ kind: 'elixir' }).label).toBe('elixir');
   expect(detect(repoOf({ 'mix.exs': '' }))).toBeNull();
+  expect(Object.hasOwn(KINDS, 'elixir')).toBe(false);
 });

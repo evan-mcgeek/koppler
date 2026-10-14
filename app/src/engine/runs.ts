@@ -8,10 +8,11 @@ import path from 'node:path';
 import { fail } from '../failure.ts';
 import * as kp from '../core/plan.ts';
 import { readData, readStack } from '../data.ts';
-import { STATE, TEMP } from '../paths.ts';
+import { stateDir, tempDir } from '../paths.ts';
 import { redact } from '../scrub.ts';
 import { APP_ID, RUN_ID } from '../ids.ts';
 import { alive, records } from './processes.ts';
+import { writeJson } from '../json-files.ts';
 
 type Loose = Record<string, unknown>;
 type Steps = Pick<kp.Plan, 'starts' | 'restarts' | 'stops' | 'keeps'>;
@@ -65,11 +66,9 @@ interface Prompt {
   data?: Loose;
 }
 
-const temp = () => process.env['KOPPLER_TEMP'] || TEMP;
-const stateDir = () => process.env['KOPPLER_STATE'] || STATE;
-const historyFile = () => path.join(temp(), 'history.jsonl');
-const liveFile = () => path.join(temp(), 'live.json');
-const actionsFile = () => path.join(temp(), 'actions.json');
+const historyFile = () => path.join(tempDir(), 'history.jsonl');
+const liveFile = () => path.join(tempDir(), 'live.json');
+const actionsFile = () => path.join(tempDir(), 'actions.json');
 const ID = APP_ID;
 const MAX_RUNS = 200;
 const LIBRARY = /^[\w@./-]{1,100}$/;
@@ -153,7 +152,7 @@ export interface Note {
 }
 const NOTES: readonly string[] = ['stop-apps', 'stop-all', 'canvas-closed'];
 export const appendNote = (note: Note['note'], stopped: string[] = []): void => {
-  fs.mkdirSync(temp(), { recursive: true });
+  fs.mkdirSync(tempDir(), { recursive: true });
   append({ note, at: stamp(), stopped: stopped.filter(name => ID.test(name)).slice(0, 100) });
 };
 /** The notes in the history, oldest first. They are not runs: no plan or live state looks at them. */
@@ -410,14 +409,19 @@ async function gatherSession(stop: Run): Promise<void> {
   try {
     const { isDev, collectSession } = await import('./session.ts');
     if (!isDev()) return;
-    const { dir, quiet } = collectSession({ temp: temp(), logsDir: path.join(stateDir(), 'logs'), stop, runs: runs() });
+    const { dir, quiet } = collectSession({
+      temp: tempDir(),
+      logsDir: path.join(stateDir(), 'logs'),
+      stop,
+      runs: runs(),
+    });
     if (quiet) {
       console.log(`Session gathered in ${dir}; nothing went wrong, so no review is queued.`);
       return;
     }
     const review = `The session ended with a full Stop. Review it using the koppler-run skill: read ${dir}/summary.md and the files next to it, find every problem the user ran into, fix them in Koppler, verify each fix, and report.`;
     const prompt = { tag: 'koppler-review', at: stamp(), text: review, data: { dir } };
-    fs.appendFileSync(path.join(temp(), 'prompts.jsonl'), JSON.stringify(prompt) + '\n', { mode: 0o600 });
+    fs.appendFileSync(path.join(tempDir(), 'prompts.jsonl'), JSON.stringify(prompt) + '\n', { mode: 0o600 });
     console.log(`Session gathered in ${dir}; a review request is queued for the agent.`);
   } catch (error) {
     console.error(`koppler: could not gather the session (${(error as Error).message})`);
@@ -427,7 +431,7 @@ async function gatherSession(stop: Run): Promise<void> {
 /** `koppler history session`: what happened since the last finished Stop, gathered for the agent to read. */
 export async function sessionCommand(): Promise<void> {
   const { collectSession } = await import('./session.ts');
-  const { dir } = collectSession({ temp: temp(), logsDir: path.join(stateDir(), 'logs'), runs: runs() });
+  const { dir } = collectSession({ temp: tempDir(), logsDir: path.join(stateDir(), 'logs'), runs: runs() });
   console.log(fs.readFileSync(path.join(dir, 'summary.md'), 'utf8').trimEnd());
   console.log(`\nThe files are in ${dir}; they stay on this Mac.`);
 }
@@ -478,7 +482,7 @@ export async function appliedCommand(args: string[]): Promise<void> {
     edges,
     ...(run.queues && { queues: run.queues }),
   };
-  fs.writeFileSync(liveFile(), JSON.stringify(now, null, 2) + '\n', { mode: 0o600 });
+  writeJson(liveFile(), now);
   if (run.kind === 'stop' && !failed) await gatherSession(run);
   const ended = failed ? `failed (${reason ?? ''})` : 'done';
   const running = Object.keys(nodes).join(', ') || 'empty';

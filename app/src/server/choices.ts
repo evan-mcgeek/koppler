@@ -4,6 +4,7 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { readJson } from '../json-files.ts';
 
 const MOST_FILES = 4000;
 
@@ -21,13 +22,6 @@ export function awsProfiles(
   return [...new Set(names.filter(Boolean))].sort((a, b) => a.localeCompare(b));
 }
 
-const parsed = (file: string): unknown => {
-  try {
-    return JSON.parse(fs.readFileSync(file, 'utf8').replace(/^﻿/, ''));
-  } catch {
-    return null;
-  }
-};
 const keysOf = (value: unknown, key: string) => {
   const inner = typeof value === 'object' && value !== null ? (value as Record<string, unknown>)[key] : null;
   return typeof inner === 'object' && inner !== null ? Object.keys(inner) : [];
@@ -59,7 +53,7 @@ export function cloneChoices(dir: string | undefined): CloneChoices {
   const all = listed.split('\0').filter(Boolean);
   const named = (name: string) => all.filter(file => path.posix.basename(file) === name).slice(0, 40);
   const read = (files: string[], key: string) =>
-    Object.fromEntries(files.map(file => [file, keysOf(parsed(path.join(dir, file)), key)]));
+    Object.fromEntries(files.map(file => [file, keysOf(readJson(path.join(dir, file)), key)]));
   return {
     files: all.slice(0, MOST_FILES),
     profiles: read(named('launchSettings.json'), 'profiles'),

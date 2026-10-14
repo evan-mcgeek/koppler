@@ -8,7 +8,7 @@ import { isDeepStrictEqual } from 'node:util';
 import { flagValue } from '../cli/output.ts';
 import { fail, Failure } from '../failure.ts';
 import { readData } from '../data.ts';
-import { TEMP } from '../paths.ts';
+import { tempDir } from '../paths.ts';
 import { appliedCommand } from './runs.ts';
 import {
   readActions,
@@ -175,9 +175,9 @@ function unloggedEdits(): string[] {
  * done in the history.
  */
 export async function down(args: string[]): Promise<void> {
-  const logFile = path.join(TEMP, 'actions.json');
+  const logFile = path.join(tempDir(), 'actions.json');
   for (const record of records().filter(r => r.name !== 'canvas')) console.log(await stopOne(record));
-  fs.rmSync(path.join(TEMP, 'progress.json'), { force: true });
+  fs.rmSync(path.join(tempDir(), 'progress.json'), { force: true });
   let log: Action[];
   try {
     log = readActions(logFile);

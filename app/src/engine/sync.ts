@@ -7,14 +7,14 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { writeJson } from '../json-files.ts';
-import { KINDS, of as kindOf, register } from '../core/kinds.ts';
+import { readJson, writeJson } from '../json-files.ts';
+import { kindsFor, of as kindOf } from '../core/kinds.ts';
 import { validateStack } from '../core/stack.ts';
 import { getAt, parsePath, setAt } from '../core/stack-path.ts';
 import { brokenLock, LOCKED } from './locks.ts';
 import { readData, writeData, type Clone } from '../data.ts';
 import { Failure } from '../failure.ts';
-import { TEMP } from '../paths.ts';
+import { configDir, tempDir } from '../paths.ts';
 import { checkStack as checkLoadedStack } from './checks.ts';
 import { detectKind } from './investigate.ts';
 import { librariesFor, packageOf, type Library } from './libraries.ts';
@@ -80,9 +80,8 @@ export interface KnownStack {
 }
 type Save = (config: Config) => void;
 
-const CONFIG_DIR = process.env['KOPPLER_CONFIG_DIR'] || path.join(os.homedir(), '.config', 'koppler');
-const CONFIG = path.join(CONFIG_DIR, 'config.json');
-const INDEX = path.join(CONFIG_DIR, 'repos.json');
+const CONFIG = path.join(configDir(), 'config.json');
+const INDEX = path.join(configDir(), 'repos.json');
 const SKIP = new Set([
   'node_modules',
   'Library',
@@ -314,14 +313,7 @@ export function urlsInClone(repo: string): string[] {
   }
 }
 
-function readJson<T>(file: string, fallback: T | null = null): T | null {
-  try {
-    return JSON.parse(fs.readFileSync(file, 'utf8')) as T | null;
-  } catch {
-    return fallback;
-  }
-}
-const readIndex = () => readJson<Index>(INDEX);
+const readIndex = () => readJson(INDEX) as Index | null;
 const saveConfig: Save = config => {
   writeJson(CONFIG, config);
 };
@@ -371,7 +363,7 @@ function parseFlags(args: string[]): Flags {
 }
 
 function loadConfig(): Config {
-  const config = readJson<Config>(CONFIG) ?? {};
+  const config = (readJson(CONFIG) as Config | null) ?? {};
   if (config.root && !config.roots) config.roots = [config.root];
   delete config.root;
   return config;
@@ -409,7 +401,6 @@ export function candidateRepos(
   stack: Partial<StackFile>,
   stackDir: string | null | undefined,
 ): Candidate[] {
-  register(stack.kinds);
   const seen = new Set<string>();
   const stackPath = path.resolve(stackDir ?? '/nowhere');
   return index.repos
@@ -425,7 +416,7 @@ export function candidateRepos(
         {
           slug,
           name: nameFromRepo(slug.split('/').pop() ?? ''),
-          kind: detectKind(repo.path),
+          kind: detectKind(repo.path, stack),
           path: tilde(repo.path),
           folder: tilde(path.dirname(repo.path)),
           ...(inStack && { inStack }),
@@ -440,7 +431,7 @@ const NO_STACK = 'No stack is set up yet: koppler init';
 function stackInUse(config: Config): { source: string; stack: StackFile; error?: undefined } | { error: string } {
   if (!config.stack) return { error: NO_STACK };
   const source = path.join(config.stack, 'stack.json');
-  const stack = readJson<StackFile>(source);
+  const stack = readJson(source) as StackFile | null;
   return stack ? { source, stack } : { error: `cannot read ${source}` };
 }
 
@@ -461,7 +452,7 @@ export function addApps(
     const pick = (picked ?? {}) as { slug?: string; kind?: string; name?: unknown };
     const candidate = known.get(pick.slug ?? '');
     if (!candidate || candidate.inStack) continue;
-    const kind = Object.hasOwn(KINDS, pick.kind ?? '') ? pick.kind : candidate.kind;
+    const kind = Object.hasOwn(kindsFor(stack), pick.kind ?? '') ? pick.kind : candidate.kind;
     if (!kind) return { error: `Say what kind of app ${candidate.slug} is.` };
     const repo = candidate.slug.split('/').pop() ?? '';
     const base =
@@ -500,7 +491,7 @@ export function saveStack(source: string, before: unknown, next: unknown): { err
 export function refreshRegistry(): void {
   const source = stackSource();
   const registry = readData('registry');
-  const stack = source ? readJson<StackFile>(source) : null;
+  const stack = source ? (readJson(source) as StackFile | null) : null;
   if (source && registry && stack) writeData('registry', { ...stack, source, found: registry['found'] });
 }
 
@@ -649,7 +640,7 @@ const PER_STACK = [
   'stack.deployed.json',
 ];
 /** Says which stack a `koppler sync` is loading, for as long as it runs. */
-export const LOADING = path.join(TEMP, 'loading.json');
+export const LOADING = path.join(tempDir(), 'loading.json');
 export const stackKey = (dir: string): string =>
   crypto.createHash('sha1').update(path.resolve(dir)).digest('hex').slice(0, 12);
 /** Moves each per-stack file that is in `from` to `to`. */
@@ -662,19 +653,19 @@ export function setStack(config: Config, dir: string, save: Save = saveConfig): 
   const from = config.stack;
   if (from && path.resolve(from) === path.resolve(dir)) return;
   // The undo log goes with its stack: switched away mid-run, a Stop would find nothing to revert.
-  const logged = readJson<unknown[]>(path.join(TEMP, 'actions.json'), []);
+  const logged = readJson<unknown[]>(path.join(tempDir(), 'actions.json'), []);
   if (Array.isArray(logged) && logged.length)
     throw new Failure(
       'the run on this stack still has changes to undo; stop and revert it first (canvas, or koppler down), then switch',
     );
-  const shelf = (stack: string) => path.join(TEMP, 'stacks', stackKey(stack));
+  const shelf = (stack: string) => path.join(tempDir(), 'stacks', stackKey(stack));
   if (from) {
     fs.mkdirSync(shelf(from), { recursive: true });
-    moveFiles(TEMP, shelf(from), false);
+    moveFiles(tempDir(), shelf(from), false);
   }
   // With no stack in use before, what lies there is put aside too, never deleted: it may be a run's action log.
-  else moveFiles(TEMP, path.join(TEMP, 'stacks', `unassigned-${String(Date.now())}`));
-  moveFiles(shelf(dir), TEMP, false);
+  else moveFiles(tempDir(), path.join(tempDir(), 'stacks', `unassigned-${String(Date.now())}`));
+  moveFiles(shelf(dir), tempDir(), false);
   config.stack = dir;
   save(config);
 }
@@ -690,7 +681,7 @@ export function forgetStacks(): void {
 }
 
 // Stacks the user created here live with their private config until they move one to a shared repo.
-const PRIVATE_STACKS = path.join(CONFIG_DIR, 'stacks');
+const PRIVATE_STACKS = path.join(configDir(), 'stacks');
 const privateStacks = () => {
   try {
     return fs
@@ -737,8 +728,8 @@ export function knownStacks(index: Pick<Index, 'repos'> | null | undefined): Kno
     ...privateStacks().map((dir): [string, boolean] => [dir, false]),
   ];
   return dirs.flatMap(([dir, inRepo]): KnownStack[] => {
-    const stack = readJson<StackFile>(path.join(dir, 'stack.json'));
-    const linked = readJson<{ url?: string }>(path.join(dir, '.source.json'))?.url;
+    const stack = readJson(path.join(dir, 'stack.json')) as StackFile | null;
+    const linked = (readJson(path.join(dir, '.source.json')) as { url?: string } | null)?.url;
     if (!stack || validateStack(stack).length) return [];
     return [
       {
@@ -770,7 +761,7 @@ export function useStack(
 }
 /** With no stack yet, the canvas still opens: it asks for a name and environments, then for the apps. */
 function writeSetup(index: Index): void {
-  fs.mkdirSync(TEMP, { recursive: true });
+  fs.mkdirSync(tempDir(), { recursive: true });
   writeData('registry', { name: '', envs: ['dev'], apps: {}, setup: true, stacks: knownStacks(index) });
   writeData('local', { roots: index.roots, at: new Date().toISOString(), apps: {} });
   writeData('repos', { roots: index.roots.map(tilde), stack: null, repos: candidateRepos(index, { apps: {} }, null) });
@@ -779,10 +770,10 @@ function writeSetup(index: Index): void {
 /** Copies the stack and resolves each app to a clone from the index; branch and changes are read fresh every time. */
 function syncStack(stackDir: string, index: Index): void {
   const source = path.join(stackDir, 'stack.json');
-  const stack = readJson<StackFile>(source) ?? fail(`cannot read ${source}`);
+  const stack = (readJson(source) as StackFile | null) ?? fail(`cannot read ${source}`);
   const errors = validateStack(stack);
   if (errors.length) fail(`${source} is invalid:\n  ${errors.join('\n  ')}`);
-  fs.mkdirSync(TEMP, { recursive: true });
+  fs.mkdirSync(tempDir(), { recursive: true });
   // A copy of the stack file; `source` says which, and that is the one to edit.
   writeData('registry', { ...stack, source });
   const count = String(Object.keys(stack.apps).length);
@@ -831,7 +822,7 @@ function syncStack(stackDir: string, index: Index): void {
       console.log(`FOUND ${caller} -> ${callee}, not in stack.json: ${where}`);
   const known = hostsByApp(stack);
   for (const [id, app] of Object.entries(stack.apps))
-    if (!app.outside && !known[id]?.size && kindOf(app).serves)
+    if (!app.outside && !known[id]?.size && kindOf(app, stack).serves)
       console.log(`UNKNOWN ${id}: no deployed address in stack.json, so calls to it cannot be found`);
   for (const [host, ids] of hostOwners(stack).shared)
     console.log(`SHARED ${host} is used by ${ids.join(' and ')}, so calls to it are not attributed`);
@@ -963,7 +954,7 @@ export function sync(args: string[]): void {
   }
   if (flags.roots.length) config.roots = flags.roots;
   if (!config.stack) fail('no stack set yet: koppler init');
-  fs.mkdirSync(TEMP, { recursive: true });
+  fs.mkdirSync(tempDir(), { recursive: true });
   writeJson(LOADING, { stack: config.stack, pid: process.pid });
   try {
     let index = readIndex();

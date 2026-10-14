@@ -6,13 +6,12 @@
 import { execFileSync } from 'node:child_process';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { writeJson } from '../json-files.ts';
-import { of as kindOf, register } from '../core/kinds.ts';
+import { of as kindOf } from '../core/kinds.ts';
 import { isSignIn, signInOf, type DeclaredSignIn } from '../core/sign-in.ts';
 import { readData } from '../data.ts';
-import { TEMP } from '../paths.ts';
+import { configDir, tempDir } from '../paths.ts';
 
 // A stack as its file gives it. Anyone on the team can edit that file, so nothing in it is taken on trust here.
 interface LoosePrereq {
@@ -91,9 +90,7 @@ export interface Result {
   kind?: Gap['kind'];
 }
 
-const temp = () => process.env['KOPPLER_TEMP'] || TEMP;
-const approvalsFile = () =>
-  path.join(process.env['KOPPLER_CONFIG_DIR'] || path.join(os.homedir(), '.config', 'koppler'), 'approved-checks.json');
+const approvalsFile = () => path.join(configDir(), 'approved-checks.json');
 const TOOL = /^[A-Za-z0-9._+-]{1,64}$/;
 const text = (value: unknown, max = 300) => (typeof value === 'string' ? value.slice(0, max) : '');
 
@@ -110,9 +107,8 @@ export function checksFor(stack: MaybeStack): Check[] {
   };
   tool('git', 'Koppler', 'xcode-select --install');
   tool('node', 'Koppler', 'Install Node 22 or newer');
-  if (stack?.kinds) register(stack.kinds);
   for (const [, app] of apps.filter(([, one]) => !one.outside)) {
-    const kind = kindOf(app);
+    const kind = kindOf(app, stack);
     for (const need of kind.needs ?? []) tool(need.tool, kind.label, need.fix);
     // Every environment's prerequisites: an AWS sign-in uses the aws program, a command is started by its first word.
     const prereqs = [...(app.prereqs ?? []), ...Object.values(app.envs ?? {}).flatMap(env => env?.prereqs ?? [])];
@@ -316,7 +312,7 @@ export function report(results: Result[]): void {
 }
 const save = (stack: LooseStack, results: Result[]) => {
   const saved = { at: new Date().toISOString(), stack: stack.name ?? '', results };
-  fs.writeFileSync(path.join(temp(), 'checks.json'), JSON.stringify(saved, null, 2) + '\n');
+  writeJson(path.join(tempDir(), 'checks.json'), saved);
 };
 
 /** Runs the loaded stack's checks, prints them, and leaves the result for the canvas. False when something is missing. */
@@ -324,7 +320,7 @@ export function checkStack({ quiet = false } = {}): boolean {
   const stack = readData('registry') as LooseStack | null;
   if (!stack) return true;
   const results = runChecks(stack);
-  fs.mkdirSync(temp(), { recursive: true });
+  fs.mkdirSync(tempDir(), { recursive: true });
   save(stack, results);
   if (!quiet) report(results);
   return !results.some(result => result.state === 'missing');

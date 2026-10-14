@@ -7,7 +7,7 @@ import { readClones, readData, readStack } from '../data.ts';
 import { alive, listener, NAME, readRecord, records, sh, sleep, stopOne, uptime } from '../engine/processes.ts';
 import { run } from '../engine/run.ts';
 import { appendNote } from '../engine/runs.ts';
-import { CODE, LOGS, TEMP } from '../paths.ts';
+import { CODE, logsDir, tempDir } from '../paths.ts';
 import { redact, scrub } from '../scrub.ts';
 import { confirm, flagValue, positional, table } from './output.ts';
 import { fail } from '../failure.ts';
@@ -46,7 +46,7 @@ export async function canvas(args: string[]): Promise<void> {
     const port = String(Number(process.env['KOPPLER_PORT']) || 4747);
     await run(['canvas', '--port', port, '--', process.execPath, path.join(CODE, 'status-watch.mjs')]);
   }
-  const urlFile = path.join(TEMP, 'canvas-url');
+  const urlFile = path.join(tempDir(), 'canvas-url');
   for (let tries = 0; tries < 40 && !fs.existsSync(urlFile); tries++) await sleep(250);
   if (!fs.existsSync(urlFile)) fail('the canvas did not start; see koppler logs canvas');
   // The address carries the page's access token, so it goes to the browser and is not printed.
@@ -67,7 +67,7 @@ export function logs(args: string[]): void {
   const lines = Number(flagValue(args, '-n')) || 50;
   if (!want) fail('usage: koppler logs <name> [-f] [-n <lines>]');
   if (!NAME.test(want)) fail(notAName(want));
-  const file = path.join(LOGS, `${want}.log`);
+  const file = path.join(logsDir(), `${want}.log`);
   if (!fs.existsSync(file)) fail(`no log for ${want}; koppler status lists what runs`);
   const last = fs.readFileSync(file, 'utf8').trimEnd().split('\n').slice(-lines);
   process.stdout.write(redact(last.join('\n')) + '\n');
@@ -106,10 +106,10 @@ const read = (file: string): unknown => {
 };
 const newestRunLog = () => {
   try {
-    const logs = fs.readdirSync(TEMP).filter(file => /^up-.*\.log$/.test(file));
-    const age = (file: string) => fs.statSync(path.join(TEMP, file)).mtimeMs;
+    const logs = fs.readdirSync(tempDir()).filter(file => /^up-.*\.log$/.test(file));
+    const age = (file: string) => fs.statSync(path.join(tempDir(), file)).mtimeMs;
     const [newest] = logs.sort((a, b) => age(b) - age(a));
-    return newest ? path.join(TEMP, newest) : null;
+    return newest ? path.join(tempDir(), newest) : null;
   } catch {
     return null;
   }
@@ -143,11 +143,14 @@ async function debugReport(names: string[]): Promise<void> {
   const add = (title: string, text: string | null | undefined) => {
     if (text) parts.push(`## ${title}\n\n\`\`\`text\n${text}\n\`\`\``);
   };
-  add('Canvas debug log', tail(path.join(TEMP, 'debug.jsonl'), 40)?.split('\n').map(unnamed).join('\n'));
+  add('Canvas debug log', tail(path.join(tempDir(), 'debug.jsonl'), 40)?.split('\n').map(unnamed).join('\n'));
   const runLog = newestRunLog();
   add(`Latest run (${runLog ? path.basename(runLog) : ''})`, runLog && tail(runLog, 60));
   for (const name of names)
-    add(`${name} log`, NAME.test(name) ? (tail(path.join(LOGS, `${name}.log`), 80) ?? 'no log') : 'not a log name');
+    add(
+      `${name} log`,
+      NAME.test(name) ? (tail(path.join(logsDir(), `${name}.log`), 80) ?? 'no log') : 'not a log name',
+    );
   console.log(scrub(parts.join('\n\n'), [readData('registry'), readData('state'), ...stacks]));
 }
 

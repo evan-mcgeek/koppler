@@ -6,9 +6,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fail } from '../failure.ts';
 import { readClones, readStack, type Registry } from '../data.ts';
-import { TEMP } from '../paths.ts';
+import { tempDir } from '../paths.ts';
 import { findFiles } from './investigate.ts';
 import { hostsByApp } from './sync.ts';
+import { writeJson } from '../json-files.ts';
+import { appOn } from '../core/stack.ts';
 
 type Pair = [string, string];
 /** What a Terraform expression is worked out from. */
@@ -534,10 +536,7 @@ export function readRepo(repo: string, workspaces: string[] = []): Module[] {
 }
 
 const RANK = { api: 0, cdn: 1, dns: 2 };
-const deployedUrlOf = (stack: AppsStack, id: string, env: string) => {
-  const app = stack.apps[id];
-  return env === stack.envs[0] ? app?.deployedUrl : (app?.envs?.[env]?.['deployedUrl'] as string | undefined);
-};
+const deployedUrlOf = (stack: AppsStack, id: string, env: string) => appOn(stack, id, env)?.deployedUrl;
 const union = (a: string[] | undefined, b: string[]) => [...new Set([...(a ?? []), ...b])];
 
 /** The draft for one app: per stack environment its address, account, settings, secrets and calls. */
@@ -1007,9 +1006,9 @@ export function deployed(args: string[] = []): void {
       }
   }
   const queueSuggestions = queueDraft(queues, stack);
-  const file = path.join(TEMP, 'stack.deployed.json');
+  const file = path.join(tempDir(), 'stack.deployed.json');
   const draft = { at: new Date().toISOString(), suggestions, queueSuggestions, outsideSuggestions, apps: drafts };
-  fs.writeFileSync(file, JSON.stringify(draft, null, 2) + '\n');
+  writeJson(file, draft);
   const newQueues = Object.keys(queueSuggestions.queues).length;
   if (newQueues) console.log(`${String(newQueues)} queues are new for stack.json (queueSuggestions in the draft).`);
   console.log(

@@ -9,6 +9,7 @@ import { planSteps, planTunnels, tunnelKind } from '../core/ports.ts';
 import { isSignIn, signInOf, type DeclaredSignIn } from '../core/sign-in.ts';
 import { readClones, readData, readStack } from '../data.ts';
 import { APPROVE, approved, checksFor, envGaps, stackCommands, startsFromStack } from './checks.ts';
+import { storeOf } from '../core/stack.ts';
 
 /** A prerequisite as the stack states it; a tunnel is Koppler's own job and gives the user no step. */
 interface Need {
@@ -345,7 +346,7 @@ export function needs(
     const app = appFor(id);
     const context = {
       appId: id,
-      store: env === first ? id : `${id}@${env}`,
+      store: storeOf(stack, id, env),
       secrets: app.secrets,
       skill,
       repo: clones[id]?.path,

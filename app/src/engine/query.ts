@@ -10,7 +10,7 @@ import { readStack } from '../data.ts';
 import { BIN } from '../paths.ts';
 import { clientEnv, findClient } from '../safe-env.ts';
 import { parse, type Connection } from '../secret-check.mts';
-import { appOn } from './app-start.ts';
+import { appOn, storeOf } from '../core/stack.ts';
 
 type Checked<T> = (T & { error?: undefined }) | { error: string };
 const DATABASES = ['postgres', 'mysql'];
@@ -199,11 +199,11 @@ export async function queryCommand(args: string[]): Promise<void> {
   const early = DATABASES.map(type => readOnlySql(sqlArg, type));
   const [refused] = early;
   if (refused?.error !== undefined && early.every(checked => checked.error !== undefined)) fail(refused.error);
-  const store = env === first ? app : `${app}@${env}`;
+  const store = storeOf(stack, app, env);
   const named = flagValue(args, '--secret');
   const name = base.name;
   // The app's database secret: the one named, else the one the stack types as a database, else the only one that reads as one.
-  const candidates = (appOn(base, env, first).secrets ?? []).filter(
+  const candidates = (appOn(stack, app, env)?.secrets ?? []).filter(
     secret => secret.env && (!named || secret.env === named),
   );
   const read = (secret: string) => {

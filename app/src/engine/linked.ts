@@ -1,12 +1,12 @@
 // Stacks used straight from GitHub. Koppler keeps a copy in the private config; what it learns goes into that copy,
 // shows as changes not in the shared stack yet, and reaches the team only through a pull request the user opens.
 // Next to the copy, .source.json holds the link and `base`: the shared file as it was when last fetched.
-import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { validateStack } from '../core/stack.ts';
 import { fileUrl, githubFile, proposeFile, readFile, type GithubFile } from '../github.ts';
 import { setStack } from './sync.ts';
+import { configDir } from '../paths.ts';
+import { readJson, writeJson } from '../json-files.ts';
 
 /** A stack file, compared key by key. */
 type StackJson = Record<string, unknown> & {
@@ -27,20 +27,8 @@ type Failed = { error: string };
 type Read = (file: GithubFile) => Promise<string | null>;
 type Config = Parameters<typeof setStack>[0];
 
-const configDir = () => process.env['KOPPLER_CONFIG_DIR'] || path.join(os.homedir(), '.config', 'koppler');
 const SOURCE = '.source.json';
 const NOT_LINKED: Failed = { error: 'That stack is not linked to GitHub.' };
-function readJson(file: string): unknown {
-  try {
-    return JSON.parse(fs.readFileSync(file, 'utf8'));
-  } catch {
-    return null;
-  }
-}
-const writeJson = (file: string, value: unknown) => {
-  fs.mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 });
-  fs.writeFileSync(file, JSON.stringify(value, null, 2) + '\n');
-};
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
 const stamp = () => new Date().toISOString();
 export const sourceOf = (dir: string) => readJson(path.join(dir, SOURCE)) as Source | null;

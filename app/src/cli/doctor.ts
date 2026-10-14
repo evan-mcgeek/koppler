@@ -5,7 +5,7 @@ import path from 'node:path';
 import { isProtected } from '../core/plan.ts';
 import { describePlan, planSteps, planTunnels } from '../core/ports.ts';
 import { readData, readStack, type Registry } from '../data.ts';
-import { appOn, secretTest } from '../engine/app-start.ts';
+import { secretTest } from '../engine/app-start.ts';
 import { checkTools, missingTunnels, report } from '../engine/checks.ts';
 import { needs } from '../engine/needs.ts';
 import { live } from '../engine/runs.ts';
@@ -14,6 +14,7 @@ import { cableTest, type Tested } from '../server/cable-test.ts';
 import { APP, BIN } from '../paths.ts';
 import { confirm, envOf, positional } from './output.ts';
 import { fail } from '../failure.ts';
+import { appOn, storeOf } from '../core/stack.ts';
 
 const loaded = (): Registry => readStack() ?? fail('no stack loaded (koppler init)');
 const portOf = (stack: Registry, id: string) => Number(new URL(stack.apps[id]?.url ?? 'http://x').port);
@@ -66,10 +67,9 @@ export function ports(args: string[]): void {
 
 /** Tries each stored secret the apps declare and says only whether it works; the values stay in their store. */
 function secretTests(stack: Registry, ids: string[], env: string) {
-  const first = stack.envs[0];
   return ids.flatMap(id => {
-    const app = appOn(stack.apps[id] ?? fail(`${id} is not an app in the stack`), env, first);
-    const store = env === first ? id : `${id}@${env}`;
+    const app = appOn(stack, id, env) ?? fail(`${id} is not an app in the stack`);
+    const store = storeOf(stack, id, env);
     return (app.secrets ?? []).flatMap(secret =>
       secret.env ? [{ app: id, name: secret.env, env, ...secretTest(store, secret) }] : [],
     );

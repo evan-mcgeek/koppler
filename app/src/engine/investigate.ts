@@ -6,11 +6,12 @@ import path from 'node:path';
 import { table } from '../cli/output.ts';
 import { fail } from '../failure.ts';
 import { frameworkOf, type PackageJson } from '../core/frameworks.ts';
-import { defaultPort, detect, of as kindOf, register, type RepoView } from '../core/kinds.ts';
+import { defaultPort, detect, of as kindOf, type RepoView } from '../core/kinds.ts';
 import { describePlan, planTunnels } from '../core/ports.ts';
 import { readClones, readStack } from '../data.ts';
-import { TEMP } from '../paths.ts';
+import { tempDir } from '../paths.ts';
 import { hostsByApp } from './sync.ts';
+import { writeJson } from '../json-files.ts';
 
 /** A port an app listens on locally, and where in its clone that is said. */
 export interface FoundPort {
@@ -139,13 +140,13 @@ export const repoFiles = (repo: string): RepoView => ({
   },
   find: suffix => findFiles(repo, name => name.endsWith(suffix), 4).length > 0,
 });
-export const detectKind = (repo: string): string | null => detect(repoFiles(repo));
+export const detectKind = (repo: string, stack?: { kinds?: unknown }): string | null => detect(repoFiles(repo), stack);
 
 const inProperties = (name: string, file: string) =>
   name === 'launchSettings.json' && file.includes(`${path.sep}Properties${path.sep}`);
 const NODE_FILE = /^package\.json$|^\.env|^vite\.config\.|^serverless\./;
 
-export function localPorts(repo: string, kind: string | null | undefined): FoundPort[] {
+export function localPorts(repo: string, kind: string | null | undefined, stack?: { kinds?: unknown }): FoundPort[] {
   if (kind === 'dotnet')
     return findFiles(repo, inProperties).flatMap(file =>
       dotnetPorts(read(file) ?? '').map(found => ({ ...found, where: `${path.relative(repo, file)} ${found.where}` })),
@@ -165,8 +166,10 @@ export function localPorts(repo: string, kind: string | null | undefined): Found
       ? found
       : [{ port: framework.port, scheme: 'http', where: `${framework.name} default` }];
   }
-  const usual = kind ? defaultPort(kind, repoFiles(repo)) : null;
-  return usual ? [{ port: usual, scheme: 'http', where: `${kindOf({ kind: kind ?? undefined }).label} default` }] : [];
+  const usual = kind ? defaultPort(kind, repoFiles(repo), stack) : null;
+  return usual
+    ? [{ port: usual, scheme: 'http', where: `${kindOf({ kind: kind ?? undefined }, stack).label} default` }]
+    : [];
 }
 
 const portOf = (url: string | undefined) => {
@@ -201,18 +204,17 @@ export function conflicts(apps: Investigated[]): { port: number; who: string[] }
 export function investigate({ afterSync = false } = {}): void {
   const stack = readStack() ?? fail('no stack loaded (koppler init)');
   const clones = readClones();
-  register(stack.kinds);
   const found = stack.found ?? {};
   const known = hostsByApp(stack);
   const apps = Object.entries(stack.apps).map(([id, app]) => {
     const repo = clones[id]?.path;
-    const kind = (app.kind as string | undefined) ?? (repo ? (detectKind(repo) ?? undefined) : undefined);
+    const kind = (app.kind as string | undefined) ?? (repo ? (detectKind(repo, stack) ?? undefined) : undefined);
     return {
       id,
       name: app.name,
       kind,
       repo,
-      ports: repo ? localPorts(repo, kind) : [],
+      ports: repo ? localPorts(repo, kind, stack) : [],
       tunnels: (app.prereqs ?? []).filter(need => need.tunnel && need.port),
       stackPort: portOf(app.url),
       stackUrl: app.url ?? null,
@@ -269,12 +271,12 @@ export function investigate({ afterSync = false } = {}): void {
       console.log(
         `MISMATCH ${app.id}: stack.json says port ${String(app.stackPort)}, the repo uses ${ports.join(', ')}`,
       );
-    if (!afterSync && !known[app.id]?.size && kindOf(app).serves)
+    if (!afterSync && !known[app.id]?.size && kindOf(app, stack).serves)
       console.log(`UNKNOWN ${app.id}: no deployed address in stack.json, so calls to it cannot be found`);
     for (const callee of app.found)
       console.log(`FOUND ${app.id} -> ${callee}: not in stack.json (koppler sync shows where)`);
   }
-  const file = path.join(TEMP, 'stack.suggestions.json');
-  fs.writeFileSync(file, JSON.stringify({ at: new Date().toISOString(), apps, suggestions }, null, 2) + '\n');
+  const file = path.join(tempDir(), 'stack.suggestions.json');
+  writeJson(file, { at: new Date().toISOString(), apps, suggestions });
   console.log(`\nFull results and suggestions: ${file}`);
 }

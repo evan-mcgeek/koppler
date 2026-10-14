@@ -33,6 +33,8 @@ export interface StartContext {
   /** The app's plain http port. */
   httpPort?: number | undefined;
   device?: (Device & { id: string }) | null | undefined;
+  /** The stack, for the kinds it adds. */
+  stack?: { kinds?: unknown };
   platform?: string | undefined;
   scripts?: Record<string, string>;
   pkg?: PackageJson | null;
@@ -196,7 +198,7 @@ function startOther(app: App, ctx: StartContext): Start {
 
 const NO_FILES: RepoView = { has: () => false, read: () => null, list: () => [] };
 function startFromRecipe(app: App, ctx: StartContext): Start {
-  const recipe = recipeOf(app.kind);
+  const recipe = recipeOf(app.kind, ctx.stack);
   if (!recipe) return { error: `kind ${app.kind ?? ''} cannot start by id yet` };
   const files = ctx.files ?? NO_FILES;
   const port = portOf(app.url) ?? recipe.port?.(files) ?? undefined;

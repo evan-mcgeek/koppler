@@ -6,13 +6,14 @@ import https from 'node:https';
 import path from 'node:path';
 import { execFileSync, spawn } from 'node:child_process';
 import { fail, Failure } from '../failure.ts';
-import { LOGS, STATE } from '../paths.ts';
+import { logsDir, stateDir } from '../paths.ts';
 import { appEnv } from '../safe-env.ts';
 import { redact } from '../scrub.ts';
 import { keepPreviousLog } from './session.ts';
 import { APP_ID } from '../ids.ts';
+import { writeJson } from '../json-files.ts';
 
-const PROCS = path.join(STATE, 'procs');
+const PROCS = path.join(stateDir(), 'procs');
 /** What a process started by Koppler can be called. */
 export const NAME = APP_ID;
 // How long an app with a port may take to answer: a build can take minutes.
@@ -251,9 +252,9 @@ async function waitUntilReady(record: ProcessRecord, port: number, ready: Ready)
 export async function startProcess(options: RunOptions): Promise<ProcessRecord> {
   const { name, command } = options;
   refuseWhatIsTaken(options);
-  fs.mkdirSync(LOGS, { recursive: true, mode: 0o700 });
+  fs.mkdirSync(logsDir(), { recursive: true, mode: 0o700 });
   fs.mkdirSync(PROCS, { recursive: true, mode: 0o700 });
-  const log = path.join(LOGS, `${name}.log`);
+  const log = path.join(logsDir(), `${name}.log`);
   const program = command[0] ?? '';
   const display = [path.isAbsolute(program) ? path.basename(program) : program, ...command.slice(1)].join(' ');
   keepPreviousLog(log);
@@ -296,7 +297,7 @@ export async function startProcess(options: RunOptions): Promise<ProcessRecord> 
     psCommand: psCommand(child.pid),
     psStart: psStart(child.pid),
   };
-  fs.writeFileSync(recordPath(name), `${JSON.stringify(record, null, 2)}\n`, { mode: 0o600 });
+  writeJson(recordPath(name), record);
   await sleep(700);
   if (!alive(record)) fail(`${name} exited right away; last lines of ${log}:\n${tailOf(log, 15)}`);
   if (record.port) await waitForPort(record, record.port);

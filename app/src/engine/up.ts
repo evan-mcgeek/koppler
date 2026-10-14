@@ -13,7 +13,7 @@ import { aliasReady, planSteps, planTunnels, type TunnelNeed } from '../core/por
 import { signInOf, type SignIn } from '../core/sign-in.ts';
 import type { Prereq } from '../core/stack.ts';
 import { readClones, readData, readStack, type Clone, type Registry } from '../data.ts';
-import { TEMP } from '../paths.ts';
+import { tempDir } from '../paths.ts';
 import { readActions, type Action } from './actions.ts';
 import { switchTo, type Carry } from './branch.ts';
 import { APPROVE, approved, missingTunnels, startsFromStack } from './checks.ts';
@@ -25,6 +25,8 @@ import { matches, prepare, recipesFor } from './recipes.ts';
 import { run } from './run.ts';
 import { appendRun, appliedCommand, live, planFor, runningPart, runRecord, runs, type Run } from './runs.ts';
 import { wireInfo } from './wire.ts';
+import { writeJson } from '../json-files.ts';
+import { appOn } from '../core/stack.ts';
 
 type StepState = 'todo' | 'user' | 'done' | 'failed';
 interface ProgressStep {
@@ -62,8 +64,7 @@ const running = (name: string) => {
 };
 const nameOf = (stack: Registry, id: string) => stack.apps[id]?.name ?? id;
 const prereqsOf = (stack: Registry, id: string, env: string): Prereq[] => {
-  const app = stack.apps[id];
-  return (env !== stack.envs[0] && app?.envs?.[env]?.prereqs) || (app?.prereqs ?? []);
+  return appOn(stack, id, env)?.prereqs ?? [];
 };
 /** The tunnels an app needs on an environment, as the stack states them. */
 export const tunnelsOf = (stack: Registry, id: string, env: string): TunnelNeed[] =>
@@ -143,7 +144,7 @@ function appsNamed(stack: Registry, args: string[]): string {
 
 /** Each app's steps as the run goes, shown on its card; if the run stops on an error, the step it was on fails. */
 function progressOf(board: Run | null, env: string): Up['step'] {
-  const file = path.join(TEMP, 'progress.json');
+  const file = path.join(tempDir(), 'progress.json');
   const progress = {
     run: board?.id ?? null,
     env,
@@ -151,7 +152,7 @@ function progressOf(board: Run | null, env: string): Up['step'] {
     apps: {} as Record<string, ProgressStep[]>,
   };
   const save = () => {
-    fs.writeFileSync(file, JSON.stringify(progress) + '\n', { mode: 0o600 });
+    writeJson(file, progress);
   };
   process.on('exit', code => {
     if (!code || code === 3) return;
@@ -548,7 +549,7 @@ async function carryOut(stack: Registry, args: string[]): Promise<void> {
     skip: new Set(),
     waits: new Set(),
     setEnv: Object.fromEntries(Object.entries(given).filter(([, env]) => Object.keys(env).length)),
-    logFile: path.join(TEMP, 'actions.json'),
+    logFile: path.join(tempDir(), 'actions.json'),
     step: progressOf(board, env),
   };
   announce(up);
@@ -573,7 +574,7 @@ async function carryOut(stack: Registry, args: string[]): Promise<void> {
       edges,
       ...(board.queues && { queues: board.queues }),
     };
-    fs.writeFileSync(path.join(TEMP, 'live.json'), JSON.stringify(now, null, 2) + '\n', { mode: 0o600 });
+    writeJson(path.join(tempDir(), 'live.json'), now);
   }
   if (up.left.length) {
     console.log(`\nLeft for the agent:\n${up.left.map(line => `  - ${line}`).join('\n')}`);

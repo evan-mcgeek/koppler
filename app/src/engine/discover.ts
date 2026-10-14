@@ -3,7 +3,7 @@
 // Nothing is written until the user picks what to keep.
 import fs from 'node:fs';
 import { fail } from '../failure.ts';
-import { of as kindOf, register } from '../core/kinds.ts';
+import { of as kindOf } from '../core/kinds.ts';
 import { validateStack } from '../core/stack.ts';
 import { readClones, readStack } from '../data.ts';
 import { draftApp, ENV_TOKEN, readRepo, stackEnv } from './deployed.ts';
@@ -136,7 +136,6 @@ export function discover(
   clones: Clones,
   { grep = grepClone, urls = urlsInClone }: { grep?: typeof grepClone; urls?: typeof urlsInClone } = {},
 ): Finding[] {
-  register(given.kinds);
   const out: Finding[] = [];
   const [first] = given.envs;
   const alias = aliasIn(given, clones);
@@ -158,7 +157,7 @@ export function discover(
     const repo = clones[id];
     if (!repo) continue;
     if (!app.url && !kindOf(app).platforms) {
-      const [port] = localPorts(repo, app.kind);
+      const [port] = localPorts(repo, app.kind, given);
       if (port)
         out.push({
           id: `url:${id}`,

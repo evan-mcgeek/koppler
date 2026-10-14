@@ -4,7 +4,6 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { APPROVE, approved, startsFromStack } from './checks.ts';
 import { fail } from '../failure.ts';
-import { register } from '../core/kinds.ts';
 import { launchProfile, startCommand, type LaunchProfiles, type StartContext } from '../core/launch.ts';
 import { isProtected } from '../core/plan.ts';
 import type { App, Secret } from '../core/stack.ts';
@@ -14,6 +13,7 @@ import { readJson } from '../json-files.ts';
 import { BIN, CODE } from '../paths.ts';
 import { resolveDevice, type RunDevice } from './devices.ts';
 import { sh, type Ready, type RunOptions } from './processes.ts';
+import { appOn, storeOf } from '../core/stack.ts';
 
 // Koppler's own folder, where its runners (Lambda, SAM) are.
 
@@ -27,10 +27,6 @@ export interface AppStart {
   env: string;
   ready?: Ready;
 }
-
-/** An app as an environment has it: what the stack says for that environment laid over the app. */
-export const appOn = (app: App, env: string, first: string | undefined): App =>
-  env === first ? app : { ...app, ...app.envs?.[env] };
 
 /** A .NET app's launch profiles, from its clone. */
 export function profilesOf(app: Partial<App>, repo: string | undefined): LaunchProfiles {
@@ -135,11 +131,10 @@ export function appStart(id: string, options: RunOptions): AppStart | null {
   if (!stack || !base) return null;
   // An app the stack marks as living outside this machine (a SaaS, a managed service) is never started here.
   if (base.outside) fail(`${base.name} does not run on this Mac: ${String(base.outside)}`);
-  register(stack.kinds);
   const first = stack.envs[0];
   const env = options.env ?? first ?? '';
   if (!stack.envs.includes(env)) fail(`unknown env ${env}; the stack has ${stack.envs.join(', ')}`);
-  const app = appOn(base, env, first);
+  const app = appOn(stack, id, env) ?? base;
   // A start command written in the shared stack runs only once the user has seen and allowed it, and again after it
   // changes.
   if (startsFromStack(stack, id, env) && !approved(stack.source ?? '', stack))
@@ -148,10 +143,10 @@ export function appStart(id: string, options: RunOptions): AppStart | null {
     );
   const repo = readClones()[id]?.path ?? fail(`${id} is not cloned (koppler sync --rescan after cloning)`);
   const device = app.kind === 'flutter' ? resolveDevice(options.device, app) : undefined;
-  const ctx = contextFor(id, app, repo, env, options, stack.envAliases?.[env] ?? [], device);
+  const ctx = { ...contextFor(id, app, repo, env, options, stack.envAliases?.[env] ?? [], device), stack };
   const start = startCommand(app, ctx);
   if (start.error !== undefined) fail(`${id}: ${start.error}; or run any command: koppler run ${id} -- <command>`);
-  const store = env === first ? id : `${id}@${env}`;
+  const store = storeOf(stack, id, env);
   // A protected environment's store asks the user on every read, so it is only tried when asked (--test); --no-test
   // skips the check everywhere.
   checkSecrets(id, app, store, env, !options.dryRun && (options.test ?? !isProtected(stack, env)));

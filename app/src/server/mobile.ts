@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { readClones, readStack } from '../data.ts';
 import { runningNames, live } from '../engine/runs.ts';
-import { CODE, STATE } from '../paths.ts';
+import { CODE, stateDir } from '../paths.ts';
 
 /** A mobile app found running on a simulator, emulator or phone. */
 export interface MobileApp {
@@ -78,7 +78,9 @@ export async function findMobileApp({ iosBundleId, androidPackage }: MobileIds):
 
 const recordOf = (id: string): { command?: string } | null => {
   try {
-    return JSON.parse(fs.readFileSync(path.join(STATE, 'procs', `${id}.json`), 'utf8')) as { command?: string } | null;
+    return JSON.parse(fs.readFileSync(path.join(stateDir(), 'procs', `${id}.json`), 'utf8')) as {
+      command?: string;
+    } | null;
   } catch {
     return null;
   }

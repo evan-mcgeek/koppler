@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url';
 import * as z from 'zod';
 import { StackSchema } from './core/stack.ts';
 import { readClones, readData, type DataName } from './data.ts';
-import { CODE, STATE, TEMP } from './paths.ts';
+import { CODE, stateDir, tempDir } from './paths.ts';
 import { awsProfiles, cloneChoices } from './server/choices.ts';
 import { tail } from './server/logs.ts';
 import { ROUTES } from './server/routes.ts';
@@ -155,7 +155,7 @@ function servePage(what: string, url: URL, res: Response): void {
     res.writeHead(404).end();
     return;
   }
-  const full = file.startsWith('temp/') ? path.join(TEMP, file.slice(5)) : path.join(CODE, file);
+  const full = file.startsWith('temp/') ? path.join(tempDir(), file.slice(5)) : path.join(CODE, file);
   fs.readFile(full, (error, body) => {
     if (error) {
       res.writeHead(404).end();
@@ -172,7 +172,7 @@ function servePage(what: string, url: URL, res: Response): void {
 
 /** The page's token: kept across restarts, so an open canvas tab keeps working. */
 function pageToken(): string {
-  const file = path.join(STATE, 'canvas-token');
+  const file = path.join(stateDir(), 'canvas-token');
   try {
     const kept = fs.readFileSync(file, 'utf8').trim();
     if (/^[0-9a-f]{48}$/.test(kept)) return kept;
@@ -180,7 +180,7 @@ function pageToken(): string {
     // The first start on this Mac.
   }
   const token = crypto.randomBytes(24).toString('hex');
-  fs.mkdirSync(STATE, { recursive: true, mode: 0o700 });
+  fs.mkdirSync(stateDir(), { recursive: true, mode: 0o700 });
   fs.writeFileSync(file, token + '\n', { mode: 0o600 });
   return token;
 }
@@ -256,7 +256,7 @@ function startServer(): void {
   });
   server.listen(PORT, '127.0.0.1', () => {
     const page = `http://127.0.0.1:${String((server.address() as AddressInfo).port)}${prefix}`;
-    fs.writeFileSync(path.join(TEMP, 'canvas-url'), page + '\n', { mode: 0o600 });
+    fs.writeFileSync(path.join(tempDir(), 'canvas-url'), page + '\n', { mode: 0o600 });
     console.log(`canvas: ${page}`);
   });
 }
@@ -265,7 +265,7 @@ if (process.argv[1] && fs.realpathSync(process.argv[1]) === fileURLToPath(import
   // With --once the status is published a single time and nothing is served.
   const serving = !process.argv.includes('--once');
   // On a machine where Koppler never ran, nothing has made its folder yet.
-  fs.mkdirSync(TEMP, { recursive: true, mode: 0o700 });
+  fs.mkdirSync(tempDir(), { recursive: true, mode: 0o700 });
   // Said from the very first status on: a page that loaded can only have come from this server.
   if (serving) startServer();
   // A status that cannot be put together is said, not the end of the canvas.
