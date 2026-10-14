@@ -73,6 +73,8 @@ export function logs(args: string[]): void {
   process.stdout.write(redact(last.join('\n')) + '\n');
   if (!args.includes('-f') && !args.includes('--follow')) return;
   let at = fs.statSync(file).size;
+  // Shown a whole line at a time: a secret is masked by the name before it, which may come in an earlier read.
+  let held = Buffer.alloc(0);
   fs.watchFile(file, { interval: 500 }, now => {
     if (now.size < at) at = 0;
     if (now.size === at) return;
@@ -81,7 +83,10 @@ export function logs(args: string[]): void {
     fs.readSync(fd, added, 0, added.length, at);
     fs.closeSync(fd);
     at = now.size;
-    process.stdout.write(redact(added.toString('utf8')));
+    const all = Buffer.concat([held, added]);
+    const end = all.lastIndexOf(10) + 1;
+    held = all.subarray(end);
+    if (end) process.stdout.write(redact(all.subarray(0, end).toString('utf8')));
   });
 }
 

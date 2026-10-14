@@ -212,7 +212,12 @@ export function stackCommands(stack: MaybeStack): Command[] {
   };
   for (const check of checksFor(stack)) if (!check.safe) add('check', check.name, check.run);
   // Only the check: Koppler runs it. The login is shown for the user to run themselves.
-  for (const [name, signIn] of Object.entries(stack?.signIns ?? {})) add('sign-in check', name, signIn?.check);
+  for (const [name, signIn] of Object.entries(stack?.signIns ?? {})) {
+    add('sign-in check', name, signIn?.check);
+    // What it gives the apps it is for reaches them at start, so it is allowed with the rest.
+    for (const [setting, value] of Object.entries((signIn as { env?: Record<string, unknown> } | null)?.env ?? {}))
+      add('sign-in setting', `${name}: ${setting}`, value);
+  }
   for (const [id, kind] of Object.entries(stack?.kinds ?? {})) {
     add('start of every', `${id} app`, kind?.start);
     add('stop of every', `${id} app`, kind?.stop);

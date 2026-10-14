@@ -54,7 +54,7 @@ const Prereq = z.looseObject(
     signIn: matching(NAME, 'the name of a sign-in').optional().describe('A sign-in of the stack, by its name'),
     devCerts: z.boolean().optional().describe('It serves https here: the local certificate must be trusted'),
     nuget: z.boolean().optional().describe('It downloads packages from a private feed while it builds'),
-    cmd: z.string().optional().describe('The command that opens the tunnel, when it is not the usual one'),
+    cmd: z.string().optional().describe('How the team opens it by hand; Koppler checks that its program is installed'),
     note: z.string().optional().describe('Anything else worth knowing, in words'),
   },
   { error: 'an object: a tunnel, a sign-in or another need' },
@@ -438,8 +438,13 @@ function crossProblems(stack: Loose): string[] {
   }
   for (const [index, preset] of list(stack['presets']).entries())
     if (isObject(preset)) problems.push(...presetProblems(index, preset, stack));
-  for (const [name] of entries(stack['signIns']))
+  for (const [name, signIn] of entries(stack['signIns'])) {
     if (!NAME.test(name)) problems.push(`signIns.${name}: a name of letters, digits, dots, dashes and underscores`);
+    // What a sign-in gives an app is set where the app starts: never a variable that makes a runtime load code.
+    for (const [setting] of entries(isObject(signIn) ? signIn['env'] : undefined))
+      if (loadsCode(setting) || setting === 'PATH')
+        problems.push(`signIns.${name}.env: "${setting}" cannot be given to an app; it changes what code the app runs`);
+  }
   problems.push(...signInProblems(stack));
   return problems;
 }

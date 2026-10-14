@@ -198,8 +198,9 @@ async function history([sub, ...rest]: string[]): Promise<void> {
   const args = rest;
   const [id] = positional(args, ['--failed']);
   // Without a reason the flag still goes along, so the command asks for one.
-  const failed = args.includes('--failed') ? ['--failed', flagValue(args, '--failed')] : [];
-  await appliedCommand([...(id ? [id] : []), ...failed] as string[]);
+  const why = flagValue(args, '--failed');
+  const failed = args.includes('--failed') ? ['--failed', ...(why ? [why] : [])] : [];
+  await appliedCommand([...(id ? [id] : []), ...failed]);
 }
 
 /** Remembered code changes: list them, keep the last edit, or apply the ones that match the latest Send. */

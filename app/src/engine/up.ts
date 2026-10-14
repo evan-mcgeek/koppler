@@ -16,7 +16,7 @@ import { readClones, readData, readStack, type Clone, type Registry } from '../d
 import { TEMP } from '../paths.ts';
 import { readActions, type Action } from './actions.ts';
 import { switchTo, type Carry } from './branch.ts';
-import { APPROVE, approved, startsFromStack } from './checks.ts';
+import { APPROVE, approved, missingTunnels, startsFromStack } from './checks.ts';
 import { link } from './libraries.ts';
 import { isDone } from './needs.ts';
 import { alive, listener, readRecord, sh, sleep, stopOne } from './processes.ts';
@@ -486,6 +486,14 @@ async function carryOut(stack: Registry, args: string[]): Promise<void> {
     : args.filter((arg, at) => !arg.startsWith('--') && !['--env', '--run'].includes(args[at - 1] ?? ''));
   if (!ids.length && !board) fail('usage: koppler up <app...> [--env <env>] | koppler up --run <id>');
   for (const id of ids) if (!stack.apps[id]) fail(`${id} is not an app in the stack`);
+  // An app with no tunnels of its own on this environment never gets the first environment's: that would reach the
+  // wrong database. Checked before anything starts, like every other refusal.
+  const wantsTunnels = (id: string) => (board?.nodes[id] as { tunnels?: boolean } | undefined)?.tunnels !== false;
+  const noTunnel = missingTunnels(stack, env).filter(id => ids.includes(id) && wantsTunnels(id));
+  if (noTunnel.length)
+    fail(
+      `${noTunnel.map(id => nameOf(stack, id)).join(', ')}: the stack has no ${env.toUpperCase()} tunnel, and another environment's is never used. Set it with koppler stack set apps.<id>.envs.${env}.prereqs, or turn Tunnels off on the card.`,
+    );
   // Checked before anything starts: a run never gets half-way and then stops at a command that needs the user's yes.
   const waiting = ids.filter(id => startsFromStack(stack, id, env));
   if (waiting.length && !approved(stack.source ?? '', stack))

@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { stepsFor, isDone } from '../dist/engine/needs.js';
+import { freePorts } from './helpers.mjs';
 
 // The stack a command reads is the one in the run folder.
 process.env.KOPPLER_TEMP = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-needs-'));
@@ -55,13 +56,15 @@ assert.equal(store.alt, undefined);
 }
 // An own environment list missing the sign-in keeps its own tunnel; the sign-in shows as a gap first.
 {
-  const reg = { envs: ['qa', 'prod'], apps: { w: { name: 'Wallet', prereqs: [{ sso: 'qa-ops' }, { tunnel: 'qa-db', port: 5432 }], envs: { prod: { prereqs: [{ tunnel: 'prod-db', port: 5432 }] } } } } };
+  // A port nothing listens on, whatever runs on this machine.
+  const [free] = await freePorts(1);
+  const reg = { envs: ['qa', 'prod'], apps: { w: { name: 'Wallet', prereqs: [{ sso: 'qa-ops' }, { tunnel: 'qa-db', port: free }], envs: { prod: { prereqs: [{ tunnel: 'prod-db', port: free }] } } } } };
   const out = []; const log = console.log; console.log = s => out.push(s);
   useStack(reg); needs(['w', '--env', 'prod', '--json'], { skill: '/skill', fail: e => { throw new Error(e); } });
   console.log = log;
   const r = JSON.parse(out[0]);
   assert.deepEqual(r.steps.map(s => s.gap ? 'gap' : s.id), ['gap']);
-  assert.deepEqual(r.koppler, ['tunnel to prod-db on localhost:5432', 'start Wallet']);
+  assert.deepEqual(r.koppler, [`tunnel to prod-db on localhost:${free}`, 'start Wallet']);
 }
 // A tunnel already listening is reported as open, not as something Koppler will start.
 {
