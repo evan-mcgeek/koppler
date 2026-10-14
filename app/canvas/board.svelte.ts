@@ -2,7 +2,7 @@
 // waypoints, sliding an end along its side). The geometry is core/cables and core/arrange, unchanged.
 import type { Edge, Node } from '@xyflow/svelte';
 import { arrange, sidesFor, squeeze, type Point, type Side } from '../src/core/arrange.ts';
-import { endOffsets, orderSlots, sidePoint, SIDES, type Box, type Cable } from '../src/core/cables.ts';
+import { endOffsets, orderSlots, SIDES, type Box, type Cable } from '../src/core/cables.ts';
 import { of as kindOf } from '../src/core/kinds.ts';
 import { isProtected, LOCAL_QUEUE_TYPES, queuesOf } from '../src/core/plan.ts';
 import { planTunnels, tunnelKind, type Tunnel } from '../src/core/ports.ts';
@@ -17,7 +17,6 @@ import {
 } from '../src/core/presets.ts';
 import type { Registry } from '../src/data.ts';
 import type { Loaded, SavedBoard } from './data.ts';
-import { toasts } from './toast.svelte.ts';
 
 export interface CableData extends Record<string, unknown> {
   fromSide: Side;
@@ -156,22 +155,9 @@ export interface StackApp {
   /** The libraries it depends on that are cloned here, and where. */
   libraries: { name: string; path: string }[];
 }
-interface Draft {
-  a: Point;
-  side: Side;
-  b: Point;
-  bSide: Side | null;
-  points: Point[];
-}
-
 const PAD = 24;
 /** The room a new card is given before it has been measured. */
 const PLACE = { w: 300, h: 240, gap: 32 };
-const cardAt = (x: number, y: number) =>
-  document
-    .elementsFromPoint(x, y)
-    .find((el): el is HTMLElement => el.classList.contains('svelte-flow__node'))
-    ?.getAttribute('data-id') ?? undefined;
 export const cable = (from: string, to: string, data: CableData): CableEdge => ({
   id: `${from}>${to}`,
   source: from,
@@ -207,12 +193,6 @@ class Board {
     return this.#cards;
   });
   edges = $state.raw<CableEdge[]>([]);
-  /** The cable being drawn. */
-  draft = $state.raw<Draft | null>(null);
-  /** The end being slid along its side. */
-  grabbed = $state.raw<{ id: string; end: End } | null>(null);
-  /** The card a drawn cable would land on. */
-  drop = $state.raw<{ id: string; ok: boolean } | null>(null);
   /** The cable under the pointer: a click unplugs it. */
   hovered = $state.raw<string | null>(null);
   /** A protected environment (production, usually): local code runs against its real data. */
@@ -679,213 +659,66 @@ class Board {
     );
   }
 
-  /** Where a cable's end is drawn: its place among the others on that side of the card. */
-  endPoint(index: number, end: End): Point | undefined {
-    const one = this.cables[index];
-    const box = one && this.boxes.get(one[end]);
-    if (!box) return undefined;
-    const side = one[`${end}Side`];
-    const middle = sidePoint(box, side);
-    const by = this.ends.offset[`${String(index)}|${end}`] ?? 0;
-    return SIDES[side][0] === 0 ? { ...middle, x: middle.x + by } : { ...middle, y: middle.y + by };
+  /** The cards as the flow draws them: squeezed into view when far away. */
+  flowNodes(): (CardNode | InfraNode)[] {
+    return [...this.nodes, ...this.infra].map(node => ({ ...node, position: this.shown(node.position) }));
   }
-
-  nearestSide(box: Box, to: Point): Side {
-    const far = (side: Side) => Math.hypot(sidePoint(box, side).x - to.x, sidePoint(box, side).y - to.y);
-    return (Object.keys(SIDES) as Side[]).reduce((best, side) => (far(side) < far(best) ? side : best));
-  }
-
+  /** Each card's height when last drawn, and in which form (far away, Live): growing in the same form pushes others. */
+  #heights: Record<string, { brief: string; height: number } | undefined> = {};
   /**
-   * Drawing a cable: drag from a port to a card. Letting go on the empty board drops a waypoint there and the cable
-   * stays on the pointer: each click on the board adds another, a click on a card finishes it, Escape cancels.
+   * Takes the cards as the flow drew them, after a drag, the arrow keys or a change of size. `brief` names the form
+   * cards are drawn in; until `settled` (the first status shown) cards are still filling in, and their growth pushes
+   * nothing. True when a card's change of size moved others.
    */
-  startWire(from: string, fromSide: Side): void {
-    const box = this.boxes.get(from);
-    if (!box) return;
-    const a = sidePoint(box, fromSide);
-    const points: Point[] = [];
-    const flow = (ev: PointerEvent) => this.toFlow({ x: ev.clientX, y: ev.clientY });
-    const target = (ev: PointerEvent) => {
-      const id = cardAt(ev.clientX, ev.clientY);
-      const at = id && id !== from ? this.boxes.get(id) : undefined;
-      return id && at ? { id, side: this.nearestSide(at, points.at(-1) ?? flow(ev)), at } : undefined;
-    };
-    const app = (id: string) => this.app(id);
-    const calls = (caller: string, callee: string) => !!app(caller)?.calls.includes(callee);
-    // A cable can land where the caller may call the app, and not against the only direction the code shows.
-    const canCall = (to: string) => !app(from)?.outside && !!app(to) && !app(to)?.outside && !!app(to)?.answers;
-    const wrongWay = (to: string) => !calls(from, to) && calls(to, from);
-    const move = (ev: PointerEvent) => {
-      const onto = target(ev);
-      const lands = !!onto && canCall(onto.id) && !wrongWay(onto.id);
-      this.draft = {
-        a,
-        side: fromSide,
-        b: onto && lands ? sidePoint(onto.at, onto.side) : flow(ev),
-        bSide: onto && lands ? onto.side : null,
-        points: [...points],
-      };
-      this.drop = onto ? { id: onto.id, ok: lands } : null;
-    };
-    const end = () => {
-      removeEventListener('pointermove', move);
-      removeEventListener('pointerdown', click, true);
-      removeEventListener('keydown', esc, true);
-      this.draft = this.drop = null;
-    };
-    const finish = (ev: PointerEvent) => {
-      const onto = target(ev);
-      end();
-      if (!onto) return;
-      const [caller, callee] = [app(from)?.name ?? from, app(onto.id)?.name ?? onto.id];
-      if (!canCall(onto.id)) {
-        const said = app(onto.id)?.answers
-          ? `${caller} doesn't call ${callee}`
-          : `${callee} is a ${app(onto.id)?.kindLabel ?? ''} app: it calls others, nothing calls it.`;
-        toasts.show(said, 'warning');
-        return;
-      }
-      // Drawn against the only call the repos show between these two: no cable is added; the real one is offered.
-      if (wrongWay(onto.id)) {
-        const wired = this.edges.some(edge => edge.id === `${onto.id}>${from}`);
-        toasts.show(
-          `In the code ${callee} calls ${caller}, not the other way round.${wired ? ' That cable is already on the board.' : ''}`,
-          'warning',
-          wired
-            ? undefined
-            : {
-                label: 'Connect that way',
-                run: () => {
-                  this.connect(onto.id, from);
-                },
-              },
+  fromFlow(drawn: (CardNode | InfraNode)[], brief: string, settled: boolean): boolean {
+    // The flow has the cards where they are drawn: one it moved is kept where that is on the full board.
+    const kept = new Map([...this.nodes, ...this.infra].map(node => [node.id, node]));
+    const all = drawn.map(node => {
+      const at = kept.get(node.id);
+      if (at?.dragging && !node.dragging) return { ...node, position: this.dropped(node.id, node.position) };
+      const was = at && this.shown(at.position);
+      return at && was?.x === node.position.x && was.y === node.position.y
+        ? { ...node, position: at.position }
+        : { ...node, position: this.stored(node.position) };
+    }) as (CardNode | InfraNode)[];
+    // An app the library moved (a drag, the arrow keys) takes its tunnel cards along, in the same step.
+    const was = new Map(this.nodes.map(node => [node.id, node.position]));
+    const grew: Record<string, { bottom: number; by: number }> = {};
+    let infra = all.filter(node => node.type !== 'app');
+    let apps = all.filter(node => node.type === 'app');
+    for (const { id, measured } of apps) {
+      // Grown or shrunk in the same form, it moves the app cards under it too, each with its own tunnel cards.
+      // ponytail: only the cards straight under it; a card under one of those, off to the side, stays.
+      const last = this.#heights[id];
+      const height = measured?.height;
+      if (height) this.#heights[id] = { brief, height };
+      // Only growing in the same form moves what is under it: a change of form is squeezed on screen instead.
+      const by = settled && last?.brief === brief && height ? height - last.height : 0;
+      if (by) grew[id] = { bottom: last?.height ?? 0, by };
+      const box = this.boxes.get(id);
+      if (by && box) {
+        const under = (other: Box | undefined) =>
+          !!other && other.y >= box.y + (last?.height ?? 0) && other.x < box.x + box.w && box.x < other.x + other.w;
+        for (const below of apps.filter(node => node.id !== id && under(this.boxes.get(node.id))))
+          infra = this.followed(below.id, { x: 0, y: by }, infra);
+        apps = apps.map(node =>
+          node.id !== id && under(this.boxes.get(node.id))
+            ? { ...node, position: { x: node.position.x, y: node.position.y + by } }
+            : node,
         );
-        return;
       }
-      const drawn = cable(from, onto.id, { fromSide, toSide: onto.side, ...(points.length && { points }) });
-      this.edges = [...this.edges.filter(edge => edge.id !== drawn.id), drawn];
-    };
-    const click = (ev: PointerEvent) => {
-      if (ev.button !== 0) return;
-      ev.preventDefault();
-      ev.stopPropagation();
-      // The click that places a point or ends the cable is not also a press on the card or the board under it.
-      for (const type of ['mousedown', 'click'])
-        addEventListener(
-          type,
-          after => {
-            after.stopPropagation();
-          },
-          { capture: true, once: true },
-        );
-      if (cardAt(ev.clientX, ev.clientY)) {
-        finish(ev);
-        return;
-      }
-      if ((ev.target as Element).closest('.svelte-flow__panel, button')) {
-        end();
-        return;
-      }
-      points.push(flow(ev));
-      move(ev);
-    };
-    const esc = (ev: KeyboardEvent) => {
-      if (ev.key !== 'Escape') return;
-      ev.preventDefault();
-      end();
-    };
-    addEventListener('pointermove', move);
-    addEventListener(
-      'pointerup',
-      ev => {
-        const at = flow(ev);
-        const far = Math.hypot(at.x - a.x, at.y - a.y) > 24 / this.zoom();
-        if (cardAt(ev.clientX, ev.clientY) || !far) {
-          finish(ev);
-          return;
-        }
-        points.push(at);
-        move(ev);
-        addEventListener('pointerdown', click, true);
-        addEventListener('keydown', esc, true);
-      },
-      { once: true },
-    );
-  }
-
-  /**
-   * A cable's end, pressed: sliding it along its side reorders the cables there, live; pulling it away from the side
-   * starts a new cable from that port, as from a free one.
-   */
-  grabEnd(ev: PointerEvent, id: string, end: End): void {
-    const pressed = this.edges.find(edge => edge.id === id);
-    if (ev.button !== 0 || !pressed || this.live) return;
-    ev.preventDefault();
-    ev.stopPropagation();
-    const card = end === 'from' ? pressed.source : pressed.target;
-    const side = pressed.data[`${end}Side`];
-    const along = SIDES[side][0] === 0 ? 'x' : 'y';
-    const start = this.toFlow({ x: ev.clientX, y: ev.clientY });
-    const members = () =>
-      this.edges
-        .flatMap((edge, index) => {
-          const which: End | null =
-            edge.source === card && edge.data.fromSide === side
-              ? 'from'
-              : edge.target === card && edge.data.toSide === side
-                ? 'to'
-                : null;
-          return which ? [{ edge, index, end: which }] : [];
-        })
-        .sort(
-          (a, b) =>
-            (a.edge.data[`${a.end}Slot`] ?? Infinity) - (b.edge.data[`${b.end}Slot`] ?? Infinity) || a.index - b.index,
-        );
-    let mode: 'order' | 'wire' | null = null;
-    const stop = () => {
-      removeEventListener('pointermove', move);
-      removeEventListener('pointerup', stop);
-      this.grabbed = null;
-    };
-    const move = (moved: PointerEvent) => {
-      const at = this.toFlow({ x: moved.clientX, y: moved.clientY });
-      const slid = at[along] - start[along];
-      const pulled = along === 'x' ? at.y - start.y : at.x - start.x;
-      if (!mode) {
-        if (Math.hypot(slid, pulled) < 6 / this.zoom()) return;
-        mode = Math.abs(pulled) > Math.abs(slid) ? 'wire' : 'order';
-        if (mode === 'wire') {
-          stop();
-          this.startWire(card, side);
-          return;
-        }
-        this.grabbed = { id, end };
-      }
-      const list = members();
-      const me = list.find(one => one.edge.id === id && one.end === end);
-      if (!me || list.length < 2) return;
-      const others = list.filter(one => one !== me);
-      const before = others.filter(one => (this.endPoint(one.index, one.end)?.[along] ?? 0) < at[along]).length;
-      const order = [...others.slice(0, before), me, ...others.slice(before)];
-      if (order.every((one, place) => list[place] === one)) return;
-      const slot = new Map(order.map((one, place) => [`${one.edge.id}|${one.end}`, place]));
-      this.edges = this.edges.map(edge => {
-        const fromSlot = slot.get(`${edge.id}|from`);
-        const toSlot = slot.get(`${edge.id}|to`);
-        return fromSlot === undefined && toSlot === undefined
-          ? edge
-          : {
-              ...edge,
-              data: {
-                ...edge.data,
-                ...(fromSlot !== undefined && { fromSlot }),
-                ...(toSlot !== undefined && { toSlot }),
-              },
-            };
-      });
-    };
-    addEventListener('pointermove', move);
-    addEventListener('pointerup', stop);
+    }
+    for (const { id, position } of apps) {
+      // A card that grows or shrinks (its steps open, a note) moves the cards stacked under it by as much.
+      const grown = grew[id];
+      if (grown) infra = this.pushed(id, position.y + grown.bottom, grown.by, infra);
+      const from = was.get(id);
+      if (from && (from.x !== position.x || from.y !== position.y))
+        infra = this.followed(id, { x: position.x - from.x, y: position.y - from.y }, infra);
+    }
+    this.nodes = apps;
+    this.infra = infra;
+    return Object.keys(grew).length > 0;
   }
 
   /** Where the board was left: its zoom and position. Unset until one is known. */
@@ -910,17 +743,9 @@ class Board {
   /** Back to the board as it was left in Edit. */
   goEdit(): void {
     if (!this.live) return;
-    this.#apply(this.#edit);
+    this.setContent(this.#edit);
     this.live = false;
   }
-
-  /** Whether there is a step to go back to, or forward to again. */
-  canUndo = $state(false);
-  canRedo = $state(false);
-  #past: string[] = [];
-  #future: string[] = [];
-  #now = '';
-  #at = 0;
 
   /** The cards and cables as one text: a step of the undo history. */
   content(): string {
@@ -935,37 +760,8 @@ class Board {
     });
   }
 
-  /** Notes a change to the board. Changes less than 0.7 seconds apart, a drag for one, are one step to undo. */
-  record(): void {
-    if (this.live) return;
-    const now = this.content();
-    if (now === this.#now) return;
-    if (this.#now && Date.now() - this.#at > 700) this.#past.push(this.#now);
-    if (this.#now) this.#future = [];
-    this.#now = now;
-    this.#at = Date.now();
-    this.canUndo = this.#past.length > 0;
-    this.canRedo = false;
-  }
-
-  /** Takes the board as it is now as the current step, without a step to undo. */
-  adopt(): void {
-    if (!this.live) this.#now = this.content();
-  }
-
-  #step(from: string[], to: string[]): void {
-    const back = from.pop();
-    if (back === undefined) return;
-    to.push(this.#now);
-    this.#now = back;
-    // The next change is a step of its own.
-    this.#at = 0;
-    this.#apply(back);
-    this.canUndo = this.#past.length > 0;
-    this.canRedo = this.#future.length > 0;
-  }
   /** Puts back a board held as text: its cards, cables and the cards beside them. */
-  #apply(back: string): void {
+  setContent(back: string): void {
     const { name, nodes, edges, infra, queues, hiddenQueues, pinned } = JSON.parse(back) as {
       name: string | null;
       nodes: CardNode[];
@@ -987,13 +783,6 @@ class Board {
       position: infra.find(one => one.id === card.id)?.position ?? card.position,
     }));
   }
-  undo(): void {
-    this.#step(this.#past, this.#future);
-  }
-  redo(): void {
-    this.#step(this.#future, this.#past);
-  }
-
   /** The name of the board on screen, one of the user's or the team's; null for one that is not kept yet. */
   name = $state<string | null>(null);
   /** The user's own boards, as they are stored. */

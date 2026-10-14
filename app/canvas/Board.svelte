@@ -30,6 +30,8 @@
   import Queue from './Queue.svelte';
   import Tunnel from './Tunnel.svelte';
   import { board, FAR_ZOOM, type CardNode, type InfraNode } from './board.svelte.ts';
+  import { wiring } from './wiring.svelte.ts';
+  import { undo } from './undo.svelte.ts';
   import { ago, openBoard } from './boards.ts';
   import { live } from './live.svelte.ts';
   import { probes, type Job, type Probe } from './probes.svelte.ts';
@@ -72,7 +74,7 @@
     probes.follow(jobs);
   });
   const draft = $derived.by(() => {
-    const drawn = board.draft;
+    const drawn = wiring.draft;
     if (!drawn) return '';
     return drawn.points.length
       ? throughPath(drawn.a, drawn.side, drawn.b, drawn.bSide, drawn.points)
@@ -107,8 +109,8 @@
     if (ev.metaKey || ev.ctrlKey) {
       if (key !== 'z') return;
       ev.preventDefault();
-      if (ev.shiftKey) board.redo();
-      else board.undo();
+      if (ev.shiftKey) undo.redo();
+      else undo.undo();
     } else if (key === 'f') void fit();
     else if (key === 'p') void present();
     else if (key === 'escape' && board.present) void present();
@@ -288,7 +290,6 @@
     await flow.setViewport(viewFor(drawn(), FAR_ZOOM - 0.01), { duration });
   };
   // Each card's last height and the form it was measured in: a change of form is not the card growing.
-  const heights: Record<string, { brief: string; height: number } | undefined> = {};
   // Each card's size in full, as Edit draws it close up: the board is laid out for that, in Live too.
   const full: Record<string, { w: number; h: number } | undefined> = {};
   $effect(() => {
@@ -357,60 +358,11 @@
 >
   <SvelteFlow
     bind:nodes={
-      () => [...board.nodes, ...board.infra].map(node => ({ ...node, position: board.shown(node.position) })),
+      () => board.flowNodes(),
       (drawn: (CardNode | InfraNode)[]) => {
-        // The flow has the cards where they are drawn: one it moved is kept where that is on the full board.
-        const kept = new Map([...board.nodes, ...board.infra].map(node => [node.id, node]));
-        const all = drawn.map(node => {
-          const at = kept.get(node.id);
-          if (at?.dragging && !node.dragging) return { ...node, position: board.dropped(node.id, node.position) };
-          const was = at && board.shown(at.position);
-          return at && was?.x === node.position.x && was.y === node.position.y
-            ? { ...node, position: at.position }
-            : { ...node, position: board.stored(node.position) };
-        }) as (CardNode | InfraNode)[];
-        // An app the library moved (a drag, the arrow keys) takes its tunnel cards along, in the same step.
-        const was = new Map(board.nodes.map(node => [node.id, node.position]));
-        const grew: Record<string, { bottom: number; by: number }> = {};
-        let infra = all.filter(node => node.type !== 'app');
-        let apps = all.filter(node => node.type === 'app');
-        const brief = `${String(viewport.current.zoom < FAR_ZOOM)} ${String(board.live)}`;
-        // Until the first status is shown, cards are still filling in: that growth is not theirs to push with.
-        const settled = live.asked;
-        for (const { id, measured } of apps) {
-          // Grown or shrunk in the same form, it moves the app cards under it too, each with its own tunnel cards.
-          // ponytail: only the cards straight under it; a card under one of those, off to the side, stays.
-          const last = heights[id];
-          const height = measured?.height;
-          if (height) heights[id] = { brief, height };
-          // Only growing in the same form moves what is under it: a change of form is squeezed on screen instead.
-          const by = settled && last?.brief === brief && height ? height - last.height : 0;
-          if (by) grew[id] = { bottom: last?.height ?? 0, by };
-          const box = board.boxes.get(id);
-          if (by && box) {
-            const under = (other: Box | undefined) =>
-              !!other && other.y >= box.y + (last?.height ?? 0) && other.x < box.x + box.w && box.x < other.x + other.w;
-            for (const below of apps.filter(node => node.id !== id && under(board.boxes.get(node.id))))
-              infra = board.followed(below.id, { x: 0, y: by }, infra);
-            apps = apps.map(node =>
-              node.id !== id && under(board.boxes.get(node.id))
-                ? { ...node, position: { x: node.position.x, y: node.position.y + by } }
-                : node,
-            );
-          }
-        }
-        for (const { id, position } of apps) {
-          // A card that grows or shrinks (its steps open, a note) moves the cards stacked under it by as much.
-          const grown = grew[id];
-          if (grown) infra = board.pushed(id, position.y + grown.bottom, grown.by, infra);
-          const from = was.get(id);
-          if (from && (from.x !== position.x || from.y !== position.y))
-            infra = board.followed(id, { x: position.x - from.x, y: position.y - from.y }, infra);
-        }
-        board.nodes = apps;
-        board.infra = infra;
         // Moved by a card's change of size, not by anyone: no step of its own to undo.
-        if (Object.keys(grew).length) board.adopt();
+        if (board.fromFlow(drawn, `${String(viewport.current.zoom < FAR_ZOOM)} ${String(board.live)}`, live.asked))
+          undo.adopt();
       }
     }
     bind:edges={board.edges}
@@ -490,9 +442,9 @@
           type="button"
           aria-label="Undo"
           title="Undo (Ctrl+Z or Cmd+Z)"
-          disabled={!board.canUndo}
+          disabled={!undo.canUndo}
           onclick={() => {
-            board.undo();
+            undo.undo();
           }}
         >
           <Icon of={Undo2} size={15} />
@@ -502,9 +454,9 @@
           type="button"
           aria-label="Redo"
           title="Redo (Shift+Ctrl+Z or Shift+Cmd+Z)"
-          disabled={!board.canRedo}
+          disabled={!undo.canRedo}
           onclick={() => {
-            board.redo();
+            undo.redo();
           }}
         >
           <Icon of={Redo2} size={15} />
@@ -592,14 +544,14 @@
     <ViewportPortal target="front" style="position: absolute; z-index: 1001">
       <svg
         class="ends"
-        class:reordering={!!board.grabbed}
+        class:reordering={!!wiring.grabbed}
         class:still={board.live}
         role="group"
         aria-label="Cable ends"
       >
         {#each board.edges as edge, index (edge.id)}
-          {@const a = board.endPoint(index, 'from')}
-          {@const b = board.endPoint(index, 'to')}
+          {@const a = wiring.endPoint(index, 'from')}
+          {@const b = wiring.endPoint(index, 'to')}
           {#if a && b}
             {#if !covered(a, edge.source)}
               <circle
@@ -608,12 +560,12 @@
                 class:cut={board.hovered === edge.id}
                 class:idle={!live.up(edge.source) || !live.up(edge.target)}
                 data-cable={edge.id}
-                class:grabbed={board.grabbed?.id === edge.id && board.grabbed.end === 'from'}
+                class:grabbed={wiring.grabbed?.id === edge.id && wiring.grabbed.end === 'from'}
                 cx={a.x}
                 cy={a.y}
                 r="5"
                 onpointerdown={ev => {
-                  board.grabEnd(ev, edge.id, 'from');
+                  wiring.grabEnd(ev, edge.id, 'from');
                 }}
               />
             {/if}
@@ -634,13 +586,13 @@
                 class="socket nodrag nopan"
                 class:tested
                 data-cable={edge.id}
-                class:grabbed={board.grabbed?.id === edge.id && board.grabbed.end === 'to'}
+                class:grabbed={wiring.grabbed?.id === edge.id && wiring.grabbed.end === 'to'}
                 cx={b.x}
                 cy={b.y}
                 r="8"
                 onpointerdown={ev => {
                   pressedAt = { x: ev.clientX, y: ev.clientY };
-                  board.grabEnd(ev, edge.id, 'to');
+                  wiring.grabEnd(ev, edge.id, 'to');
                 }}
                 onclick={ev => {
                   // A press that slid reordered the cables or drew a new one: only a press in place tests.

@@ -2,13 +2,14 @@
   import type { EdgeProps } from '@xyflow/svelte';
   import { cablePath, SIDES, throughPath } from '../src/core/cables.ts';
   import { board, type CableData } from './board.svelte.ts';
+  import { wiring } from './wiring.svelte.ts';
   import { live } from './live.svelte.ts';
 
   const { id, source, target, data: given }: EdgeProps = $props();
   const data = $derived(given as CableData | undefined);
   const index = $derived(board.edges.findIndex(edge => edge.id === id));
-  const a = $derived(board.endPoint(index, 'from'));
-  const b = $derived(board.endPoint(index, 'to'));
+  const a = $derived(wiring.endPoint(index, 'from'));
+  const b = $derived(wiring.endPoint(index, 'to'));
   const path = $derived(
     !a || !b || !data
       ? ''
