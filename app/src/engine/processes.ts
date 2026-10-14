@@ -9,6 +9,7 @@ import { fail, Failure } from '../failure.ts';
 import { logsDir, stateDir } from '../paths.ts';
 import { appEnv } from '../safe-env.ts';
 import { redact } from '../scrub.ts';
+import { keepRunLog } from './run-logs.ts';
 import { keepPreviousLog } from './session.ts';
 import { APP_ID } from '../ids.ts';
 import { writeJson } from '../json-files.ts';
@@ -264,6 +265,7 @@ export async function startProcess(options: RunOptions): Promise<ProcessRecord> 
   const log = path.join(logsDir(), `${name}.log`);
   const program = command[0] ?? '';
   const display = [path.isAbsolute(program) ? path.basename(program) : program, ...command.slice(1)].join(' ');
+  keepRunLog(name);
   keepPreviousLog(log);
   const fd = fs.openSync(log, 'w', 0o600);
   fs.writeSync(fd, `${new Date().toLocaleString('sv-SE')} $ ${display}\n`);

@@ -1,5 +1,6 @@
 // What the canvas page loads: its own files, its data as JSON, the stack schema, the choices for the settings panels and
 // an app's log.
+import { runLog } from '../engine/run-logs.ts';
 import fs from 'node:fs';
 import type http from 'node:http';
 import path from 'node:path';
@@ -35,8 +36,16 @@ export function serveFile(what: string, url: URL, res: http.ServerResponse): voi
   // The open log tab reads its app's log here, much longer than the short tail every status carries.
   if (what === 'log') {
     const id = url.searchParams.get('app') ?? '';
+    const run = url.searchParams.get('run');
     if (!APP_ID.test(id)) {
       res.writeHead(400).end();
+      return;
+    }
+    // A past run's log, as the run kept it.
+    if (run !== null) {
+      const kept = runLog(run, id);
+      const text = kept ? tail(kept, 2 * 1024 * 1024, 2000) : null;
+      res.writeHead(text === null ? 404 : 200, { 'content-type': 'text/plain; charset=utf-8' }).end(text ?? '');
       return;
     }
     let named: unknown;

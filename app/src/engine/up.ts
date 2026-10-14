@@ -3,6 +3,7 @@
 // With --run <id> it carries out that confirmed Send: stops and restarts, branches as chosen on the cards, remembered
 // changes, each cable's local address passed to its caller, then starts. What it cannot do alone is listed for the
 // agent (exit 3).
+import { keepRunLogs } from './run-logs.ts';
 import fs from 'node:fs';
 import path from 'node:path';
 import { envOf, flagValue, positional } from '../cli/output.ts';
@@ -537,6 +538,7 @@ async function carryOut(stack: Registry, args: string[]): Promise<void> {
   const runId = flagValue(args, '--run');
   const all = runs();
   const board = runId ? (all.find(one => one.id === runId) ?? fail(`no run ${runId} in the history`)) : null;
+  keepRunLogs(board?.id);
   const env = board?.env ?? flagValue(args, '--env') ?? stack.envs[0] ?? '';
   const latest = board ?? all.findLast(one => one.kind === 'run' && one.env === env);
   const ids = board

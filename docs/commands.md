@@ -17,9 +17,9 @@ Apps and tunnels that `koppler` starts run detached, so they keep running after 
 | `koppler doctor --approve` | Review everything the stack would run or write (checks, start commands, code changes) and allow it; asks you, never a script |
 | `koppler secret set\|list\|remove\|psql <app>[@<env>] [<NAME>] [--stdin] [--pgpass]` | Store and manage secrets; a value never shows. `psql` opens the database with the stored connection |
 | `koppler status [--apps] [--debug [name...]] [--json]` | What Koppler runs; `--apps` adds the stack's apps and clones; `--debug` gives versions and scrubbed logs for a bug report. With `--json`, each app has a `status`, as its card shows it: `waiting`, `building`, `running`, `unhealthy`, `exited`, `failed-to-start` or `secret-missing`, with a `detail` |
-| `koppler logs <name> [-f] [-n <lines>]` | Show or follow a log, secrets masked |
+| `koppler logs <name> [-f] [-n <lines>] [--run <id>]` | Show or follow a log, secrets masked; `--run` shows the log a past run kept |
 | `koppler stop <name...> \| --all` | Stop by name, or every app and tunnel (asks first); changes stay until `koppler down` |
-| `koppler history [session \| done [<id>] [--failed "<why>"]]` | Recent runs and Stops and how they ended; `session` gathers what happened since the last Stop, for a bug report; `done` marks a run finished |
+| `koppler history [session \| done [<id>] [--failed "<why>"] \| pin\|unpin <id>]` | Recent runs and Stops and how they ended; `session` gathers what happened since the last Stop, for a bug report; `done` marks a run finished. Each run keeps its apps' logs (History opens them); the newest 20 runs keep theirs, and `pin` keeps a run's for good |
 | `koppler query <app> [--env <env>] [--secret <NAME>] "<sql>"` | A read-only query with the app's stored connection; on production, in your own terminal only |
 
 ## Used by the agent add-on

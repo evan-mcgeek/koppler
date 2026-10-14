@@ -37,6 +37,8 @@ import { createStack } from './engine/stacks.ts';
 import { init as initStack, stacksCommand, sync, useCommand } from './engine/sync.ts';
 import { up } from './engine/up.ts';
 import { wait } from './cli/wait.ts';
+import { pin } from './engine/run-logs.ts';
+import { runs } from './engine/history.ts';
 import { mcp } from './cli/mcp.ts';
 import { agentCommand } from './cli/agent.ts';
 import { doCommand } from './engine/app-commands.ts';
@@ -201,6 +203,15 @@ function plan(args: string[]): void {
 async function history([sub, ...rest]: string[]): Promise<void> {
   if (sub === 'session') {
     await sessionCommand();
+    return;
+  }
+  if (sub === 'pin' || sub === 'unpin') {
+    const [id = ''] = rest;
+    if (!runs().some(run => run.id === id)) fail(`no run ${id}; koppler history lists them`);
+    pin(id, sub === 'pin');
+    console.log(
+      sub === 'pin' ? `Kept: run ${id}'s logs stay until you unpin it.` : `Run ${id}'s logs go with the oldest again.`,
+    );
     return;
   }
   if (sub !== 'done') {
@@ -440,8 +451,8 @@ const COMMANDS: Command[] = [
   {
     name: 'logs',
     who: 'you',
-    args: '<name> [-f] [-n <lines>]',
-    about: 'show or follow a log, secrets masked',
+    args: '<name> [-f] [-n <lines>] [--run <id>]',
+    about: 'show or follow a log, secrets masked; --run shows the one a past run kept',
     run: logs,
     example: 'koppler logs orders-api -f',
   },
@@ -461,12 +472,13 @@ const COMMANDS: Command[] = [
   {
     name: 'history',
     who: 'you',
-    args: '[--json] | session | done [<id>] [--failed "<why>"]',
+    args: '[--json] | session | done [<id>] [--failed "<why>"] | pin|unpin <id>',
     about: 'recent runs and Stops; session gathers what happened since the last Stop; done marks a run finished',
     forms: [
       ['[--json]', 'recent runs and Stops and how each ended'],
       ['session', 'gather what happened since the last Stop, for a bug report'],
       ['done [<id>] [--failed "<why>"]', 'mark a run finished, or failed and why (the agent does this)'],
+      ['pin|unpin <id>', "keep a run's app logs, which otherwise go with the oldest after 20 runs"],
     ],
     run: history,
     example: 'koppler history',

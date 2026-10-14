@@ -7,6 +7,7 @@ import { readClones, readData, readStack } from '../data.ts';
 import { alive, listener, NAME, readRecord, records, sh, sleep, stopOne, uptime } from '../engine/processes.ts';
 import { run } from '../engine/run.ts';
 import { appendNote, live } from '../engine/history.ts';
+import { runLog } from '../engine/run-logs.ts';
 import { CODE, logsDir, tempDir } from '../paths.ts';
 import { redact, scrub } from '../scrub.ts';
 import { confirm, flagValue, positional, table } from './output.ts';
@@ -79,12 +80,16 @@ export async function canvas(args: string[]): Promise<void> {
 
 /** A log, with secrets masked as on the card; `-f` follows it. */
 export function logs(args: string[]): void {
-  const [want] = positional(args, ['-n']);
+  const [want] = positional(args, ['-n', '--run']);
   const lines = Number(flagValue(args, '-n')) || 50;
-  if (!want) fail('usage: koppler logs <name> [-f] [-n <lines>]');
+  if (!want) fail('usage: koppler logs <name> [-f] [-n <lines>] [--run <id>]');
   if (!NAME.test(want)) fail(notAName(want));
-  const file = path.join(logsDir(), `${want}.log`);
-  if (!fs.existsSync(file)) fail(`no log for ${want}; koppler status lists what runs`);
+  const run = flagValue(args, '--run');
+  const kept = run ? runLog(run, want) : null;
+  if (run && !kept) fail(`${run} is not a run id; koppler history lists them`);
+  const file = kept ?? path.join(logsDir(), `${want}.log`);
+  if (!fs.existsSync(file))
+    fail(run ? `run ${run} kept no log of ${want}` : `no log for ${want}; koppler status lists what runs`);
   const last = fs.readFileSync(file, 'utf8').trimEnd().split('\n').slice(-lines);
   process.stdout.write(redact(last.join('\n')) + '\n');
   if (!args.includes('-f') && !args.includes('--follow')) return;

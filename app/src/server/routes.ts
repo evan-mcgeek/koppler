@@ -1,5 +1,7 @@
 // What the page can ask the server to do: one function per address, each given the request's JSON body and answering
 // with a status and, usually, a JSON body.
+import { runs } from '../engine/history.ts';
+import { pin } from '../engine/run-logs.ts';
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -189,6 +191,13 @@ export const ROUTES: Record<string, Route> = {
       { detached: true, stdio: 'ignore' },
     ).unref();
     return { status: 200, body: { started: true } };
+  },
+  '/run-pin': body => {
+    const id = body['id'];
+    if (typeof id !== 'string' || !runs().some(run => run.id === id))
+      return { status: 400, body: { error: 'No such run.' } };
+    pin(id, body['on'] === true);
+    return { status: 200, body: { pinned: body['on'] === true } };
   },
   '/apps-outside': body => {
     const result = addOutside(body);

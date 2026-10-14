@@ -2,7 +2,6 @@
   import Icon from './Icon.svelte';
   import X from '@lucide/svelte/icons/x';
   import { parseLog } from '../src/core/logfmt.ts';
-  import { board } from './board.svelte.ts';
   import { live } from './live.svelte.ts';
   import { logs } from './logs.svelte.ts';
 
@@ -13,7 +12,6 @@
     koppler: 'KOPPLER',
     start: 'START',
   };
-  const name = board.nameOf;
   const active = $derived(logs.active);
   const text = $derived(active ? logs.text(active) : '');
   // Keyed by what a row says, so a row keeps its place (and an open list of warnings stays open) as the log scrolls on.
@@ -118,7 +116,7 @@
     <header>
       <div class="tabs" role="tablist">
         {#each logs.tabs as id (id)}
-          {@const up = live.up(id)}
+          {@const up = logs.past(id) ? null : live.up(id)}
           <span class="tab" class:on={id === active}>
             <button
               type="button"
@@ -128,12 +126,12 @@
                 logs.active = id;
               }}
             >
-              <span class="live" data-on={up} aria-hidden="true"></span>{name(id)}
+              <span class="live" data-on={up} aria-hidden="true"></span>{logs.label(id)}
             </button>
             <button
               class="x"
               type="button"
-              aria-label="Close {name(id)} log"
+              aria-label="Close {logs.label(id)} log"
               onclick={() => {
                 logs.close(id);
               }}><Icon of={X} size={14} /></button
@@ -141,7 +139,7 @@
           </span>
         {/each}
       </div>
-      <span class="meta">{live.tail(active) ? '' : 'no log yet'}</span>
+      <span class="meta">{(logs.past(active) ? text : live.tail(active)) ? '' : 'no log yet'}</span>
       <button
         type="button"
         title="Hide what is in this log so far; new lines keep coming. The log file is not touched."
