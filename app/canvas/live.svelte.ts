@@ -96,6 +96,9 @@ export interface Run {
   changes?: { app: string; title: string; file?: string; fresh?: boolean; removed?: string[]; added?: string[] }[];
   note?: string;
   stopped?: string[];
+  /** The apps whose logs the run kept, and whether they are kept for good. */
+  logs?: string[];
+  pinned?: boolean;
 }
 interface Status {
   apps?: Record<string, AppStatus | undefined>;

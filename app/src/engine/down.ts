@@ -1,6 +1,7 @@
 // Stop and revert: stop what Koppler runs, undo the action log in reverse (code edits, env-file lines, launch profiles,
 // then branches back with set-aside changes), and look for temporary edits nobody logged. What cannot be undone safely
 // stays in the log and is listed for the agent.
+import { keepRunLogs } from './run-logs.ts';
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
@@ -177,6 +178,7 @@ function unloggedEdits(): string[] {
 export async function down(args: string[]): Promise<void> {
   const logFile = path.join(tempDir(), 'actions.json');
   for (const record of records().filter(r => r.name !== 'canvas')) console.log(await stopOne(record));
+  keepRunLogs();
   fs.rmSync(path.join(tempDir(), 'progress.json'), { force: true });
   let log: Action[];
   try {

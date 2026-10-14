@@ -26,6 +26,7 @@ import {
   type Run,
 } from './history.ts';
 import { finishTaken } from './listen.ts';
+import { pinned, runLogs } from './run-logs.ts';
 import { markRuns } from './recipes.ts';
 
 type Loose = Record<string, unknown>;
@@ -223,7 +224,9 @@ export async function appliedCommand(args: string[]): Promise<void> {
 export function historyCommand(args: string[] = []): void {
   const all = runs().slice(-15);
   if (args.includes('--json')) {
-    console.log(JSON.stringify(all, null, 2));
+    const pins = pinned();
+    const told = all.map(run => ({ ...run, logs: runLogs(run.id), pinned: pins.includes(run.id) }));
+    console.log(JSON.stringify(told, null, 2));
     return;
   }
   const lines = all.map((run): [string, string] => {

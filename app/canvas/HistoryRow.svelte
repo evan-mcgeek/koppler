@@ -1,7 +1,12 @@
 <script lang="ts">
   // One line of the history: a run or a Stop with how it ended, opened for its plan and code changes; or a note of
   // something that stopped outside a run.
+  import Icon from './Icon.svelte';
+  import Pin from '@lucide/svelte/icons/pin';
+  import PinOff from '@lucide/svelte/icons/pin-off';
   import { board } from './board.svelte.ts';
+  import { post } from './data.ts';
+  import { logs } from './logs.svelte.ts';
   import type { Run } from './live.svelte.ts';
 
   const { run, open, toggle, back }: { run: Run; open: boolean; toggle: () => void; back: () => void } = $props();
@@ -104,6 +109,30 @@
               </figure>
             {/each}
           {/each}
+        </div>
+      {/if}
+      {#if run.logs?.length && run.id}
+        {@const id = run.id}
+        <div class="logs">
+          <h3>Logs</h3>
+          {#each run.logs as app (app)}
+            <button
+              type="button"
+              onclick={() => {
+                logs.open(app, id);
+              }}>{name(app)}</button
+            >
+          {/each}
+          <button
+            class="pin"
+            type="button"
+            aria-pressed={!!run.pinned}
+            title={run.pinned
+              ? 'Kept for good. Unpin to let them go with the oldest runs.'
+              : 'Keep these logs: the newest 20 runs keep theirs, older ones are let go.'}
+            onclick={() => void post('run-pin', { id, on: !run.pinned })}
+            ><Icon of={run.pinned ? PinOff : Pin} size={13} />{run.pinned ? 'Unpin' : 'Pin'}</button
+          >
         </div>
       {/if}
       {#if on}
@@ -266,6 +295,39 @@
     overflow: hidden;
     clip-path: inset(50%);
     white-space: nowrap;
+  }
+  .logs {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    margin: 0 10px 10px;
+  }
+  .logs h3 {
+    flex-basis: 100%;
+  }
+  .logs button {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 9px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: none;
+    color: var(--ink);
+    font: 600 12px var(--sans);
+    cursor: pointer;
+  }
+  .logs button:hover {
+    background: color-mix(in oklab, var(--ink) 6%, transparent);
+  }
+  .logs .pin {
+    margin-left: auto;
+    color: var(--muted);
+  }
+  .logs .pin[aria-pressed='true'] {
+    border-color: var(--cable);
+    color: var(--cable);
   }
   .back {
     margin: 0 10px 10px;

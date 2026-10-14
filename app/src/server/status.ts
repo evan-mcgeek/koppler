@@ -24,6 +24,7 @@ import { secretsStatus } from './secrets.ts';
 import { waiting } from './waiting.ts';
 import { APP_ID, RUN_ID } from '../ids.ts';
 import { processState, stateOf, type StateOf } from '../engine/app-state.ts';
+import { pinned, runLogs } from '../engine/run-logs.ts';
 
 type Loose = Record<string, unknown>;
 interface Step {
@@ -273,9 +274,16 @@ async function snapshot(serving: boolean): Promise<Status> {
   status['queued'] = (status['waiting'] as unknown[]).length;
   status['running'] = runningNames();
   status['runningEnvs'] = runningEnvs();
+  const pins = pinned();
   status['runs'] = runs()
     .slice(-20)
-    .map(({ nodes, edges, ...run }) => ({ ...run, nodes, edges }));
+    .map(({ nodes, edges, ...run }) => ({
+      ...run,
+      nodes,
+      edges,
+      logs: runLogs(run.id),
+      pinned: pins.includes(run.id),
+    }));
   status['notes'] = notes().slice(-20);
   status['at'] = new Date().toISOString();
   // The page works out the server's addresses from its own, so the token is in no file but its own.
