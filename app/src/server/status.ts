@@ -14,7 +14,7 @@ import { readMessages } from '../engine/messages.ts';
 import { recipesFor } from '../engine/recipes.ts';
 import { live, notes, runningEnvs, runningNames, runs } from '../engine/runs.ts';
 import { currentStack, LOADING, stacksHere } from '../engine/sync.ts';
-import { CODE, LOGS, STATE, TEMP } from '../paths.ts';
+import { CODE, logsDir, stateDir, tempDir } from '../paths.ts';
 import { redact } from '../scrub.ts';
 import { tail } from './logs.ts';
 import { mobileState, refreshMobile, type MobileApp } from './mobile.ts';
@@ -39,13 +39,13 @@ interface AppStatus extends Loose {
 }
 type Status = Loose & { apps: Record<string, AppStatus> };
 
-export const SOURCE = path.join(TEMP, 'status.json');
-const OUT = path.join(TEMP, 'status.js');
+export const SOURCE = path.join(tempDir(), 'status.json');
+const OUT = path.join(tempDir(), 'status.js');
 const STEP_STATES = ['done', 'failed', 'user', 'todo'];
 /** A value from a file as text, cut to size. */
 const cut = (value: unknown, most: number) => String(value).slice(0, most);
 const readJson = (file: string): unknown => JSON.parse(fs.readFileSync(file, 'utf8'));
-const procFile = (name: string) => path.join(STATE, 'procs', name);
+const procFile = (name: string) => path.join(stateDir(), 'procs', name);
 
 /** The newest of the server's own files: the page reloads itself, but the server's code only takes effect after a restart. */
 const codeVersion = () => {
@@ -109,7 +109,7 @@ function tunnelPorts(): number[] {
 /** The steps of the run Koppler applies itself (koppler up), for cards the agent wrote no checklist for. */
 function addProgress(status: Status): void {
   try {
-    const progress = readJson(path.join(TEMP, 'progress.json')) as { run?: string; env?: unknown; apps?: Loose };
+    const progress = readJson(path.join(tempDir(), 'progress.json')) as { run?: string; env?: unknown; apps?: Loose };
     if (!RUN_ID.test(progress.run ?? '')) return;
     const apps = Object.entries(progress.apps ?? {}).filter(([id]) => APP_ID.test(id));
     status['progress'] = { run: progress.run, env: cut(progress.env ?? '', 16), apps: apps.map(([id]) => id) };
@@ -131,7 +131,7 @@ function addProgress(status: Status): void {
 /** What the stack needs on this Mac, as `koppler doctor` last found it. */
 function lastChecks(): object[] | null {
   try {
-    const { results } = readJson(path.join(TEMP, 'checks.json')) as { results: (Loose & { state: string })[] };
+    const { results } = readJson(path.join(tempDir(), 'checks.json')) as { results: (Loose & { state: string })[] };
     return results.slice(0, 80).map(result => ({
       name: cut(result['name'], 80),
       state: cut(result.state, 16),
@@ -175,7 +175,7 @@ function recipesByApp(): Record<string, object[]> {
 function agentState(): { state: string; since?: string | undefined; busy?: string } {
   let listener: { pid: number | null; since?: string; busy?: string; started?: string | null } | null;
   try {
-    listener = readJson(path.join(TEMP, 'listener.json')) as typeof listener;
+    listener = readJson(path.join(tempDir(), 'listener.json')) as typeof listener;
   } catch {
     return { state: 'none' };
   }
@@ -195,7 +195,7 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 export const logFile = (id: string, named: unknown): string =>
   typeof named === 'string' && path.isAbsolute(named) && /\.(log|out|txt)$/i.test(named)
     ? named
-    : path.join(LOGS, `${id}.log`);
+    : path.join(logsDir(), `${id}.log`);
 
 async function snapshot(serving: boolean): Promise<Status> {
   let written: Partial<Status> = {};

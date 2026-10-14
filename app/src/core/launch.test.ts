@@ -1,5 +1,4 @@
 import { expect, test } from 'vitest';
-import { register } from './kinds.ts';
 import { launchProfile, startCommand, type App, type Start, type StartContext } from './launch.ts';
 import { CLONES, repoOf } from './testing/repo.ts';
 
@@ -237,9 +236,8 @@ test('recipes: each technology is started the usual way, from what its repo hold
 });
 
 test("a stack's own kind starts as the stack says", () => {
-  register({ elixir: { label: 'Elixir', detect: ['mix.exs'], start: 'mix phx.server', port: 4000 } });
-  const elixir = startCommand({ kind: 'elixir' }, { repo: '/r' });
+  const stack = { kinds: { elixir: { label: 'Elixir', detect: ['mix.exs'], start: 'mix phx.server', port: 4000 } } };
+  const elixir = startCommand({ kind: 'elixir' }, { repo: '/r', stack });
   expect([script(elixir), elixir.port]).toEqual(['mix phx.server', 4000]);
-  register({});
   expect(startCommand({ kind: 'elixir' }, { repo: '/r' }).error).toMatch(/cannot start by id yet/);
 });

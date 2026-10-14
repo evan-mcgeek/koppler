@@ -3,7 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { expect, test } from 'vitest';
 import { APP_ID } from '../ids.ts';
-import { LOGS } from '../paths.ts';
+import { logsDir } from '../paths.ts';
 import { tail } from './logs.ts';
 import { logFile } from './status.ts';
 
@@ -14,7 +14,7 @@ test('an id never reads as a flag', () => {
 
 test("an app's log is read only from a file that is a log", () => {
   expect(logFile('orders', '/tmp/run/orders.log')).toBe('/tmp/run/orders.log');
-  const own = path.join(LOGS, 'orders.log');
+  const own = path.join(logsDir(), 'orders.log');
   for (const named of ['/Users/jane/.ssh/id_ed25519', '/etc/passwd', 'relative.log', null, 7])
     expect(logFile('orders', named)).toBe(own);
 });

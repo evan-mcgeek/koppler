@@ -45,7 +45,7 @@ import {
 } from './engine/sync.ts';
 import { up } from './engine/up.ts';
 import { wire } from './engine/wire.ts';
-import { APP, CODE, TEMP } from './paths.ts';
+import { APP, CODE, configDir, tempDir } from './paths.ts';
 
 const without = (args: string[], ...flags: string[]) => args.filter(arg => !flags.includes(arg));
 
@@ -232,8 +232,7 @@ function add(args: string[]): void {
   }
   const wanted = positional(args);
   if (!wanted.length) fail('usage: koppler add <repo or folder>...  (koppler add --list shows the repos you can add)');
-  const configDir = process.env['KOPPLER_CONFIG_DIR'] || path.join(os.homedir(), '.config', 'koppler');
-  const config = JSON.parse(fs.readFileSync(path.join(configDir, 'config.json'), 'utf8')) as { stack: string };
+  const config = JSON.parse(fs.readFileSync(path.join(configDir(), 'config.json'), 'utf8')) as { stack: string };
   const index = (readData('repos') ?? fail('no repos found yet: koppler init')) as Parameters<typeof candidateRepos>[0];
   const stack = JSON.parse(fs.readFileSync(path.join(config.stack, 'stack.json'), 'utf8')) as Parameters<
     typeof candidateRepos
@@ -543,7 +542,7 @@ const COMMANDS: Command[] = [
     args: '<app> <branch> [--set-aside | --take-along] | <app> --back',
     about: "switch a clone to the board's branch, and back",
     run: args => {
-      switchCommand(args, { temp: TEMP });
+      switchCommand(args, { temp: tempDir() });
     },
     example: 'koppler switch orders-api feature/refunds --set-aside',
   },

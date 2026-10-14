@@ -5,6 +5,7 @@ import path from 'node:path';
 import { isProtected } from '../core/plan.ts';
 import { readStack, type Registry } from '../data.ts';
 import { APP, BIN } from '../paths.ts';
+import { storeOf } from '../core/stack.ts';
 
 /** A secret an app declares for an environment, as the Credentials panel shows it. */
 export interface DeclaredSecret {
@@ -35,7 +36,6 @@ export interface Answer {
 }
 
 const said = (value: unknown) => (typeof value === 'string' ? value : JSON.stringify(value));
-const storeOf = (stack: SecretStack, app: string, env: string) => (env === stack.envs[0] ? app : `${app}@${env}`);
 // The panel stores the value itself, so the closing "then run secret-set" step is left out.
 const CLOSING_STEP = /[,;.]?\s*(and\s+|then\s+)*run:?\s+(<skill>\/bin\/secret-set|koppler secret set)\b.*$/is;
 

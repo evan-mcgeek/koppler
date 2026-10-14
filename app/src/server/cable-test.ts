@@ -12,8 +12,9 @@ import { launchProfile, type LaunchProfiles } from '../core/launch.ts';
 import { isProtected } from '../core/plan.ts';
 import type { App } from '../core/stack.ts';
 import { readClones, type Registry } from '../data.ts';
-import { STATE } from '../paths.ts';
+import { stateDir } from '../paths.ts';
 import { declaredSecrets, secretRequest } from './secrets.ts';
+import { appOn } from '../core/stack.ts';
 
 /** What a test came to, in a few words for the cable and a sentence for its panel. */
 export interface Tested {
@@ -163,7 +164,7 @@ function localProfile(stack: Registry, id: string, env: string): Profile | null 
     // ponytail: the file's time, so any later edit of it asks for a restart
     let started: number | null = null;
     try {
-      const record = JSON.parse(fs.readFileSync(path.join(STATE, 'procs', `${id}.json`), 'utf8')) as {
+      const record = JSON.parse(fs.readFileSync(path.join(stateDir(), 'procs', `${id}.json`), 'utf8')) as {
         startedAt: string;
       };
       started = Date.parse(record.startedAt);
@@ -401,9 +402,7 @@ export async function cableTest(
   const [first = ''] = stack.envs;
   const env = typeof body['env'] === 'string' && stack.envs.includes(body['env']) ? body['env'] : first;
   const appOf = (id: unknown): App | null => {
-    const base = typeof id === 'string' && Object.hasOwn(stack.apps, id) ? stack.apps[id] : undefined;
-    if (!base) return null;
-    return env === first ? base : { ...base, ...base.envs?.[env] };
+    return typeof id === 'string' ? (appOn(stack, id, env) ?? null) : null;
   };
   const { node, from, to, app } = body;
   if (typeof node === 'string') return testApp(appOf(node), probe);

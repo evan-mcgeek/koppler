@@ -2,12 +2,14 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-/** The file's content, or null when it is missing or not JSON. A byte order mark, as editors on Windows add, is fine. */
-export function readJson(file: string): unknown {
+/** The file's content, or `fallback` when it is missing or not JSON. A byte order mark, as editors on Windows add, is fine. */
+export function readJson(file: string): unknown;
+export function readJson<T>(file: string, fallback: T): T;
+export function readJson<T>(file: string, fallback: T | null = null): T | null {
   try {
-    return JSON.parse(fs.readFileSync(file, 'utf8').replace(/^\uFEFF/, ''));
+    return JSON.parse(fs.readFileSync(file, 'utf8').replace(/^\uFEFF/, '')) as T;
   } catch {
-    return null;
+    return fallback;
   }
 }
 

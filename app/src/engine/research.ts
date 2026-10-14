@@ -8,6 +8,7 @@ import path from 'node:path';
 import { readStack } from '../data.ts';
 import { Failure } from '../failure.ts';
 import { gh } from '../github.ts';
+import { configDir } from '../paths.ts';
 
 /** A repo that may be the one meant, and where it was found. */
 interface Candidate {
@@ -40,10 +41,9 @@ interface GithubRepo {
   archived?: boolean;
 }
 
-const CONFIG_DIR = process.env['KOPPLER_CONFIG_DIR'] || path.join(os.homedir(), '.config', 'koppler');
 const readIndex = (): Index | null => {
   try {
-    return JSON.parse(fs.readFileSync(path.join(CONFIG_DIR, 'repos.json'), 'utf8')) as Index | null;
+    return JSON.parse(fs.readFileSync(path.join(configDir(), 'repos.json'), 'utf8')) as Index | null;
   } catch {
     return null;
   }

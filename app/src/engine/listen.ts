@@ -8,8 +8,10 @@ import { execFileSync } from 'node:child_process';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { TEMP } from '../paths.ts';
+import { tempDir } from '../paths.ts';
+import { Failure } from '../failure.ts';
 import { pickPrompts } from './runs.ts';
+import { writeJson } from '../json-files.ts';
 
 /** Who is connected to the canvas, as temp/listener.json has it. */
 interface Listener {
@@ -52,19 +54,19 @@ const REPLACED =
 
 /** Ends the agent's work on what it took, when that was no run (a fill request, an answer): true when it was working. */
 export function finishTaken(): boolean {
-  const file = path.join(process.env['KOPPLER_TEMP'] || TEMP, 'listener.json');
+  const file = path.join(tempDir(), 'listener.json');
   try {
     const { busy, ...rest } = JSON.parse(fs.readFileSync(file, 'utf8')) as Listener;
     if (!busy) return false;
-    fs.writeFileSync(file, JSON.stringify(rest) + '\n', { mode: 0o600 });
+    writeJson(file, rest);
     return true;
   } catch {
     return false;
   }
 }
 
-export function listen(argv: string[]): void {
-  const temp = process.env['KOPPLER_TEMP'] || TEMP;
+export async function listen(argv: string[]): Promise<void> {
+  const temp = tempDir();
   const inbox = path.join(temp, 'prompts.jsonl');
   const taking = inbox + '.taking';
   const listener = path.join(temp, 'listener.json');
@@ -77,7 +79,7 @@ export function listen(argv: string[]): void {
     }
   };
   const write = (record: Listener) => {
-    fs.writeFileSync(listener, JSON.stringify(record) + '\n', { mode: 0o600 });
+    writeJson(listener, record);
   };
   // Who is connected changes in one step at a time: a session being replaced cannot undo what the new one just wrote.
   function locked<T>(work: () => T): T {
@@ -114,7 +116,7 @@ export function listen(argv: string[]): void {
         ? 'Disconnected: Sends from the canvas now wait until an agent session connects.'
         : 'No agent session was connected.',
     );
-    process.exit(0);
+    return;
   }
   // One session listens at a time, so a Send never lands in a session the user is not looking at. A session listening
   // again names itself, so one the user has moved away from cannot take the connection back.
@@ -142,10 +144,7 @@ export function listen(argv: string[]): void {
     if (other) stop(other);
     return { since, session };
   });
-  if (joined.refused !== undefined) {
-    console.error(joined.refused);
-    process.exit(3);
-  }
+  if (joined.refused !== undefined) throw new Failure(joined.refused, 3);
   const { since, session } = joined;
   if (takeOver) console.log(`connected as session ${session}; listen again with: koppler listen as ${session}`);
   const release = () => {
@@ -166,10 +165,7 @@ export function listen(argv: string[]): void {
   // True once prompts were handed over; a session that was replaced or disconnected meanwhile takes nothing and ends.
   const take = () =>
     locked(() => {
-      if (read()?.session !== session) {
-        console.error(REPLACED);
-        process.exit(3);
-      }
+      if (read()?.session !== session) throw new Failure(REPLACED, 3);
       // What a listener that died half-way left behind is handed over first, never written over.
       let text = '';
       try {
@@ -203,9 +199,5 @@ export function listen(argv: string[]): void {
       }
       return true;
     });
-  if (!take()) {
-    const timer = setInterval(() => {
-      if (take()) clearInterval(timer);
-    }, 1000);
-  }
+  while (!take()) await new Promise(done => setTimeout(done, 1000));
 }

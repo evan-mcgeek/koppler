@@ -1,7 +1,7 @@
 // The end of an app's log for its card, and the debug log of what the user did on the canvas.
 import fs from 'node:fs';
 import path from 'node:path';
-import { TEMP } from '../paths.ts';
+import { tempDir } from '../paths.ts';
 import { redact } from '../scrub.ts';
 
 const TAIL_BYTES = 96 * 1024;
@@ -30,7 +30,7 @@ export function tail(file: string, bytes = TAIL_BYTES, lines = TAIL_LINES): stri
 // The debug log: what the user did on the canvas, one JSON line each, so a concern can be traced afterwards.
 // Kept to the last MAX_DEBUG_LINES lines; every text goes through `redact`, and only known fields are kept.
 const MAX_DEBUG_LINES = 5000;
-const debugFile = () => path.join(TEMP, 'debug.jsonl');
+const debugFile = () => path.join(tempDir(), 'debug.jsonl');
 const shown = (value: unknown) => (typeof value === 'string' ? redact(value).slice(0, 300) : undefined);
 const count = (value: unknown) => (typeof value === 'number' && Number.isFinite(value) ? value : undefined);
 export function cleanDebugEntry(given: unknown): object | null {

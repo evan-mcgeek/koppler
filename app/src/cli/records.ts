@@ -6,11 +6,11 @@ import { fail } from '../failure.ts';
 import { readActions, updateActions, type Action } from '../engine/actions.ts';
 import { APP_ID } from '../ids.ts';
 import { readJson, writeJson } from '../json-files.ts';
-import { TEMP } from '../paths.ts';
+import { tempDir } from '../paths.ts';
 import { redact } from '../scrub.ts';
 import { flagValue, positional } from './output.ts';
 
-const LOG = () => path.join(TEMP, 'actions.json');
+const LOG = () => path.join(tempDir(), 'actions.json');
 /** What each kind of entry cannot do without. `checkout` is written by `koppler switch` only. */
 const NEEDS: Record<string, string[]> = {
   edit: ['file', 'before', 'after'],
@@ -98,7 +98,7 @@ interface Shown {
 export function stepCommand(args: string[]): void {
   const [app, label, state] = positional(args, ['--detail', '--copy', '--port', '--log']);
   if (!app || !APP_ID.test(app)) fail(STEP);
-  const file = path.join(TEMP, 'status.json');
+  const file = path.join(tempDir(), 'status.json');
   const read = readJson(file);
   const shown: Shown = typeof read === 'object' && read !== null && !Array.isArray(read) ? read : {};
   const apps = { ...shown.apps };

@@ -29,6 +29,7 @@ export interface Kind {
   /** Added by the stack in use. */
   custom?: true;
 }
+/** Koppler's own kinds. */
 export const KINDS: Record<string, Kind> = {
   dotnet: {
     label: '.NET',
@@ -207,39 +208,48 @@ for (const [id, recipe] of Object.entries(BUILT_IN_RECIPES))
 /** The kinds Koppler has itself: a stack cannot define one under the same id. */
 export const BUILT_IN_KINDS: readonly string[] = Object.keys(KINDS);
 
-// The stack in use adds its own kinds to these two tables; another stack's are taken out first.
-const recipes: Record<string, Recipe> = { ...BUILT_IN_RECIPES };
-const custom = new Set<string>();
-export const recipeOf = (kind: string | undefined): Recipe | undefined =>
-  kind !== undefined && Object.hasOwn(recipes, kind) ? recipes[kind] : undefined;
+/** The kinds a stack can use: Koppler's own, then the stack's (`"kinds": { "<id>": { "label", "detect", "start", "port", "serves" } }`). */
+interface Table {
+  kinds: Record<string, Kind>;
+  recipes: Record<string, Recipe>;
+  custom: string[];
+}
+type WithKinds = { kinds?: unknown } | null | undefined;
+const BUILT_IN: Table = { kinds: KINDS, recipes: BUILT_IN_RECIPES, custom: [] };
+const tables = new WeakMap<object, Table>();
 
-/**
- * Takes a stack's own kinds: `"kinds": { "<id>": { "label", "detect": [files], "start": "<command>", "port" } }`.
- * One that is malformed, or named like a kind Koppler has, is left out.
- */
-export function register(kinds: unknown): void {
-  for (const id of custom) {
-    delete KINDS[id]; // eslint-disable-line @typescript-eslint/no-dynamic-delete -- the tables are keyed by kind id
-    delete recipes[id]; // eslint-disable-line @typescript-eslint/no-dynamic-delete
-  }
-  custom.clear();
-  if (typeof kinds !== 'object' || kinds === null) return;
-  for (const [id, given] of Object.entries(kinds as Record<string, unknown>)) {
-    if (!/^[a-z0-9-]{1,32}$/.test(id) || Object.hasOwn(KINDS, id) || typeof given !== 'object' || given === null)
-      continue;
-    const kind = given as { label?: unknown; detect?: unknown; start?: unknown; port?: unknown; serves?: unknown };
+/** A malformed kind, or one named like a kind Koppler has, is left out. */
+function tableOf(stack: WithKinds): Table {
+  const given = stack?.kinds;
+  if (typeof given !== 'object' || given === null) return BUILT_IN;
+  const cached = tables.get(given);
+  if (cached) return cached;
+  const table: Table = { kinds: { ...KINDS }, recipes: { ...BUILT_IN_RECIPES }, custom: [] };
+  for (const [id, one] of Object.entries(given as Record<string, unknown>)) {
+    if (!/^[a-z0-9-]{1,32}$/.test(id) || Object.hasOwn(KINDS, id) || typeof one !== 'object' || one === null) continue;
+    const kind = one as { label?: unknown; detect?: unknown; start?: unknown; port?: unknown; serves?: unknown };
     const files = [kind.detect ?? []].flat().filter((file): file is string => typeof file === 'string');
     const label = typeof kind.label === 'string' && kind.label ? kind.label : id;
-    recipes[id] = {
+    table.recipes[id] = {
       label,
       detect: repo => files.length > 0 && files.every(file => repo.has(file)),
       port: () => Number(kind.port) || null,
       start: () => (typeof kind.start === 'string' && kind.start ? kind.start : null),
     };
-    KINDS[id] = { label, runIn: RUN_IN, serves: kind.serves !== false, custom: true };
-    custom.add(id);
+    table.kinds[id] = { label, runIn: RUN_IN, serves: kind.serves !== false, custom: true };
+    table.custom.push(id);
   }
+  tables.set(given, table);
+  return table;
 }
+
+/** Every kind a stack can use, by id. */
+export const kindsFor = (stack: WithKinds): Readonly<Record<string, Kind>> => tableOf(stack).kinds;
+
+export const recipeOf = (kind: string | undefined, stack?: WithKinds): Recipe | undefined => {
+  const { recipes } = tableOf(stack);
+  return kind !== undefined && Object.hasOwn(recipes, kind) ? recipes[kind] : undefined;
+};
 
 const packageJson = (repo: RepoView): PackageJson | null => {
   try {
@@ -252,7 +262,8 @@ const isSam = (repo: RepoView) =>
   ['template.yaml', 'template.yml'].some(file => repo.has(file) && read(repo, file).includes('AWS::Serverless'));
 
 /** Which kind a clone looks like, or null. A stack's own kinds are asked first, then the specific, then the general. */
-export function detect(repo: RepoView): string | null {
+export function detect(repo: RepoView, stack?: WithKinds): string | null {
+  const { custom, recipes } = tableOf(stack);
   for (const id of custom) if (recipes[id]?.detect(repo)) return id;
   if (repo.has('pubspec.yaml')) return 'flutter';
   if (BUILT_IN_RECIPES['reactnative']?.detect(repo)) return 'reactnative';
@@ -265,12 +276,18 @@ export function detect(repo: RepoView): string | null {
 }
 
 /** The port a clone of this kind usually answers on, when its files say. */
-export const defaultPort = (kind: string, repo: RepoView): number | null => recipeOf(kind)?.port?.(repo) ?? null;
+export const defaultPort = (kind: string, repo: RepoView, stack?: WithKinds): number | null =>
+  recipeOf(kind, stack)?.port?.(repo) ?? null;
 
 /** What is known about an app's kind; a kind nobody defined still gets a label and the usual choices. */
-export function of(app: { kind?: string | undefined } | null | undefined): Kind {
+export function of(app: { kind?: string | undefined } | null | undefined, stack?: WithKinds): Kind {
   const kind = app?.kind;
-  if (kind !== undefined && Object.hasOwn(KINDS, kind))
-    return KINDS[kind] ?? { label: kind, runIn: RUN_IN, serves: true };
-  return { label: kind ?? 'App', runIn: RUN_IN, serves: true };
+  const kinds = kindsFor(stack);
+  return (
+    (kind !== undefined && Object.hasOwn(kinds, kind) && kinds[kind]) || {
+      label: kind ?? 'App',
+      runIn: RUN_IN,
+      serves: true,
+    }
+  );
 }

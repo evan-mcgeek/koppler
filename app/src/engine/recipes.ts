@@ -12,11 +12,12 @@ import path from 'node:path';
 import { flagValue } from '../cli/output.ts';
 import { fail } from '../failure.ts';
 import { readClones, readStack } from '../data.ts';
-import { TEMP } from '../paths.ts';
+import { configDir, tempDir } from '../paths.ts';
 import { readActions, updateActions, type Action, type EditAction } from './actions.ts';
 import { APPROVE, approved } from './checks.ts';
 import { runs } from './runs.ts';
 import { saveStack } from './sync.ts';
+import { readJson, writeJson } from '../json-files.ts';
 
 /** When a remembered change applies: always, when the app calls another local app, or on one environment. */
 interface When {
@@ -61,18 +62,9 @@ export interface Applied {
   scope?: Recipe['scope'];
 }
 
-const configDir = () => process.env['KOPPLER_CONFIG_DIR'] || path.join(os.homedir(), '.config', 'koppler');
 const privateFile = () => path.join(configDir(), 'recipes.json');
-function readJson<T>(file: string, fallback: T): T {
-  try {
-    return JSON.parse(fs.readFileSync(file, 'utf8')) as T;
-  } catch {
-    return fallback;
-  }
-}
 const writePrivate = (mine: Private) => {
-  fs.mkdirSync(configDir(), { recursive: true });
-  fs.writeFileSync(privateFile(), JSON.stringify(mine, null, 2) + '\n', { mode: 0o600 });
+  writeJson(privateFile(), mine);
 };
 
 export const recipeId = (recipe: { app: string; file: string; find: string }): string =>
@@ -280,7 +272,7 @@ const REMEMBER =
 
 export function recipesCommand(command: 'recipes' | 'remember' | 'prepare', args: string[]): void {
   const stack = readStack() ?? fail('no stack loaded (koppler init)');
-  const logFile = path.join(TEMP, 'actions.json');
+  const logFile = path.join(tempDir(), 'actions.json');
   const ids = args.filter((arg, at) => !arg.startsWith('--') && !args[at - 1]?.startsWith('--'));
   if (command === 'recipes') {
     for (const app of ids.length ? ids : Object.keys(stack.apps))

@@ -469,3 +469,18 @@ export function validateStack(stack: unknown): string[] {
       );
   return [...new Set([...shape, ...(isObject(stack) ? crossProblems(stack) : [])])];
 }
+
+/** An app as an environment has it: that environment's fields replace the app's own, a list whole. */
+export function appOn<A extends object>(
+  stack: { envs: readonly string[]; apps: Record<string, A | undefined> },
+  id: string,
+  env: string,
+): A | undefined {
+  const app = Object.hasOwn(stack.apps, id) ? stack.apps[id] : undefined;
+  if (!app || env === stack.envs[0]) return app;
+  return { ...app, ...(app as { envs?: Record<string, object | undefined> }).envs?.[env] };
+}
+
+/** Where an app's secrets for an environment are stored: the first environment's under the app's id alone. */
+export const storeOf = (stack: { envs: readonly string[] }, id: string, env: string): string =>
+  env === stack.envs[0] ? id : `${id}@${env}`;

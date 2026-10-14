@@ -1,13 +1,12 @@
 // Fields of a stack the user locked on this Mac: no command, no canvas edit and no agent changes them until the user
 // unlocks them, on the canvas or in their own terminal. Kept beside the approvals, out of the shared stack file.
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { writeJson } from '../json-files.ts';
 import { getAt, parsePath } from '../core/stack-path.ts';
+import { configDir } from '../paths.ts';
 
-const locksFile = () =>
-  path.join(process.env['KOPPLER_CONFIG_DIR'] || path.join(os.homedir(), '.config', 'koppler'), 'locked-fields.json');
+const locksFile = () => path.join(configDir(), 'locked-fields.json');
 const all = (): Record<string, string[] | undefined> => {
   try {
     return JSON.parse(fs.readFileSync(locksFile(), 'utf8')) as Record<string, string[] | undefined>;

@@ -4,9 +4,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { readStack } from '../data.ts';
 import { appendEvent, runs } from '../engine/runs.ts';
-import { TEMP } from '../paths.ts';
+import { tempDir } from '../paths.ts';
 
-const PROMPTS = path.join(TEMP, 'prompts.jsonl');
+const PROMPTS = path.join(tempDir(), 'prompts.jsonl');
 type Loose = Record<string, unknown>;
 /** A value from the queue as text, when it is text. */
 const text = (value: unknown) => (typeof value === 'string' ? value : '');

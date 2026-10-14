@@ -4,13 +4,13 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { Stack } from './core/stack.ts';
 import { readJson, writeJson } from './json-files.ts';
-import { TEMP } from './paths.ts';
+import { tempDir } from './paths.ts';
 
 export type DataName = 'registry' | 'local' | 'repos' | 'state' | 'board-edits';
 export type Data = Record<string, unknown>;
 
 // Read at each call: the tests, and a stack switch, change where the run folder is while the process lives.
-const folder = () => process.env['KOPPLER_TEMP'] ?? TEMP;
+const folder = tempDir;
 export const dataFile = (name: DataName) => path.join(folder(), `${name}.json`);
 
 const isData = (value: unknown): value is Data => typeof value === 'object' && value !== null && !Array.isArray(value);

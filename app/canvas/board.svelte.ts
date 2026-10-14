@@ -1337,19 +1337,19 @@ class Board {
       id,
       name: app.name,
       kind: app.kind,
-      kindLabel: kindOf(app).label,
+      kindLabel: kindOf(app, stack).label,
       slug: app.slug ?? '',
       cloned: !!clones[id],
       calls: [...new Set([...Object.keys(app.consumes ?? {}), ...Object.keys(stack.found?.[id] ?? {})])],
       known: Object.keys(app.consumes ?? {}),
       answers:
-        kindOf(app).serves ||
+        kindOf(app, stack).serves ||
         Object.entries(stack.apps).some(
           ([from, other]) => from !== id && (other.consumes?.[id] ?? stack.found?.[from]?.[id]),
         ),
       serves: !!app.url,
-      runIn: kindOf(app).runIn,
-      platforms: kindOf(app).platforms ?? [],
+      runIn: kindOf(app, stack).runIn,
+      platforms: kindOf(app, stack).platforms ?? [],
       current: clones[id]?.branch ?? '',
       branches: clones[id]?.branches ?? [],
       dirty: clones[id]?.dirty ?? 0,
