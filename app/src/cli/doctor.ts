@@ -37,7 +37,7 @@ export function ports(args: string[]): void {
   const noTunnel = missingTunnels(stack, env).filter(id => ids.includes(id));
   if (noTunnel.length)
     fail(
-      `${noTunnel.map(name).join(', ')}: the stack has no ${ENV} tunnel. Add it to stack.json (apps.<id>.envs.${env}.prereqs) before running on ${ENV}; never use another environment's.`,
+      `${noTunnel.map(name).join(', ')}: the stack has no ${ENV} tunnel, and another environment's is never used. Set it with koppler stack set apps.<id>.envs.${env}.prereqs before running on ${ENV}.`,
     );
   const needed = ids.flatMap(id => tunnelsOf(stack, id, env));
   const taken = ids.map(id => portOf(stack, id)).filter(Boolean);

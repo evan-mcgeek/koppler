@@ -14,7 +14,9 @@ import { fail } from '../failure.ts';
 import { readClones, readStack } from '../data.ts';
 import { TEMP } from '../paths.ts';
 import { readActions, updateActions, type Action, type EditAction } from './actions.ts';
+import { APPROVE, approved } from './checks.ts';
 import { runs } from './runs.ts';
+import { saveStack } from './sync.ts';
 
 /** When a remembered change applies: always, when the app calls another local app, or on one environment. */
 interface When {
@@ -160,8 +162,10 @@ export function remember({
   const file = readJson<{ apps?: Record<string, { localChanges?: Stored[] } | undefined> } | null>(source, null);
   const shared = file?.apps?.[app];
   if (!shared) return { error: `${app} is not in ${source}` };
+  const before = readJson<unknown>(source, null);
   add((shared.localChanges ??= []));
-  fs.writeFileSync(source, JSON.stringify(file, null, 2) + '\n');
+  const refused = saveStack(source, before, file);
+  if (refused) return refused;
   return { id, scope: 'shared' };
 }
 
@@ -320,7 +324,16 @@ export function recipesCommand(command: 'recipes' | 'remember' | 'prepare', args
   const edges = run?.edges ?? [];
   const calls = Object.fromEntries(ids.map(app => [app, edges.filter(edge => edge.from === app).map(edge => edge.to)]));
   const clones = readClones();
-  const results = prepare({ registry: stack, apps: ids, env, calls, repoOf: app => clones[app]?.path, logFile });
+  // A code change the stack remembers is the stack's own doing: applied only once the user allowed it.
+  const allowed = approved(stack.source ?? '', stack);
+  const held = allowed ? [] : ids.filter(id => stack.apps[id]?.localChanges?.length);
+  if (held.length)
+    console.log(
+      `${held.join(', ')}: the stack's code changes were not applied; the user has to allow them first, in their own terminal: ${APPROVE}`,
+    );
+  const own = Object.fromEntries(Object.entries(stack.apps).map(([id, app]) => [id, { ...app, localChanges: [] }]));
+  const registry = allowed ? stack : { ...stack, apps: own };
+  const results = prepare({ registry, apps: ids, env, calls, repoOf: app => clones[app]?.path, logFile });
   if (!results.length) console.log('No remembered changes for these apps.');
   for (const result of results)
     console.log(

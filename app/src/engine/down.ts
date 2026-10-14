@@ -74,15 +74,27 @@ function undoEdit(action: EditAction): Undone {
 }
 
 function undoEnvFile(action: EnvFileAction): Undone {
+  const name = path.basename(action.file);
+  // A file Koppler made and that is gone already has nothing left to take out.
+  if (action.created && !fs.existsSync(action.file)) return { state: 'gone', said: `${name} already gone` };
   // One line out per line added, the last one: a line of the user's own that reads the same stays.
   const rest = fs.readFileSync(action.file, 'utf8').split('\n');
-  for (const line of [action.lines ?? []].flat()) {
-    const at = rest.lastIndexOf(line);
+  const bare = (line: string) => line.replace(/\r$/, '');
+  const added = [action.lines ?? []].flat().flatMap(text => text.split(/\r?\n/).filter(Boolean));
+  const missing: string[] = [];
+  for (const line of added) {
+    const at = rest.findLastIndex(one => bare(one) === line);
     if (at >= 0) rest.splice(at, 1);
+    else missing.push(line);
   }
   if (action.created && !rest.join('').trim()) fs.rmSync(action.file);
   else fs.writeFileSync(action.file, rest.join('\n'));
-  return { state: 'gone', said: `removed Koppler's lines from ${path.basename(action.file)}` };
+  if (missing.length)
+    return {
+      state: 'left',
+      why: `${action.file} no longer has what Koppler added; take out by hand: ${missing.join(', ').slice(0, 200)}`,
+    };
+  return { state: 'gone', said: `removed Koppler's lines from ${name}` };
 }
 
 function undoProfile(action: ProfileAction): Undone {
@@ -178,15 +190,16 @@ export async function down(args: string[]): Promise<void> {
       action.kind === 'process' ? (action.label ?? action.command) : 'repo' in action ? action.repo : undefined;
     return (action.app ? (apps[action.app]?.name ?? action.app) : fallback) ?? '';
   };
-  // A file logged without its folder is looked for where it can be: from here, in the app's clone, then under each
-  // folder the clones are scanned in. Whoever wrote the log may have stood somewhere else than this Stop runs.
+  // A file logged without its folder is looked for where it can be: in the app's clone first, since another app's
+  // folder may hold a file of the same name, then under each folder the clones are scanned in, then from here.
   const local = readData('local');
   const roots = (local?.['roots'] ?? []) as string[];
   const cloneOf = (app?: string) =>
     (app && (local?.['apps'] as Record<string, { path?: string } | null> | undefined)?.[app]?.path) || '';
   const located = (action: Action): Action => {
     if (!('file' in action) || !action.file || path.isAbsolute(action.file)) return action;
-    const from = ['', cloneOf(action.app), ...roots].map(base => path.resolve(base, action.file));
+    const bases = [cloneOf(action.app), ...roots, ''].filter((base, at, all) => base || at === all.length - 1);
+    const from = bases.map(base => path.resolve(base, action.file));
     return { ...action, file: from.find(file => fs.existsSync(file)) ?? action.file };
   };
   const left: string[] = [];

@@ -78,6 +78,8 @@ export const switchTo = ({ app, repo, to, how, logFile }: SwitchTo): Outcome =>
     const from = detached ? git(repo, 'rev-parse', 'HEAD') : head(repo);
     const was = named(from, detached);
     if (from === to) return { message: `${app} is already on ${to}` };
+    // Given to git as an argument: never something git would read as an option.
+    if (to.startsWith('-')) return { error: `${to} is not a branch name` };
     const dirty = changed(repo);
     if (dirty && !how)
       return {

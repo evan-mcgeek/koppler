@@ -11,6 +11,7 @@ import { readData, readStack } from '../data.ts';
 import { STATE, TEMP } from '../paths.ts';
 import { redact } from '../scrub.ts';
 import { APP_ID, RUN_ID } from '../ids.ts';
+import { alive, records } from './processes.ts';
 
 type Loose = Record<string, unknown>;
 type Steps = Pick<kp.Plan, 'starts' | 'restarts' | 'stops' | 'keeps'>;
@@ -305,38 +306,8 @@ export function pickPrompts(lines: string[], now = Date.now()): (Prompt & { wait
     }));
 }
 
-interface Running {
-  pid: number;
-  name: string;
-  env?: string;
-}
-const answers = (pid: number) => {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch {
-    return false;
-  }
-};
-/** What Koppler is running right now (apps, tunnels, the canvas), with the environment a stack app was started on by id. */
-function runningRecords(): Running[] {
-  const dir = path.join(stateDir(), 'procs');
-  try {
-    return fs
-      .readdirSync(dir)
-      .filter(file => file.endsWith('.json'))
-      .flatMap(file => {
-        try {
-          const record = JSON.parse(fs.readFileSync(path.join(dir, file), 'utf8')) as Running | null;
-          return record?.pid && answers(record.pid) ? [record] : [];
-        } catch {
-          return [];
-        }
-      });
-  } catch {
-    return [];
-  }
-}
+/** What Koppler is running right now (apps, tunnels, the canvas): its own records, each checked to still be that process. */
+const runningRecords = () => records().filter(alive);
 export const runningNames = (): string[] => runningRecords().map(record => record.name);
 export const runningEnvs = (): Record<string, string> =>
   Object.fromEntries(runningRecords().flatMap(record => (record.env ? [[record.name, record.env]] : [])));

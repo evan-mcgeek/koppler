@@ -661,6 +661,12 @@ const moveFiles = (from: string, to: string, make = true) => {
 export function setStack(config: Config, dir: string, save: Save = saveConfig): void {
   const from = config.stack;
   if (from && path.resolve(from) === path.resolve(dir)) return;
+  // The undo log goes with its stack: switched away mid-run, a Stop would find nothing to revert.
+  const logged = readJson<unknown[]>(path.join(TEMP, 'actions.json'), []);
+  if (Array.isArray(logged) && logged.length)
+    throw new Failure(
+      'the run on this stack still has changes to undo; stop and revert it first (canvas, or koppler down), then switch',
+    );
   const shelf = (stack: string) => path.join(TEMP, 'stacks', stackKey(stack));
   if (from) {
     fs.mkdirSync(shelf(from), { recursive: true });
