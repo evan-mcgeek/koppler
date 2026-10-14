@@ -372,3 +372,28 @@ test('closed after a save, the board takes what was saved without reloading the 
   await page.mouse.click(100, 400);
   await expect(again).toBeHidden();
 });
+
+test("a tunnel card opens the settings of its app's need for it, on the board's environment", async ({
+  page,
+  canvas,
+}) => {
+  const read = stackFile(canvas.dir);
+  const tunnel = page.locator('.svelte-flow__node-tunnel').first();
+  await tunnel.getByRole('button', { name: 'Settings for the Database (Postgres) tunnel' }).click();
+  const panel = page.getByRole('dialog', { name: 'Database (Postgres) tunnel' });
+  const port = panel.getByLabel('Port', { exact: true });
+  await expect(port).toHaveValue('5432');
+  // Only a tunnel's own fields, not those of every other kind of need.
+  await expect(panel.getByLabel('AWS profile', { exact: true })).toHaveCount(0);
+  await page.screenshot({ path: 'test-results/next-tunnel-settings.png' });
+  await port.fill('5433');
+  await port.press('Tab');
+  await panel.getByRole('button', { name: 'Save' }).click();
+  await expect(panel.getByRole('status')).toHaveText('Saved');
+  const orders = read().apps['orders'] as {
+    prereqs: { port: number }[];
+    envs: { prod: { prereqs: { port: number }[] } };
+  };
+  expect(orders.prereqs[0]?.port).toBe(5433);
+  expect(orders.envs.prod.prereqs[0]?.port).toBe(5432);
+});
