@@ -1,5 +1,7 @@
 <script lang="ts">
   import Cog from './Cog.svelte';
+  import Icon from './Icon.svelte';
+  import X from '@lucide/svelte/icons/x';
   import type { NodeProps } from '@xyflow/svelte';
   import { board, type OutsideNode } from './board.svelte.ts';
   import { dialogs } from './dialogs.svelte.ts';
@@ -18,6 +20,17 @@
   >
     <Cog size={13} />
   </button>
+  <button
+    class="gear hide nodrag"
+    type="button"
+    aria-label="Hide {data.name}"
+    title="Take it off the board. Bring it back from the list of apps."
+    onclick={() => {
+      board.showOutside(id.slice(8), false);
+    }}
+  >
+    <Icon of={X} size={13} />
+  </button>
   <span class="where">{data.where}</span>
 </div>
 
@@ -29,7 +42,7 @@
     width: max-content;
     min-width: 200px;
     max-width: 420px;
-    padding: 10px 34px 12px 12px;
+    padding: 10px 58px 12px 12px;
     border: 1px dashed color-mix(in oklab, var(--muted) 55%, var(--line));
     border-radius: 10px;
     background: color-mix(in oklab, var(--paper) 60%, transparent);
@@ -47,7 +60,7 @@
   .gear {
     position: absolute;
     top: 6px;
-    right: 6px;
+    right: 30px;
     display: grid;
     place-items: center;
     width: 22px;
@@ -58,6 +71,9 @@
     background: none;
     color: var(--muted);
     cursor: pointer;
+  }
+  .gear.hide {
+    right: 6px;
   }
   .gear:hover {
     background: color-mix(in oklab, var(--ink) 9%, transparent);

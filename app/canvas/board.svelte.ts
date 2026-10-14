@@ -216,6 +216,8 @@ class Board {
   /** The queues run locally instead of the deployed ones, and the queues taken off the board. */
   queues = $state.raw<Record<string, 'local'>>({});
   hiddenQueues = $state.raw<Record<string, true>>({});
+  /** Outside systems taken off the board, though an app on it calls them or reads their queue. */
+  hiddenOutside = $state.raw<Record<string, true>>({});
   /** The outside systems put on the board by hand: shown even when none of their apps is. */
   pinned = $state.raw<string[]>([]);
   pin(id: string): void {
@@ -358,7 +360,7 @@ class Board {
   ownedBy(id: string): string[] {
     const alone = (queue: { pubs: string[]; reads: string[] }) =>
       [...queue.pubs, ...queue.reads]
-        .filter(app => this.#onBoard.has(app) || this.#outside(app))
+        .filter(app => this.#onBoard.has(app) || (this.#outside(app) && !this.hiddenOutside[app]))
         .every(app => app === id);
     return this.ledBy(id).filter(
       key => key.startsWith('tunnel:') || this.boardQueues.some(one => `queue:${one.id}` === key && alone(one)),
@@ -609,7 +611,7 @@ class Board {
         ...this.flows.flatMap(flow => [flow.from, flow.to]),
         ...this.pinned.filter(id => this.#outside(id)).map(id => `outside:${id}`),
       ]),
-    ].filter(key => key.startsWith('outside:'));
+    ].filter(key => key.startsWith('outside:') && !this.hiddenOutside[key.slice(8)]);
     const outside = linked.map((id): OutsideNode => {
       const app = this.#registry?.apps[id.slice(8)];
       const kept = before.get(id);
@@ -871,6 +873,7 @@ class Board {
       infra: this.infra.map(({ id, position }) => ({ id, position })),
       queues: this.queues,
       hiddenQueues: this.hiddenQueues,
+      hiddenOutside: this.hiddenOutside,
       pinned: this.pinned,
       edges: this.edges.map(({ id, source, target, type, data }) => ({ id, source, target, type, data })),
     });
@@ -878,13 +881,14 @@ class Board {
 
   /** Puts back a board held as text: its cards, cables and the cards beside them. */
   setContent(back: string): void {
-    const { name, nodes, edges, infra, queues, hiddenQueues, pinned } = JSON.parse(back) as {
+    const { name, nodes, edges, infra, queues, hiddenQueues, hiddenOutside, pinned } = JSON.parse(back) as {
       name: string | null;
       nodes: CardNode[];
       edges: CableEdge[];
       infra: { id: string; position: Point }[];
       queues: Record<string, 'local'>;
       hiddenQueues: Record<string, true>;
+      hiddenOutside: Record<string, true>;
       pinned: string[];
     };
     this.name = name;
@@ -893,6 +897,7 @@ class Board {
     this.edges = edges;
     this.queues = queues;
     this.hiddenQueues = hiddenQueues;
+    this.hiddenOutside = hiddenOutside;
     this.syncInfra(Object.fromEntries(infra.map(({ id, position }) => [id, position])));
     this.infra = this.infra.map(card => ({
       ...card,
@@ -1125,6 +1130,7 @@ class Board {
     this.edges = [];
     this.queues = {};
     this.hiddenQueues = {};
+    this.hiddenOutside = {};
     this.pinned = [];
   }
   /**
@@ -1162,6 +1168,7 @@ class Board {
     this.name = preset.name;
     this.queues = {};
     this.hiddenQueues = {};
+    this.hiddenOutside = {};
     this.pinned = Array.isArray(given['outside'])
       ? (given['outside'] as unknown[]).filter((id): id is string => typeof id === 'string')
       : [];
@@ -1316,6 +1323,7 @@ class Board {
     this.infra = [];
     this.queues = (saved?.['queues'] ?? {}) as Record<string, 'local'>;
     this.hiddenQueues = (saved?.['hiddenQueues'] ?? {}) as Record<string, true>;
+    this.hiddenOutside = (saved?.['hiddenOutside'] ?? {}) as Record<string, true>;
     this.pinned = (Array.isArray(saved?.['outside']) ? saved['outside'] : []) as string[];
     this.syncInfra((saved?.infra ?? {}) as Record<string, Point | undefined>);
     const { zoom, pan } = saved ?? {};
@@ -1346,6 +1354,7 @@ class Board {
       this.fullHeights,
       this.queues,
       this.hiddenQueues,
+      this.hiddenOutside,
       this.pinned,
     ];
   }
@@ -1394,6 +1403,7 @@ class Board {
       edges: this.edges.map(({ source, target, data }) => ({ from: source, to: target, ...data })),
       queues: this.queues,
       hiddenQueues: this.hiddenQueues,
+      hiddenOutside: Object.keys(this.hiddenOutside).length ? this.hiddenOutside : undefined,
       outside: this.pinned.length ? this.pinned : undefined,
       infra: Object.fromEntries(
         this.infra.map(({ id, position }) => [id, { x: Math.round(position.x), y: Math.round(position.y) }]),
@@ -1464,6 +1474,14 @@ class Board {
     this.nodes = [...this.nodes.map(unselected), { ...card, selected: true }];
   }
 
+  /** Takes an outside system off the board, even one an app on it uses, or puts it back. */
+  showOutside(id: string, show: boolean): void {
+    const { [id]: _was, ...others } = this.hiddenOutside;
+    this.hiddenOutside = show ? others : { ...others, [id]: true };
+    if (show) this.pin(id);
+    else this.unpin(id);
+    this.syncInfra();
+  }
   /** Changes what the user chose on a card. */
   set(id: string, chosen: Partial<CardData>): void {
     this.nodes = this.nodes.map(node => (node.id === id ? { ...node, data: { ...node.data, ...chosen } } : node));

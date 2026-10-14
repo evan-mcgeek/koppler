@@ -300,6 +300,25 @@ test.describe('an outside system that reads a queue one app on the board sends t
     await page.screenshot({ path: 'test-results/next-queue-reader.png' });
   });
 
+  test('it is hidden from its card although its queue is on the board, kept so, and brought back from the list', async ({
+    page,
+  }) => {
+    const feed = outside(page).filter({ hasText: 'Warehouse Feed' });
+    await expect(feed).toBeVisible();
+    await expect(page.locator('.links .flow.msg')).toHaveCount(4);
+    const kept = saved(page);
+    await feed.getByRole('button', { name: 'Hide Warehouse Feed' }).click();
+    await expect(feed).toHaveCount(0);
+    await expect(page.locator('.links .flow.msg')).toHaveCount(3);
+    await kept;
+    await page.reload();
+    await expect(card(page, 'orders')).toBeVisible();
+    await expect(outside(page).filter({ hasText: 'Warehouse Feed' })).toHaveCount(0);
+    await page.getByRole('complementary').getByRole('button', { name: 'Warehouse Feed', exact: true }).click();
+    await expect(outside(page).filter({ hasText: 'Warehouse Feed' })).toBeVisible();
+    await page.screenshot({ path: 'test-results/next-outside-hide.png' });
+  });
+
   test('the queue is shared with it, so it stays put when the app is dragged', async ({ page }) => {
     const receipts = queue(page).filter({ hasText: 'Receipts' });
     await expect(receipts).toBeVisible();
