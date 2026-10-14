@@ -142,16 +142,30 @@ export interface TunnelSteps {
  * The commands and settings that carry one tunnel of a plan out. An address of its own moves the name the app dials
  * to that address: off any hosts line that maps it already, since the first match wins, with a backup to undo.
  */
+/** A process name Koppler accepts (a-z, 0-9, dashes, at most 64): a longer one keeps a hash of the whole, so it stays unique. */
+function processName(given: string): string {
+  const name = given
+    .toLowerCase()
+    .replace(/[^a-z0-9-]/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+  if (name.length <= 64) return name;
+  let hash = 2166136261;
+  for (const char of name) hash = Math.imul(hash ^ char.charCodeAt(0), 16777619);
+  return `${name.slice(0, 55).replace(/-$/, '')}-${(hash >>> 0).toString(16).padStart(8, '0')}`;
+}
+
 export function planSteps(
   t: Pick<Tunnel, 'host' | 'port' | 'bind' | 'connectsAs' | 'settings' | 'needsAlias'>,
 ): TunnelSteps {
   const url = `${t.bind}:${String(t.port)}`;
   const dialed = t.connectsAs ?? t.host;
   const pattern = dialed.replace(/[^\w-]/g, c => `\\${c}`);
-  // Two tunnels can share a port, each on its own address: the address is then part of the name.
-  const name = `tunnel-${t.host.split('.')[0] ?? ''}-${String(t.port)}${t.needsAlias ? `-on-${t.bind}` : ''}`;
+  // The whole host, so QA's and PROD's tunnels never share a name; two tunnels sharing a port, each on its own address,
+  // have the address in it too.
+  const name = `tunnel-${t.host}-${String(t.port)}${t.needsAlias ? `-on-${t.bind}` : ''}`;
   return {
-    name: name.toLowerCase().replace(/[^a-z0-9-]/g, '-'),
+    name: processName(name),
     sudo: t.needsAlias
       ? [
           `sudo ifconfig lo0 alias ${shellWord(t.bind)} up`,

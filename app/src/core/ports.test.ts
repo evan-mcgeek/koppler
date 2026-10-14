@@ -105,3 +105,13 @@ test('a host is never read as shell syntax, even one that got past the stack che
   ]);
   expect(steps.tunnel).toMatch(/--hostname 'db\.acme\.dev; touch \/tmp\/x #'/);
 });
+
+test('tunnels to different hosts never share a name, even when their hosts start alike', () => {
+  const step = (host: string) => planSteps({ host, bind: 'localhost', port: 5432 }).name;
+  expect(step('db.qa.acme.example')).toBe('tunnel-db-qa-acme-example-5432');
+  expect(step('db.qa.acme.example')).not.toBe(step('db.prod.acme.example'));
+  // A long host still gives a name Koppler can run, and still its own.
+  const long = (env: string) => step(`aurora-campus-connect-${env}.cluster-abc123def456.eu-west-1.rds.amazonaws.com`);
+  expect(long('qa')).toMatch(/^[a-z0-9][a-z0-9-]{0,63}$/);
+  expect(long('qa')).not.toBe(long('prod'));
+});

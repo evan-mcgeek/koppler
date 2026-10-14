@@ -19,7 +19,7 @@ import { switchTo, type Carry } from './branch.ts';
 import { APPROVE, approved, missingTunnels, startsFromStack } from './checks.ts';
 import { link } from './libraries.ts';
 import { isDone } from './needs.ts';
-import { alive, listener, readRecord, sh, sleep, stopOne } from './processes.ts';
+import { alive, listener, readRecord, records, sh, sleep, stopOne } from './processes.ts';
 import * as localQueue from './queues.ts';
 import { matches, prepare, recipesFor } from './recipes.ts';
 import { run } from './run.ts';
@@ -351,9 +351,17 @@ async function openTunnels(up: Up): Promise<void> {
         );
       else settingsFor(up, app)[setting] = value;
     }
-    if (running(steps.name) || listener(tunnel.port, tunnel.bind)) {
+    if (running(steps.name)) {
       console.log(`${steps.name}: already open on ${port}`);
       continue;
+    }
+    // Something else on the port may lead to another environment's database: it is never taken for this tunnel.
+    const holder = listener(tunnel.port, tunnel.bind);
+    if (holder) {
+      const ours = records().find(record => record.port === tunnel.port && alive(record))?.name;
+      fail(
+        `port ${port} is held by ${ours ?? `${holder.command ?? 'another program'} (pid ${String(holder.pid)})`}, not by ${steps.name}: it may reach another environment's ${tunnel.what.toLowerCase()}. ${ours ? `Stop it (koppler stop ${ours})` : 'Close it'}, then run again.`,
+      );
     }
     if (
       steps.sudo.length &&
