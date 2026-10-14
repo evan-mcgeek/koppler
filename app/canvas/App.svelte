@@ -247,6 +247,22 @@
     }
   };
   // From the folded rail: its board button lands on the board picker.
+  // A pinch zooms the board only: anywhere else the browser would zoom the whole page.
+  $effect(() => {
+    const outside = (ev: Event) => {
+      if (!(ev.target instanceof Element && ev.target.closest('.svelte-flow'))) ev.preventDefault();
+    };
+    const wheel = (ev: WheelEvent) => {
+      if (ev.ctrlKey) outside(ev);
+    };
+    window.addEventListener('wheel', wheel, { passive: false });
+    // Safari's pinch.
+    window.addEventListener('gesturestart', outside);
+    return () => {
+      window.removeEventListener('wheel', wheel);
+      window.removeEventListener('gesturestart', outside);
+    };
+  });
   const openSide = async (at?: 'board') => {
     toggleSide();
     if (!at) return;
