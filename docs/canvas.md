@@ -9,8 +9,10 @@ The board holds the apps you want running locally.
 Every board you build is saved as you change it, per stack.
 Team boards are boards the stack shares with everyone who uses it; one click opens one.
 A team board you change becomes your own copy.
-**Share** makes your board a team board of the stack.
-**Copy** copies it as JSON, and a board file can be opened, dropped on the page or linked from GitHub.
+**Share with team** proposes your board as a team board of the stack: a pull request on the stack's repo on GitHub, made from the team's `stack.json` as it is there, so nothing else on your Mac goes with it. Your team gets it once the pull request is merged.
+A stack that is not on GitHub keeps the board among its team boards in its file here, for you to commit.
+The same is `koppler board share "<name>"` in the terminal.
+A board file can also be opened, dropped on the page or linked from GitHub.
 `koppler board new "<name>"` makes a board from the terminal, and `koppler board edit "<name>"` changes one, even one open on the canvas.
 
 ## Cards

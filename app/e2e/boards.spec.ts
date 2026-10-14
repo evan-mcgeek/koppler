@@ -118,12 +118,6 @@ test('a board of your own is renamed, copied, shared, deleted and restored', asy
 
   await picker(page).click();
   await page.screenshot({ path: 'test-results/next-boards-manage.png' });
-  await boards(page).getByRole('button', { name: 'Copy Orders work as JSON' }).click();
-  await expect(page.getByRole('status').filter({ hasText: 'Copied' })).toBeVisible();
-  const shared = JSON.parse(await page.evaluate(() => navigator.clipboard.readText())) as Record<string, unknown>;
-  expect(Object.keys(shared)).toEqual(['name', 'version', 'nodes', 'edges']);
-  expect(shared['name']).toBe('Orders work');
-
   await boards(page).getByRole('button', { name: 'Duplicate' }).click();
   await expect(picker(page)).toHaveText('Orders work copy');
   await picker(page).click();
@@ -221,6 +215,10 @@ test('a board of your own is shared with the team: it joins the stack as a team 
   await saveSettles(page);
   await picker(page).click();
   await boards(page).getByRole('button', { name: 'Share Web Shop with the team' }).click();
+  // The stack is not in a repo on GitHub: the review says the board is kept in its file here, to commit.
+  const review = page.getByRole('dialog', { name: 'Share Web Shop with the team' });
+  await expect(review).toContainText('not on GitHub');
+  await review.getByRole('button', { name: 'Add to team boards' }).click();
   await expect(page.getByRole('status').filter({ hasText: 'Web Shop is a team board now' })).toContainText(
     "Commit the stack's repo",
   );
@@ -230,7 +228,8 @@ test('a board of your own is shared with the team: it joins the stack as a team 
   const shared = kept.presets.find(one => one.name === 'Web Shop');
   expect(Object.keys(shared?.nodes ?? {}).sort()).toEqual(['orders', 'web']);
   expect(shared?.layout).toBeTruthy();
-  // The menu, still open, lists it with the team's boards.
+  // The menu lists it with the team's boards.
+  await picker(page).click();
   await expect(boards(page).getByText('Team board').first()).toBeVisible();
   await expect(opens(page).filter({ hasText: 'Web Shop' })).toHaveCount(2);
 });

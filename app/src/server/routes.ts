@@ -21,6 +21,8 @@ import {
   saveStack,
   stackSource,
 } from '../engine/stack-file.ts';
+import { shareBoard, shareTarget } from '../engine/share.ts';
+import type { StoredPreset } from '../core/presets.ts';
 import { createStack, currentStack, forgetStacks, useStack } from '../engine/stacks.ts';
 import { CODE, tempDir } from '../paths.ts';
 import { cableTest } from './cable-test.ts';
@@ -126,6 +128,19 @@ export const ROUTES: Record<string, Route> = {
     return reload('The apps were added, but the stack could not be loaded again. Run koppler sync.', result);
   },
   // One field of the stack, set or taken out, checked as the terminal's koppler stack set is.
+  // A board of the user's own, proposed to the team: `check` says where it would go before anything is sent.
+  '/board-share': async body => {
+    const dir = currentStack();
+    const preset = body['preset'] as StoredPreset | undefined;
+    if (!dir) return { status: 400, body: { error: 'No stack is in use.' } };
+    if (!preset || typeof preset.name !== 'string') return { status: 400, body: { error: 'No board to share.' } };
+    if (body['check'] === true) {
+      const target = await shareTarget(dir);
+      return { status: 200, body: target.error === undefined ? { repo: target.repo } : { local: true } };
+    }
+    const shared = await shareBoard(dir, preset);
+    return { status: shared.error === undefined ? 200 : 400, body: shared };
+  },
   '/stack-edit': body => {
     const at = typeof body['path'] === 'string' ? body['path'] : '';
     const result = editStack(at, body['unset'] === true ? undefined : [body['value']]);
