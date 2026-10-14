@@ -17,6 +17,7 @@
   import Inbox from './Inbox.svelte';
   import { inbox } from './inbox.svelte.ts';
   import History from './History.svelte';
+  import Traces from './Traces.svelte';
   import Logs from './Logs.svelte';
   import Menu from './Menu.svelte';
   import Rail from './Rail.svelte';
@@ -315,7 +316,7 @@
   {/if}
   <span class="spacer"></span>
   {#if board.stack}<Health /><Agent />{/if}
-  {#if board.stack}<History /><Credentials />{/if}
+  {#if board.stack}<History /><Traces /><Credentials />{/if}
   <Help />
   {#if board.stack}
     <span class="split" inert={!!loading}>

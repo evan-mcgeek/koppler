@@ -44,6 +44,7 @@ import { agentCommand } from './cli/agent.ts';
 import { doCommand } from './engine/app-commands.ts';
 import { watchCommand } from './engine/watch.ts';
 import { shellCommand } from './cli/shell.ts';
+import { tracesCommand } from './engine/traces.ts';
 import { wire } from './engine/wire.ts';
 import { APP, CODE, configDir, tempDir } from './paths.ts';
 
@@ -492,6 +493,14 @@ const COMMANDS: Command[] = [
     about: "a shell in an app's clone with its run's settings, never its secrets; --query opens psql on its database",
     run: shellCommand,
     example: 'koppler shell orders-api',
+  },
+  {
+    name: 'traces',
+    who: 'you',
+    args: 'start|stop|open [<app>]',
+    about: 'collect traces from the apps Koppler starts and follow one request across them (Jaeger in Docker)',
+    run: tracesCommand,
+    example: 'koppler traces open orders-api',
   },
   {
     name: 'query',

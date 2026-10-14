@@ -101,6 +101,8 @@ export interface Run {
   pinned?: boolean;
 }
 interface Status {
+  /** The trace collector: off, starting, or on with where its view is. */
+  traces?: { state: 'off' | 'starting' | 'on'; view?: string };
   apps?: Record<string, AppStatus | undefined>;
   /** Tunnel ports, and whether something listens on each. */
   ports?: Record<string, boolean | undefined>;

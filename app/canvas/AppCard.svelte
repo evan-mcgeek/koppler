@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Waypoints from '@lucide/svelte/icons/waypoints';
   import RefreshCw from '@lucide/svelte/icons/refresh-cw';
   import Check from '@lucide/svelte/icons/check';
   import Icon from './Icon.svelte';
@@ -191,6 +192,18 @@
         <Icon of={COMMAND_ICON[command.icon ?? 'terminal']} size={15} />
       </button>
     {/each}
+    {#if live.status?.traces?.state === 'on' && live.sent(id)}
+      <a
+        class="tool"
+        href="{live.status.traces.view}?service={encodeURIComponent(id)}"
+        target="_blank"
+        rel="noopener"
+        aria-label="Traces of {data.name}"
+        title="Its requests, followed across your local apps"
+      >
+        <Icon of={Waypoints} size={15} />
+      </a>
+    {/if}
     {#if app?.cloned && !app.outside}
       <button
         type="button"
@@ -655,7 +668,7 @@
   .tools.reading .remove {
     display: none;
   }
-  .tools button {
+  .tools :is(button, .tool) {
     display: grid;
     place-items: center;
     width: 26px;
@@ -667,8 +680,8 @@
     color: var(--muted);
     cursor: pointer;
   }
-  .tools button:hover,
-  .tools button:focus-visible {
+  .tools :is(button, .tool):hover,
+  .tools :is(button, .tool):focus-visible {
     background: color-mix(in oklab, var(--ink) 8%, transparent);
     color: var(--ink);
   }
