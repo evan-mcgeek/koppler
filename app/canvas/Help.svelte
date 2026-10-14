@@ -32,6 +32,8 @@
     <dd>Select / move around the board</dd>
     <dt><kbd>Cmd</kbd> or <kbd>Ctrl</kbd> + <kbd>Z</kbd></dt>
     <dd>Undo (add <kbd>Shift</kbd> to redo)</dd>
+    <dt><kbd>Cmd</kbd> or <kbd>Ctrl</kbd> + <kbd>A</kbd></dt>
+    <dd>Select every card</dd>
     <dt><kbd>Tab</kbd>, then arrow keys</dt>
     <dd>Move to a card, then move it</dd>
     <dt><kbd>Delete</kbd></dt>

@@ -107,6 +107,11 @@
     if (document.querySelector('dialog[open], :popover-open')) return;
     const key = ev.key.toLowerCase();
     if (ev.metaKey || ev.ctrlKey) {
+      if (key === 'a' && !board.live) {
+        ev.preventDefault();
+        board.selectAll();
+        return;
+      }
       if (key !== 'z') return;
       ev.preventDefault();
       if (ev.shiftKey) undo.redo();

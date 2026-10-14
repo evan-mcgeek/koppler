@@ -322,3 +322,19 @@ test('cards still move after a system shortcut swallowed the key-ups of Cmd and 
     }
   }
 });
+
+test('Cmd or Ctrl and A selects every card, tunnels included, and not while typing', async ({ page }) => {
+  await expect(card(page, 'web')).toBeVisible();
+  await page.locator('.svelte-flow__pane').click({ position: { x: 20, y: 600 } });
+  await page.keyboard.press('ControlOrMeta+a');
+  const nodes = page.locator('.svelte-flow__node');
+  const count = await nodes.count();
+  expect(count).toBeGreaterThan(3);
+  await expect(page.locator('.svelte-flow__node.selected')).toHaveCount(count);
+  // In a field it selects the field's text, as anywhere else.
+  await page.locator('.svelte-flow__pane').click({ position: { x: 20, y: 600 } });
+  await expect(page.locator('.svelte-flow__node.selected')).toHaveCount(0);
+  await page.getByRole('searchbox', { name: 'Find an app by name or kind' }).fill('web');
+  await page.getByRole('searchbox', { name: 'Find an app by name or kind' }).press('ControlOrMeta+a');
+  await expect(page.locator('.svelte-flow__node.selected')).toHaveCount(0);
+});
