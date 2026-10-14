@@ -31,7 +31,7 @@ test('koppler up writes each app\'s steps for its card as it goes; the step a fa
   assert.equal(progress.run, 'prog0001');
   assert.deepEqual(progress.apps.api, [{ label: 'Start', state: 'done', detail: 'Running.' }]);
   assert.equal(progress.apps.web[0].state, 'failed');
-  assert.match(progress.apps.web[0].detail, /stopped here/);
+  assert.match(progress.apps.web[0].detail, /web exited right away/);
   assert.deepEqual(progress.apps.app, [{ label: 'Start', state: 'user', detail: 'Start it in your IDE.' }]);
 });
 

@@ -99,6 +99,10 @@ const Call = z.looseObject(
     deployed: z.string().optional().describe('The deployed address it calls today'),
     found: z.string().optional().describe('Where the call was seen in its code'),
     note: z.string().optional().describe('Anything else worth knowing, in words'),
+    ifDown: z
+      .enum(['skip', 'start'], { error: 'skip or start' })
+      .optional()
+      .describe('When the local app it calls does not start: skip this one too (the default), or start it anyway'),
   },
   { error: 'an object (how the call is made; {} when not known yet)' },
 );
