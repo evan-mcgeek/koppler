@@ -29,6 +29,7 @@ import { findCommand } from './engine/research.ts';
 import { run } from './engine/run.ts';
 import { appliedCommand, historyCommand, planCommand, runningNames, sessionCommand } from './engine/runs.ts';
 import { updateClones } from './engine/clones.ts';
+import { readIndex } from './engine/config.ts';
 import { candidateRepos } from './engine/repos.ts';
 import { addApps, addOutside, editStack, stackSource, readStackAt, removeApp } from './engine/stack-file.ts';
 import { createStack } from './engine/stacks.ts';
@@ -226,16 +227,18 @@ function add(args: string[]): void {
   const wanted = positional(args);
   if (!wanted.length) fail('usage: koppler add <repo or folder>...  (koppler add --list shows the repos you can add)');
   const config = JSON.parse(fs.readFileSync(path.join(configDir(), 'config.json'), 'utf8')) as { stack: string };
-  const index = (readData('repos') ?? fail('no repos found yet: koppler init')) as Parameters<typeof candidateRepos>[0];
+  // The clones as the last scan found them, at their full paths: not the picker's copy, which shows them as ~/...
+  const index = readIndex() ?? fail('no repos found yet: koppler init');
   const stack = JSON.parse(fs.readFileSync(path.join(config.stack, 'stack.json'), 'utf8')) as Parameters<
     typeof candidateRepos
   >[1];
   const known = candidateRepos(index, stack, config.stack);
   const picks = wanted.map(want => {
-    const folder = path.resolve(want.replace(/^~(?=\/|$)/, os.homedir()));
+    const full = (given: string) => path.resolve(given.replace(/^~(?=\/|$)/, os.homedir()));
+    const folder = full(want);
     const is = (slug: string) => slug === want || slug.split('/').pop() === want;
     return (
-      known.find(candidate => is(candidate.slug) || candidate.path === folder) ??
+      known.find(candidate => is(candidate.slug) || full(candidate.path) === folder) ??
       fail(`${want} is not one of your clones that is outside the stack; koppler sync --rescan finds new clones`)
     );
   });
