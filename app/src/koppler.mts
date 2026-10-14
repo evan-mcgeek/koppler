@@ -7,6 +7,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { doctor, ports, secret } from './cli/doctor.ts';
 import { confirm, flagValue, positional } from './cli/output.ts';
+import { actionsCommand, stepCommand } from './cli/records.ts';
 import { fail, Failure } from './failure.ts';
 import { canvas, logs, status, stop } from './cli/running.ts';
 import { readData, readStack } from './data.ts';
@@ -379,7 +380,7 @@ const COMMANDS: Command[] = [
   {
     name: 'doctor',
     who: 'you',
-    args: '[app...] [--env <env>] [--secrets] [--flow] [--approve] [--json]',
+    args: '[app...] [--env <env>] [--no-tunnels <app,...>] [--secrets] [--flow] [--approve] [--json]',
     about: 'can it run here: tools, what you still have to do, secrets, connections',
     run: doctor,
     example: 'koppler doctor orders-api --env prod',
@@ -387,7 +388,7 @@ const COMMANDS: Command[] = [
   {
     name: 'secret',
     who: 'you',
-    args: 'set|list|remove|psql <app>[@<env>] [<NAME>] [--stdin]',
+    args: 'set|list|remove|psql <app>[@<env>] [<NAME>] [--stdin] [--pgpass]',
     about: 'store and manage secrets; values never show',
     run: secret,
     example: 'koppler secret set orders-api@prod DB_URL',
@@ -395,15 +396,32 @@ const COMMANDS: Command[] = [
       ['set <app>[@<env>] <NAME> [--stdin]', 'store a secret, typed hidden or read from stdin'],
       ['list <app>[@<env>]', 'which secrets are stored, never their values'],
       ['remove <app>[@<env>] <NAME>', 'delete a stored secret'],
-      ['psql <app>[@<env>]', "open psql with the app's stored connection"],
+      [
+        'psql <app>[@<env>] <NAME> [--pgpass]',
+        "open psql with the app's stored connection; --pgpass writes a pgpass file for another client",
+      ],
     ],
   },
   {
     name: 'status',
     who: 'you',
-    args: '[--apps] [--debug [name...]] [--json]',
+    args: '[--apps] [--debug [name...]] [--json] | step <app> "<label>" done|todo|user|failed [--detail "<what>"] [--copy "<command>"] [--port <n>] [--log <file>] | step <app> --clear',
+    forms: [
+      [
+        '[--apps] [--debug [name...]] [--json]',
+        "what Koppler runs; --apps adds the stack's apps; --debug gives scrubbed logs for a bug report",
+      ],
+      [
+        'step <app> "<label>" done|todo|user|failed [--detail "<what>"] [--copy "<command>"] [--port <n>] [--log <file>]',
+        "set one step of an app's checklist on its card (the agent does this)",
+      ],
+      ['step <app> --clear', "take the agent's steps off an app's card"],
+    ],
     about: "what Koppler runs; --apps adds the stack's apps; --debug gives scrubbed logs for a bug report",
-    run: status,
+    run: args => {
+      if (args[0] === 'step') stepCommand(args.slice(1));
+      else return status(args);
+    },
     example: 'koppler status --apps',
   },
   {
@@ -431,7 +449,7 @@ const COMMANDS: Command[] = [
     name: 'history',
     who: 'you',
     args: '[--json] | session | done [<id>] [--failed "<why>"]',
-    about: 'recent Sends and Stops; session gathers what happened since the last Stop; done marks a run finished',
+    about: 'recent runs and Stops; session gathers what happened since the last Stop; done marks a run finished',
     forms: [
       ['[--json]', 'recent runs and Stops and how each ended'],
       ['session', 'gather what happened since the last Stop, for a bug report'],
@@ -459,7 +477,7 @@ const COMMANDS: Command[] = [
   {
     name: 'discover',
     who: 'agent',
-    args: '[app...] [--deployed] [--apply] [--find "<names>"] [--no-fetch]',
+    args: '[app...] [--deployed] [--apply] [--find "<name,...>"] [--no-fetch] [--no-github]',
     about: 'what the repos say: ports, tunnels, calls, deployed addresses, gaps',
     run: discover,
     example: 'koppler discover --deployed',
@@ -490,15 +508,15 @@ const COMMANDS: Command[] = [
   {
     name: 'plan',
     who: 'agent',
-    args: '[app...] [--env <env>] [--wire <caller> <callee>] [--json]',
-    about: 'what the newest Send does; the tunnels apps need; what one cable changes',
+    args: '[app...] [--env <env>] [--wire <caller> <callee> [--device ios|android|phone|<id>]] [--json]',
+    about: 'what the newest run does; the tunnels apps need; what one cable changes',
     run: plan,
     example: 'koppler plan orders-api payments-api --env qa',
   },
   {
     name: 'up',
     who: 'agent',
-    args: '<app...> [--cable <caller>:<callee>]... [--env <env>] | --board "<name>" | --run <id>',
+    args: '<app...> [--cable <caller>:<callee>]... [--env <env>] | --board "<name>" [--env <env>] | --run <id>',
     about: 'start a run, recorded like Run on the canvas: tunnels, local queues, then apps, callees first',
     run: up,
     example: 'koppler up orders-api payments-api --cable orders-api:payments-api --env qa',
@@ -514,7 +532,7 @@ const COMMANDS: Command[] = [
   {
     name: 'run',
     who: 'agent',
-    args: '<app> [--env <env>] [--device ios|android|phone|<id>] [--lan] [--dry-run] | <name> [--cwd <dir>] [--port <n>] [--bind <address>] [--restart] -- <command...>',
+    args: '<app> [--env <env>] [--device ios|android|phone|<id>] [--lan] [--no-test] [--dry-run] | <name> [--cwd <dir>] [--port <n>] [--bind <address>] [--ready <url>] [--restart] -- <command...>',
     about: 'start one stack app, or any command, detached and logged',
     run: args => run(args),
     example: 'koppler run orders-api --env qa',
@@ -532,7 +550,7 @@ const COMMANDS: Command[] = [
   {
     name: 'recipes',
     who: 'agent',
-    args: '[app] | --remember <app> --why "<why>" [--when ...] | --apply <app...>',
+    args: '[app] | --remember <app> --why "<why>" [--when ...] [--any-os] [--private] | --apply <app...> [--env <env>]',
     about: 'remembered code changes: list, keep the last edit, apply the matching ones',
     run: recipes,
     example: 'koppler recipes orders-api',
@@ -546,7 +564,7 @@ const COMMANDS: Command[] = [
       ['as <id>', 'listen again as that session'],
       ['stop', 'disconnect whichever session listens'],
     ],
-    about: 'wait for Sends from the canvas (one agent session at a time)',
+    about: 'wait for requests from the canvas (one agent session at a time)',
     run: listen,
     example: 'koppler listen take',
   },
@@ -583,9 +601,25 @@ const COMMANDS: Command[] = [
     example: 'koppler stack set apps.orders-api.ready \'{"path":"/health"}\'',
   },
   {
+    name: 'actions',
+    who: 'agent',
+    args: "[--json] | add '<json>' | add --file <json file> | clear [--app <app>]",
+    forms: [
+      ['[--json]', 'the changes Stop will undo'],
+      [
+        "add '<json>' | add --file <json file>",
+        'log a change, or a list of them, before making it; checked, and never a secret value',
+      ],
+      ['clear [--app <app>]', "empty the log once everything in it is undone, or drop one app's entries"],
+    ],
+    about: 'the action log: every temporary change, which Stop undoes; the only way to write it',
+    run: actionsCommand,
+    example: `koppler actions add '{"kind":"env-file","app":"orders-api","file":"/full/path/.env.local","lines":["A=1"],"created":true}'`,
+  },
+  {
     name: 'say',
     who: 'agent',
-    args: '[--file <json>] | --answered <id>',
+    args: '[--file <json>] | --answered <id> [--text "<what was answered>"]',
     about: 'show a question or result on the canvas',
     run: sayCommand,
     example: 'koppler say --file reply.json',
@@ -619,7 +653,8 @@ function help(command?: Command): void {
     'koppler help <command>, or koppler <command> --help, shows its options and an example. koppler --version prints the version.',
     '',
     'Environment: KOPPLER_STATE (state folder, default ~/.local/state/koppler), KOPPLER_CONFIG_DIR (default ~/.config/koppler),',
-    '  KOPPLER_PORT (canvas, default 4747), KOPPLER_SECRETS (a folder for secrets instead of the Keychain).',
+    '  KOPPLER_PORT (canvas, default 4747), KOPPLER_SECRETS (a folder for secrets instead of the Keychain),',
+    '  KOPPLER_KEYCHAIN (a keychain file of its own), KOPPLER_TEMP and KOPPLER_LOGS (run state and logs, default inside KOPPLER_STATE).',
   ];
   console.log(lines.join('\n'));
 }

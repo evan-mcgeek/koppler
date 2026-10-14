@@ -12,9 +12,10 @@ It helps most when you work on one app (a mobile app, a front end, one API) and 
 ## How it works
 
 - **A shared stack.** The team describes its apps once in a `stack.json` in a repo they share: what each app is, how it runs, what it calls, which queues it uses, which secrets it needs.
-- **A board per person.** On the canvas each app is a card. A cable from one card to another means "this caller uses my local copy of that app". Presets load a usual setup in one click.
+- **A board per person.** On the canvas each app is a card. A cable from one card to another means "this caller uses my local copy of that app". Team boards load a usual setup in one click.
 - **Run.** Koppler switches branches, points callers at the local apps, opens tunnels, starts local queues and starts the apps callees first, checking that each one answers.
 - **Live cards.** Each card shows its steps, whether its port answers, and its log.
+- **Settings, not JSON.** Every fact of the stack is edited in the canvas's settings or with `koppler stack set`, checked before it is kept; a lock keeps a field as it is. Nobody edits `stack.json` by hand.
 - **Stop and revert.** One click stops what Koppler started and undoes every temporary change. Apps you started yourself are left alone.
 - **Secrets stay yours.** You store them in the macOS Keychain (on Linux, in files only you can read); Koppler starts an app with them and never shows them.
 

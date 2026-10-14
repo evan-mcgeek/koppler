@@ -33,7 +33,7 @@ Back this up with deny rules in your agent's settings; [secrets.md](../plugin/sk
 ## Changes are temporary
 
 - Every change is recorded in an action log and undone on Stop.
-- Koppler works in your real clones, so your IDE sees the changes, but it never commits, stashes or discards your work.
+- Koppler works in your real clones, so your IDE sees the changes, but it never commits or discards your work, and sets changes aside only when you choose that on the card.
 - Apps you started yourself are left alone.
 
 ## The canvas stays on your machine

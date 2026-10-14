@@ -34,15 +34,15 @@ A secret's optional `type` in `stack.json` (`postgres`, `mysql`, `redis`) says w
 A value is only ever sent to the host named inside it. API keys and tokens are not tested: that would mean sending them to an address taken from `stack.json`, which anyone editing that file could point elsewhere.
 `koppler secret psql <app or app@env> <NAME>` opens `psql` with a stored connection string, and `... --pgpass` adds its line to `~/.pgpass` (for `localhost` and `127.0.0.1`) so other database tools find the password; both are for the user's own terminal.
 `--pgpass` refuses a protected environment's store: that password stays behind its Keychain prompt and is never copied into a plain file.
-Scripts are in the skill's `bin/`:
+Scripts are in `<app>/bin/`:
 
 | Script | Who runs it | What it does |
 |---|---|---|
 | `koppler secret set <app> <ENV_NAME>` | the user, in their own terminal | hidden prompt; prints only the key name and length |
 | `<fetch> \| koppler secret set <app> <ENV_NAME> --stdin` | the user | stores a fetched value without showing it |
-| `koppler secret list [app]` | anyone | key names only |
+| `koppler secret list <app>[@<env>]` | anyone | key names only |
 | `with-secrets <app> -- <command>` | the user | runs the command with the app's secrets in its environment only |
-| `koppler run <app>` | the agent or the user | starts a stack .NET app with its secrets, detached and logged; with only an app id it cannot run another command, and `koppler run <name> -- <command>` never gets secrets |
+| `koppler run <app>` | the agent or the user | starts a stack app of any kind with its secrets, detached and logged; with only an app id it cannot run another command, and `koppler run <name> -- <command>` never gets secrets |
 
 ## Asking the user
 

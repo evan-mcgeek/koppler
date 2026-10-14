@@ -134,3 +134,37 @@ test('what a sign-in gives an app is part of what the user allows, and cannot ch
   assert.match(validateStack(stack({ PATH: '/tmp/x' })).join('\n'), /signIns\.azure.*PATH/);
   assert.match(validateStack(stack({ NODE_OPTIONS: '--require /tmp/x.js' })).join('\n'), /signIns\.azure.*NODE_OPTIONS/);
 });
+
+test('the action log is written through a command: checked, never a secret, cleared when undone', () => {
+  const { koppler, read, repo } = withClone();
+  const file = path.join(repo, '.env.local');
+  const entry = { kind: 'env-file', app: 'orders', file, lines: ['A=http://localhost:1'], created: true };
+  assert.equal(koppler(['actions', 'add', JSON.stringify(entry)]).code, 0);
+  assert.deepEqual(read('actions.json'), [entry]);
+  for (const [bad, why] of [
+    [{ kind: 'checkout', app: 'orders' }, /not one an entry can have/],
+    [{ kind: 'edit', file }, /needs before, after/],
+    [{ kind: 'env-file', file: '.env.local', lines: [] }, /full path/],
+    [{ kind: 'env-file', file, lines: ['Db__Password=hunter2'] }, /secret/],
+  ]) {
+    const r = koppler(['actions', 'add', JSON.stringify(bad)]);
+    assert.equal(r.code, 1, r.out);
+    assert.match(r.out, why);
+  }
+  assert.equal(read('actions.json').length, 1);
+  assert.match(koppler(['actions']).out, /orders\s+env-file/);
+  assert.equal(koppler(['actions', 'clear']).code, 0);
+  assert.deepEqual(read('actions.json'), []);
+});
+
+test("a card's steps are set through a command, one by its label", () => {
+  const { koppler, read } = fresh();
+  assert.equal(koppler(['status', 'step', 'orders', 'Start', 'user', '--detail', 'Run it in your terminal', '--copy', 'dotnet run', '--port', '5001']).code, 0);
+  assert.equal(koppler(['status', 'step', 'orders', 'Check', 'todo']).code, 0);
+  assert.equal(koppler(['status', 'step', 'orders', 'Start', 'done']).code, 0);
+  assert.deepEqual(read('status.json').apps.orders, { port: 5001, steps: [{ label: 'Start', state: 'done' }, { label: 'Check', state: 'todo' }] });
+  assert.equal(koppler(['status', 'step', 'orders', 'Start', 'sideways']).code, 2);
+  assert.equal(koppler(['status', 'step', '--secrets', 'Start', 'done']).code, 2);
+  assert.equal(koppler(['status', 'step', 'orders', '--clear']).code, 0);
+  assert.deepEqual(read('status.json').apps, {});
+});

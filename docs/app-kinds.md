@@ -2,7 +2,7 @@
 
 Every app in the stack has a `kind`.
 It says how Koppler recognises the repo, how `koppler run <app>` starts it, and how a cable passes it a local address.
-`koppler add` and `koppler discover` pick the kind from the repo's files; you can always set it by hand in `stack.json`.
+`koppler add` and `koppler discover` pick the kind from the repo's files; you can always change it with `koppler stack set apps.<id>.kind <kind>` or in the app's settings on the canvas.
 
 Each kind is marked:
 
