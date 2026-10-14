@@ -206,6 +206,10 @@ const App = z.looseObject(
       .describe(
         'It runs to completion, like a migration: the exit code it must end with (0) and the seconds it may take',
       ),
+    watch: z
+      .looseObject({ ignore: z.array(z.string(), { error: 'a list of paths' }).optional() }, { error: 'an object' })
+      .optional()
+      .describe('Restart on change: paths in its repo whose changes do not restart it'),
     commands: z
       .record(z.string().regex(/^[a-z0-9][a-z0-9-]{0,31}$/, { error: 'an id such as seed' }), AppCommand, {
         error: 'an object',

@@ -14,14 +14,15 @@ import { aliasReady, planSteps, planTunnels, type TunnelNeed } from '../core/por
 import { signInOf, type SignIn } from '../core/sign-in.ts';
 import type { Prereq } from '../core/stack.ts';
 import { readClones, readData, readStack, type Clone, type Registry } from '../data.ts';
-import { tempDir } from '../paths.ts';
+import { CODE, tempDir } from '../paths.ts';
 import { readActions, writeLogged, type Action } from './actions.ts';
 import { lambdaOverrides } from './app-start.ts';
 import { switchTo, type Carry } from './branch.ts';
 import { APPROVE, approved, missingTunnels, startsFromStack } from './checks.ts';
 import { link } from './libraries.ts';
 import { isDone } from './needs.ts';
-import { alive, listener, readRecord, records, sh, sleep, stopOne } from './processes.ts';
+import { alive, listener, readRecord, records, sh, sleep, startProcess, stopOne } from './processes.ts';
+import { watcherOf } from './watch.ts';
 import * as localQueue from './queues.ts';
 import { matches, prepare, recipesFor } from './recipes.ts';
 import { run } from './run.ts';
@@ -527,6 +528,19 @@ async function startApps(up: Up): Promise<void> {
     }
   }
   if (yours.length) console.log(`Start ${yours.join(', ')} in your IDE.`);
+  // A card set to restart on change has a watcher beside its app; one set back has none.
+  for (const id of order) {
+    const watcher = readRecord(watcherOf(id));
+    const wants = node(id).watch === true && node(id).run !== 'ide' && running(id) && !up.stack.apps[id]?.once;
+    if (wants && !(watcher && alive(watcher)))
+      await startProcess({
+        name: watcherOf(id),
+        command: [process.execPath, path.join(CODE, 'koppler.mjs'), 'watch', id],
+        cwd: up.clones[id]?.path ?? process.cwd(),
+        restart: false,
+      });
+    else if (!wants && watcher) console.log(await stopOne(watcher));
+  }
   if (down.size)
     throw new Failure(
       `Not everything started:\n${[...down].map(([id, why]) => `  ${nameOf(up.stack, id)}: ${why.split('\n')[0] ?? ''}`).join('\n')}`,

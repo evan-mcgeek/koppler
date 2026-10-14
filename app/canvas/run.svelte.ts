@@ -60,6 +60,7 @@ class Runs {
         run: data.run as 'cli' | 'ide',
         ...(data.hideTunnels && board.tunnelsOf(id).length > 0 && { tunnels: false as const }),
         ...(data.showQueues && board.queuesOf(id).length > 0 && { queues: true as const }),
+        ...(data.watch && data.run === 'cli' && { watch: true as const }),
         ...(board.switchesOver(id) && { changes: data.changes ?? ('set-aside' as const) }),
         ...(data.platform && data.run === 'cli' && !!app?.platforms.length && { platform: data.platform }),
         ...(data.note.trim() && { note: data.note.trim() }),

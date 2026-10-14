@@ -139,6 +139,7 @@ export function sanitizePresets(list: unknown): Preset[] {
                 ...note(node['note']),
                 ...(node['tunnels'] === false && { tunnels: false as const }),
                 ...(node['queues'] === true && { queues: true as const }),
+                ...(node['watch'] === true && { watch: true as const }),
               },
             ];
           }),
@@ -197,6 +198,7 @@ export function sanitizeLayout(input: unknown): Loose | null {
       ...note(node['note']),
       ...(node['hideTunnels'] === true && { hideTunnels: true }),
       ...(node['showQueues'] === true && { showQueues: true }),
+      ...(node['watch'] === true && { watch: true }),
       ...(['set-aside', 'take-along'].includes(changes as string) && { changes }),
       ...(libraries.length > 0 && { libraries }),
       ...(typeof node['full'] === 'number' && node['full'] > 0 && { full: Math.min(Math.round(node['full']), 5000) }),

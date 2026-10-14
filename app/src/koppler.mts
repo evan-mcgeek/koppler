@@ -42,6 +42,7 @@ import { runs } from './engine/history.ts';
 import { mcp } from './cli/mcp.ts';
 import { agentCommand } from './cli/agent.ts';
 import { doCommand } from './engine/app-commands.ts';
+import { watchCommand } from './engine/watch.ts';
 import { wire } from './engine/wire.ts';
 import { APP, CODE, configDir, tempDir } from './paths.ts';
 
@@ -569,6 +570,14 @@ const COMMANDS: Command[] = [
     about: "run one of an app's commands from the stack, such as seed or migrate, in its clone with its secrets",
     run: doCommand,
     example: 'koppler do orders-api seed --arg COUNT=50 --yes',
+  },
+  {
+    name: 'watch',
+    who: 'agent',
+    args: '<app>',
+    about: 'restart an app when a file in its clone changes (a run starts this for a card set to Restart on change)',
+    run: watchCommand,
+    example: 'koppler watch orders-api',
   },
   {
     name: 'down',

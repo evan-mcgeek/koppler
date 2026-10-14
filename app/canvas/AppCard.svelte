@@ -1,4 +1,5 @@
 <script lang="ts">
+  import RefreshCw from '@lucide/svelte/icons/refresh-cw';
   import Check from '@lucide/svelte/icons/check';
   import Icon from './Icon.svelte';
   import GripVertical from '@lucide/svelte/icons/grip-vertical';
@@ -189,6 +190,21 @@
         <Icon of={COMMAND_ICON[command.icon ?? 'terminal']} size={15} />
       </button>
     {/each}
+    {#if data.run === 'cli'}
+      <button
+        type="button"
+        aria-pressed={!!data.watch}
+        aria-label="Auto-restart for {data.name}"
+        title={data.watch
+          ? 'Auto-restart is on: Koppler starts it again whenever a file in its clone changes. Click to turn it off.'
+          : 'Auto-restart: start it again whenever a file in its clone changes'}
+        onclick={() => {
+          board.set(id, { watch: !data.watch });
+        }}
+      >
+        <Icon of={RefreshCw} size={15} />
+      </button>
+    {/if}
     <button
       type="button"
       aria-label="Settings for {data.name}"
@@ -241,6 +257,12 @@
       ></span>
     {/if}
     <span class="name" title={data.name}>{data.name}</span>
+    {#if data.watch && data.run === 'cli'}<span
+        class="watch"
+        role="img"
+        aria-label="Auto-restart"
+        title="Restarts when its files change"><Icon of={RefreshCw} size={12} /></span
+      >{/if}
     <span class="kind">{data.kindLabel}</span>
   </header>
   {#if brief}
@@ -639,6 +661,10 @@
     background: color-mix(in oklab, var(--ink) 8%, transparent);
     color: var(--ink);
   }
+  .tools button[aria-pressed='true'] {
+    background: color-mix(in oklab, var(--cable) 14%, transparent);
+    color: var(--cable);
+  }
   .tools :is(.remove, .stop):hover {
     color: var(--bad);
   }
@@ -710,6 +736,11 @@
     min-height: 30px;
     color: var(--ink);
     font-size: 13px;
+  }
+  .watch {
+    display: inline-grid;
+    flex: none;
+    color: var(--muted);
   }
   .live {
     flex: none;

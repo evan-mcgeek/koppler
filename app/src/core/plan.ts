@@ -16,6 +16,8 @@ export interface BoardNode {
   libraries?: string[];
   /** Asked to start again, though nothing about it changed. */
   restart?: true;
+  /** Restarted whenever a file in its clone changes. */
+  watch?: true;
 }
 export interface Edge {
   from: string;
@@ -41,6 +43,7 @@ interface NodeInput {
   changes?: unknown;
   libraries?: unknown;
   restart?: unknown;
+  watch?: unknown;
 }
 export interface BoardInput {
   env?: string | null;
@@ -92,6 +95,7 @@ const nodeOf = (n: NodeInput | null): BoardNode => ({
   ...(text(n?.changes) && { changes: text(n?.changes) }),
   ...(Array.isArray(n?.libraries) && n.libraries.length > 0 && { libraries: n.libraries.map(String).sort() }),
   ...(n?.restart === true && { restart: true as const }),
+  ...(n?.watch === true && { watch: true as const }),
 });
 
 export function board(input: BoardInput | null | undefined): Board {

@@ -12,6 +12,7 @@ Apps and tunnels that `koppler` starts run detached, so they keep running after 
 | `koppler use [stack] [--boards]` | List the stacks on this machine (`*` marks the one in use), switch to one, or list its boards |
 | `koppler link [<url> \| update \| discard \| pr]` | Use a stack shared on GitHub; then bring in its changes, drop yours, or open a pull request with yours |
 | `koppler doctor [app...] [--env <env>] [--no-tunnels <app,...>]` | Can it run here: the tools your stack needs, then what you still have to do for these apps |
+| `koppler watch <app>` | Restart an app when a file in its clone changes, as it was started, its wiring included; a run starts this beside each card set to Auto-restart, and Stop ends it |
 | `koppler doctor --secrets [app...]` | Also test that each stored secret works, for example that the database connects |
 | `koppler doctor --flow` | Test every connection of what runs now, like the canvas's Flow check |
 | `koppler doctor --approve` | Review everything the stack would run or write (checks, start commands, code changes) and allow it; asks you, never a script |

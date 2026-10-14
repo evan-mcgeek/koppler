@@ -39,6 +39,8 @@ export interface ProcessRecord {
   startedAt: string;
   psCommand: string;
   psStart: string;
+  /** How it was started, to start it the same way again when its files change. */
+  start?: RunOptions;
 }
 /** What `koppler run` was asked for. */
 /** When a started app is ready: a GET of this address answers, with `status` or any status below 400. */
@@ -306,6 +308,7 @@ export async function startProcess(options: RunOptions): Promise<ProcessRecord> 
     startedAt: new Date().toISOString(),
     psCommand: psCommand(child.pid),
     psStart: psStart(child.pid),
+    start: { ...options, cwd },
   };
   writeJson(recordPath(name), record);
   await sleep(700);
