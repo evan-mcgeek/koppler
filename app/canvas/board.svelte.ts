@@ -89,6 +89,8 @@ export interface TunnelData extends Record<string, unknown> {
   /** What is worth knowing about it, one line each. */
   about: string[];
   apps: string[];
+  /** Where its facts are kept in the stack: the need on its first app. */
+  settings: string;
 }
 export type TunnelNode = Node<TunnelData, 'tunnel'>;
 /** A queue between apps: a card with a switch between the deployed queue and a local copy. */
@@ -285,6 +287,13 @@ class Board {
       const { tunnel, port } = need;
       return tunnel && port && Number.isInteger(port) && port < 65536 ? [{ ...need, tunnel, port }] : [];
     });
+  }
+  /** The stack path of an app's need for a tunnel to a host, on the board's environment. */
+  tunnelPath(id: string, host: string): string {
+    const app = this.#registry?.apps[id];
+    const own = this.env !== this.envs[0] ? app?.envs?.[this.env]?.prereqs : undefined;
+    const at = (own ?? app?.prereqs ?? []).findIndex(need => need.tunnel === host);
+    return `apps.${id}.${own ? `envs.${this.env}.` : ''}prereqs[${String(at)}]`;
   }
   /** The tunnels for everything on the board, planned together so none clash: shared, moved, or on an address of its own. */
   plan = $derived.by(() => {
@@ -545,6 +554,7 @@ class Board {
             typeof note === 'string' ? note : '',
           ].filter(Boolean),
           apps: tunnel.apps,
+          settings: this.tunnelPath(tunnel.apps[0] ?? '', tunnel.host),
         },
       };
     });

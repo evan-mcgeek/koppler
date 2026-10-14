@@ -2,6 +2,8 @@
   import Icon from './Icon.svelte';
   import X from '@lucide/svelte/icons/x';
   import type { NodeProps } from '@xyflow/svelte';
+  import Cog from './Cog.svelte';
+  import { dialogs } from './dialogs.svelte.ts';
   import { board, type TunnelNode } from './board.svelte.ts';
   import { live } from './live.svelte.ts';
 
@@ -20,6 +22,15 @@
   <button
     class="hide nodrag"
     type="button"
+    aria-label="Settings for the {data.what} tunnel"
+    title="Settings: the host, its port and how it is opened"
+    onclick={() => void dialogs.settings?.open({ title: `${data.what} tunnel`, path: data.settings })}
+  >
+    <Cog size={13} />
+  </button>
+  <button
+    class="hide nodrag"
+    type="button"
     aria-label="Run without this tunnel"
     title="Turn it off: the tunnel is not opened, so calls to it fail. Turn Tunnels back on on the app's card to bring it back."
     onclick={() => {
@@ -32,7 +43,7 @@
 <style>
   .tunnel {
     display: grid;
-    grid-template-columns: 8px 1fr auto auto;
+    grid-template-columns: 8px 1fr auto auto auto;
     column-gap: 8px;
     row-gap: 3px;
     align-items: baseline;

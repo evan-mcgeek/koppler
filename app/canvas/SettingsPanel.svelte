@@ -29,6 +29,7 @@
     lockedBy,
     OUTSIDE_TABS,
     problemsByPath,
+    rowOf,
     STACK_HEAD,
     STACK_TABS,
     within,
@@ -90,6 +91,9 @@
     const named = new Set([...head, ...own.flatMap(one => one.keys)]);
     const rest = [...Object.keys(shape.properties ?? {}), ...Object.keys(value ?? {})].filter(key => !named.has(key));
     const other = [...new Set(rest)];
+    // One row of a list (a need): only the fields of its type, and any others it already has.
+    const row = at ? rowOf(at, value, draft) : undefined;
+    if (row) return [{ name: 'Settings', keys: [...new Set([...row.fields, ...Object.keys(value ?? {})])] }];
     if (!own.length) return [{ name: 'Settings', keys: other }];
     return other.length ? [...own, { name: 'Other', keys: other }] : own;
   });
