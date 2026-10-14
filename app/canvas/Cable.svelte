@@ -1,11 +1,14 @@
 <script lang="ts">
-  import type { EdgeProps } from '@xyflow/svelte';
+  import { useViewport, type EdgeProps } from '@xyflow/svelte';
   import { cablePath, SIDES, throughPath } from '../src/core/cables.ts';
   import { board, type CableData } from './board.svelte.ts';
   import { wiring } from './wiring.svelte.ts';
   import { live } from './live.svelte.ts';
 
   const { id, source, target, selected, data: given }: EdgeProps = $props();
+  const viewport = useViewport();
+  // Zoomed out, the mark to unplug a cable keeps its size on screen, so it can still be hit.
+  const markScale = $derived(Math.max(1, 1 / viewport.current.zoom));
   const data = $derived(given as CableData | undefined);
   const index = $derived(board.edges.findIndex(edge => edge.id === id));
   const a = $derived(wiring.endPoint(index, 'from'));
@@ -30,7 +33,7 @@
     const probe = document.createElementNS('http://www.w3.org/2000/svg', 'path');
     probe.setAttribute('d', path);
     const at = probe.getPointAtLength(probe.getTotalLength() / 2);
-    return `translate(${String(at.x)} ${String(at.y)})`;
+    return `translate(${String(at.x)} ${String(at.y)}) scale(${String(markScale)})`;
   });
 </script>
 
@@ -45,7 +48,8 @@
     onpointerleave={() => (board.hovered = null)}
   >
     <title>{name(source)} calls local {name(target)}. Click to pick it; the × in its middle unplugs it.</title>
-    <path class="svelte-flow__edge-interaction hit" d={path} />
+    <!-- As wide on screen at every zoom: a cable far away is as easy to point at. -->
+    <path class="svelte-flow__edge-interaction hit" d={path} style:stroke-width="{16 * markScale}px" />
     <path class="under" d={path} />
     <path class="wire" d={path} />
     <path class="head" d="M-10,-5 L0,0 L-10,5 L-7.5,0 Z" transform={head} />

@@ -1,7 +1,14 @@
 // Shared by the tests: ports the system says are free, and waiting for something instead of sleeping a guessed time.
 import net from 'node:net';
 
-const free = port => new Promise(resolve => { const s = net.createServer(); s.once('error', () => resolve(null)); s.listen(port, '127.0.0.1', () => { const got = s.address().port; s.close(() => resolve(got)); }); });
+const on = (port, host) => new Promise(resolve => { const s = net.createServer(); s.once('error', error => resolve(error.code === 'EADDRNOTAVAIL' ? port : null)); s.listen(port, host, () => { const got = s.address().port; s.close(() => resolve(got)); }); });
+// Free on every local address: a program can hold a port on [::1] alone (as Dart's tools do), and Koppler sees it.
+const free = async port => {
+  const got = await on(port, '127.0.0.1');
+  if (!got) return null;
+  for (const host of ['::1', '0.0.0.0']) if ((await on(got, host)) !== got) return null;
+  return got;
+};
 // `count` free ports; with `roomAfter`, each also has that many free ports straight after it.
 export async function freePorts(count, { roomAfter = 0 } = {}) {
   const ports = [];
