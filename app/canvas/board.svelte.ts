@@ -16,7 +16,7 @@ import {
   type StoredPreset,
 } from '../src/core/presets.ts';
 import type { Registry } from '../src/data.ts';
-import type { Loaded, SavedBoard } from './data.ts';
+import { load, save, type Loaded, type SavedBoard } from './data.ts';
 
 export interface CableData extends Record<string, unknown> {
   fromSide: Side;
@@ -540,11 +540,11 @@ class Board {
           kind: one.queue.type.toUpperCase(),
           can,
           local,
-          shares: shares ? `Shared with ${env}'s reader` : '',
+          shares: shares ? `Your local ${shares} reads the ${env} queue` : '',
           about: [
             one.queue.envs?.[this.env]?.queue ?? one.queue.queue ?? one.id,
             shares
-              ? `Your local ${shares} reads the ${env} queue, so it takes messages the deployed reader would get.`
+              ? `It takes messages the deployed ${env} reader would get. Switch to Local to give your run its own copy.`
               : '',
           ].filter(Boolean),
         },
@@ -1152,6 +1152,13 @@ class Board {
   }
 
   /** Puts the board the server kept on screen: the stack's apps where they were left, and their cables. */
+  /** The stack read again after it changed (Settings saved), in place: the page, and full screen, stay. */
+  async reload(): Promise<void> {
+    this.commit();
+    await save(this.saved());
+    const loaded = await load();
+    if (loaded) this.open(loaded);
+  }
   open({ stack, clones, roots, saved }: Loaded): void {
     this.#registry = stack;
     this.#guarded = stack.envs.filter(env => isProtected(stack, env));
