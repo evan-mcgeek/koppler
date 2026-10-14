@@ -249,6 +249,15 @@ test('the stack has its own settings, beside its name, with its apps a click awa
   await expect.poll(() => (read() as unknown as { name: string }).name).toBe('Acme Store');
   await tabOf(page, 'Apps').click();
   await page.screenshot({ path: 'test-results/next-stack-settings.png' });
+  // An app's settings open in the same panel: never over changes that are not saved yet.
+  await name.fill('Acme Shop 2');
+  await name.press('Tab');
+  const toOrders = panel
+    .getByRole('listitem')
+    .filter({ hasText: 'Orders API' })
+    .getByRole('button', { name: 'Settings' });
+  await expect(toOrders).toBeDisabled();
+  await panel.getByRole('button', { name: 'Discard' }).click();
   await panel.getByRole('listitem').filter({ hasText: 'Orders API' }).getByRole('button', { name: 'Settings' }).click();
   await expect(page.getByRole('dialog', { name: 'Orders API' })).toBeVisible();
 });

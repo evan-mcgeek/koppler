@@ -137,6 +137,7 @@ class Live {
   asked = $state(false);
   #timer: ReturnType<typeof setInterval> | undefined;
 
+  #last = '';
   /** Asks for the status now and every second and a half, while the page is in view. */
   watch(): void {
     let asking = false;
@@ -146,7 +147,12 @@ class Live {
       asking = true;
       try {
         const answer = await fetch('data/status.json');
-        if (answer.ok) this.status = (await answer.json()) as Status;
+        // Nothing new is nothing to draw again: every card reads the status.
+        const text = answer.ok ? await answer.text() : this.#last;
+        if (text !== this.#last) {
+          this.#last = text;
+          this.status = JSON.parse(text) as Status;
+        }
       } catch {
         // The server is away: the last status stays until it answers again.
       }

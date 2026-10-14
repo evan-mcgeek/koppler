@@ -23,9 +23,9 @@
     return `translate(${String(b.x + x * 10)} ${String(b.y + y * 10)}) rotate(${String((Math.atan2(-y, -x) * 180) / Math.PI)})`;
   });
   const name = (app: string) => board.apps.find(one => one.id === app)?.name ?? app;
-  /** The middle of the cable, where the mark to unplug it shows: measured on a path of that shape. */
+  /** The middle of the cable, where the mark to unplug it shows while it is pointed at: measured only then. */
   const middle = $derived.by(() => {
-    if (!path) return '';
+    if (!path || board.hovered !== id) return '';
     const probe = document.createElementNS('http://www.w3.org/2000/svg', 'path');
     probe.setAttribute('d', path);
     const at = probe.getPointAtLength(probe.getTotalLength() / 2);
@@ -46,10 +46,12 @@
     <path class="under" d={path} />
     <path class="wire" d={path} />
     <path class="head" d="M-10,-5 L0,0 L-10,5 L-7.5,0 Z" transform={head} />
-    <g class="cut" transform={middle}>
-      <circle r="8" />
-      <path d="M-3,-3 L3,3 M3,-3 L-3,3" />
-    </g>
+    {#if middle}
+      <g class="cut" transform={middle}>
+        <circle r="8" />
+        <path d="M-3,-3 L3,3 M3,-3 L-3,3" />
+      </g>
+    {/if}
   </g>
 {/if}
 

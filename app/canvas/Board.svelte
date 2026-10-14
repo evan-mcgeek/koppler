@@ -707,7 +707,7 @@
       <p>Click the apps you want to run together.<br />Connect them; the board is saved as you go.</p>
       {#if lately.length && !board.live}
         <ul aria-label="Or open a board">
-          {#each lately as { preset, team, at } (preset.name)}
+          {#each lately as { preset, team, at } (`${team ? 'team' : 'own'}:${preset.name}`)}
             <li>
               <button
                 type="button"

@@ -1156,7 +1156,9 @@ class Board {
     if (!first) return { error: read[0]?.error ?? 'No board found in it.' };
     const checked = check(first, this.#facts());
     if (checked.error !== undefined) return { error: checked.error };
-    this.own = [...this.own.filter(one => !list.some(other => other.name === one.name)), ...list];
+    // One board per name: of two in the file, the later one.
+    const named = [...new Map(list.map(one => [one.name, one])).values()];
+    this.own = [...this.own.filter(one => !named.some(other => other.name === one.name)), ...named];
     const out = this.openBoard(first);
     return out.error === undefined ? { notes: out.notes, name: first.name } : out;
   }

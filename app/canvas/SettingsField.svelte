@@ -217,16 +217,19 @@
       <button type="button" disabled={!newKey.trim()} onclick={() => void add()}>Add</button>
     </span>
   {:else}
-    {#each list as item, at (at)}
-      <Self
-        path={child(path, at)}
-        name={itemName(item, `${name} ${String(at + 1)}`)}
-        schema={schema.items ?? {}}
-        value={item}
-        {ctx}
-        depth={depth + 1}
-      />
-    {/each}
+    <!-- Drawn anew when one is added or taken out: what was open belongs to an item, not to its place. -->
+    {#key list.length}
+      {#each list as item, at (at)}
+        <Self
+          path={child(path, at)}
+          name={itemName(item, `${name} ${String(at + 1)}`)}
+          schema={schema.items ?? {}}
+          value={item}
+          {ctx}
+          depth={depth + 1}
+        />
+      {/each}
+    {/key}
     {#if rows && !list.length && !draft && !choosing}<span class="none">{EMPTY[rows]}</span>{/if}
     {#if draft}
       <div class="draft" role="group" aria-label="New in {name}">
