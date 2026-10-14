@@ -104,6 +104,7 @@ export function runRecord(prompt: Prompt | null | undefined): RunRecord | null {
         ...(node.note && { note: text(node.note, 4000) }),
         ...(node.tunnels === false && { tunnels: false }),
         ...(node.queues === true && { queues: true }),
+        ...(node.watch === true && { watch: true }),
         ...(node.restart && { restart: true }),
         ...(['set-aside', 'take-along'].includes(node.changes ?? '') && { changes: node.changes }),
         ...(node.libraries?.length && {

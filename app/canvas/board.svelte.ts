@@ -46,6 +46,8 @@ export interface CardData extends Record<string, unknown> {
   hideTunnels?: boolean;
   /** It is on its queues: linked to their cards, each of which can run locally. Off by default: it keeps the deployed ones. */
   showQueues?: boolean;
+  /** Koppler starts it again whenever a file in its clone changes. */
+  watch?: boolean;
   /** What happens to the clone's uncommitted changes when another branch runs; set aside unless chosen. */
   changes?: Changes;
   /** The libraries it runs with the local copy of, by name. */
@@ -889,6 +891,7 @@ class Board {
             ...(data.note && { note: data.note }),
             ...(data.hideTunnels && { tunnels: false }),
             ...(data.showQueues && this.queuesOf(id).length > 0 && { queues: true }),
+            ...(data.watch && data.run === 'cli' && { watch: true }),
           },
         ]),
       ),
@@ -1185,6 +1188,7 @@ class Board {
         kindLabel,
         ...(chosen.hideTunnels === true && { hideTunnels: true }),
         ...(chosen.showQueues === true && { showQueues: true }),
+        ...(chosen.watch === true && { watch: true }),
         ...((chosen.changes === 'take-along' || chosen.changes === 'set-aside') && { changes: chosen.changes }),
         ...(Array.isArray(chosen.libraries) && {
           libraries: chosen.libraries.filter(name => typeof name === 'string'),
@@ -1314,7 +1318,11 @@ class Board {
       ...(this.view && { zoom: this.view.zoom, pan: { x: this.view.x, y: this.view.y } }),
       nodes: Object.fromEntries(
         this.nodes.map(
-          ({ id, position, data: { branch, run, platform, note, hideTunnels, showQueues, changes, libraries } }) => [
+          ({
+            id,
+            position,
+            data: { branch, run, platform, note, hideTunnels, showQueues, watch, changes, libraries },
+          }) => [
             id,
             {
               ...before[id],
@@ -1326,6 +1334,7 @@ class Board {
               note,
               hideTunnels: hideTunnels ? true : undefined,
               showQueues: showQueues ? true : undefined,
+              watch: watch ? true : undefined,
               changes,
               libraries: libraries?.length ? libraries : undefined,
               full: this.fullHeights[id],

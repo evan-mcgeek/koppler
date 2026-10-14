@@ -71,6 +71,7 @@ export interface OpenedNode {
   note?: string;
   tunnels?: false;
   queues?: true;
+  watch?: true;
 }
 export interface OpenedPreset {
   name: string;
@@ -108,6 +109,7 @@ function openNode(id: string, stored: Loose, stack: StackFacts, name: string, no
   if (typeof stored['note'] === 'string' && stored['note'].trim()) node.note = stored['note'];
   if (stored['tunnels'] === false) node.tunnels = false;
   if (stored['queues'] === true) node.queues = true;
+  if (stored['watch'] === true) node.watch = true;
   return node;
 }
 
