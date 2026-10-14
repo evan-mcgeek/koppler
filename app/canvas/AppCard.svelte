@@ -15,7 +15,8 @@
   import type { Side } from '../src/core/arrange.ts';
   import { board, FAR_ZOOM, type CardNode } from './board.svelte.ts';
   import { wiring } from './wiring.svelte.ts';
-  import { COMMAND_ICON, runCommand } from './commands.ts';
+  import { COMMAND_ICON, openTerminal, runCommand } from './commands.ts';
+  import SquareTerminal from '@lucide/svelte/icons/square-terminal';
   import { toasts } from './toast.svelte.ts';
   import { live, progress, STATE_NAMES } from './live.svelte.ts';
   import { logs } from './logs.svelte.ts';
@@ -190,6 +191,16 @@
         <Icon of={COMMAND_ICON[command.icon ?? 'terminal']} size={15} />
       </button>
     {/each}
+    {#if app?.cloned && !app.outside}
+      <button
+        type="button"
+        aria-label="Open a terminal for {data.name}"
+        title="A terminal in its clone, with the settings its run starts it with; never its secrets"
+        onclick={() => void openTerminal(id)}
+      >
+        <Icon of={SquareTerminal} size={15} />
+      </button>
+    {/if}
     {#if data.run === 'cli'}
       <button
         type="button"
