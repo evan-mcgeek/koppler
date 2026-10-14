@@ -4,7 +4,7 @@
 import { execFile, execFileSync } from 'node:child_process';
 import net from 'node:net';
 import tls from 'node:tls';
-import { SECRET_TYPES } from './core/stack.ts';
+import { SECRET_TYPES } from './core/secret-types.ts';
 import { clientEnv, findClient } from './safe-env.ts';
 
 export const TYPES = SECRET_TYPES;

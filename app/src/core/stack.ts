@@ -5,9 +5,7 @@ import { loadsCode } from '../safe-env.ts';
 import { BUILT_IN_KINDS } from './kinds.ts';
 import { QUEUE_TYPES } from './plan.ts';
 import { VERSION as PRESET_VERSION } from './presets.ts';
-
-/** The kinds of stored secret Koppler can test by connecting. */
-export const SECRET_TYPES = ['postgres', 'mysql', 'redis'] as const;
+import { SECRET_TYPES } from './secret-types.ts';
 
 // Values that end up in commands (tunnels, sign-ins, hosts entries, secret steps, clone commands) must look like what
 // they are, so a shared stack file cannot smuggle shell syntax into them.

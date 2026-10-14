@@ -7,7 +7,7 @@
   // draft until Save, which checks the whole stack and writes it at once; Discard drops them. A lock keeps a field as it
   // is, for the user and the agent.
   import { KINDS } from '../src/core/kinds.ts';
-  import { SECRET_TYPES } from '../src/core/stack.ts';
+  import { SECRET_TYPES } from '../src/core/secret-types.ts';
   import { getAt, parsePath, setAt } from '../src/core/stack-path.ts';
   import EnvOverrides from './EnvOverrides.svelte';
   import KindIcon from './KindIcon.svelte';
