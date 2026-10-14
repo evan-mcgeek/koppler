@@ -93,7 +93,7 @@ interface Status {
   /** `busy`: when it took what it works on. */
   agent?: { state?: string; busy?: string };
   /** Changes made to boards from the terminal that this page has not made on its copy yet. */
-  boardEdits?: { id: string; board: string; edit: BoardEdit }[];
+  boardEdits?: { id: string; board: string; edit: BoardEdit; create?: true }[];
   /** The stack's fields locked on this Mac, as paths. */
   locks?: string[];
   /** What the agent said: questions, results and failures, oldest first. */

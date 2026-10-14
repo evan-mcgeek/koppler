@@ -1,6 +1,6 @@
 // Changing a board from the terminal. The change goes into state.json at once, and waits in board-edits.json for an
 // open canvas to make it on its own copy too, so the canvas shows it and never saves its older copy over it.
-import { describeEdit, editPreset, type BoardEdit, type StoredPreset } from '../core/presets.ts';
+import { describeEdit, editPreset, VERSION, type BoardEdit, type StoredPreset } from '../core/presets.ts';
 import type { Edge } from '../core/plan.ts';
 import { readClones, readData, readStack, writeData } from '../data.ts';
 import { fail } from '../failure.ts';
@@ -13,6 +13,8 @@ export interface QueuedEdit {
   stack: string | null;
   board: string;
   edit: BoardEdit;
+  /** A board made from the terminal: a canvas that does not have it starts it empty. */
+  create?: true;
 }
 
 const queued = () => (readData('board-edits')?.['edits'] ?? []) as QueuedEdit[];
@@ -26,12 +28,14 @@ export function editDone(id: unknown): void {
   writeData('board-edits', { edits: queued().filter(one => one.id !== id) });
 }
 
-const USAGE =
-  'usage: koppler board edit "<name>" [--add <app,...>] [--remove <app,...>] [--cable <caller>:<callee>]... [--uncable <caller>:<callee>]... [--branch <app>=<branch>]... [--note <app>="<note>"]...';
+const CHANGES =
+  '[--add <app,...>] [--remove <app,...>] [--cable <caller>:<callee>]... [--uncable <caller>:<callee>]... [--branch <app>=<branch>]... [--note <app>="<note>"]...';
+const USAGE = `usage: koppler board new "<name>" ${CHANGES}\n       koppler board edit "<name>" ${CHANGES}`;
 
 export function boardCommand(args: string[]): void {
   const [what, name] = args;
-  if (what !== 'edit' || !name || name.startsWith('-')) fail(USAGE);
+  if ((what !== 'edit' && what !== 'new') || !name?.trim() || name.startsWith('-')) fail(USAGE);
+  const create = what === 'new';
   const stack = readStack() ?? fail('no stack loaded (koppler init)');
   const values = (flag: string) => args.filter((_, at) => args[at - 1] === flag);
   const ids = (flag: string) =>
@@ -61,10 +65,14 @@ export function boardCommand(args: string[]): void {
   const own = (state['presets'] ?? []) as StoredPreset[];
   const team = (stack.presets ?? []) as StoredPreset[];
   const lower = name.toLowerCase();
-  const board =
-    [...own, ...team].find(one => one.name === name) ??
-    [...own, ...team].find(one => one.name.toLowerCase() === lower) ??
-    fail(`no board called ${name}; koppler use --boards lists them`);
+  const found =
+    [...own, ...team].find(one => one.name === name) ?? [...own, ...team].find(one => one.name.toLowerCase() === lower);
+  if (create && found) fail(`a board called ${found.name} already exists; change it with koppler board edit`);
+  const board: StoredPreset =
+    found ??
+    (create
+      ? { name: name.trim(), version: VERSION, nodes: {}, edges: [] }
+      : fail(`no board called ${name}; koppler board new makes one, koppler use --boards lists them`));
   const app = (id: string) => stack.apps[id];
   const clones = readClones();
   for (const id of edit.add ?? []) {
@@ -85,7 +93,7 @@ export function boardCommand(args: string[]): void {
   }
 
   const changed = { ...editPreset(board, edit), name: board.name };
-  if (JSON.stringify(changed) === JSON.stringify(board)) {
+  if (!create && JSON.stringify(changed) === JSON.stringify(board)) {
     console.log(`Nothing to change on ${board.name}.`);
     return;
   }
@@ -101,12 +109,14 @@ export function boardCommand(args: string[]): void {
     stack: currentStack(),
     board: board.name,
     edit,
+    ...(create && { create: true as const }),
   };
   writeData('board-edits', {
     edits: [...queued().filter(one => now - Date.parse(one.at) < DAY), entry],
   });
   const canvas = readRecord('canvas');
-  console.log(`CHANGED ${board.name}: ${describeEdit(edit, id => app(id)?.name ?? id)}`);
+  const said = describeEdit(edit, id => app(id)?.name ?? id);
+  console.log(`${create ? 'MADE' : 'CHANGED'} ${board.name}${said ? `: ${said}` : ''}`);
   console.log(
     canvas && alive(canvas)
       ? 'An open canvas shows the change as soon as it is in view.'

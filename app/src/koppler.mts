@@ -563,8 +563,12 @@ const COMMANDS: Command[] = [
   {
     name: 'board',
     who: 'agent',
-    args: 'edit "<name>" [--add <app,...>] [--remove <app,...>] [--cable <caller>:<callee>]... [--uncable <caller>:<callee>]... [--branch <app>=<branch>]... [--note <app>="<note>"]...',
+    args: 'new|edit "<name>" [--add <app,...>] [--remove <app,...>] [--cable <caller>:<callee>]... [--uncable <caller>:<callee>]... [--branch <app>=<branch>]... [--note <app>="<note>"]...',
     forms: [
+      [
+        'new "<name>" [--add <app,...>] [--cable <caller>:<callee>]...',
+        'make a board of your own, with its apps and cables',
+      ],
       [
         'edit "<name>" [--add <app,...>] [--remove <app,...>]',
         'put apps on a board or take them off; the cards already there keep their places',
@@ -572,7 +576,7 @@ const COMMANDS: Command[] = [
       ['edit "<name>" [--cable <caller>:<callee>]... [--uncable <caller>:<callee>]...', 'add or take off cables'],
       ['edit "<name>" [--branch <app>=<branch>]... [--note <app>="<note>"]...', "set an app's branch or note"],
     ],
-    about: 'change a board, even one open on the canvas, which shows the change',
+    about: 'make a board, or change one even while it is open on the canvas, which shows the change',
     run: boardCommand,
     example: 'koppler board edit "Checkout" --add orders-api --cable web:orders-api',
   },

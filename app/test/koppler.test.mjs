@@ -386,8 +386,20 @@ test('A board is changed from the terminal: kept at once, queued for an open can
   assert.match(koppler('board', 'edit', 'Shop', '--cable', 'web:pay').out, /pay is not on Shop/);
   assert.match(koppler('board', 'edit', 'Shop', '--branch', 'web').out, /expected <app>=<value>/);
   assert.match(koppler('board', 'edit', 'Shop', '--add', 'orders').out, /Nothing to change on Shop/);
-  assert.match(koppler('board', 'Shop').out, /usage: koppler board edit/);
+  assert.match(koppler('board', 'Shop').out, /usage: koppler board new/);
+  assert.match(koppler('board', 'new', 'shop', '--add', 'web').out, /a board called Shop already exists/);
   assert.equal(fs.readFileSync(path.join(dir, 'state.json'), 'utf8'), before);
+
+  // A board of its own, made from the terminal, with its apps and cables; an open canvas makes it too.
+  const made = koppler('board', 'new', 'Orders work', '--add', 'web,orders', '--cable', 'web:orders');
+  assert.equal(made.code, 0, made.out);
+  assert.match(made.out, /MADE Orders work: added Web, Orders; cabled Web to Orders/);
+  const work = read('state').presets.find(one => one.name === 'Orders work');
+  assert.deepEqual(Object.keys(work.nodes), ['web', 'orders']);
+  assert.deepEqual(work.edges, [{ from: 'web', to: 'orders' }]);
+  assert.equal(read('board-edits').edits.at(-1).create, true);
+  assert.equal(koppler('board', 'new', 'Empty one').code, 0);
+  assert.deepEqual(read('state').presets.find(one => one.name === 'Empty one').nodes, {});
   fs.rmSync(dir, { recursive: true });
 });
 
