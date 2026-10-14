@@ -49,5 +49,5 @@ test('a picked tunnel card keeps its app bright, and the rest fades', async ({ p
       .evaluate(el => el.classList.contains('dimmed'));
   await expect.poll(() => dimmed('web')).toBe(true);
   expect(await dimmed('orders')).toBe(false);
-  await expect(page.locator('.links .link').first()).not.toHaveClass(/dimmed/);
+  await expect(page.locator('.links .link').first()).toHaveClass(/\blit\b/);
 });
