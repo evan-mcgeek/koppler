@@ -92,7 +92,13 @@
   const rows = $derived(ROW_LISTS.exec(path)?.[1]);
   const text = (one: unknown) => (typeof one === 'string' ? one : '');
   const strings = $derived(list.filter(one => typeof one === 'string'));
-  const stack = $derived(ctx.stack() as { envs?: string[]; queues?: Record<string, { name?: string }> } | null);
+  const stack = $derived(
+    ctx.stack() as {
+      envs?: string[];
+      queues?: Record<string, { name?: string }>;
+      apps?: Record<string, { name?: string; outside?: unknown }>;
+    } | null,
+  );
   const signIns = $derived(Object.keys((ctx.stack() as { signIns?: object } | null)?.signIns ?? {}).length);
   let newKey = $state('');
   // A new item is filled in here first, then kept as a whole.
@@ -365,6 +371,21 @@
         ontoggle={(env, on) => {
           const now = value === undefined ? envs.slice(1) : strings;
           void save(envs.filter(one => (one === env ? on : now.includes(one))));
+        }}
+      />
+    {:else if control === 'apps'}
+      {@const self = path.split('.')[1]}
+      <Checks
+        options={Object.entries(stack?.apps ?? {})
+          .filter(([key, one]) => key !== self && !one.outside)
+          .map(([key, one]) => ({ value: key, label: one.name ?? key }))}
+        picked={strings}
+        label={name}
+        disabled={locked}
+        none="The stack has no other apps."
+        ontoggle={(app, on) => {
+          const next = on ? [...strings, app] : strings.filter(one => one !== app);
+          void save(next.length ? next : undefined);
         }}
       />
     {:else if control === 'queues'}

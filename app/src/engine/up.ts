@@ -459,7 +459,10 @@ async function startQueues(up: Up, chosen: Record<string, string>): Promise<void
     }
 }
 
-/** Apps the others call start first, so a caller finds its callee answering; a loop just starts in board order. */
+/**
+ * Apps the others call start first, so a caller finds its callee answering, and an app's `after` (a migration that
+ * runs to completion) before it; a loop just starts in board order.
+ */
 async function startApps(up: Up): Promise<void> {
   const { ids, env, edges, node, step } = up;
   const order: string[] = [];
@@ -468,6 +471,7 @@ async function startApps(up: Up): Promise<void> {
     if (seen.has(id)) return;
     seen.add(id);
     for (const edge of edges) if (edge.from === id) visit(edge.to);
+    for (const first of up.stack.apps[id]?.after ?? []) if (ids.includes(first)) visit(first);
     order.push(id);
   };
   ids.forEach(visit);
@@ -484,7 +488,7 @@ async function startApps(up: Up): Promise<void> {
     else {
       const setEnv = up.setEnv[id];
       await run([id, '--env', env, ...(platform ? ['--device', platform] : [])], setEnv ? { setEnv } : {});
-      step(id, 'Start', 'done', 'Running.');
+      step(id, 'Start', 'done', up.stack.apps[id]?.once ? 'Finished.' : 'Running.');
     }
   }
   if (yours.length) console.log(`Start ${yours.join(', ')} in your IDE.`);

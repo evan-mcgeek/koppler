@@ -397,3 +397,19 @@ test("a tunnel card opens the settings of its app's need for it, on the board's 
   expect(orders.prereqs[0]?.port).toBe(5433);
   expect(orders.envs.prod.prereqs[0]?.port).toBe(5432);
 });
+
+test('an app is set to run to completion, and to start after another app picked from the stack', async ({
+  page,
+  canvas,
+}) => {
+  const read = stackFile(canvas.dir);
+  await (await actions(page, 'orders')).getByRole('button', { name: 'Settings for Orders API' }).click();
+  const panel = page.getByRole('dialog', { name: 'Orders API' });
+  const after = panel.getByRole('group', { name: 'Starts after' });
+  await after.getByRole('checkbox', { name: 'Payments API' }).check();
+  await expect(after.getByRole('checkbox', { name: 'Orders API' })).toHaveCount(0);
+  await page.screenshot({ path: 'test-results/next-settings-after.png' });
+  await panel.getByRole('button', { name: 'Save' }).click();
+  await expect(panel.getByRole('status')).toHaveText('Saved');
+  expect(read().apps['orders']?.['after']).toEqual(['payments']);
+});

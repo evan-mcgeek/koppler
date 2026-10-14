@@ -141,10 +141,16 @@ export const test = base.extend<{
       stdio: 'ignore',
     });
     const urlFile = path.join(temp, 'canvas-url');
-    await expect.poll(() => fs.existsSync(urlFile), { message: 'the canvas server starts' }).toBe(true);
-    await use({ url: fs.readFileSync(urlFile, 'utf8').trim(), dir, temp });
-    server.kill();
-    fs.rmSync(dir, { recursive: true, force: true });
+    try {
+      // A busy machine can take a while to start Node.
+      await expect
+        .poll(() => fs.existsSync(urlFile), { message: 'the canvas server starts', timeout: 20_000 })
+        .toBe(true);
+      await use({ url: fs.readFileSync(urlFile, 'utf8').trim(), dir, temp });
+    } finally {
+      server.kill();
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
   },
   page: async ({ page, canvas, start }, use) => {
     const errors: string[] = [];
