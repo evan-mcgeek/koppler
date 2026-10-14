@@ -42,9 +42,9 @@
   let title = $state('');
   let at = $state('');
   /** The stack as it is kept, and the draft the panel edits. */
-  let stack = $state<unknown>(null);
-  let draft = $state<unknown>(null);
-  let schema = $state<Schema | null>(null);
+  let stack = $state.raw<unknown>(null);
+  let draft = $state.raw<unknown>(null);
+  let schema = $state.raw<Schema | null>(null);
   let locks = $state<string[]>([]);
   let problems = $state(new Map<string, string>());
   let tab = $state(0);
@@ -295,8 +295,11 @@
               <span class="kind"
                 >{(Object.hasOwn(KINDS, one.kind ?? '') ? KINDS[one.kind ?? '']?.label : null) ?? one.kind ?? ''}</span
               >
-              <button type="button" onclick={() => void open({ title: one.name ?? id, path: `apps.${id}` })}
-                >Settings</button
+              <button
+                type="button"
+                disabled={count > 0}
+                title={count ? 'Save or discard your changes first' : undefined}
+                onclick={() => void open({ title: one.name ?? id, path: `apps.${id}` })}>Settings</button
               >
             </li>
           {/each}
@@ -580,7 +583,8 @@
     background: var(--bad);
     color: var(--on-accent);
   }
-  footer button:disabled {
+  footer button:disabled,
+  .apps button:disabled {
     opacity: 0.5;
     cursor: default;
   }

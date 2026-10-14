@@ -22,18 +22,18 @@
     <h2 id="review-title">{review.title}</h2>
     <p class="sub">{review.sub}</p>
     <div class="body">
-      {#each review.notices as notice (notice.text)}
+      {#each review.notices as notice, at (at)}
         <p class="notice" class:prod={notice.kind === 'prod'}>
           {notice.text}
           {#if notice.act}<button class="mini" type="button" onclick={notice.act.run}>{notice.act.label}</button>{/if}
         </p>
       {/each}
-      {#each review.groups as group (group.label)}
+      {#each review.groups as group, at (at)}
         <ul class="lines">
           <li>
             <span class="verb" data-verb={group.verb}>{group.label}</span>
             <span class="apps">
-              {#each group.items as item (item.name)}
+              {#each group.items as item, at (at)}
                 <span class:off={item.off}>
                   {item.name}
                   {#if item.act}

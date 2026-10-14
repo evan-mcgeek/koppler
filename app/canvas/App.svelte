@@ -102,13 +102,21 @@
 
   // Every change is kept: sent once the board has been still for a moment, and again as the page is left.
   let sent = '';
+  let sending = '';
   let waiting: ReturnType<typeof setTimeout> | undefined;
   const keep = (leaving = false) => {
     clearTimeout(waiting);
-    const now = JSON.stringify(board.saved());
-    if (now === sent) return;
-    sent = now;
-    void save(board.saved(), leaving).then(kept => (board.unsaved = !kept));
+    const now = board.saved();
+    const text = JSON.stringify(now);
+    if (text === sent || text === sending) return;
+    sending = text;
+    void save(now, leaving).then(kept => {
+      sending = '';
+      board.unsaved = !kept;
+      // Only what the server took counts as sent; what it did not is tried again until it does.
+      if (kept) sent = text;
+      else waiting = setTimeout(keep, 2000);
+    });
   };
   // The tunnel and queue cards follow what is on the board: its apps, which of them run without tunnels or are off
   // their queues, and the environment.
@@ -154,7 +162,7 @@
     if (!board.stack) return;
     // What the server handed over is what it has.
     if (!sent) sent = now;
-    else if (now !== sent) waiting = setTimeout(keep, 400);
+    else if (now !== sent && now !== sending) waiting = setTimeout(keep, 400);
     return () => {
       clearTimeout(waiting);
     };

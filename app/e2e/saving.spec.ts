@@ -79,3 +79,25 @@ test('a board that cannot be saved says so', async ({ page }) => {
   await (await actions(page, 'web')).getByRole('button', { name: 'Remove Web Shop' }).click();
   await expect(page.getByRole('alert')).toContainText('Not saved');
 });
+
+test('a change the server did not take is sent again, not lost', async ({ page, canvas }) => {
+  await expect(card(page, 'web')).toBeVisible();
+  // The server is away for the first try.
+  let refused = 0;
+  await page.route('**/state?*', async route => {
+    if (refused++ === 0) await route.abort();
+    else await route.continue();
+  });
+  await card(page, 'orders').getByLabel('Branch').fill('feature/checkout');
+  await card(page, 'orders').getByLabel('Branch').blur();
+  await expect
+    .poll(
+      async () => {
+        const kept = (await (await page.request.get(`${canvas.url}data/state.json`)).json()) as typeof board;
+        return kept.nodes.orders.branch;
+      },
+      { timeout: 10000 },
+    )
+    .toBe('feature/checkout');
+  expect(refused).toBeGreaterThan(1);
+});
