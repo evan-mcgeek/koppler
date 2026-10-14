@@ -3,6 +3,8 @@
   import X from '@lucide/svelte/icons/x';
   import type { NodeProps } from '@xyflow/svelte';
   import Cog from './Cog.svelte';
+  import Database from '@lucide/svelte/icons/database';
+  import { openTerminal } from './commands.ts';
   import { dialogs } from './dialogs.svelte.ts';
   import { board, type TunnelNode } from './board.svelte.ts';
   import { live } from './live.svelte.ts';
@@ -19,6 +21,17 @@
   ></span>
   <span class="what">{data.what}</span>
   <span class="local" class:moved={data.moved}>{data.local}</span>
+  {#if data.what.startsWith('Database')}
+    <button
+      class="hide nodrag"
+      type="button"
+      aria-label="Query the {data.what}"
+      title="Open psql on it in a Terminal window, with the stored connection"
+      onclick={() => void openTerminal(data.apps[0] ?? '', true)}
+    >
+      <Icon of={Database} size={13} />
+    </button>
+  {/if}
   <button
     class="hide nodrag"
     type="button"
@@ -43,7 +56,7 @@
 <style>
   .tunnel {
     display: grid;
-    grid-template-columns: 8px 1fr auto auto auto;
+    grid-template-columns: 8px 1fr repeat(4, auto);
     column-gap: 8px;
     row-gap: 3px;
     align-items: baseline;

@@ -43,6 +43,7 @@ import { mcp } from './cli/mcp.ts';
 import { agentCommand } from './cli/agent.ts';
 import { doCommand } from './engine/app-commands.ts';
 import { watchCommand } from './engine/watch.ts';
+import { shellCommand } from './cli/shell.ts';
 import { wire } from './engine/wire.ts';
 import { APP, CODE, configDir, tempDir } from './paths.ts';
 
@@ -483,6 +484,14 @@ const COMMANDS: Command[] = [
     ],
     run: history,
     example: 'koppler history',
+  },
+  {
+    name: 'shell',
+    who: 'you',
+    args: '<app> [--env <env>] [--query]',
+    about: "a shell in an app's clone with its run's settings, never its secrets; --query opens psql on its database",
+    run: shellCommand,
+    example: 'koppler shell orders-api',
   },
   {
     name: 'query',
