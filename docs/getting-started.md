@@ -23,7 +23,7 @@ koppler init
 - **Your team shares one on GitHub:** `koppler link <GitHub link to the stack.json>` uses it straight from there.
 - **None yet:** start one with `koppler init --new "Shop" --envs qa,prod`, then pick its apps from your repos on the canvas.
 
-`init` ends with `koppler discover`, which reads every app's repo and reports local ports, tunnels, calls and gaps in the stack.
+Once the stack has apps, `init` ends with `koppler discover`, which reads every app's repo and reports local ports, tunnels, calls and gaps in the stack.
 `koppler discover --deployed` drafts deployed addresses, settings, secret names, queues and calls from each repo's infrastructure code.
 The agent checks those drafts in the repos before adding them to `stack.json`.
 The stack lives in your team's repo, so changes to it are yours to review and commit.

@@ -145,6 +145,30 @@ export const detectKind = (repo: string, stack?: { kinds?: unknown }): string | 
 const inProperties = (name: string, file: string) =>
   name === 'launchSettings.json' && file.includes(`${path.sep}Properties${path.sep}`);
 const NODE_FILE = /^package\.json$|^\.env|^vite\.config\.|^serverless\./;
+const ENTRY_FILES = ['server', 'index', 'app', 'main'].flatMap(name =>
+  ['js', 'mjs', 'cjs', 'ts'].flatMap(ext => [`${name}.${ext}`, `src/${name}.${ext}`]),
+);
+/**
+ * The port a Node app's entry file falls back to, `process.env.PORT || 3000` or `.listen(3000)`: the file its start
+ * script runs, else its `main`, else the usual names.
+ */
+function entryPorts(repo: string, pkg: (PackageJson & { main?: unknown }) | null): FoundPort[] {
+  const run = Object.values(pkg?.scripts ?? {}).flatMap(command =>
+    [...command.matchAll(/\b(?:node|nodemon|tsx|ts-node)\s+(?:-\S+\s+)*([\w./-]+\.[cm]?[jt]s)\b/g)].map(
+      found => found[1] ?? '',
+    ),
+  );
+  const main = typeof pkg?.main === 'string' ? [pkg.main] : [];
+  for (const name of new Set([...run, ...main, ...ENTRY_FILES])) {
+    if (!name || name.startsWith('/') || name.split('/').includes('..')) continue;
+    const text = read(path.join(repo, name)) ?? '';
+    const port =
+      /process\.env\.PORT\)?\s*(?:\|\||\?\?)\s*['"]?(\d{2,5})/.exec(text)?.[1] ??
+      /\.listen\(\s*(\d{2,5})\b/.exec(text)?.[1];
+    if (port) return [{ port: Number(port), where: name }];
+  }
+  return [];
+}
 
 export function localPorts(repo: string, kind: string | null | undefined, stack?: { kinds?: unknown }): FoundPort[] {
   if (kind === 'dotnet')
@@ -161,10 +185,10 @@ export function localPorts(repo: string, kind: string | null | undefined, stack?
     } catch {
       // Not JSON: no framework to tell.
     }
+    if (found.length) return found;
     const framework = kind === 'web' ? frameworkOf(pkg) : null;
-    return found.length || !framework
-      ? found
-      : [{ port: framework.port, scheme: 'http', where: `${framework.name} default` }];
+    if (framework) return [{ port: framework.port, scheme: 'http', where: `${framework.name} default` }];
+    return entryPorts(repo, pkg);
   }
   const usual = kind ? defaultPort(kind, repoFiles(repo), stack) : null;
   return usual

@@ -117,8 +117,12 @@ const keepConfig: Save = () => undefined;
 const SEVERAL =
   'Several stacks found. Pick one on the canvas (koppler init --pick), or: koppler init --stack <one of the folders above>';
 
-const NONE =
-  'No stack yet. Create one on the canvas (koppler init --pick), or point at an existing one: koppler init --stack <folder with stack.json>';
+const NONE = [
+  'No stack yet. Start one:',
+  '  koppler init --new "<name>" --envs qa,prod   then pick its apps on the canvas',
+  '  koppler link <GitHub link to a stack.json>   use one your team shares',
+  '  koppler init --stack <folder>                use one in a folder on this Mac',
+].join('\n');
 
 export function init(args: string[]): void {
   const flags = parseFlags(args);

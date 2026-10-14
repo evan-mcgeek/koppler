@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict';
-import { conflicts, dotnetPorts, nodePorts, portsIn } from './investigate.ts';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { conflicts, dotnetPorts, localPorts, nodePorts, portsIn } from './investigate.ts';
 import { test } from 'vitest';
 
 test('ports are read from launch settings and package files, and only clashes with an app are conflicts', async () => {
@@ -47,4 +50,29 @@ test('ports are read from launch settings and package files, and only clashes wi
     { port: 5432, who: ['a', 'tunnel to db.y (for b)'] },
   ]);
   console.log('ok');
+});
+
+test("a Node app's port is its entry file's default when nothing else sets it", () => {
+  const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-node-'));
+  const write = (name: string, text: string) => {
+    fs.mkdirSync(path.dirname(path.join(repo, name)), { recursive: true });
+    fs.writeFileSync(path.join(repo, name), text);
+  };
+  write('package.json', '{"scripts":{"start":"node src/server.js"}}');
+  write('src/server.js', 'const port = Number(process.env.PORT) || 5101;\nserver.listen(port);');
+  assert.deepEqual(localPorts(repo, 'node'), [{ port: 5101, where: 'src/server.js' }]);
+  write('package.json', '{"main":"app.js"}');
+  write('app.js', "app.listen(process.env.PORT ?? '8080');");
+  assert.deepEqual(localPorts(repo, 'node'), [{ port: 8080, where: 'app.js' }]);
+  write('index.js', 'http.createServer(handler).listen(4000);');
+  write('package.json', '{}');
+  fs.rmSync(path.join(repo, 'src'), { recursive: true });
+  fs.rmSync(path.join(repo, 'app.js'));
+  assert.deepEqual(localPorts(repo, 'node'), [{ port: 4000, where: 'index.js' }]);
+  // A PORT the .env file sets wins over the code's default.
+  write('.env', 'PORT=3001\n');
+  assert.deepEqual(
+    localPorts(repo, 'node').map(found => found.port),
+    [3001],
+  );
 });
