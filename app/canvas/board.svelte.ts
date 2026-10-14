@@ -350,12 +350,14 @@ class Board {
     });
   });
   /**
-   * The cards that are an app's own and go where it goes: its tunnels, and the queues no other app on the board uses.
-   * A queue shared by several apps is a card of the flow between them.
+   * The cards that are an app's own and go where it goes: its tunnels, and the queues nothing else on the board uses.
+   * A queue shared with another app, or with an outside system that sends to it or reads it, is a card of the flow.
    */
   ownedBy(id: string): string[] {
     const alone = (queue: { pubs: string[]; reads: string[] }) =>
-      [...queue.pubs, ...queue.reads].filter(app => this.#onBoard.has(app)).every(app => app === id);
+      [...queue.pubs, ...queue.reads]
+        .filter(app => this.#onBoard.has(app) || this.#outside(app))
+        .every(app => app === id);
     return this.ledBy(id).filter(
       key => key.startsWith('tunnel:') || this.boardQueues.some(one => `queue:${one.id}` === key && alone(one)),
     );
