@@ -383,3 +383,51 @@ test('in every layout Arrange gives, no card covers another, an app’s own queu
       .toEqual([]);
   }
 });
+
+test.describe('an app whose only link is to an outside system', () => {
+  test.use({
+    stack: {
+      ...STACK,
+      apps: {
+        ...STACK.apps,
+        payments: { ...payments, consumes: { billing: { how: 'env', env: 'BILLING_URL' } } },
+        billing: {
+          name: 'Billing',
+          kind: 'other',
+          outside: 'a hosted service',
+          deployedUrl: 'https://api.billing.example',
+        },
+      },
+    },
+    // Room above the card: dragged near the window's edge, the board would pan by itself.
+    board: { env: 'qa', mode: 'auto', zoom: 0.8, pan: { x: 60, y: 300 }, nodes: { payments: at(0, 0) }, edges: [] },
+  });
+
+  test('an app dragged close to level with the outside system it calls snaps to it, from its own end', async ({
+    page,
+  }) => {
+    const billing = outside(page).filter({ hasText: 'Billing' });
+    await expect(billing).toBeVisible();
+    const off = async () => {
+      const [a, b] = await Promise.all([card(page, 'payments').boundingBox(), billing.boundingBox()]);
+      return Math.round((b?.y ?? 0) + (b?.height ?? 0) / 2 - ((a?.y ?? 0) + (a?.height ?? 0) / 2));
+    };
+    const grab = await card(page, 'payments').locator('header').boundingBox();
+    if (!grab) throw new Error('not on the page');
+    const from = { x: grab.x + 60, y: grab.y + grab.height / 2 };
+    await page.mouse.move(from.x, from.y);
+    await page.mouse.down();
+    await page.mouse.move(from.x, from.y - 120, { steps: 8 });
+    let y = from.y - 120;
+    // Back up to within a few pixels of level, whatever the drag lost on the way.
+    for (let tries = 0; tries < 3 && Math.abs(await off()) > 6; tries++) {
+      const was = await off();
+      y += was - 4 * Math.sign(was);
+      await page.mouse.move(from.x, y, { steps: 3 });
+    }
+    await expect(page.locator('.links .flow.ext.snapped')).toHaveCount(1);
+    await page.mouse.up();
+    await expect.poll(async () => Math.abs(await off())).toBe(0);
+    await expect(page.locator('.links .flow.ext.snapped')).toHaveCount(0);
+  });
+});

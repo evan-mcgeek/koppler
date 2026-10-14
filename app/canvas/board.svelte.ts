@@ -847,9 +847,29 @@ class Board {
       if (level && (!y || Math.abs(by) < Math.abs(y.by))) y = snap;
       if (!level && (!x || Math.abs(by) < Math.abs(x.by))) x = snap;
     });
+    // Its links to tunnel, queue and outside cards snap from this end too: middles in line. Its own cards move with it.
+    const own = new Set(this.ownedBy(id));
+    const partners = [
+      ...this.links.filter(link => link.from === id).map(link => link.to),
+      ...this.flows.flatMap(flow => (flow.from === id ? [flow.to] : flow.to === id ? [flow.from] : [])),
+    ].filter(partner => !own.has(partner));
+    for (const partner of new Set(partners)) {
+      const other = this.infraBoxes.get(partner);
+      if (!other || this.infra.some(card => card.id === partner && card.dragging)) continue;
+      const gapX = Math.max(other.x - (moved.x + moved.w), moved.x - (other.x + other.w));
+      const gapY = Math.max(other.y - (moved.y + moved.h), moved.y - (other.y + other.h));
+      const stacked = gapY >= gapX;
+      const by = stacked
+        ? other.x + other.w / 2 - (moved.x + moved.w / 2)
+        : other.y + other.h / 2 - (moved.y + moved.h / 2);
+      if (Math.abs(by) > near) continue;
+      const snap = { by, cable: `${id}>${partner}` };
+      if (stacked && (!x || Math.abs(by) < Math.abs(x.by))) x = snap;
+      if (!stacked && (!y || Math.abs(by) < Math.abs(y.by))) y = snap;
+    }
     const dx = x?.by ?? 0;
     const dy = y?.by ?? 0;
-    for (const snap of [x, y]) if (snap) snapped.push(snap.cable);
+    for (const snap of [x, y]) if (snap) snapped.push(snap.cable, snap.cable.split('>').reverse().join('>'));
     return { x: to.x + dx, y: to.y + dy };
   }
   /**
