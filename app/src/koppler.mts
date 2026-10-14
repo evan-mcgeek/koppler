@@ -37,6 +37,7 @@ import { createStack } from './engine/stacks.ts';
 import { init as initStack, stacksCommand, sync, useCommand } from './engine/sync.ts';
 import { up } from './engine/up.ts';
 import { wait } from './cli/wait.ts';
+import { mcp } from './cli/mcp.ts';
 import { wire } from './engine/wire.ts';
 import { APP, CODE, configDir, tempDir } from './paths.ts';
 
@@ -655,6 +656,14 @@ const COMMANDS: Command[] = [
     about: 'show a question or result on the canvas',
     run: sayCommand,
     example: 'koppler say --file reply.json',
+  },
+  {
+    name: 'mcp',
+    who: 'agent',
+    args: '',
+    about: 'serve MCP on stdio: status, logs, doctor, plan, history, wait and say as tools for any agent',
+    run: () => mcp(version()),
+    example: 'claude mcp add koppler -- koppler mcp',
   },
 ];
 const named = (name: string | undefined) => COMMANDS.find(command => command.name === name);
