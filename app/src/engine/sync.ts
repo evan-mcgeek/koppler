@@ -48,7 +48,7 @@ interface AppFile {
   consumes?: Record<string, Called> | undefined;
   /** What differs per environment; read as it comes. */
   envs?: Record<string, Record<string, unknown>> | undefined;
-  pending?: string;
+  pending?: string | boolean | undefined;
 }
 /** A stack file as far as this module reads it. */
 interface StackFile {

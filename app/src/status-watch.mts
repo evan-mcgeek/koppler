@@ -10,8 +10,9 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as z from 'zod';
 import { StackSchema } from './core/stack.ts';
-import { readData, type DataName } from './data.ts';
+import { readClones, readData, type DataName } from './data.ts';
 import { CODE, LOGS, STATE, TEMP } from './paths.ts';
+import { awsProfiles, cloneChoices } from './server/choices.ts';
 import { tail } from './server/logs.ts';
 import { ROUTES } from './server/routes.ts';
 import { publish, SOURCE, statusJson } from './server/status.ts';
@@ -122,6 +123,13 @@ function servePage(what: string, url: URL, res: Response): void {
     res
       .writeHead(200, JSON_HEADERS)
       .end(JSON.stringify(z.toJSONSchema(StackSchema, { unrepresentable: 'any', io: 'input' })));
+    return;
+  }
+  // What the settings panels offer to pick from on this machine: names only.
+  if (what === 'data/choices.json') {
+    const id = url.searchParams.get('app') ?? '';
+    const clone = /^[a-z0-9-]{1,64}$/.test(id) ? readClones()[id]?.path : undefined;
+    res.writeHead(200, JSON_HEADERS).end(JSON.stringify({ awsProfiles: awsProfiles(), ...cloneChoices(clone) }));
     return;
   }
   if (what === 'data/status.json') {

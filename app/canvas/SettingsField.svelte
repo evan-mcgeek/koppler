@@ -1,8 +1,33 @@
 <script lang="ts">
-  // One field of the stack in a settings panel, edited the way its schema says: text, a number, a switch, a choice, or a
-  // group, list or table of fields. Each keeps its value through the panel, which checks it; a lock keeps it as it is.
+  // One field of the stack in a settings panel, edited the way it is best edited: picked where Koppler knows what it
+  // can be, a row with a sentence where it is one of a list, else by its schema (text, a number, a switch, a group).
+  // Each keeps its value through the panel, which checks it; a lock keeps it as it is.
+  import { untrack } from 'svelte';
+  import { parsePath, setAt } from '../src/core/stack-path.ts';
+  import Checks from './Checks.svelte';
+  import Chips from './Chips.svelte';
+  import KindIcon from './KindIcon.svelte';
+  import KindPick from './KindPick.svelte';
+  import Pick from './Pick.svelte';
   import Self from './SettingsField.svelte';
-  import { child, emptyFor, itemName, kindOf, label, needsFields, type Ctx, type Schema } from './settings.ts';
+  import {
+    addressNote,
+    child,
+    controlOf,
+    emptyFor,
+    EMPTY,
+    EXAMPLES,
+    itemName,
+    kindOf,
+    label,
+    NEEDS,
+    needsFields,
+    ROW_LISTS,
+    rowOf,
+    type Ctx,
+    type NeedType,
+    type Schema,
+  } from './settings.ts';
 
   const {
     path,
@@ -13,6 +38,9 @@
     required = false,
     depth = 0,
     drop,
+    as,
+    bare = false,
+    open,
   }: {
     path: string;
     name: string;
@@ -23,8 +51,16 @@
     depth?: number;
     /** Words for taking the value out, when that means more than removing it: "Use QA's". */
     drop?: string;
+    /** The type of a need that holds nothing yet. */
+    as?: string | undefined;
+    /** Only the control: the row it sits in names it and holds its lock. */
+    bare?: boolean;
+    open?: boolean;
   } = $props();
   const kind = $derived(kindOf(schema, value));
+  const nested = $derived(kind === 'group' || kind === 'table' || kind === 'list');
+  const choice = $derived(nested ? null : ctx.options(path));
+  const control = $derived(controlOf(path, schema, value, choice));
   const locked = $derived(ctx.locked(path));
   const id = $props.id();
   let error = $state('');
@@ -37,37 +73,49 @@
     typeof value === 'object' && value !== null && !Array.isArray(value) ? (value as Record<string, unknown>) : {},
   );
   const list = $derived(Array.isArray(value) ? (value as unknown[]) : []);
-  // Fields the schema does not name are shown too: nothing in the stack is hidden.
-  const extra = $derived(
-    Object.keys(object).filter(key => !schema.properties || !Object.hasOwn(schema.properties, key)),
-  );
+  const row = $derived(rowOf(path, value, ctx.stack(), as));
+  // Fields the schema or the row does not name are shown too: nothing in the stack is hidden.
+  const named = $derived(row ? [...row.fields, ...(row.own ?? [])] : Object.keys(schema.properties ?? {}));
+  const extra = $derived(Object.keys(object).filter(key => !named.includes(key)));
+  const fields = $derived(row ? row.fields : Object.keys(schema.properties ?? {}));
+  const inline = $derived(row?.inline && !extra.length ? row.inline : undefined);
+  const called = $derived(row ? [row.label, row.say].filter(Boolean).join(': ') : name);
   const json = (shown: unknown) => (shown === undefined ? '' : JSON.stringify(shown, null, 2));
   const offered = $derived((ctx.keys(path) ?? []).filter(key => !Object.hasOwn(object, key)));
   const hint = $derived(schema.description ?? '');
+  const address = $derived(control === 'address' ? addressNote(value) : {});
+  const rows = $derived(ROW_LISTS.exec(path)?.[1]);
+  const text = (one: unknown) => (typeof one === 'string' ? one : '');
+  const strings = $derived(list.filter(one => typeof one === 'string'));
+  const stack = $derived(ctx.stack() as { envs?: string[]; queues?: Record<string, { name?: string }> } | null);
+  const signIns = $derived(Object.keys((ctx.stack() as { signIns?: object } | null)?.signIns ?? {}).length);
   let newKey = $state('');
-  // An item with fields it cannot do without is filled in here first, then kept as a whole.
+  // A new item is filled in here first, then kept as a whole.
   let draft = $state<Record<string, unknown> | null>(null);
-  const draftCtx: Ctx = {
-    save: (at, next) => {
-      const key = at.slice(child(path, list.length).length).replace(/^\./, '');
-      const rest = Object.entries(draft ?? {}).filter(([one]) => one !== key);
-      draft = Object.fromEntries(next === undefined || next === '' ? rest : [...rest, [key, next]]);
+  let draftAs = $state<string>();
+  let choosing = $state(false);
+  // Open or closed as it starts, then as it is left by hand, whatever is edited inside.
+  let unfolded = $state(untrack(() => open ?? (!row && value !== undefined && depth < 2)));
+  const draftCtx = $derived<Ctx>({
+    ...ctx,
+    save: (at: string, next: unknown) => {
+      const inside = parsePath(at.slice(child(path, list.length).length).replace(/^\./, ''));
+      if (!('error' in inside)) draft = setAt(draft, inside, next) as Record<string, unknown>;
       return Promise.resolve(null);
     },
     locked: () => false,
-    lock: (at, on) => {
-      ctx.lock(at, on);
-    },
-    keys: at => ctx.keys(at),
-    problem: at => ctx.problem?.(at),
+    fresh: true,
+  });
+  const start = (type?: NeedType) => {
+    choosing = false;
+    draftAs = type?.id;
+    draft = { ...type?.start };
   };
   const add = async () => {
     if (kind === 'list') {
-      if (needsFields(schema.items)) {
-        draft = {};
-        return;
-      }
-      error = (await ctx.save(child(path, list.length), emptyFor(schema.items))) ?? '';
+      if (rows === 'prereqs') choosing = true;
+      else if (rows || needsFields(schema.items)) start();
+      else error = (await ctx.save(child(path, list.length), emptyFor(schema.items))) ?? '';
       return;
     }
     const key = newKey.trim();
@@ -75,15 +123,33 @@
     error = (await ctx.save(child(path, key), emptyFor(schema.additionalProperties))) ?? '';
     if (!error) newKey = '';
   };
+  const ADD: Record<string, string> = {
+    prereqs: 'Add a need',
+    secrets: 'Add a secret',
+    localChanges: 'Add a change',
+    consumes: 'Add an app it calls…',
+  };
 </script>
 
 <!-- eslint-disable @typescript-eslint/no-confusing-void-expression -- {@render} of a snippet returns nothing -->
+{#snippet glyph(paths: string[])}
+  <svg class="glyph" viewBox="0 0 24 24" width="15" height="15" aria-hidden="true">
+    {#each paths as d (d)}<path {d} />{/each}
+  </svg>
+{/snippet}
+
 {#snippet acts()}
-  <span class="acts">
+  <span class="acts" class:fresh={ctx.fresh}>
     {#if drop && !locked}
       <button class="words" type="button" onclick={() => void save(undefined)}>{drop}</button>
     {:else if value !== undefined && !required && !locked}
-      <button class="icon" type="button" aria-label="Remove {name}" title="Remove" onclick={() => void save(undefined)}>
+      <button
+        class="icon"
+        type="button"
+        aria-label="Remove {called}"
+        title="Remove"
+        onclick={() => void save(undefined)}
+      >
         <svg viewBox="0 0 16 16" width="11" height="11" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" /></svg>
       </button>
     {/if}
@@ -92,7 +158,7 @@
       class:on={locked}
       type="button"
       aria-pressed={locked}
-      aria-label="{locked ? 'Unlock' : 'Lock'} {name}"
+      aria-label="{locked ? 'Unlock' : 'Lock'} {called}"
       title={locked ? 'Locked: nothing changes it. Click to unlock' : 'Lock: keep it as it is, for you and the agent'}
       onclick={() => {
         ctx.lock(path, !locked);
@@ -108,11 +174,11 @@
 
 {#snippet inside()}
   {#if kind === 'group'}
-    {#each Object.entries(schema.properties ?? {}) as [key, inner] (key)}
+    {#each fields as key (key)}
       <Self
         path={child(path, key)}
         name={label(key, path === '')}
-        schema={inner}
+        schema={schema.properties?.[key] ?? {}}
         value={object[key]}
         {ctx}
         required={!!schema.required?.includes(key)}
@@ -120,7 +186,14 @@
       />
     {/each}
     {#each extra as key (key)}
-      <Self path={child(path, key)} name={key} schema={{}} value={object[key]} {ctx} depth={depth + 1} />
+      <Self
+        path={child(path, key)}
+        name={label(key)}
+        schema={schema.properties?.[key] ?? {}}
+        value={object[key]}
+        {ctx}
+        depth={depth + 1}
+      />
     {/each}
   {:else if kind === 'table'}
     {#each Object.keys(object) as key (key)}
@@ -133,11 +206,14 @@
         depth={depth + 1}
       />
     {/each}
+    {#if rows && !Object.keys(object).length}<span class="none">{EMPTY[rows]}</span>{/if}
     <span class="add">
       {#if ctx.keys(path)}
         <select aria-label="Add to {name}" bind:value={newKey}>
-          <option value="">Add…</option>
-          {#each offered as key (key)}<option value={key}>{key}</option>{/each}
+          <option value="">{(rows && ADD[rows]) || 'Add…'}</option>
+          {#each offered as key (key)}
+            <option value={key}>{rowOf(child(path, key), {}, ctx.stack())?.label ?? key}</option>
+          {/each}
         </select>
       {:else}
         <input aria-label="New key in {name}" placeholder="New key" bind:value={newKey} />
@@ -155,15 +231,18 @@
         depth={depth + 1}
       />
     {/each}
+    {#if rows && !list.length && !draft && !choosing}<span class="none">{EMPTY[rows]}</span>{/if}
     {#if draft}
-      <div class="draft" role="group" aria-label="New item in {name}">
+      <div class="draft" role="group" aria-label="New in {name}">
         <Self
           path={child(path, list.length)}
           name="New"
           schema={schema.items ?? {}}
           value={draft}
           ctx={draftCtx}
+          as={draftAs}
           required
+          open
           depth={depth + 1}
         />
         <span class="add">
@@ -178,38 +257,130 @@
           <button type="button" onclick={() => (draft = null)}>Cancel</button>
         </span>
       </div>
+    {:else if choosing}
+      <div class="types" role="group" aria-label="What does it need?">
+        {#each NEEDS as type (type.id)}
+          {@const none = type.id === 'signIn' && !signIns}
+          <button type="button" disabled={none} onclick={() => start(type)}>
+            {@render glyph(type.icon)}
+            <span class="what">{type.label}</span>
+            <span class="about">{none ? 'This stack defines none yet' : type.about}</span>
+          </button>
+        {/each}
+        <span class="add"><button type="button" onclick={() => (choosing = false)}>Cancel</button></span>
+      </div>
     {:else}
-      <span class="add"><button type="button" onclick={() => void add()}>Add</button></span>
+      <span class="add"><button type="button" onclick={() => void add()}>{(rows && ADD[rows]) || 'Add'}</button></span>
     {/if}
   {/if}
   {#if shown}<span class="error" role="alert">{shown}</span>{/if}
 {/snippet}
 
-{#if (kind === 'group' || kind === 'table' || kind === 'list') && depth === 0}
+{#if inline}
+  <div class="field line" class:locked class:wide={depth > 1 || bare}>
+    {#if depth <= 1}<span class="name" title={hint}>{name}</span>{/if}
+    <fieldset class="parts" disabled={locked}>
+      <legend class="sr">{called}</legend>
+      {#each fields as key (key)}
+        <span class="part" data-key={key}>
+          <span class="word">{inline[key]}</span>
+          <Self
+            path={child(path, key)}
+            name={label(key)}
+            schema={schema.properties?.[key] ?? {}}
+            value={object[key]}
+            {ctx}
+            bare
+            depth={depth + 1}
+          />
+        </span>
+      {/each}
+    </fieldset>
+    {@render acts()}
+    {#if shown}<span class="error" role="alert">{shown}</span>{/if}
+  </div>
+{:else if nested && !control && depth === 0}
   <fieldset class="top" disabled={locked}>
     <legend class="sr">{name}</legend>
     <span class="row"><span class="name">Everything</span>{@render acts()}</span>
+    {#if hint}<span class="about">{hint}</span>{/if}
     {@render inside()}
   </fieldset>
-{:else if kind === 'group' || kind === 'table' || kind === 'list'}
-  <!-- A group with nothing in it stays closed: what it holds is a click away. -->
-  <details class="nest" open={value !== undefined && depth < 2}>
+{:else if nested && !control}
+  <!-- A group with nothing in it stays closed, and so does a row: what it holds is a click away. -->
+  <details class="nest" class:rowed={!!row} bind:open={unfolded}>
     <summary title={hint}>
       <svg class="chev" viewBox="0 0 16 16" width="10" height="10" aria-hidden="true"><path d="M6 4l4 4-4 4" /></svg>
-      <span class="name">{name}</span>
-      {#if value === undefined}<span class="unset">Not set</span>{/if}
+      {#if row?.kind}
+        <KindIcon kind={row.kind} label="" />
+      {:else if row?.icon}
+        {@render glyph(row.icon)}
+      {/if}
+      {#if row}
+        <span class="name"><span class="what">{row.label}</span><span class="say">{row.say}</span></span>
+      {:else}
+        <span class="name">{name}</span>
+        {#if value === undefined}<span class="unset">Not set</span>{/if}
+      {/if}
       {@render acts()}
     </summary>
     <fieldset disabled={locked}>
-      <legend class="sr">{name}</legend>
-      {#if hint}<span class="about">{hint}</span>{/if}
+      <legend class="sr">{called}</legend>
+      {#if hint && !row}<span class="about">{hint}</span>{/if}
       {@render inside()}
     </fieldset>
   </details>
 {:else}
-  <div class="field" class:locked>
-    <label class="name" for={id} title={hint}>{name}</label>
-    {#if kind === 'switch'}
+  <div class="field" class:locked class:bare>
+    <label class="name" class:sr={bare} for={id} title={hint}>{name}</label>
+    {#if control === 'kind' && choice}
+      <KindPick {id} value={text(value)} options={choice.options} disabled={locked} onpick={next => void save(next)} />
+    {:else if control === 'pick' && choice}
+      <Pick
+        {id}
+        value={text(value)}
+        options={choice.options}
+        other={!!choice.other}
+        {required}
+        disabled={locked}
+        placeholder={bare ? (EXAMPLES[path.split('.').at(-1) ?? ''] ?? name) : hint}
+        onpick={next => void save(next)}
+      />
+    {:else if control === 'ordered' || control === 'chips'}
+      <Chips
+        value={strings}
+        label={name}
+        ordered={control === 'ordered'}
+        first={control === 'ordered' ? 'runs by default' : ''}
+        disabled={locked}
+        onchange={(next: string[]) => void save(next.length || required || control === 'ordered' ? next : undefined)}
+      />
+    {:else if control === 'envs'}
+      {@const envs = stack?.envs ?? []}
+      <Checks
+        options={envs.map(env => ({ value: env, label: env.toUpperCase() }))}
+        picked={value === undefined ? envs.slice(1) : strings}
+        label={name}
+        disabled={locked}
+        none="The stack has no environments yet."
+        ontoggle={(env, on) => {
+          const now = value === undefined ? envs.slice(1) : strings;
+          void save(envs.filter(one => (one === env ? on : now.includes(one))));
+        }}
+      />
+    {:else if control === 'queues'}
+      <Checks
+        options={Object.entries(stack?.queues ?? {}).map(([key, queue]) => ({ value: key, label: queue.name ?? key }))}
+        picked={Object.keys(object)}
+        label={name}
+        disabled={locked}
+        none="The stack has no queues yet: add them in the stack's settings."
+        ontoggle={(queue, on) => {
+          const { [queue]: was, ...rest } = object;
+          void save(on ? { ...object, [queue]: was ?? {} } : Object.keys(rest).length ? rest : undefined);
+        }}
+      />
+    {:else if kind === 'switch'}
       <input
         {id}
         type="checkbox"
@@ -233,15 +404,18 @@
         {id}
         type="number"
         disabled={locked}
-        placeholder={hint}
+        placeholder={bare ? (EXAMPLES[path.split('.').at(-1) ?? ''] ?? name) : hint}
         value={value ?? ''}
         onchange={ev => void save(ev.currentTarget.value === '' ? undefined : Number(ev.currentTarget.value))}
       />
-    {:else if kind === 'text' && !(typeof value === 'string' && (value.length > 60 || value.includes('\n')))}
+    {:else if kind === 'text' && !(typeof value === 'string' && (value.length > 60 || value.includes('\n')) && !bare)}
       <input
         {id}
         disabled={locked}
-        placeholder={hint}
+        inputmode={control === 'address' ? 'url' : undefined}
+        spellcheck={control === 'address' ? false : undefined}
+        aria-invalid={address.warn ? true : undefined}
+        placeholder={bare ? (EXAMPLES[path.split('.').at(-1) ?? ''] ?? name) : hint}
         value={typeof value === 'string' ? value : ''}
         onchange={ev => void save(ev.currentTarget.value === '' ? undefined : ev.currentTarget.value)}
       />
@@ -277,7 +451,12 @@
         }}
       ></textarea>
     {/if}
-    {@render acts()}
+    {#if !bare}{@render acts()}{/if}
+    {#if address.warn}
+      <span class="note warn">{address.warn}</span>
+    {:else if address.note}
+      <span class="note">{address.note}</span>
+    {/if}
     {#if shown}<span class="error" role="alert">{shown}</span>{/if}
   </div>
 {/if}
@@ -425,6 +604,13 @@
   select {
     height: 28px;
   }
+  select {
+    padding-right: 26px;
+    appearance: none;
+    background-image: var(--chevron);
+    background-repeat: no-repeat;
+    background-position: right 9px center;
+  }
   input::placeholder,
   textarea::placeholder {
     color: color-mix(in oklab, var(--muted) 70%, transparent);
@@ -481,5 +667,117 @@
     grid-column: 2 / -1;
     color: var(--bad);
     font-size: 12px;
+  }
+  .glyph {
+    flex: none;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    color: var(--muted);
+  }
+  summary .name {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+  }
+  .what {
+    flex: none;
+    font-weight: 600;
+  }
+  .say {
+    min-width: 0;
+    overflow: hidden;
+    color: var(--muted);
+    font-weight: 400;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .acts.fresh {
+    display: none;
+  }
+  .none {
+    padding: 2px 0;
+    color: var(--muted);
+  }
+  .note {
+    grid-column: 2 / -1;
+    color: var(--muted);
+    font-size: 12px;
+  }
+  .note.warn {
+    color: var(--warn);
+  }
+  .bare {
+    display: block;
+    flex: 1;
+    min-width: 0;
+  }
+  .line {
+    align-items: start;
+  }
+  .line > .name {
+    line-height: 28px;
+  }
+  .line.wide {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .line.wide .error {
+    grid-column: 1 / -1;
+  }
+  .parts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 8px;
+  }
+  .part {
+    display: flex;
+    flex: 1 1 150px;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+  }
+  .part[data-key='file'] {
+    flex-basis: 100%;
+  }
+  .part[data-key='status'],
+  .part[data-key='timeout'] {
+    flex: 0 1 132px;
+  }
+  .word {
+    flex: none;
+    color: var(--muted);
+  }
+  .types {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+  }
+  .types > button {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: 2px 8px;
+    padding: 8px 10px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--paper);
+    color: var(--ink);
+    font: 13px var(--sans);
+    text-align: left;
+    cursor: pointer;
+  }
+  .types > button:hover:not(:disabled) {
+    border-color: var(--cable);
+  }
+  .types > button:disabled {
+    opacity: 0.6;
+  }
+  .types .about {
+    grid-column: 2;
+  }
+  .types .add {
+    grid-column: 1 / -1;
   }
 </style>

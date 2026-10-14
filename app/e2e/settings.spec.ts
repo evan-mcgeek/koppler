@@ -1,4 +1,5 @@
 // Settings for a part of the stack, from the gear beside it: every field shown, each change checked and kept, locks.
+import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Page } from '@playwright/test';
@@ -44,15 +45,15 @@ test('an app card opens its settings: edits wait for Save, a broken one is refus
 
   await url.fill('http://localhost:5011');
   await url.press('Tab');
-  const kind = panel.getByLabel('Kind', { exact: true });
-  await kind.fill('');
-  await kind.press('Tab');
+  const name = panel.getByLabel('Name', { exact: true });
+  await name.fill('');
+  await name.press('Tab');
   await panel.getByRole('button', { name: 'Save' }).click();
   await expect(panel.getByRole('alert')).toContainText('required');
   await expect(panel.getByRole('status')).toHaveText('1 to fix before it can be saved');
   expect(read().apps['orders']?.['url']).toBe('http://localhost:5001');
-  await kind.fill('dotnet');
-  await kind.press('Tab');
+  await name.fill('Orders API');
+  await name.press('Tab');
   await panel.getByRole('button', { name: 'Save' }).click();
   await expect(panel.getByRole('status')).toHaveText('Saved');
   expect(read().apps['orders']?.['url']).toBe('http://localhost:5011');
@@ -95,22 +96,125 @@ test('an environment uses its own value only where it is given one', async ({ pa
   await expect(prod).toContainText('Same as QA: https://orders-api.qa.acme.example');
 });
 
-test('a list item is added in its tab, and closing with changes asks first', async ({ page, canvas }) => {
+test('a need is a row that says what it is; a new one asks its type and shows only that type', async ({
+  page,
+  canvas,
+}) => {
   const read = stackFile(canvas.dir);
+  fs.writeFileSync(path.join(canvas.dir, 'aws-config'), '[profile acme-dev]\nregion = eu-west-1\n[default]\n');
   await (await actions(page, 'orders')).getByRole('button', { name: 'Settings for Orders API' }).click();
   const panel = page.getByRole('dialog', { name: 'Orders API' });
   await tabOf(page, 'Needs first').click();
-  await panel
-    .getByRole('tabpanel')
-    .locator(':scope > details > fieldset > .add')
-    .getByRole('button', { name: 'Add' })
-    .click();
+  const needs = panel.getByRole('tabpanel');
+  const tunnel = needs.locator('details.rowed').filter({ hasText: 'Database (Postgres), db.qa.acme.example:5432' });
+  await expect(tunnel.locator('summary')).toContainText('Tunnel');
+  await tunnel.locator('summary').click();
+  await expect(tunnel.getByLabel('Host', { exact: true })).toHaveValue('db.qa.acme.example');
+  await expect(tunnel.getByLabel('AWS profile')).toHaveCount(0);
+
+  await needs.getByRole('button', { name: 'Add a need' }).click();
+  const types = needs.getByRole('group', { name: 'What does it need?' });
+  await expect(types.getByRole('button')).toHaveText([
+    /Tunnel/,
+    /AWS sign-in/,
+    /Hosts entry/,
+    /Stack sign-in.*defines none/,
+    /HTTPS certificate/,
+    /Private package feed/,
+    'Cancel',
+  ]);
+  await types.getByRole('button', { name: /AWS sign-in/ }).click();
+  const fresh = needs.getByRole('group', { name: 'New in Needs first' });
+  await expect(fresh.getByLabel('Host', { exact: true })).toHaveCount(0);
+  // The profiles of this Mac are offered by name.
+  await fresh.getByLabel('AWS profile', { exact: true }).selectOption('acme-dev');
+  await fresh.getByLabel('Account', { exact: true }).fill('123456789012');
+  await fresh.getByLabel('Account', { exact: true }).press('Tab');
+  await page.screenshot({ path: 'test-results/next-settings-needs.png' });
+  await fresh.getByRole('button', { name: 'Keep' }).click();
+  await expect(needs.locator('details.rowed').filter({ hasText: 'acme-dev, account 123456789012' })).toBeVisible();
   await expect(panel.getByRole('status')).toHaveText('1 change, not saved yet');
   await panel.getByRole('button', { name: 'Close' }).click();
   await expect(panel.getByRole('alert')).toHaveText('Close without saving 1 change?');
   await panel.getByRole('button', { name: 'Keep editing' }).click();
   await panel.getByRole('button', { name: 'Save' }).click();
-  await expect.poll(() => (read().apps['orders']?.['prereqs'] as unknown[] | undefined)?.length).toBe(2);
+  await expect
+    .poll(() => read().apps['orders']?.['prereqs'])
+    .toEqual([
+      { tunnel: 'db.qa.acme.example', port: 5432, what: 'Database (Postgres)' },
+      { sso: 'acme-dev', account: '123456789012' },
+    ]);
+});
+
+test('what Koppler knows is picked, not typed: the kind, the launch profile from the clone, the app it calls', async ({
+  page,
+  canvas,
+}) => {
+  const read = stackFile(canvas.dir);
+  const clone = path.join(canvas.dir, 'clones', 'orders');
+  fs.mkdirSync(path.join(clone, 'src', 'Api', 'Properties'), { recursive: true });
+  fs.writeFileSync(path.join(clone, 'src', 'Api', 'Api.csproj'), '<Project />');
+  fs.writeFileSync(
+    path.join(clone, 'src', 'Api', 'Properties', 'launchSettings.json'),
+    JSON.stringify({ profiles: { Local: {}, Qa: {} } }),
+  );
+  execFileSync('git', ['-C', clone, 'init', '-q']);
+  execFileSync('git', ['-C', clone, 'add', '.']);
+  await (await actions(page, 'orders')).getByRole('button', { name: 'Settings for Orders API' }).click();
+  const panel = page.getByRole('dialog', { name: 'Orders API' });
+
+  const kind = panel.getByLabel('Kind', { exact: true });
+  await expect(kind).toHaveText('.NET');
+  await kind.click();
+  await page.screenshot({ path: 'test-results/next-settings-kind.png' });
+  await panel.getByRole('option', { name: 'Node' }).click();
+  await expect(kind).toHaveText('Node');
+  await kind.click();
+  await panel.getByRole('option', { name: '.NET' }).click();
+
+  // Its own kind's fields; those of other kinds are folded away below.
+  const runs = panel.locator('.body > .field');
+  await runs.getByLabel('Project', { exact: true }).selectOption('src/Api/Api.csproj');
+  await panel.getByLabel('Launch settings', { exact: true }).selectOption('src/Api/Properties/launchSettings.json');
+  await expect(panel.getByLabel('Base profile', { exact: true }).locator('option')).toHaveText([
+    'Not set',
+    'Local',
+    'Qa',
+    'Other…',
+  ]);
+  await panel.getByLabel('Base profile', { exact: true }).selectOption('Qa');
+  const url = panel.getByLabel('URL', { exact: true });
+  await expect(panel.getByText('Answers on port 5001 of this Mac')).toBeVisible();
+  await url.fill('localhost:5001');
+  await url.press('Tab');
+  await expect(panel.getByText('Start it with http:// or https://')).toBeVisible();
+  await url.fill('http://localhost:5001');
+  await url.press('Tab');
+  const ready = panel.getByRole('group', { name: 'Ready' });
+  await ready.getByLabel('Path', { exact: true }).fill('/health');
+  await ready.getByLabel('Path', { exact: true }).press('Tab');
+  await ready.getByLabel('Status', { exact: true }).fill('200');
+  await ready.getByLabel('Status', { exact: true }).press('Tab');
+  await page.screenshot({ path: 'test-results/next-settings-runs.png' });
+
+  await tabOf(page, 'Calls').click();
+  const calls = panel.getByRole('tabpanel');
+  const payments = calls.locator('details.rowed').filter({ hasText: 'Payments API' });
+  await expect(payments.locator('summary')).toContainText('found by the setting Payments__Url');
+  await payments.locator('summary').click();
+  await payments.getByLabel('Finds it by', { exact: true }).selectOption({ label: 'An edit to its code' });
+  await expect(payments.locator('summary')).toContainText('found by an edit to its code');
+  await expect(payments.getByLabel('File', { exact: true })).toBeVisible();
+  await expect(calls.getByLabel('Add to Calls').locator('option')).toHaveText(['Add an app it calls…', 'Web Shop']);
+  await page.screenshot({ path: 'test-results/next-settings-calls.png' });
+
+  await panel.getByRole('button', { name: 'Save' }).click();
+  await expect(panel.getByRole('status')).toHaveText('Saved');
+  const orders = read().apps['orders'] ?? {};
+  expect(orders['baseProfile']).toBe('Qa');
+  expect(orders['project']).toBe('src/Api/Api.csproj');
+  expect(orders['ready']).toEqual({ path: '/health', status: 200 });
+  expect((orders['consumes'] as Record<string, { how: string }>)['payments']?.how).toBe('edit');
 });
 
 test("the agent is asked to fill in an app's empty settings, leaving locked ones alone", async ({ page, canvas }) => {
@@ -147,4 +251,84 @@ test('the stack has its own settings, beside its name, with its apps a click awa
   await page.screenshot({ path: 'test-results/next-stack-settings.png' });
   await panel.getByRole('listitem').filter({ hasText: 'Orders API' }).getByRole('button', { name: 'Settings' }).click();
   await expect(page.getByRole('dialog', { name: 'Orders API' })).toBeVisible();
+});
+
+test('environments are chips in their order, and the protected ones are ticked', async ({ page, canvas }) => {
+  const read = stackFile(canvas.dir);
+  await page.getByRole('button', { name: 'Stack settings' }).click();
+  const panel = page.getByRole('dialog', { name: 'Acme Shop settings' });
+  const envs = panel.getByRole('list', { name: 'Environments' });
+  await expect(envs.getByRole('listitem')).toHaveText([/qa\s+runs by default/, /prod/, '']);
+  await envs.getByLabel('Add to Environments').fill('staging');
+  await envs.getByLabel('Add to Environments').press('Enter');
+  await envs.getByRole('button', { name: 'Move staging earlier' }).click();
+  const guarded = panel.getByRole('group', { name: 'Protected' });
+  // With nothing said, every environment but the first is protected.
+  await expect(guarded.getByLabel('PROD')).toBeChecked();
+  await expect(guarded.getByLabel('QA')).not.toBeChecked();
+  await guarded.getByLabel('STAGING').uncheck();
+  await page.screenshot({ path: 'test-results/next-stack-envs.png' });
+  await panel.getByRole('button', { name: 'Save' }).click();
+  await expect(panel.getByRole('status')).toHaveText('Saved');
+  const saved = read() as unknown as { envs: string[]; protected: string[] };
+  expect(saved.envs).toEqual(['qa', 'staging', 'prod']);
+  expect(saved.protected).toEqual(['prod']);
+});
+
+test.describe('with secrets, queues and code changes in the stack', () => {
+  test.use({
+    stack: {
+      ...STACK,
+      queues: { orders: { name: 'Order events', type: 'sqs' }, mail: { name: 'Mail out', type: 'sns' } },
+      apps: {
+        ...STACK.apps,
+        orders: {
+          ...STACK.apps['orders'],
+          secrets: [{ env: 'Db__Password', type: 'postgres', when: 'on QA', fetch: { cli: 'acme-secrets pull db' } }],
+          localChanges: [{ file: 'src/Program.cs', find: 'UseHttps()', replace: '// UseHttps()' }],
+          publishes: { orders: {} },
+        },
+      },
+    },
+  });
+
+  test('a secret is a row by its name, queues are ticked, and a code change reads as one line', async ({
+    page,
+    canvas,
+    stack,
+  }) => {
+    const read = stackFile(canvas.dir);
+    fs.writeFileSync(path.join(canvas.dir, 'stack', 'stack.json'), JSON.stringify(stack));
+    await (await actions(page, 'orders')).getByRole('button', { name: 'Settings for Orders API' }).click();
+    const panel = page.getByRole('dialog', { name: 'Orders API' });
+    const change = panel.getByRole('group', { name: 'src/Program.cs' });
+    await expect(change.getByLabel('Find', { exact: true })).toHaveValue('UseHttps()');
+    await change.getByLabel('Replace', { exact: true }).fill('// no https here');
+    await change.getByLabel('Replace', { exact: true }).press('Tab');
+    await page.screenshot({ path: 'test-results/next-settings-changes.png' });
+
+    await tabOf(page, 'Secrets').click();
+    const secret = panel.locator('details.rowed').filter({ hasText: 'Db__Password' });
+    await expect(secret.locator(':scope > summary')).toContainText('Postgres, needed on QA');
+    await secret.locator(':scope > summary').click();
+    await expect(secret.getByLabel('Type', { exact: true })).toHaveValue('postgres');
+    await secret.getByLabel('Type', { exact: true }).selectOption('redis');
+    await expect(secret.getByLabel('Command', { exact: true })).toHaveValue('acme-secrets pull db');
+    await page.screenshot({ path: 'test-results/next-settings-secrets.png' });
+
+    await tabOf(page, 'Calls').click();
+    const sends = panel.getByRole('group', { name: 'Sends to queues' });
+    await expect(sends.getByLabel('Order events')).toBeChecked();
+    await sends.getByLabel('Mail out').check();
+    await sends.getByLabel('Order events').uncheck();
+    await panel.getByRole('group', { name: 'Reads from queues' }).getByLabel('Order events').check();
+
+    await panel.getByRole('button', { name: 'Save' }).click();
+    await expect(panel.getByRole('status')).toHaveText('Saved');
+    const orders = read().apps['orders'] ?? {};
+    expect(orders['publishes']).toEqual({ mail: {} });
+    expect(orders['reads']).toEqual({ orders: {} });
+    expect((orders['secrets'] as { type: string }[])[0]?.type).toBe('redis');
+    expect((orders['localChanges'] as { replace: string }[])[0]?.replace).toBe('// no https here');
+  });
 });
