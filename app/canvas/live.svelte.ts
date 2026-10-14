@@ -94,6 +94,8 @@ interface Status {
   agent?: { state?: string; busy?: string };
   /** Changes made to boards from the terminal that this page has not made on its copy yet. */
   boardEdits?: { id: string; board: string; edit: BoardEdit; create?: true }[];
+  /** When `koppler refresh` last asked this page to read the stack and its board again. */
+  refresh?: string | null;
   /** The stack's fields locked on this Mac, as paths. */
   locks?: string[];
   /** What the agent said: questions, results and failures, oldest first. */

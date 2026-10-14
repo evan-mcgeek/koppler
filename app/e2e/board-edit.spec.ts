@@ -125,3 +125,19 @@ test('an edit with --arrange lays the board on screen out along its calls, as Ar
     })
     .toBe(true);
 });
+
+test('koppler refresh has an open canvas read the stack and its board again, without reloading the page', async ({
+  page,
+  canvas,
+}) => {
+  await expect(card(page, 'web')).toContainText('Web Shop');
+  await page.evaluate(() => ((window as { stayed?: boolean }).stayed = true));
+  // A change made outside the canvas: the run copy of the stack, as a sync leaves it.
+  const file = path.join(canvas.temp, 'registry.json');
+  const stack = JSON.parse(fs.readFileSync(file, 'utf8')) as { apps: Record<string, { name: string }> };
+  stack.apps['web'] = { ...stack.apps['web'], name: 'Storefront' };
+  fs.writeFileSync(file, JSON.stringify(stack));
+  koppler(canvas, 'refresh', '--no-sync');
+  await expect(card(page, 'web')).toContainText('Storefront');
+  expect(await page.evaluate(() => (window as { stayed?: boolean }).stayed)).toBe(true);
+});

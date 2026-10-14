@@ -22,7 +22,8 @@ import { boardCommand } from './engine/boards.ts';
 import { listen } from './engine/listen.ts';
 import { lockedPaths, setLock } from './engine/locks.ts';
 import { sayCommand } from './engine/messages.ts';
-import { sh } from './engine/processes.ts';
+import { alive, readRecord, sh } from './engine/processes.ts';
+import { writeJson } from './json-files.ts';
 import { queryCommand } from './engine/query.ts';
 import { recipesCommand } from './engine/recipes.ts';
 import { findCommand } from './engine/research.ts';
@@ -79,6 +80,18 @@ async function init(given: string[]): Promise<void> {
 }
 
 const loaded = () => readStack() ?? fail('no stack loaded (koppler init)');
+
+/** After changes made outside the canvas: the stack and clones read again, and an open canvas shows them. */
+function refresh(args: string[]): void {
+  if (!args.includes('--no-sync')) sync(without(args, '--no-sync'));
+  writeJson(path.join(tempDir(), 'refresh.json'), { at: new Date().toISOString() });
+  const canvas = readRecord('canvas');
+  console.log(
+    canvas && alive(canvas)
+      ? 'The open canvas reads the stack and its board again.'
+      : 'No canvas is open; it shows the changes when it opens.',
+  );
+}
 
 /** Stacks on this Mac, or switch to one; --boards lists the boards of the stack in use (the team's presets and your own). */
 function use(args: string[]): void {
@@ -460,6 +473,14 @@ const COMMANDS: Command[] = [
     about: "read-only query with the app's stored connection (on PROD: in your own terminal)",
     run: queryCommand,
     example: 'koppler query orders-api "select count(*) from orders"',
+  },
+  {
+    name: 'refresh',
+    who: 'agent',
+    args: '[--no-sync]',
+    about: 'after changes made outside the canvas: read the stack and clones again, and have an open canvas show them',
+    run: refresh,
+    example: 'koppler refresh',
   },
   {
     name: 'sync',

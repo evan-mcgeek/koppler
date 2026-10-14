@@ -5,7 +5,7 @@ import net from 'node:net';
 import path from 'node:path';
 import { of as kindOf } from '../core/kinds.ts';
 import { dataFile, readStack } from '../data.ts';
-import { whenChanged } from '../json-files.ts';
+import { readJson as readJsonOr, whenChanged } from '../json-files.ts';
 import { linkedStatus } from '../engine/linked.ts';
 import { listenerPid } from '../engine/listen.ts';
 import { boardEdits } from '../engine/boards.ts';
@@ -252,6 +252,8 @@ async function snapshot(serving: boolean): Promise<Status> {
   status['live'] = live();
   status['messages'] = readMessages();
   status['boardEdits'] = boardEdits();
+  // `koppler refresh`: when it last asked an open canvas to read the stack and its board again.
+  status['refresh'] = (readJsonOr(path.join(tempDir(), 'refresh.json')) as { at?: unknown } | null)?.at ?? null;
   const source = stackSource();
   status['locks'] = source ? lockedPaths(source) : [];
   status['agent'] = agentState();

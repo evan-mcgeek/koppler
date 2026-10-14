@@ -164,6 +164,14 @@
   $effect(() => {
     if (board.stack) undo.record();
   });
+  // `koppler refresh`: the stack and the board read again, in place. The first status only says when it last ran.
+  let refreshed: string | null | undefined;
+  $effect(() => {
+    const asked = live.status?.refresh;
+    if (asked === undefined) return;
+    if (refreshed !== undefined && asked !== refreshed) void untrack(() => board.reload());
+    refreshed = asked;
+  });
   // A change only restarts the wait: the board is put together once, when it has been still for a moment.
   $effect(() => {
     if (!board.changes.length || !board.stack) return;
