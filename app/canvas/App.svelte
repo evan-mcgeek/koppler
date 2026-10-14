@@ -130,6 +130,7 @@
       board.env,
       board.queues,
       board.hiddenQueues,
+      board.hiddenOutside,
       board.pinned,
       board.cards.map(node => [node.id, node.data.hideTunnels, node.data.showQueues]),
     ]),

@@ -29,7 +29,11 @@
   let sort = $state(remembered());
   let search = $state('');
   let copied = $state('');
-  const onBoard = $derived([...board.cards.map(node => node.id), ...board.pinned]);
+  // Outside systems count by their card: put there by hand, or because an app on the board uses them.
+  const onBoard = $derived([
+    ...board.cards.map(node => node.id),
+    ...board.infra.filter(card => card.type === 'outside').map(card => card.id.slice(8)),
+  ]);
   /** An app matches by any part of its name, or by the start of its kind: "pay", ".net", "lam". */
   const matches = (app: StackApp) => {
     const asked = search.trim().toLowerCase();
@@ -173,7 +177,7 @@
               aria-label="Remove {app.name} from the board"
               title="Remove from the board"
               onclick={() => {
-                if (app.outside) board.unpin(app.id);
+                if (app.outside) board.showOutside(app.id, false);
                 else board.remove(app.id);
               }}
             >
@@ -185,7 +189,7 @@
               type="button"
               title="Does not run on this Mac: {app.outside}. Click to put its card on the board; it never runs."
               onclick={() => {
-                board.pin(app.id);
+                board.showOutside(app.id, true);
               }}><span class="name">{app.name}</span></button
             >
             <span class="state">outside</span>

@@ -250,6 +250,7 @@ export function sanitizeLayout(input: unknown): Loose | null {
     );
   const queues = chosen(input['queues'], 'local');
   const hiddenQueues = chosen(input['hiddenQueues'], true);
+  const hiddenOutside = chosen(input['hiddenOutside'], true);
   const { keptLive, tidy, preset } = input;
   const pan = fieldsOf(input['pan']);
   return {
@@ -260,6 +261,7 @@ export function sanitizeLayout(input: unknown): Loose | null {
     ...(Object.keys(infra).length && { infra }),
     ...(Object.keys(queues).length && { queues }),
     ...(Object.keys(hiddenQueues).length && { hiddenQueues }),
+    ...(Object.keys(hiddenOutside).length && { hiddenOutside }),
     ...(ids(input['outside']).length && { outside: ids(input['outside']) }),
     ...(TIDY.includes(tidy as string) && { tidy }),
     ...(input['scratch'] === true && { scratch: true }),
