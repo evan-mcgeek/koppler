@@ -1,5 +1,6 @@
 import { expect, test } from 'vitest';
-import { SECRET_TYPES, StackSchema, validateStack, type Stack } from './stack.ts';
+import { SECRET_TYPES } from './secret-types.ts';
+import { StackSchema, validateStack, type Stack } from './stack.ts';
 
 const app = { name: 'Orders API', kind: 'dotnet', slug: 'acme/orders-api' };
 const stack = (extra: object = {}) => ({
