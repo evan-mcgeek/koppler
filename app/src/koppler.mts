@@ -56,13 +56,16 @@ async function init(given: string[]): Promise<void> {
   }
   const pick = args.includes('--pick');
   initStack(without(args, '--pick', '--no-fetch'));
-  console.log('');
-  if (!args.includes('--no-fetch')) {
-    await updateClones();
-    console.log('');
-  }
-  investigate({ afterSync: true });
   const stack = readStack();
+  // With no app in the stack yet there is no clone to update and nothing to report.
+  if (stack && !stack.setup && Object.keys(stack.apps).length) {
+    console.log('');
+    if (!args.includes('--no-fetch')) {
+      await updateClones();
+      console.log('');
+    }
+    investigate({ afterSync: true });
+  }
   const terminal = process.stdout.isTTY;
   if (!stack || !(pick || (!Object.keys(stack.apps).length && terminal))) return;
   if (stack.setup && !pick && !terminal) return;
