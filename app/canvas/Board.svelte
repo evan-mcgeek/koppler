@@ -529,10 +529,20 @@
     <ViewportPortal target="back">
       <svg class="links" aria-hidden="true">
         {#each links as link (link.key)}
-          <path class="link" class:idle={link.idle} class:dimmed={board.dimmedLink(link.from, link.to)} d={link.d} />
+          <path
+            class="link"
+            class:idle={link.idle}
+            class:dimmed={board.dimmedLink(link.from, link.to)}
+            class:lit={board.lit(link.from, link.to)}
+            d={link.d}
+          />
         {/each}
         {#each flows as flow (flow.key)}
-          <g class="flow {flow.kind}" class:dimmed={board.dimmedLink(flow.from, flow.to)}>
+          <g
+            class="flow {flow.kind}"
+            class:dimmed={board.dimmedLink(flow.from, flow.to)}
+            class:lit={board.lit(flow.from, flow.to)}
+          >
             <path class="under" d={flow.d} />
             <path class="wire" d={flow.d} />
             <path class="head" d="M-9,-4.5 L0,0 L-9,4.5 L-6.75,0 Z" transform={flow.head} />
@@ -823,6 +833,21 @@
   }
   .flow.ext .plug {
     display: none;
+  }
+  /* The picked card's own links stand out like its cables. */
+  .link.lit,
+  .flow.ext.lit :is(.wire, .head) {
+    stroke: var(--ink);
+    stroke-width: 2.5;
+  }
+  .flow.ext.lit .head {
+    fill: var(--ink);
+  }
+  .flow.msg.lit .wire {
+    stroke-width: 3.5;
+  }
+  .flow.msg.lit .head {
+    stroke-width: 2.5;
   }
   .ends {
     position: absolute;

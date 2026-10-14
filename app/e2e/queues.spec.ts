@@ -56,6 +56,14 @@ test('a queue between two apps shows as a card linked to both, and an outside sy
   await page.screenshot({ path: 'test-results/next-queues.png' });
 });
 
+test('a picked app lights its links to queues and outside systems, like its cables', async ({ page }) => {
+  await card(page, 'payments').locator('h3, header').first().click();
+  await expect(page.locator('.links .flow.ext')).toHaveClass(/\blit\b/);
+  await expect(page.locator('.links .flow.msg.lit')).toHaveCount(1);
+  await expect(page.locator('.links .flow.msg.dimmed')).toHaveCount(2);
+  await page.screenshot({ path: 'test-results/next-queues-lit.png' });
+});
+
 test('a queue is switched to a local copy where Koppler can run one, and the choice is kept', async ({ page }) => {
   const events = queue(page).filter({ hasText: 'Order events' });
   const receipts = queue(page).filter({ hasText: 'Receipts' });
