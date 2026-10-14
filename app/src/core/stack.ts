@@ -151,6 +151,21 @@ const App = z.looseObject(
       )
       .optional()
       .describe('When it is ready: this path answers on its url, with this status'),
+    /** It runs to completion, such as a migration or seed data, instead of staying up. */
+    once: z
+      .looseObject(
+        {
+          exitCode: z.int().min(0).max(255).optional(),
+          timeout: z.number().positive().optional(),
+        },
+        { error: 'an object' },
+      )
+      .optional()
+      .describe('It runs to completion, like a migration: the exit code it must end with (0) and the seconds it may take'),
+    after: z
+      .array(z.string(), { error: 'a list of app ids' })
+      .optional()
+      .describe('Apps in the same run that must finish (a once app) or start before this one does'),
     prereqs: z
       .array(Prereq, { error: 'a list' })
       .optional()
@@ -342,6 +357,8 @@ function appProblems(id: string, app: Loose, stack: Loose, envs: string[]): stri
   if (!app['outside'] && app['slug'] === undefined) problems.push(`${at}.slug: required`);
   for (const [dep] of entries(app['consumes']))
     if (!has(stack['apps'], dep)) problems.push(`${at}.consumes.${dep}: no such app`);
+  for (const [n, dep] of list(app['after']).entries())
+    if (typeof dep !== 'string' || !has(stack['apps'], dep)) problems.push(`${at}.after[${String(n)}]: no such app`);
   for (const key of ['publishes', 'reads'])
     for (const [queue] of entries(app[key]))
       if (!has(stack['queues'], queue)) problems.push(`${at}.${key}.${queue}: no such queue under "queues"`);

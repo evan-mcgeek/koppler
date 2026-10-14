@@ -98,6 +98,9 @@ export const child = (path: string, key: string | number) =>
 /** What the stack's fields are called on screen, where their key does not say it. */
 const NAMES: Record<string, string> = {
   prereqs: 'Needs first',
+  once: 'Runs to completion',
+  after: 'Starts after',
+  exitCode: 'Exit code',
   consumes: 'Calls',
   publishes: 'Sends to queues',
   reads: 'Reads from queues',
@@ -180,6 +183,8 @@ export const APP_TABS: Tab[] = [
       'start',
       'url',
       'ready',
+      'once',
+      'after',
       'project',
       'launchSettings',
       'baseProfile',
@@ -470,11 +475,12 @@ export function addressNote(value: unknown): { warn?: string; note?: string } {
 }
 
 /** A dedicated control for the field at a path, where its schema alone would give a plain box. */
-export type Control = 'kind' | 'pick' | 'address' | 'chips' | 'ordered' | 'envs' | 'queues';
+export type Control = 'kind' | 'pick' | 'address' | 'chips' | 'ordered' | 'envs' | 'queues' | 'apps';
 export function controlOf(path: string, schema: Schema, value: unknown, choice: Choice | null): Control | undefined {
   if (path === 'envs') return 'ordered';
   if (path === 'protected') return 'envs';
   if (/(?:^|\.)(publishes|reads)$/.test(path)) return 'queues';
+  if (/^apps\.[a-z0-9-]+\.after$/.test(path)) return 'apps';
   if (choice) return /(?:^|\.)kind$/.test(path) ? 'kind' : 'pick';
   if (/(?:^|\.)(url|deployedUrl|deployed)$/.test(path)) return 'address';
   const strings = (one: Schema) => types(one).includes('array') && types(one.items ?? {}).includes('string');

@@ -12,7 +12,7 @@ import { repoFiles } from './investigate.ts';
 import { readJson } from '../json-files.ts';
 import { BIN, CODE, tempDir } from '../paths.ts';
 import { resolveDevice, type RunDevice } from './devices.ts';
-import { sh, type Ready, type RunOptions } from './processes.ts';
+import { sh, type Once, type Ready, type RunOptions } from './processes.ts';
 import { appOn, storeOf } from '../core/stack.ts';
 
 // Koppler's own folder, where its runners (Lambda, SAM) are.
@@ -26,6 +26,7 @@ export interface AppStart {
   device: RunDevice | undefined;
   env: string;
   ready?: Ready;
+  once?: Once;
 }
 
 /** The file a run writes for a Lambda: the keys of its secret that point at local apps. */
@@ -163,6 +164,7 @@ export function appStart(id: string, options: RunOptions): AppStart | null {
     device,
     env,
     // On its own address, so an https app is asked over https.
+    ...(app.once && { once: app.once }),
     ...(app.ready &&
       app.url && {
         ready: {

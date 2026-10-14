@@ -67,6 +67,13 @@ export interface RunOptions {
   setEnv?: Record<string, string>;
   /** An address, or a path on its port. */
   ready?: Ready;
+  /** It runs to completion: the start waits for it to end with this exit code. */
+  once?: Once;
+}
+/** A step that runs to completion: the exit code it must end with, and the seconds it may take. */
+export interface Once {
+  exitCode?: number | undefined;
+  timeout?: number | undefined;
 }
 
 /** A program's output, or nothing when it fails or is not there. */
@@ -277,6 +284,7 @@ export async function startProcess(options: RunOptions): Promise<ProcessRecord> 
   child.on('error', error => {
     spawnError = error;
   });
+  if (options.once) return runToEnd(options, child, fd, log, display, cwd);
   child.unref();
   fs.closeSync(fd);
   await sleep(300);
@@ -304,6 +312,63 @@ export async function startProcess(options: RunOptions): Promise<ProcessRecord> 
   if (record.port && options.ready) await waitUntilReady(record, record.port, options.ready);
   const answering = record.port ? `, answering on port ${String(record.port)}` : '';
   console.log(`started ${name} (pid ${String(record.pid)})${answering}, log ${log}`);
+  return record;
+}
+
+/** Waits for a step that runs to completion; it is a running process meanwhile, so status, wait and stop see it. */
+async function runToEnd(
+  options: RunOptions,
+  child: ReturnType<typeof spawn>,
+  fd: number,
+  log: string,
+  display: string,
+  cwd: string,
+): Promise<ProcessRecord> {
+  const { name } = options;
+  const ended = new Promise<number | null>(resolve => {
+    child.once('exit', code => {
+      resolve(code);
+    });
+    child.once('error', () => {
+      resolve(null);
+    });
+  });
+  fs.closeSync(fd);
+  const record: ProcessRecord = {
+    name,
+    pid: child.pid ?? 0,
+    command: display,
+    cwd,
+    restart: false,
+    port: null,
+    ...(options.env && { env: options.env }),
+    onStop: [],
+    log,
+    startedAt: new Date().toISOString(),
+    psCommand: child.pid ? psCommand(child.pid) : '',
+    psStart: child.pid ? psStart(child.pid) : '',
+  };
+  if (child.pid) writeJson(recordPath(name), record);
+  const expected = options.once?.exitCode ?? 0;
+  const seconds = options.once?.timeout ?? 600;
+  let timer: NodeJS.Timeout | undefined;
+  const late = new Promise<'late'>(resolve => {
+    timer = setTimeout(() => {
+      resolve('late');
+    }, seconds * 1000);
+  });
+  const code = await Promise.race([ended, late]);
+  clearTimeout(timer);
+  if (code === 'late') {
+    await stopOne(record);
+    fail(`${name} did not finish within ${String(seconds)}s; last lines of ${log}:\n${tailOf(log, 15)}`);
+  }
+  fs.rmSync(recordPath(name), { force: true });
+  if (code !== expected)
+    fail(
+      `${name} ended with exit code ${String(code)}, not ${String(expected)}; last lines of ${log}:\n${tailOf(log, 15)}`,
+    );
+  console.log(`finished ${name} (exit code ${String(code)}), log ${log}`);
   return record;
 }
 
