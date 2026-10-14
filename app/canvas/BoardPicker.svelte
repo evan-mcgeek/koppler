@@ -7,7 +7,6 @@
   import { board } from './board.svelte.ts';
   import { ago, openBoard, openFile, openLink } from './boards.ts';
   import { post } from './data.ts';
-  import { live } from './live.svelte.ts';
   import { runs } from './run.svelte.ts';
   import { toasts } from './toast.svelte.ts';
 
@@ -64,29 +63,44 @@
     if (why) hint = { text: why, warn: true };
     else close();
   };
-  // Shared with the team: kept among the stack's team boards through the same checked edit as any other change.
+  // Shared with the team: a pull request on the stack's repo on GitHub, after a review that says where it goes. A
+  // stack that is not on GitHub keeps it in its file here, to commit.
   const share = async (preset: StoredPreset) => {
-    const at = board.team.findIndex(one => one.name === preset.name);
-    const index = at < 0 ? board.team.length : at;
+    close();
     const value = board.forTeam(preset);
-    const said = await post('stack-edit', { path: `presets[${String(index)}]`, value });
-    if ('error' in said) {
-      toasts.show(`Could not share ${preset.name}: ${said.error}`, 'warning');
+    const where = await post<{ repo?: string; local?: true }>('board-share', { preset: value, check: true });
+    if ('error' in where) {
+      toasts.show(`Could not share ${preset.name}: ${where.error}`, 'warning');
       return;
     }
-    board.keptForTeam(index, value);
-    const reach = live.status?.linked
-      ? 'Open a pull request from the stack menu, so your team gets it.'
-      : "Commit the stack's repo, so your team gets it.";
-    toasts.show(`${preset.name} is a team board now. ${reach}`);
-  };
-  const copy = async (preset: StoredPreset) => {
-    const copied = await navigator.clipboard.writeText(board.asShared(preset)).then(
-      () => true,
-      () => false,
-    );
-    if (copied) toasts.show('Copied. It opens on another canvas from the board menu, as a file or a link.');
-    else toasts.show('Copy is blocked here', 'warning');
+    const replaces = board.team.some(one => one.name === preset.name);
+    runs.review = {
+      title: `Share ${preset.name} with the team`,
+      sub: where.repo
+        ? `Opens a pull request on ${where.repo} that ${replaces ? 'updates this team board' : 'adds this board to the team boards'}. Your team gets it once the pull request is merged; nothing on this Mac changes.`
+        : `This stack is not on GitHub, so the board is ${replaces ? 'updated' : 'added'} among the team boards in its file here. Commit the stack so your team gets it.`,
+      notices: [],
+      groups: [{ verb: 'keeps', label: replaces ? 'Updates' : 'Adds', items: [{ name: preset.name, notes: [] }] }],
+      ok: where.repo ? 'Open pull request' : 'Add to team boards',
+      prod: false,
+      blocked: false,
+      confirm: () => {
+        if (where.repo) toasts.show('Opening the pull request…');
+        void post<{ url?: string; local?: true }>('board-share', { preset: value }).then(said => {
+          if ('error' in said) toasts.show(`Could not share ${preset.name}: ${said.error}`, 'warning');
+          else if (said.url)
+            toasts.show(`Pull request opened for ${preset.name}`, 'message', {
+              label: 'View',
+              run: () => window.open(said.url, '_blank', 'noopener'),
+            });
+          else {
+            const at = board.team.findIndex(one => one.name === preset.name);
+            board.keptForTeam(at < 0 ? board.team.length : at, value);
+            toasts.show(`${preset.name} is a team board now. Commit the stack's repo, so your team gets it.`);
+          }
+        });
+      },
+    };
   };
   // Deleting asks first and names what goes; the board then waits in Recently deleted.
   const askDelete = (preset: StoredPreset) => {
@@ -170,15 +184,8 @@
             class="act"
             type="button"
             aria-label="Share {preset.name} with the team"
-            title="Make it a team board of the stack, for everyone who uses it"
-            onclick={() => void share(preset)}>Share</button
-          >
-          <button
-            class="act"
-            type="button"
-            aria-label="Copy {preset.name} as JSON"
-            title="Copy as JSON, to send to someone: it opens from the board menu"
-            onclick={() => void copy(preset)}>Copy</button
+            title="Propose it as a team board of the stack: a pull request on the stack's repo"
+            onclick={() => void share(preset)}>Share with team</button
           >
           <button
             class="act"

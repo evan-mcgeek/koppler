@@ -5,6 +5,7 @@ import type { Edge } from '../core/plan.ts';
 import { readClones, readData, readStack, writeData } from '../data.ts';
 import { fail } from '../failure.ts';
 import { alive, readRecord } from './processes.ts';
+import { shareBoard } from './share.ts';
 import { currentStack } from './stacks.ts';
 
 export interface QueuedEdit {
@@ -30,10 +31,30 @@ export function editDone(id: unknown): void {
 
 const CHANGES =
   '[--add <app,...>] [--remove <app,...>] [--cable <caller>:<callee>]... [--uncable <caller>:<callee>]... [--branch <app>=<branch>]... [--note <app>="<note>"]... [--arrange]';
-const USAGE = `usage: koppler board new "<name>" ${CHANGES}\n       koppler board edit "<name>" ${CHANGES}`;
+const USAGE = `usage: koppler board new "<name>" ${CHANGES}\n       koppler board edit "<name>" ${CHANGES}\n       koppler board share "<name>"`;
 
-export function boardCommand(args: string[]): void {
+/** Your own board, by name, as kept for this stack. */
+const ownBoard = (name: string): StoredPreset | undefined => {
+  const own = (readData('state')?.['presets'] ?? []) as StoredPreset[];
+  return own.find(one => one.name === name) ?? own.find(one => one.name.toLowerCase() === name.toLowerCase());
+};
+
+/** Opens the pull request that makes one of your boards a team board of the stack in use. */
+async function share(name: string): Promise<void> {
+  const dir = currentStack() ?? fail('no stack in use (koppler use)');
+  const board = ownBoard(name) ?? fail(`${name} is not one of your boards; koppler use --boards lists them`);
+  const shared = await shareBoard(dir, board);
+  if (shared.error !== undefined) fail(shared.error);
+  if (shared.local)
+    console.log(
+      `KEPT ${board.name} among the stack's team boards in ${dir}; commit the stack there so your team gets it.`,
+    );
+  else console.log(`PROPOSED ${board.name} to the team on ${shared.repo}: ${shared.url}`);
+}
+
+export function boardCommand(args: string[]): void | Promise<void> {
   const [what, name] = args;
+  if (what === 'share' && name && !name.startsWith('-')) return share(name);
   if ((what !== 'edit' && what !== 'new') || !name?.trim() || name.startsWith('-')) fail(USAGE);
   const create = what === 'new';
   const stack = readStack() ?? fail('no stack loaded (koppler init)');
