@@ -3,8 +3,11 @@
   // to it. What it is sits on top; the rest is in tabs, in plain words; every field its schema has is there. Edits are a
   // draft until Save, which checks the whole stack and writes it at once; Discard drops them. A lock keeps a field as it
   // is, for the user and the agent.
+  import { KINDS } from '../src/core/kinds.ts';
+  import { SECRET_TYPES } from '../src/core/stack.ts';
   import { getAt, parsePath, setAt } from '../src/core/stack-path.ts';
   import EnvOverrides from './EnvOverrides.svelte';
+  import KindIcon from './KindIcon.svelte';
   import SettingsField from './SettingsField.svelte';
   import { board } from './board.svelte.ts';
   import { post } from './data.ts';
@@ -16,6 +19,7 @@
     BY_KIND,
     changes,
     child,
+    HOWS,
     KIND_FIELDS,
     label,
     lockedBy,
@@ -24,7 +28,9 @@
     STACK_HEAD,
     STACK_TABS,
     within,
+    type Choice,
     type Ctx,
+    type Option,
     type Schema,
     type Tab,
   } from './settings.ts';
@@ -44,6 +50,15 @@
   let saved = $state(false);
   let changed = false;
   let asked = $state(false);
+  /** What this machine offers to pick from: AWS profile names, and what the app's clone holds. */
+  interface Choices {
+    awsProfiles: string[];
+    files: string[];
+    profiles: Record<string, string[]>;
+    scripts: Record<string, string[]>;
+  }
+  const NO_CHOICES: Choices = { awsProfiles: [], files: [], profiles: {}, scripts: {} };
+  let choices = $state(NO_CHOICES);
 
   const parts = (path: string) => {
     const parsed = parsePath(path);
@@ -89,18 +104,65 @@
     tab = 0;
     problems = new Map();
     locks = live.status?.locks ?? [];
-    const [loaded, registry] = await Promise.all([
+    const id = /^apps\.([a-z0-9-]+)$/.exec(what.path)?.[1] ?? '';
+    const [loaded, registry, here] = await Promise.all([
       schema
         ? Promise.resolve(schema)
         : fetch('data/stack-schema.json').then(answer => answer.json() as Promise<Schema>),
       fetch('data/registry.json').then(answer => answer.json() as Promise<Record<string, unknown>>),
+      fetch(`data/choices.json?app=${id}`)
+        .then(answer => answer.json() as Promise<Choices>)
+        .catch(() => NO_CHOICES),
     ]);
+    choices = { ...NO_CHOICES, ...here };
     schema = loaded;
     const { source: _source, found: _found, ...own } = registry;
     stack = own;
     draft = JSON.parse(JSON.stringify(own)) as unknown;
     dialog?.showModal();
   }
+
+  const plain = (values: string[]): Option[] => values.map(one => ({ value: one, label: one }));
+  const typed = (values: string[], other = true): Choice => ({ options: plain(values), other });
+  const filesLike = (pattern: RegExp) => choices.files.filter(file => pattern.test(file));
+  /** What the field at a path is picked from, by the key it ends in. */
+  const optionsFor = (path: string): Choice | null => {
+    const key = /(?:^|\.)([A-Za-z]+)$/.exec(path)?.[1] ?? '';
+    const all = (draft ?? {}) as { kinds?: Record<string, { label?: string }>; signIns?: Record<string, unknown> };
+    const mine = value ?? {};
+    if (key === 'kind' && /^apps\.[a-z0-9-]+\.kind$/.test(path))
+      return {
+        options: [
+          ...Object.entries(KINDS).map(([id, kind]) => ({ value: id, label: kind.label, kind: id })),
+          ...Object.entries(all.kinds ?? {})
+            .filter(([id]) => !Object.hasOwn(KINDS, id))
+            .map(([id, kind]) => ({ value: id, label: kind.label ?? id, kind: id })),
+        ],
+      };
+    if (key === 'sso') return typed(choices.awsProfiles);
+    if (key === 'signIn') return typed(Object.keys(all.signIns ?? {}), false);
+    if (key === 'how' && /consumes/.test(path)) return { options: HOWS };
+    if (key === 'type' && /secrets\[\d+\]\.type$/.test(path))
+      return { options: SECRET_TYPES.map(type => ({ value: type, label: label(type) })), other: true };
+    if (!app) return null;
+    if (key === 'project' && !/lambda\.project$/.test(path)) {
+      // dotnet takes the project's folder as well as its file.
+      const found = filesLike(/\.(cs|fs|vb)proj$/);
+      return typed([...new Set(found.map(file => file.split('/').slice(0, -1).join('/') || '.')), ...found]);
+    }
+    if (key === 'launchSettings') return typed(Object.keys(choices.profiles));
+    if (key === 'baseProfile') {
+      const file = typeof mine['launchSettings'] === 'string' ? mine['launchSettings'] : '';
+      const found = choices.profiles[file] ?? [...new Set(Object.values(choices.profiles).flat())];
+      return typed(found);
+    }
+    if (key === 'script') return typed(choices.scripts['package.json'] ?? Object.values(choices.scripts)[0] ?? []);
+    if (key === 'defineFile')
+      return typed(filesLike(/\.(json|env)$/).filter(file => !/(^|\/)package(-lock)?\.json$/.test(file)));
+    if (key === 'template') return typed(filesLike(/\.ya?ml$/));
+    if (key === 'file') return typed(choices.files);
+    return null;
+  };
 
   const ctx: Ctx = {
     // An edit changes the draft only; Save checks it all.
@@ -125,6 +187,8 @@
       return null;
     },
     problem: path => problems.get(path),
+    options: optionsFor,
+    stack: () => draft,
   };
   const save = async () => {
     saving = true;
@@ -223,8 +287,11 @@
         <ul class="apps">
           {#each Object.entries((value?.['apps'] ?? {}) as Record<string, { name?: string; kind?: string }>) as [id, one] (id)}
             <li>
+              <KindIcon kind={one.kind ?? 'other'} label="" />
               <span class="name">{one.name ?? id}</span>
-              <span class="kind">{one.kind ?? ''}</span>
+              <span class="kind"
+                >{(Object.hasOwn(KINDS, one.kind ?? '') ? KINDS[one.kind ?? '']?.label : null) ?? one.kind ?? ''}</span
+              >
               <button type="button" onclick={() => void open({ title: one.name ?? id, path: `apps.${id}` })}
                 >Settings</button
               >
@@ -245,7 +312,7 @@
             value={value?.[key]}
             {ctx}
             required={!!shape.required?.includes(key)}
-            depth={1}
+            depth={shown.keys.length === 1 ? 0 : 1}
           />
         {/each}
         {#if others.length}
@@ -438,7 +505,7 @@
   }
   .apps li {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto auto;
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
     align-items: center;
     gap: 10px;
     padding: 4px 0;

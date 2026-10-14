@@ -5,6 +5,7 @@
   --surface: #ffffff;
   --ink: #18222d;
   --muted: #5b6875;
+  --chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 16 16' fill='none' stroke='%235b6875' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E");
   --line: #c5cdd6;
   --dot: #c9d0d8;
   --cable: #2b59c3;
@@ -40,6 +41,7 @@
     --surface: #222a33;
     --ink: #e6ebf0;
     --muted: #93a0ad;
+    --chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 16 16' fill='none' stroke='%2393a0ad' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E");
     --line: #34404c;
     --dot: #2a333d;
     --cable: #6e93f0;
@@ -69,6 +71,7 @@
   --surface: #222a33;
   --ink: #e6ebf0;
   --muted: #93a0ad;
+  --chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 16 16' fill='none' stroke='%2393a0ad' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E");
   --line: #34404c;
   --dot: #2a333d;
   --cable: #6e93f0;

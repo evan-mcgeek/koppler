@@ -52,6 +52,10 @@ const Prereq = z.looseObject(
       .describe('The AWS account that profile must be in'),
     /** A sign-in of the stack's own, by its name under `signIns`. */
     signIn: matching(NAME, 'the name of a sign-in').optional().describe('A sign-in of the stack, by its name'),
+    devCerts: z.boolean().optional().describe('It serves https here: the local certificate must be trusted'),
+    nuget: z.boolean().optional().describe('It downloads packages from a private feed while it builds'),
+    cmd: z.string().optional().describe('The command that opens the tunnel, when it is not the usual one'),
+    note: z.string().optional().describe('Anything else worth knowing, in words'),
   },
   { error: 'an object: a tunnel, a sign-in or another need' },
 );
@@ -60,26 +64,43 @@ const Secret = z.looseObject(
     /** The setting the stored value is given to the app as. */
     env: setting.optional().describe('The setting the stored value is given to the app as'),
     type: z.string().optional().describe('postgres, mysql or redis, so it can be tested'),
+    file: z.string().optional().describe("A file in the app's repo that holds the secret, instead of a setting"),
+    when: z.string().optional().describe('When it is needed, if not always'),
+    fetch: z
+      .looseObject({
+        cli: z.string().optional().describe('The command that stores it, run in your own terminal'),
+        ui: z.string().optional().describe('Where to find it by hand'),
+      })
+      .optional()
+      .describe('How to get it'),
+    note: z.string().optional().describe('Anything else worth knowing, in words'),
   },
   { error: 'an object' },
 );
 /** How one app calls another, and so what to change to point it at a local copy. */
 const Call = z.looseObject(
   {
-    how: z.string().optional(),
-    env: z.union([z.string(), z.array(z.string())], { error: 'a setting name, or a list of them' }).optional(),
-    file: z.string().optional(),
-    key: z.string().optional(),
+    how: z.string().optional().describe('How it picks the address: a setting, a settings file, an edit'),
+    env: z
+      .union([z.string(), z.array(z.string())], { error: 'a setting name, or a list of them' })
+      .optional()
+      .describe('The setting that holds the address'),
+    file: z.string().optional().describe('The file that holds the address, inside its repo'),
+    key: z.string().optional().describe('The name or line in that file'),
     /** An address to use instead of the worked-out one: one for all, or one per platform (ios, android). */
-    value: z.union([z.string(), z.record(z.string(), z.string())]).optional(),
+    value: z
+      .union([z.string(), z.record(z.string(), z.string())])
+      .optional()
+      .describe('An address to use instead of the worked-out one'),
     /** The route the caller's setting holds after the callee's address, kept when the call goes local. */
     path: z
       .string()
       .regex(/^\/[^\s?#]*$/, { error: 'a path that starts with / (no query)' })
-      .optional(),
-    deployed: z.string().optional(),
-    found: z.string().optional(),
-    note: z.string().optional(),
+      .optional()
+      .describe('The route kept after the address, such as /api'),
+    deployed: z.string().optional().describe('The deployed address it calls today'),
+    found: z.string().optional().describe('Where the call was seen in its code'),
+    note: z.string().optional().describe('Anything else worth knowing, in words'),
   },
   { error: 'an object (how the call is made; {} when not known yet)' },
 );
@@ -111,6 +132,10 @@ const App = z.looseObject(
       .union([z.string(), z.boolean()])
       .optional()
       .describe('Set for a system that never runs here, to what it is'),
+    pending: z
+      .union([z.string(), z.boolean()])
+      .optional()
+      .describe('Set while its facts are not filled in yet; a run refuses it until this is taken out'),
     /** Where it answers when it runs on this machine. */
     url: z.string().optional().describe('Where it answers when it runs on this Mac'),
     deployedUrl: z.string().optional().describe('Where the deployed one answers'),
@@ -175,6 +200,13 @@ const App = z.looseObject(
       .looseObject({
         handler: z.string().optional(),
         runtime: z.string().optional(),
+        project: z.string().optional().describe('The folder to build, when not the repo itself'),
+        timeout: z.number().positive().optional().describe('Seconds a call may take'),
+        routes: z.array(z.string()).optional().describe('The paths it answers on'),
+        secret: z
+          .looseObject({ id: z.string().optional(), from: z.string().optional() })
+          .optional()
+          .describe('The secret it reads when it starts, and the stored value that holds it'),
       })
       .optional()
       .describe('Lambda: handler and runtime'),
@@ -208,6 +240,7 @@ const Queue = z.looseObject(
     type: z.enum(QUEUE_TYPES, { error: `one of ${QUEUE_TYPES.join(', ')}` }),
     queue: queueName.optional(),
     envs: z.record(z.string(), z.looseObject({ queue: queueName.optional() })).optional(),
+    note: z.string().optional(),
   },
   { error: 'an object' },
 );
@@ -276,6 +309,10 @@ export const StackSchema = z.looseObject(
     checks: z.array(Check, { error: CHECKS }).max(50, CHECKS).optional(),
     signIns: z.record(z.string(), SignIn, { error: 'an object keyed by sign-in name' }).optional(),
     presets: z.array(Preset, { error: 'a list' }).optional(),
+    /** How to install a program the stack's apps need, by its name. */
+    install: z
+      .record(z.string(), z.string(), { error: 'an object of program names and how to install each' })
+      .optional(),
   },
   { error: 'a stack is an object with envs and apps' },
 );

@@ -133,6 +133,8 @@ export const test = base.extend<{
       KOPPLER_LOGS: path.join(dir, 'state', 'logs'),
       KOPPLER_CONFIG_DIR: path.join(dir, 'config'),
       KOPPLER_PORT: String(port),
+      // Never the profiles of whoever runs the tests.
+      AWS_CONFIG_FILE: path.join(dir, 'aws-config'),
     };
     const server = spawn(process.execPath, [path.join(here, '..', 'dist', 'status-watch.mjs')], {
       env,
