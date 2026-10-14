@@ -26,12 +26,12 @@ import {
   useStack,
 } from '../engine/sync.ts';
 import { CODE, TEMP } from '../paths.ts';
-import { redact } from '../scrub.ts';
 import { cableTest } from './cable-test.ts';
-import { appendDebugLog, clearDebugLog } from './logs.ts';
+import { appendDebugLog, clearDebugLog, tail } from './logs.ts';
 import { fetchPresets, sanitizeLayout, sanitizePrompt, type Prompt } from './sanitize.ts';
 import { secretRequest } from './secrets.ts';
 import { drop } from './waiting.ts';
+import { APP_ID } from '../ids.ts';
 
 type Loose = Record<string, unknown>;
 /** How a request is answered; `after` runs once the answer has been sent. */
@@ -43,7 +43,7 @@ export interface Answer {
 type Route = (body: Loose) => Answer | Promise<Answer>;
 
 const PROMPTS = path.join(TEMP, 'prompts.jsonl');
-const APP_ID = /^[a-z0-9-]{1,64}$/;
+// Never starts with a dash: an id is passed to `koppler` as an argument, and must not read as a flag.
 const isApp = (value: unknown): value is string => typeof value === 'string' && APP_ID.test(value);
 const stamp = () => new Date().toISOString();
 const appendLine = (file: string, line: object) => {
@@ -77,18 +77,18 @@ function startRun(prompt: Prompt, record: RunRecord, command: 'up' | 'down'): vo
     stdio: ['ignore', out, out],
     env: process.env,
   });
+  child.on('error', error => {
+    fs.closeSync(out);
+    appendMessage(refusal(record.id, record.kind, `Koppler could not start: ${error.message}`));
+  });
   child.on('exit', code => {
     fs.closeSync(out);
     // A Stop from switching stacks switches once everything is stopped and reverted.
     const switchTo = prompt.data['switchTo'];
     if (code === 0 && record.kind === 'stop' && typeof switchTo === 'string') void koppler(['use', switchTo], 60000);
     if (code === 0) return;
-    let said = '';
-    try {
-      said = redact(fs.readFileSync(log, 'utf8')).trim().split('\n').slice(-40).join('\n');
-    } catch {
-      // The log went with a Stop: the exit code still tells.
-    }
+    // The log may have gone with a Stop: the exit code still tells.
+    const said = tail(log, 64 * 1024, 40)?.trim() ?? '';
     // Said on the canvas too: with no agent connected, the prompt below is read by nobody.
     appendMessage(refusal(record.id, record.kind, said));
     const finish = `koppler history done ${record.kind === 'stop' ? record.id : ''}`;
@@ -285,14 +285,18 @@ export const ROUTES: Record<string, Route> = {
   '/secret-remove': secret('remove'),
   '/secret-test': secret('test'),
   '/cable-test': async body => {
-    const lane = typeof body['port'] === 'number' ? `${String(body['host'])}:${String(body['port'])}` : null;
+    const { host, port } = body;
+    const named = typeof host === 'string' && /^[\w.-]{1,253}$/.test(host) && Number.isInteger(port);
+    const lane = named ? `${host}:${String(port)}` : null;
     const before = (lane && tunnelLanes.get(lane)) || Promise.resolve();
     const test = before.then(() => cableTest(readStack(), body));
-    if (lane)
-      tunnelLanes.set(
-        lane,
-        test.catch(() => undefined),
-      );
+    if (lane) {
+      const settled = test.catch(() => undefined);
+      tunnelLanes.set(lane, settled);
+      void settled.then(() => {
+        if (tunnelLanes.get(lane) === settled) tunnelLanes.delete(lane);
+      });
+    }
     return { status: 200, body: await test };
   },
   '/messages-clear': () => ({ status: 200, body: clearMessages() }),
@@ -312,7 +316,9 @@ export const ROUTES: Record<string, Route> = {
   // With an app, only that one.
   '/stop-apps': async body => {
     const app = body['app'];
-    const { failed, out } = await koppler(typeof app === 'string' ? ['stop', app] : ['stop', '--all', '--yes'], 60000);
+    // A name that could not be one of Koppler's processes stops nothing.
+    if (app !== undefined && !isApp(app)) return { status: 200, body: { stopped: [] } };
+    const { failed, out } = await koppler(app ? ['stop', app] : ['stop', '--all', '--yes'], 60000);
     const stopped = out
       .trim()
       .split('\n')

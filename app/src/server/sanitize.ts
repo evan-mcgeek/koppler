@@ -1,6 +1,7 @@
 // What the page sends is never taken as it comes: a board, a layout or a prompt keeps only its known fields, each cut
 // to size, so no endpoint can be used to write anything else.
 import { githubFile, readFile } from '../github.ts';
+import { APP_ID, RUN_ID } from '../ids.ts';
 
 type Loose = Record<string, unknown>;
 interface Point {
@@ -43,7 +44,7 @@ export interface Prompt {
 export const MAX_NOTE = 4000;
 const text = (value: unknown, max = 200) => (typeof value === 'string' ? value.slice(0, max) : '');
 const num = (value: unknown) => (typeof value === 'number' && Number.isFinite(value) ? value : 0);
-const isId = (value: unknown): value is string => typeof value === 'string' && /^[a-z0-9-]{1,64}$/.test(value);
+const isId = (value: unknown): value is string => typeof value === 'string' && APP_ID.test(value);
 const isObject = (value: unknown): value is Loose => !!value && typeof value === 'object';
 const isMap = (value: unknown): value is Loose => isObject(value) && !Array.isArray(value);
 const listOf = (value: unknown) => (Array.isArray(value) ? (value as unknown[]) : []);
@@ -253,7 +254,7 @@ export function sanitizeLayout(input: unknown): Loose | null {
     env: text(input['env'], 8),
     mode: text(input['mode'], 8),
     ...(dismissed.length && { dismissed }),
-    ...(typeof keptLive === 'string' && /^[a-z0-9]{6,40}$/.test(keptLive) && { keptLive }),
+    ...(typeof keptLive === 'string' && RUN_ID.test(keptLive) && { keptLive }),
     ...(Object.keys(infra).length && { infra }),
     ...(Object.keys(queues).length && { queues }),
     ...(Object.keys(hiddenQueues).length && { hiddenQueues }),

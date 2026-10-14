@@ -11,11 +11,12 @@ import { fileURLToPath } from 'node:url';
 import * as z from 'zod';
 import { StackSchema } from './core/stack.ts';
 import { readClones, readData, type DataName } from './data.ts';
-import { CODE, LOGS, STATE, TEMP } from './paths.ts';
+import { CODE, STATE, TEMP } from './paths.ts';
 import { awsProfiles, cloneChoices } from './server/choices.ts';
 import { tail } from './server/logs.ts';
 import { ROUTES } from './server/routes.ts';
-import { publish, SOURCE, statusJson } from './server/status.ts';
+import { logFile, publish, SOURCE, statusJson } from './server/status.ts';
+import { APP_ID } from './ids.ts';
 
 const MAX_BODY_BYTES = 256 * 1024;
 const PORT = Number(process.env['KOPPLER_PORT']) || 4747;
@@ -102,17 +103,18 @@ function servePage(what: string, url: URL, res: Response): void {
   // The open log tab reads its app's log here, much longer than the short tail every status carries.
   if (what === 'log') {
     const id = url.searchParams.get('app') ?? '';
-    if (!/^[a-z0-9-]{1,64}$/.test(id)) {
+    if (!APP_ID.test(id)) {
       res.writeHead(400).end();
       return;
     }
-    let file = path.join(LOGS, `${id}.log`);
+    let named: unknown;
     try {
-      const status = JSON.parse(fs.readFileSync(SOURCE, 'utf8')) as { apps?: Record<string, { log?: string }> };
-      file = status.apps?.[id]?.log || file;
+      const status = JSON.parse(fs.readFileSync(SOURCE, 'utf8')) as { apps?: Record<string, { log?: unknown } | null> };
+      named = status.apps?.[id]?.log;
     } catch {
       // No agent wrote a status: the log is where Koppler keeps it.
     }
+    const file = logFile(id, named);
     const text = tail(file, 2 * 1024 * 1024, 2000);
     const headers = { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' };
     res.writeHead(text === null ? 404 : 200, headers).end(text ?? '');
@@ -128,7 +130,7 @@ function servePage(what: string, url: URL, res: Response): void {
   // What the settings panels offer to pick from on this machine: names only.
   if (what === 'data/choices.json') {
     const id = url.searchParams.get('app') ?? '';
-    const clone = /^[a-z0-9-]{1,64}$/.test(id) ? readClones()[id]?.path : undefined;
+    const clone = APP_ID.test(id) ? readClones()[id]?.path : undefined;
     res.writeHead(200, JSON_HEADERS).end(JSON.stringify({ awsProfiles: awsProfiles(), ...cloneChoices(clone) }));
     return;
   }
@@ -266,7 +268,8 @@ if (process.argv[1] && fs.realpathSync(process.argv[1]) === fileURLToPath(import
   fs.mkdirSync(TEMP, { recursive: true, mode: 0o700 });
   // Said from the very first status on: a page that loaded can only have come from this server.
   if (serving) startServer();
-  await publish(serving);
+  // A status that cannot be put together is said, not the end of the canvas.
+  await publish(serving).catch(logged);
   if (serving) {
     // A slow publish is not started again on top of itself.
     let publishing = false;

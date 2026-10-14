@@ -21,6 +21,15 @@ test('secrets are masked and everything that names the user or their stack is re
     ['key AKIAABCDEFGHIJKLMNOP used', 'key ***aws-key*** used'],
     ['\x1b[32minfo\x1b[0m: Now listening on: http://localhost:58000', 'info: Now listening on: http://localhost:58000'],
     ['TokenCount=5, secretsmanager:GetSecretValue denied', 'TokenCount=5, secretsmanager:GetSecretValue denied'],
+    // A value is masked whole, whatever it holds.
+    ['password=ab,cd&ef}gh next', 'password=*** next'],
+    ['postgres://admin:pa/55@db.internal/orders', 'postgres://***:***@db.internal/orders'],
+    ['https://ghtoken1234567890@github.com/acme/x.git', 'https://***@github.com/acme/x.git'],
+    ['ssh://git@github.com/acme/x.git', 'ssh://git@github.com/acme/x.git'],
+    ['Authorization: Basic dXNlcjpwYXNzd29yZA== sent', 'Authorization: Basic *** sent'],
+    ['AccountName=acme;AccountKey=abc+def/ghi==;Endpoint=x', 'AccountName=acme;AccountKey=***;Endpoint=x'],
+    ['https://acme.blob.example/x?sv=2024&sig=abc%2Fdef&se=1', 'https://acme.blob.example/x?sv=2024&sig=***&se=1'],
+    ['-----BEGIN RSA PRIVATE KEY-----\nMIIabc\n-----END RSA PRIVATE KEY----- after', '***private key*** after'],
   ])
     assert.equal(redact(raw as any), masked);
 

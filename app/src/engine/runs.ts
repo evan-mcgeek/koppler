@@ -10,6 +10,7 @@ import * as kp from '../core/plan.ts';
 import { readData, readStack } from '../data.ts';
 import { STATE, TEMP } from '../paths.ts';
 import { redact } from '../scrub.ts';
+import { APP_ID, RUN_ID } from '../ids.ts';
 
 type Loose = Record<string, unknown>;
 type Steps = Pick<kp.Plan, 'starts' | 'restarts' | 'stops' | 'keeps'>;
@@ -68,8 +69,7 @@ const stateDir = () => process.env['KOPPLER_STATE'] || STATE;
 const historyFile = () => path.join(temp(), 'history.jsonl');
 const liveFile = () => path.join(temp(), 'live.json');
 const actionsFile = () => path.join(temp(), 'actions.json');
-const ID = /^[a-z0-9-]{1,64}$/;
-const RUN_ID = /^[a-z0-9]{6,40}$/;
+const ID = APP_ID;
 const MAX_RUNS = 200;
 const LIBRARY = /^[\w@./-]{1,100}$/;
 const text = (value: unknown, max = 200) => (typeof value === 'string' ? value.slice(0, max) : '');

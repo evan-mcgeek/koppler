@@ -7,6 +7,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { writeJson } from '../json-files.ts';
 import { KINDS, of as kindOf, register } from '../core/kinds.ts';
 import { validateStack } from '../core/stack.ts';
 import { getAt, parsePath, setAt } from '../core/stack-path.ts';
@@ -320,10 +321,6 @@ function readJson<T>(file: string, fallback: T | null = null): T | null {
     return fallback;
   }
 }
-const writeJson = (file: string, value: unknown) => {
-  fs.mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 });
-  fs.writeFileSync(file, JSON.stringify(value, null, 2) + '\n');
-};
 const readIndex = () => readJson<Index>(INDEX);
 const saveConfig: Save = config => {
   writeJson(CONFIG, config);

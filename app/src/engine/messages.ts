@@ -8,6 +8,7 @@ import { flagValue } from '../cli/output.ts';
 import { fail } from '../failure.ts';
 import { TEMP } from '../paths.ts';
 import { runs } from './runs.ts';
+import { APP_ID, RUN_ID } from '../ids.ts';
 
 interface Section {
   title: string;
@@ -93,8 +94,8 @@ export function sanitizeMessage(given: unknown): { message: Message; error?: und
       kind,
       title,
       ...(summary && { summary }),
-      ...(matching(/^[a-z0-9]{6,40}$/, run) && { run }),
-      ...(Array.isArray(apps) && { apps: apps.filter(app => matching(/^[a-z0-9-]{1,64}$/, app)).slice(0, 30) }),
+      ...(matching(RUN_ID, run) && { run }),
+      ...(Array.isArray(apps) && { apps: apps.filter(app => matching(APP_ID, app)).slice(0, 30) }),
       ...(sections.length && { sections }),
       ...(choices.length && { choices }),
     },

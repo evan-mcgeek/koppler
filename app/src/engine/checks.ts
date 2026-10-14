@@ -8,6 +8,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { writeJson } from '../json-files.ts';
 import { of as kindOf, register } from '../core/kinds.ts';
 import { isSignIn, signInOf, type DeclaredSignIn } from '../core/sign-in.ts';
 import { readData } from '../data.ts';
@@ -255,9 +256,7 @@ export const approved = (source: string, stack: MaybeStack): boolean => {
   return !commands.length || approvals()[source] === fingerprint(commands);
 };
 export function approve(source: string, stack: MaybeStack): void {
-  fs.mkdirSync(path.dirname(approvalsFile()), { recursive: true });
-  const next = { ...approvals(), [source]: fingerprint(stackCommands(stack)) };
-  fs.writeFileSync(approvalsFile(), JSON.stringify(next, null, 2) + '\n', { mode: 0o600 });
+  writeJson(approvalsFile(), { ...approvals(), [source]: fingerprint(stackCommands(stack)) });
 }
 export const APPROVE = 'koppler doctor --approve';
 

@@ -10,10 +10,11 @@ import { LOGS, STATE } from '../paths.ts';
 import { appEnv } from '../safe-env.ts';
 import { redact } from '../scrub.ts';
 import { keepPreviousLog } from './session.ts';
+import { APP_ID } from '../ids.ts';
 
 const PROCS = path.join(STATE, 'procs');
 /** What a process started by Koppler can be called. */
-export const NAME = /^[a-z0-9-]{1,64}$/;
+export const NAME = APP_ID;
 // How long an app with a port may take to answer: a build can take minutes.
 const START_WAIT = Number(process.env['KOPPLER_START_WAIT']) * 1000 || 300000;
 
