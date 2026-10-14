@@ -2,40 +2,23 @@
 // re-loads on a timer, and runs a loopback-only, token-protected HTTP server: the standalone canvas page, layout
 // autosaves (the board, state.json) and Send/Stop prompts (temp/prompts.jsonl).
 // Usage: node status-watch.mjs [--once]   (port 4747 or KOPPLER_PORT, token kept across restarts so the page URL in temp/canvas-url stays the same)
-import crypto from 'node:crypto';
 import fs from 'node:fs';
 import http from 'node:http';
 import type { AddressInfo } from 'node:net';
-import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { stateDir, tempDir } from './paths.ts';
+import { tempDir } from './paths.ts';
 import { failRequest, gate, logged } from './server/gate.ts';
+import { pageToken, writePageUrl } from './server/token.ts';
 import { publish } from './server/status.ts';
 
 const PORT = Number(process.env['KOPPLER_PORT']) || 4747;
 const INTERVAL_MS = 1500;
 
-/** The page's token: kept across restarts, so an open canvas tab keeps working. */
-function pageToken(): string {
-  const file = path.join(stateDir(), 'canvas-token');
-  try {
-    const kept = fs.readFileSync(file, 'utf8').trim();
-    if (/^[0-9a-f]{48}$/.test(kept)) return kept;
-  } catch {
-    // The first start on this Mac.
-  }
-  const token = crypto.randomBytes(24).toString('hex');
-  fs.mkdirSync(stateDir(), { recursive: true, mode: 0o700 });
-  fs.writeFileSync(file, token + '\n', { mode: 0o600 });
-  return token;
-}
-
 /** Loopback only, token-protected. Serves the canvas standalone, takes layout autosaves and Send/Stop prompts. */
 function startServer(): void {
-  const token = pageToken();
   const server = http.createServer((req, res) => {
     try {
-      gate(req, res, token, String((server.address() as AddressInfo).port));
+      gate(req, res, pageToken(), String((server.address() as AddressInfo).port));
     } catch (error) {
       failRequest(res, error);
     }
@@ -47,9 +30,7 @@ function startServer(): void {
     process.exit(1);
   });
   server.listen(PORT, '127.0.0.1', () => {
-    const page = `http://127.0.0.1:${String((server.address() as AddressInfo).port)}/s/${token}/`;
-    fs.writeFileSync(path.join(tempDir(), 'canvas-url'), page + '\n', { mode: 0o600 });
-    console.log(`canvas: ${page}`);
+    console.log(`canvas: ${writePageUrl(String((server.address() as AddressInfo).port))}`);
   });
 }
 

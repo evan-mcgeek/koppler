@@ -22,6 +22,7 @@ import {
   stackSource,
 } from '../engine/stack-file.ts';
 import { shareBoard, shareTarget } from '../engine/share.ts';
+import { newToken, pageToken, writePageUrl } from './token.ts';
 import type { StoredPreset } from '../core/presets.ts';
 import { createStack, currentStack, forgetStacks, useStack } from '../engine/stacks.ts';
 import { CODE, tempDir } from '../paths.ts';
@@ -128,6 +129,13 @@ export const ROUTES: Record<string, Route> = {
     return reload('The apps were added, but the stack could not be loaded again. Run koppler sync.', result);
   },
   // One field of the stack, set or taken out, checked as the terminal's koppler stack set is.
+  // A new address for the page: every address given out before stops working. The page moves to the new one.
+  '/new-address': body => {
+    newToken();
+    const port = typeof body['port'] === 'string' && /^\d{2,5}$/.test(body['port']) ? body['port'] : '';
+    const page = port ? writePageUrl(port) : '';
+    return { status: 200, body: { path: page ? new URL(page).pathname : `/s/${pageToken()}/` } };
+  },
   // A board of the user's own, proposed to the team: `check` says where it would go before anything is sent.
   '/board-share': async body => {
     const dir = currentStack();

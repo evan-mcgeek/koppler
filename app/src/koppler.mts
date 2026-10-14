@@ -353,12 +353,13 @@ const COMMANDS: Command[] = [
   {
     name: 'canvas',
     who: 'you',
-    args: '[start] [--board "<name>"] [--no-open] | stop',
+    args: '[start] [--board "<name>"] [--no-open] [--new-address] | stop',
     about: 'start the canvas if needed and open it, on a board when one is named; stop stops it',
     run: canvas,
     example: 'koppler canvas stop && koppler canvas start',
     forms: [
       ['[start] [--board "<name>"] [--no-open]', 'start it if needed and open it in the browser, on that board'],
+      ['--new-address', 'give the canvas a new address: every address given out before stops working'],
       ['stop', 'stop the canvas; apps and tunnels keep running'],
     ],
   },

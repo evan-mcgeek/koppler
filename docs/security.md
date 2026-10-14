@@ -39,6 +39,7 @@ Back this up with deny rules in your agent's settings; [secrets.md](../plugin/sk
 ## The canvas stays on your machine
 
 - The canvas server listens on this machine only, and its address holds a random token; the files that keep the token are readable by you alone.
+- The token stays the same across restarts, so an open tab keeps working. To make a copied or shared address stop working, give the canvas a new one: `koppler canvas --new-address`, or New address in the canvas's Settings.
 - It answers its own page and nothing else: a request made by another site, or under another site's name pointed at your machine, is refused.
 - The page loads nothing from the network, fonts included, and cannot be shown inside another page.
 - The limit: the port is fixed. A program already running on your machine could take it while the canvas is stopped and answer a tab you left open. Open the canvas with `koppler canvas` after a restart instead of reloading an old tab.

@@ -11,6 +11,7 @@ import { CODE, logsDir, tempDir } from '../paths.ts';
 import { redact, scrub } from '../scrub.ts';
 import { confirm, flagValue, positional, table } from './output.ts';
 import { fail } from '../failure.ts';
+import { newToken } from '../server/token.ts';
 
 const notAName = (name: string) => `${name} is not a name Koppler gives its processes`;
 
@@ -42,11 +43,26 @@ export async function canvas(args: string[]): Promise<void> {
     return;
   }
   const record = readRecord('canvas');
+  const urlFile = path.join(tempDir(), 'canvas-url');
+  // A new address: a running canvas switches to it, so every address given out before stops working.
+  if (args.includes('--new-address')) {
+    if (record && alive(record)) {
+      const old = new URL(fs.readFileSync(urlFile, 'utf8').trim());
+      const token = old.pathname.split('/')[2] ?? '';
+      const answer = await fetch(`${old.origin}/new-address?token=${encodeURIComponent(token)}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ port: old.port }),
+      }).catch(() => null);
+      if (!answer?.ok)
+        fail('the canvas did not take a new address; koppler canvas stop, then koppler canvas --new-address');
+    } else newToken();
+    console.log('The canvas has a new address; every address given out before no longer works.');
+  }
   if (!record || !alive(record)) {
     const port = String(Number(process.env['KOPPLER_PORT']) || 4747);
     await run(['canvas', '--port', port, '--', process.execPath, path.join(CODE, 'status-watch.mjs')]);
   }
-  const urlFile = path.join(tempDir(), 'canvas-url');
   for (let tries = 0; tries < 40 && !fs.existsSync(urlFile); tries++) await sleep(250);
   if (!fs.existsSync(urlFile)) fail('the canvas did not start; see koppler logs canvas');
   // The address carries the page's access token, so it goes to the browser and is not printed.
