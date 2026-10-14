@@ -136,3 +136,44 @@ test('another board opens with nothing selected, though it has the same tunnel',
   await expect(tunnels(page)).toHaveCount(1);
   await expect(page.locator('.svelte-flow__node.selected')).toHaveCount(0);
 });
+
+test.describe('another board', () => {
+  test.use({
+    board: {
+      env: 'qa',
+      mode: 'auto',
+      zoom: 1,
+      pan: { x: 120, y: 80 },
+      nodes: { web: at(0, 0), orders: at(420, 0) },
+      edges: [{ from: 'web', to: 'orders', fromSide: 'right', toSide: 'left' }],
+      presets: [
+        {
+          name: 'Orders alone',
+          version: 1,
+          nodes: { orders: { run: 'cli' } },
+          edges: [],
+          layout: { nodes: { orders: { x: 1600, y: 1200 } } },
+        },
+      ],
+    },
+  });
+
+  test('opened, it puts its tunnel cards beside its own apps, not where the board before had them', async ({
+    page,
+  }) => {
+    await expect(tunnels(page)).toHaveCount(1);
+    await page.getByRole('button', { name: /^Board: / }).click();
+    await page
+      .getByRole('dialog', { name: 'Boards' })
+      .getByRole('button', { name: /^Orders alone/ })
+      .click();
+    await expect(card(page, 'web')).toHaveCount(0);
+    await expect
+      .poll(async () => {
+        const app = await card(page, 'orders').boundingBox();
+        const under = await tunnels(page).first().boundingBox();
+        return app && under ? [Math.round(under.x - app.x), Math.round(under.y - (app.y + app.height))] : null;
+      })
+      .toEqual([0, 20]);
+  });
+});

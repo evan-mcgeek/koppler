@@ -1080,6 +1080,8 @@ class Board {
         ...(Array.isArray(points) && { points: points as Point[] }),
       });
     });
+    // The board before's tunnel and queue cards are not this one's: each goes where this board kept it, or beside its app.
+    this.infra = [];
     this.syncInfra(placed ? (layout.infra ?? {}) : {});
     this.opened = placed ? 'fit' : 'arrange';
     return { notes };
