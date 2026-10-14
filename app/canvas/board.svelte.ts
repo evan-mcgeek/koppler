@@ -332,6 +332,17 @@ class Board {
       return shown ? [{ id, queue, pubs, reads }] : [];
     });
   });
+  /**
+   * The cards that are an app's own and go where it goes: its tunnels, and the queues no other app on the board uses.
+   * A queue shared by several apps is a card of the flow between them.
+   */
+  ownedBy(id: string): string[] {
+    const alone = (queue: { pubs: string[]; reads: string[] }) =>
+      [...queue.pubs, ...queue.reads].filter(app => this.#onBoard.has(app)).every(app => app === id);
+    return this.ledBy(id).filter(
+      key => key.startsWith('tunnel:') || this.boardQueues.some(one => `queue:${one.id}` === key && alone(one)),
+    );
+  }
   #leadOf(queue: { pubs: string[]; reads: string[] }): string | undefined {
     return [...queue.pubs, ...queue.reads].find(app => this.#onBoard.has(app));
   }
@@ -484,10 +495,10 @@ class Board {
     id: string,
     cards: InfraNode[],
     size: Size = this.boxes.get(id) ?? { w: 260, h: 200 },
-    tunnelsOnly = false,
+    ownOnly = false,
   ): InfraNode[] {
     const app = this.nodes.find(node => node.id === id);
-    const led = new Set(this.ledBy(id).filter(key => !tunnelsOnly || key.startsWith('tunnel:')));
+    const led = new Set(ownOnly ? this.ownedBy(id) : this.ledBy(id));
     if (!app || !led.size) return cards;
     const box = { ...app.position, ...size };
     const side = this.infraSide(id);
@@ -680,9 +691,9 @@ class Board {
         : card,
     );
   }
-  /** Moved with its app: its tunnel cards. A queue is a card of the flow and stays where it is put. */
+  /** Moved with its app: its own cards (tunnels, queues only it uses). A shared queue stays where it is put. */
   followed(id: string, by: Point, cards: InfraNode[]): InfraNode[] {
-    const led = new Set(this.ledBy(id).filter(key => key.startsWith('tunnel:')));
+    const led = new Set(this.ownedBy(id));
     return cards.map(card =>
       led.has(card.id) && !card.selected && !card.dragging
         ? { ...card, position: { x: card.position.x + by.x, y: card.position.y + by.y } }
@@ -1468,7 +1479,7 @@ class Board {
     // An app is given the room of its tunnel cards too: top-down beside it when it calls others, else under it.
     const size = (id: string) => {
       const led = this.ledBy(id)
-        .filter(key => key.startsWith('tunnel:'))
+        .filter(key => this.ownedBy(id).includes(key))
         .map(key => this.infraBoxes.get(key) ?? TUNNEL);
       const { w, h } = card(id);
       if (!led.length) return { w, h };
@@ -1479,7 +1490,9 @@ class Board {
         : { w: Math.max(w, wide), h: h + tall };
     };
     // Queues and outside systems take their place in the flow: who sends, the queue, who reads; who calls out.
-    const joined = this.infra.filter(one => one.type !== 'tunnel').map(one => one.id);
+    // An app's own queues stay in its stack, as its tunnels do.
+    const owned = new Set(this.nodes.flatMap(node => this.ownedBy(node.id)));
+    const joined = this.infra.filter(one => one.type !== 'tunnel' && !owned.has(one.id)).map(one => one.id);
     const onBoard = (id: string) => joined.includes(id) || this.cards.some(node => node.id === id);
     const flows = this.flows.filter(({ from, to }) => onBoard(from) && onBoard(to));
     const placed = arrange(
