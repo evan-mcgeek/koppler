@@ -15,10 +15,26 @@ test('callers sit above the apps they call', () => {
   expect(pos['api']?.y).toBeLessThan(pos['db']?.y ?? 0);
 });
 
-test('apps that call each other in a loop share a layer', () => {
+test('a loop is laid out from where it is entered, the link that closes it going back up', () => {
+  // The way in is the card nothing leads to; inside the loop the cards follow its order.
+  expect(layerDepths(['b', 'a', 'c', 'entry'], calls('entry>a', 'a>b', 'b>c', 'c>a'))).toEqual({
+    entry: 0,
+    a: 1,
+    b: 2,
+    c: 3,
+  });
+  // A loop with no way in starts at the card that reaches the most.
   const depth = layerDepths(['a', 'b', 'c'], calls('a>b', 'b>a', 'b>c'));
-  expect(depth['a']).toBe(depth['b']);
-  expect(depth['c']).toBe((depth['b'] ?? 0) + 1);
+  expect([depth['a'], depth['b'], depth['c']]).toEqual([0, 1, 2]);
+});
+
+test('a card that only feeds a queue sits just above it, and the queue just above its reader', () => {
+  // The app's own path: web, api, orders, payments; a notifier feeds payments through a queue.
+  const depth = layerDepths(
+    ['notifier', 'queue:paid', 'web', 'api', 'orders', 'payments'],
+    calls('web>api', 'api>orders', 'orders>payments', 'notifier>queue:paid', 'queue:paid>payments'),
+  );
+  expect(depth).toEqual({ web: 0, api: 1, orders: 2, payments: 3, 'queue:paid': 2, notifier: 1 });
 });
 
 test('a layer is ordered so that cables do not cross', () => {

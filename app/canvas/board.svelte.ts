@@ -465,9 +465,14 @@ class Board {
    * Tunnel cards go on the first side of their app its cables do not use (below, else right, left, above), so they
    * are never in front of cables, stacked there as one block with the app.
    */
-  #beside(id: string, cards: InfraNode[], size: Size = this.boxes.get(id) ?? { w: 260, h: 200 }): InfraNode[] {
+  #beside(
+    id: string,
+    cards: InfraNode[],
+    size: Size = this.boxes.get(id) ?? { w: 260, h: 200 },
+    tunnelsOnly = false,
+  ): InfraNode[] {
     const app = this.nodes.find(node => node.id === id);
-    const led = new Set(this.ledBy(id));
+    const led = new Set(this.ledBy(id).filter(key => !tunnelsOnly || key.startsWith('tunnel:')));
     if (!app || !led.size) return cards;
     const box = { ...app.position, ...size };
     const side = this.infraSide(id);
@@ -660,8 +665,9 @@ class Board {
         : card,
     );
   }
+  /** Moved with its app: its tunnel cards. A queue is a card of the flow and stays where it is put. */
   followed(id: string, by: Point, cards: InfraNode[]): InfraNode[] {
-    const led = new Set(this.ledBy(id));
+    const led = new Set(this.ledBy(id).filter(key => key.startsWith('tunnel:')));
     return cards.map(card =>
       led.has(card.id) && !card.selected && !card.dragging
         ? { ...card, position: { x: card.position.x + by.x, y: card.position.y + by.y } }
@@ -1446,7 +1452,9 @@ class Board {
     const links = this.cables.map(({ from, to }) => ({ from, to }));
     // An app is given the room of its tunnel cards too: top-down beside it when it calls others, else under it.
     const size = (id: string) => {
-      const led = this.ledBy(id).map(key => this.infraBoxes.get(key) ?? TUNNEL);
+      const led = this.ledBy(id)
+        .filter(key => key.startsWith('tunnel:'))
+        .map(key => this.infraBoxes.get(key) ?? TUNNEL);
       const { w, h } = card(id);
       if (!led.length) return { w, h };
       const tall = led.reduce((sum, box) => sum + box.h + TUNNEL.gap / 2, 0);
@@ -1455,10 +1463,14 @@ class Board {
         ? { w: w + TUNNEL.gap + wide, h: Math.max(h, tall) }
         : { w: Math.max(w, wide), h: h + tall };
     };
+    // Queues and outside systems take their place in the flow: who sends, the queue, who reads; who calls out.
+    const joined = this.infra.filter(one => one.type !== 'tunnel').map(one => one.id);
+    const onBoard = (id: string) => joined.includes(id) || this.cards.some(node => node.id === id);
+    const flows = this.flows.filter(({ from, to }) => onBoard(from) && onBoard(to));
     const placed = arrange(
-      this.nodes.map(node => node.id),
-      links,
-      size,
+      [...this.nodes.map(node => node.id), ...joined],
+      [...links, ...flows],
+      id => (joined.includes(id) ? (this.infraBoxes.get(id) ?? { w: 220, h: 70 }) : size(id)),
       dir,
       mirror,
       { pad: PAD },
@@ -1467,14 +1479,11 @@ class Board {
     orderSlots(cables, id => ({ ...(placed[id] ?? { x: 0, y: 0 }), ...card(id) }));
     this.nodes = this.nodes.map(node => ({ ...node, position: placed[node.id] ?? node.position }));
     this.edges = cables.map(({ from, to, ...data }) => cable(from, to, data));
-    let cards = this.infra;
-    for (const node of this.nodes) cards = this.#beside(node.id, cards, card(node.id));
-    // Queues and outside systems go beside what they are linked to, each on the first free spot.
-    for (const one of cards.filter(other => other.type !== 'tunnel')) {
-      const parked = cards.map(other => (other.id === one.id ? { ...other, position: { x: 0, y: 0 } } : other));
-      const spot = this.#nextTo(one.id, parked, card);
-      cards = cards.map(other => (other.id === one.id ? { ...other, position: spot } : other));
-    }
+    let cards: InfraNode[] = this.infra.map(one => {
+      const at = placed[one.id];
+      return at ? { ...one, position: at } : one;
+    });
+    for (const node of this.nodes) cards = this.#beside(node.id, cards, card(node.id), true);
     this.infra = cards;
   }
 }
