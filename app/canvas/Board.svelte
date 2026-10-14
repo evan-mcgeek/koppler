@@ -158,7 +158,9 @@
       const card = board.infraBoxes.get(to);
       if (!app || !card) return [];
       const payload = { app: from, host: tunnel.bind, port: tunnel.port, original: tunnel.original };
-      return [{ key: `${from}>${to}`, from, what: tunnel.what, payload, ...linkPath(app, card), idle: !live.up(from) }];
+      return [
+        { key: `${from}>${to}`, from, to, what: tunnel.what, payload, ...linkPath(app, card), idle: !live.up(from) },
+      ];
     }),
   );
   const name = board.nameOf;
@@ -202,6 +204,8 @@
       return [
         {
           key: `${from}>${to}`,
+          from,
+          to,
           d: cablePath(start, sides[0], end, sides[1]),
           start,
           // No socket sits at this end: the tip touches the card's edge.
@@ -528,10 +532,10 @@
     <ViewportPortal target="back">
       <svg class="links" aria-hidden="true">
         {#each links as link (link.key)}
-          <path class="link" class:idle={link.idle} d={link.d} />
+          <path class="link" class:idle={link.idle} class:dimmed={board.dimmedLink(link.from, link.to)} d={link.d} />
         {/each}
         {#each flows as flow (flow.key)}
-          <g class="flow {flow.kind}">
+          <g class="flow {flow.kind}" class:dimmed={board.dimmedLink(flow.from, flow.to)}>
             <path class="under" d={flow.d} />
             <path class="wire" d={flow.d} />
             <path class="head" d="M-9,-4.5 L0,0 L-9,4.5 L-6.75,0 Z" transform={flow.head} />
@@ -559,6 +563,7 @@
                 class="plug nodrag nopan"
                 class:cut={board.hovered === edge.id}
                 class:idle={!live.up(edge.source) || !live.up(edge.target)}
+                class:dimmed={board.dimmedLink(edge.source, edge.target)}
                 data-cable={edge.id}
                 class:grabbed={wiring.grabbed?.id === edge.id && wiring.grabbed.end === 'from'}
                 cx={a.x}
@@ -584,6 +589,7 @@
                   void probes.test({ key: edge.id, payload: { from: edge.source, to: edge.target } });
                 }}
                 class="socket nodrag nopan"
+                class:dimmed={board.dimmedLink(edge.source, edge.target)}
                 class:tested
                 data-cable={edge.id}
                 class:grabbed={wiring.grabbed?.id === edge.id && wiring.grabbed.end === 'to'}

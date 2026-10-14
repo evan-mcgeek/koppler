@@ -165,3 +165,14 @@ details[open] > summary:not(:has(.chev))::before {
     transition: none;
   }
 }
+
+/* While one app card is picked, what it does not touch fades back. */
+.dimmed {
+  opacity: 0.28;
+  transition: opacity 0.15s;
+}
+@media (prefers-reduced-motion: reduce) {
+  .dimmed {
+    transition: none;
+  }
+}
