@@ -221,8 +221,8 @@
       return;
     }
     dialog?.close();
-    // What the board shows comes from the stack: it opens again with what was saved.
-    if (changed) location.reload();
+    // What the board shows comes from the stack: it is read again with what was saved.
+    if (changed) void board.reload();
   };
 </script>
 
@@ -232,6 +232,10 @@
   oncancel={ev => {
     ev.preventDefault();
     close();
+  }}
+  onclick={ev => {
+    // A click outside the panel lands on the dialog itself (its backdrop): it closes, or asks first with changes.
+    if (ev.target === dialog) close();
   }}
 >
   <header>

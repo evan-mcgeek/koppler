@@ -340,3 +340,35 @@ test.describe('with secrets, queues and code changes in the stack', () => {
     expect((orders['localChanges'] as { replace: string }[])[0]?.replace).toBe('// no https here');
   });
 });
+
+test('closed after a save, the board takes what was saved without reloading the page; a click outside closes it', async ({
+  page,
+  canvas,
+}) => {
+  stackFile(canvas.dir);
+  // A page reload would leave full screen; this mark would be gone after one.
+  await page.evaluate(() => ((window as { stayed?: boolean }).stayed = true));
+  const open = async () =>
+    (await actions(page, 'orders')).getByRole('button', { name: 'Settings for Orders API' }).click();
+  await open();
+  const panel = page.getByRole('dialog', { name: 'Orders API' });
+  const name = panel.getByLabel('Name', { exact: true });
+  await name.fill('Orders Service');
+  await name.press('Tab');
+  // With a change not saved, a click outside asks first instead of closing.
+  await page.mouse.click(100, 400);
+  await expect(panel.getByRole('alert')).toHaveText('Close without saving 1 change?');
+  await panel.getByRole('button', { name: 'Keep editing' }).click();
+  await panel.getByRole('button', { name: 'Save' }).click();
+  await expect(panel.getByRole('status')).toHaveText('Saved');
+  await panel.getByRole('button', { name: 'Close' }).click();
+  await expect(page.locator('.svelte-flow__node[data-id="orders"]')).toContainText('Orders Service');
+  expect(await page.evaluate(() => (window as { stayed?: boolean }).stayed)).toBe(true);
+
+  // Nothing changed: a click outside closes it.
+  await (await actions(page, 'orders')).getByRole('button', { name: 'Settings for Orders Service' }).click();
+  const again = page.getByRole('dialog', { name: 'Orders Service' });
+  await expect(again).toBeVisible();
+  await page.mouse.click(100, 400);
+  await expect(again).toBeHidden();
+});

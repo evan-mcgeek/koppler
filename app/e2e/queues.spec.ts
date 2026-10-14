@@ -46,7 +46,7 @@ test('a queue between two apps shows as a card linked to both, and an outside sy
   await expect(queue(page)).toHaveCount(2);
   const events = queue(page).filter({ hasText: 'Order events' });
   await expect(events).toContainText('SQS');
-  await expect(events).toContainText("Shared with QA's reader");
+  await expect(events).toContainText('Your local Payments API reads the QA queue');
   await expect(outside(page)).toHaveCount(1);
   await expect(outside(page)).toContainText('Billing');
   await expect(outside(page)).toContainText('QA: api.billing.example');
@@ -62,7 +62,7 @@ test('a queue is switched to a local copy where Koppler can run one, and the cho
   await expect(receipts.getByRole('radio', { name: 'Local' })).toBeDisabled();
   const kept = saved(page);
   await events.getByRole('radio', { name: 'Local' }).check();
-  await expect(events).not.toContainText('Shared with');
+  await expect(events).not.toContainText('reads the QA queue');
   await expect(page.locator('.links .flow.msg.local')).toHaveCount(2);
   await kept;
   await page.reload();
