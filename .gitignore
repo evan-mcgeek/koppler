@@ -11,3 +11,4 @@ playwright-report/
 dist/
 dist.next/
 dist.previous/
+/app/skills/

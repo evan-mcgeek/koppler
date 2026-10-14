@@ -33,7 +33,8 @@
   },
   "files": [
     "dist",
-    "bin"
+    "bin",
+    "skills"
   ],
   "scripts": {
     "test": "npm run build && vitest run && node --test --test-concurrency=1 test/*.test.mjs",
@@ -45,7 +46,8 @@
     "format:check": "prettier --check .",
     "types": "tsc --noEmit && svelte-check --workspace canvas --tsconfig ./tsconfig.json --fail-on-warnings",
     "build": "node scripts/build.mjs",
-    "prepack": "npm run build"
+    "prepack": "npm run build && node scripts/pack-skill.mjs",
+    "postpack": "node scripts/pack-skill.mjs --clean"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

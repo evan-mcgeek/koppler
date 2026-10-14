@@ -66,7 +66,7 @@ jobs:
           import json, subprocess, sys
           files = {f["path"] for f in json.loads(subprocess.check_output(["npm", "pack", "--dry-run", "--json"], text=True))[0]["files"]}
           failed = False
-          for need in ("package.json", "dist/koppler.mjs", "dist/page/index.html", "dist/status-watch.mjs", "dist/paths.js"):
+          for need in ("package.json", "dist/koppler.mjs", "dist/page/index.html", "dist/status-watch.mjs", "dist/paths.js", "skills/koppler-run/SKILL.md", "skills/koppler-run/VERSION"):
               if need not in files: print(f"::error::{need} is missing from the package"); failed = True
           for f in sorted(files):
               if f.startswith(("test/", "src/", "e2e/", "scripts/", "node_modules/")) or ".test." in f or f.startswith("."):
