@@ -42,8 +42,6 @@
   board.toFlow = at => flow.screenToFlowPosition(at, { snapToGrid: false });
   board.zoom = () => flow.getZoom();
   const viewport = useViewport();
-  // How far, on screen, a snap guide runs past the two things it lines up.
-  const GUIDE_PAST = 24;
   let area: HTMLElement | undefined = $state();
   board.area = () => area?.getBoundingClientRect() ?? new DOMRect();
   // Brings a card to the middle of the board, at the zoom the board is at, and picks it.
@@ -541,6 +539,7 @@
             class:idle={link.idle}
             class:dimmed={board.dimmedLink(link.from, link.to)}
             class:lit={board.lit(link.from, link.to)}
+            class:snapped={board.snapped.includes(`${link.from}>${link.to}`)}
             d={link.d}
           />
         {/each}
@@ -549,6 +548,7 @@
             class="flow {flow.kind}"
             class:dimmed={board.dimmedLink(flow.from, flow.to)}
             class:lit={board.lit(flow.from, flow.to)}
+            class:snapped={board.snapped.includes(`${flow.from}>${flow.to}`)}
           >
             <path class="under" d={flow.d} />
             <path class="wire" d={flow.d} />
@@ -567,21 +567,6 @@
         role="group"
         aria-label="Cable ends"
       >
-        <!-- What a dragged card snapped into line with: one hairline, as thin at every zoom, drawn in once. -->
-        {#each board.guides as guide (`${String(guide.x1)},${String(guide.y1)},${String(guide.x2)},${String(guide.y2)}`)}
-          {@const long = Math.hypot(guide.x2 - guide.x1, guide.y2 - guide.y1) || 1}
-          {@const past = GUIDE_PAST / viewport.current.zoom}
-          {@const ux = (guide.x2 - guide.x1) / long}
-          {@const uy = (guide.y2 - guide.y1) / long}
-          <line
-            class="guide"
-            x1={guide.x1 - ux * past}
-            y1={guide.y1 - uy * past}
-            x2={guide.x2 + ux * past}
-            y2={guide.y2 + uy * past}
-            pathLength="1"
-          />
-        {/each}
         {#each board.edges as edge, index (edge.id)}
           {@const a = wiring.endPoint(index, 'from')}
           {@const b = wiring.endPoint(index, 'to')}
@@ -857,6 +842,20 @@
     display: none;
   }
   /* The picked card's own links stand out like its cables. */
+  /* Snapped straight while a card is dragged: the line goes a shade darker, nothing more. */
+  .link.snapped,
+  .flow.ext.snapped :is(.wire, .head) {
+    stroke: var(--ink);
+  }
+  .flow.ext.snapped .head {
+    fill: var(--ink);
+  }
+  .flow.msg.snapped :is(.wire, .head) {
+    stroke: color-mix(in oklab, var(--msg) 60%, var(--ink));
+  }
+  .flow.msg.snapped .head {
+    fill: color-mix(in oklab, var(--msg) 60%, var(--ink));
+  }
   .link.lit,
   .flow.ext.lit :is(.wire, .head) {
     stroke: var(--ink);
@@ -987,25 +986,6 @@
     outline-offset: -2px;
   }
   /* In Live nothing on the board is pulled or unplugged. */
-  .guide {
-    stroke: var(--cable);
-    stroke-width: 1;
-    vector-effect: non-scaling-stroke;
-    stroke-dasharray: 1;
-    pointer-events: none;
-    animation: guide 180ms cubic-bezier(0.16, 1, 0.3, 1);
-  }
-  @keyframes guide {
-    from {
-      stroke-dashoffset: 1;
-      opacity: 0;
-    }
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .guide {
-      animation: none;
-    }
-  }
   .ends.still :is(.plug, .socket) {
     pointer-events: none;
   }

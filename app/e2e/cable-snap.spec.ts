@@ -32,8 +32,8 @@ test('a cable dragged close to straight snaps straight, like a magnet', async ({
   // The drag starts a little late: whatever is left, short of level by a few pixels.
   const left = await ends();
   if (left !== 0) await page.mouse.move(from.x, from.y - off - left + 5, { steps: 4 });
-  // Snapped while still held: a hairline guide runs along it, so the snap shows.
-  const lit = page.locator('.ends .guide');
+  // Snapped while still held: the cable goes a shade darker, so the snap shows.
+  const lit = page.locator('.svelte-flow__edge[data-id="web>payments"] g.snapped');
   await expect(lit).toHaveCount(1);
   await page.waitForTimeout(400);
   await page.screenshot({ path: 'test-results/next-cable-snap.png' });
@@ -55,7 +55,9 @@ test.describe('a tunnel card', () => {
     board: { env: 'qa', mode: 'auto', zoom: 1, pan: { x: 60, y: 60 }, nodes: { orders: at(0, 0) }, edges: [] },
   });
 
-  test('snaps into line with its app when dragged close to it, and shows a guide while it is', async ({ page }) => {
+  test('snaps its middle in line with its app when dragged close to it, its link darker while it is', async ({
+    page,
+  }) => {
     const tunnel = page.locator('.svelte-flow__node-tunnel').first();
     await expect(tunnel).toBeVisible();
     const middle = async () => {
@@ -73,10 +75,10 @@ test.describe('a tunnel card', () => {
     await page.mouse.move(from.x + 140 - off + 4, from.y + 60, { steps: 4 });
     const left = await middle();
     if (Math.abs(left) > 6) await page.mouse.move(from.x + 140 - off + 4 - left + 3, from.y + 60, { steps: 2 });
-    await expect(page.locator('.ends .guide')).toHaveCount(1);
+    await expect(page.locator('.links .link.snapped')).toHaveCount(1);
     await page.screenshot({ path: 'test-results/next-tunnel-snap.png' });
     await page.mouse.up();
     await expect.poll(middle).toBe(0);
-    await expect(page.locator('.ends .guide')).toHaveCount(0);
+    await expect(page.locator('.links .link.snapped')).toHaveCount(0);
   });
 });
