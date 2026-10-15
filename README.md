@@ -9,15 +9,25 @@ Everything you leave unplugged keeps calling the deployed environment you chose.
 Koppler is for local development.
 It helps most when you work on one app (a mobile app, a front end, one API) and need a few of its neighbours running next to it.
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/board-dark.png">
+  <img alt="The Koppler canvas: a mobile app and a web shop cabled to a local Orders API, which calls a local Payments API, with its database tunnel and queue; every app running" src="docs/images/board-light.png">
+</picture>
+
 ## How it works
 
 - **A shared stack.** The team describes its apps once in a `stack.json` in a repo they share: what each app is, how it runs, what it calls, which queues it uses, which secrets it needs.
 - **A board per person.** On the canvas each app is a card. A cable from one card to another means "this caller uses my local copy of that app". Team boards load a usual setup in one click.
-- **Run.** Koppler switches branches, points callers at the local apps, opens tunnels, starts local queues and starts the apps callees first, checking that each one answers.
+- **Run.** Koppler switches branches, points callers at the local apps, opens tunnels, starts local queues and starts the apps callees first, checking that each one answers. Before anything starts, a review lists what will start, what keeps calling the deployed environment and which tunnels open.
 - **Live cards.** Each card shows its steps, whether its port answers, and its log.
 - **Settings, not JSON.** Every fact of the stack is edited in the canvas's settings or with `koppler stack set`, checked before it is kept; a lock keeps a field as it is. Nobody edits `stack.json` by hand.
 - **Stop and revert.** One click stops what Koppler started and undoes every temporary change. Apps you started yourself are left alone.
 - **Secrets stay yours.** You store them in the macOS Keychain (on Linux, in files only you can read); Koppler starts an app with them and never shows them.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/review-dark.png">
+  <img alt="The review before a Run: the apps that start, with their branches, what keeps calling the deployed QA environment, and the tunnel that opens" src="docs/images/review-light.png" width="520">
+</picture>
 
 ## Install
 
@@ -29,13 +39,6 @@ koppler canvas
 
 `koppler init` finds your repos and your team's stack (or starts a new one), and `koppler canvas` opens the canvas in your browser.
 [Getting started](docs/getting-started.md) walks through the first run.
-
-Koppler is not on npm yet. Until it is, install it from a clone:
-
-```bash
-git clone https://github.com/evan-mcgeek/koppler.git
-npm install -g ./koppler/app
-```
 
 ## The agent add-on
 
@@ -82,6 +85,7 @@ Everything else depends on your stack (the .NET SDK, Flutter, Docker, the AWS CL
 Koppler runs from `app/dist/`, which `npm run build` makes from `app/src/` (`npm install` first).
 While working on Koppler itself, link `app/scripts/koppler-dev.mjs` as `koppler`: it rebuilds when the source is newer, then runs the build.
 Run the tests with `npm test` in `app/`; unit tests sit next to their module as `<name>.test.ts`.
+The documentation's screenshots come from `npm run screenshots` in `app/`: it drives the canvas on a demo stack and writes `docs/images/`, each in a light and a dark copy.
 The canvas has tests of its own that drive it in a browser: `npm install`, `npx playwright install chromium` once, then `npm run test:canvas`.
 `npm run lint`, `npm run types` and `npm run format:check` are what CI checks besides the tests; `npm run format` formats.
 

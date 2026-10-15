@@ -1,5 +1,5 @@
 // Puts what the package carries from the repo's root into it: the agent skill, at the root an npm plugin source reads,
-// with the version it belongs to, and the README and LICENSE, the README's links made absolute for npmjs.com.
+// with the version it belongs to, and the README and LICENSE, the README's links and images made absolute for npmjs.com.
 // Usage: node scripts/pack-skill.mjs [--clean]   (prepack copies them in, postpack takes them out again)
 import fs from 'node:fs';
 import path from 'node:path';
@@ -18,6 +18,12 @@ if (!process.argv.includes('--clean')) {
   const repo = repository.url.replace(/^git\+/, '').replace(/\.git$/, '');
   const readme = fs.readFileSync(path.join(root, 'README.md'), 'utf8');
   // A path in the repo, from the README at its root: a page on GitHub.
-  const absolute = readme.replace(/\]\((?![a-z]+:|#)([^)]+)\)/g, (_, link) => `](${repo}/blob/main/${link})`);
+  const absolute = readme
+    .replace(/\]\((?![a-z]+:|#)([^)]+)\)/g, (_, link) => `](${repo}/blob/main/${link})`)
+    // Its images, from GitHub's raw files: a page link would show no picture.
+    .replace(
+      /\b(src|srcset)="(?![a-z]+:)([^"]+)"/g,
+      (_, attribute, file) => `${attribute}="${repo.replace('github.com', 'raw.githubusercontent.com')}/main/${file}"`,
+    );
   fs.writeFileSync(path.join(app, 'README.md'), absolute);
 }

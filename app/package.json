@@ -46,6 +46,7 @@
     "types": "tsc --noEmit && svelte-check --workspace canvas --tsconfig ./tsconfig.json --fail-on-warnings",
     "build": "node scripts/build.mjs",
     "release": "node scripts/release.mjs",
+    "screenshots": "npm run build && playwright test --config screenshots.config.ts",
     "prepack": "npm run build && node scripts/pack-skill.mjs",
     "postpack": "node scripts/pack-skill.mjs --clean"
   },

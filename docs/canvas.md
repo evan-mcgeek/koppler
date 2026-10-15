@@ -17,6 +17,11 @@ A board file can also be opened, dropped on the page or linked from GitHub.
 
 ## Cards
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="images/board-dark.png">
+  <img alt="A board: a mobile app and a web shop cabled to a local Orders API, which calls a local Payments API; Orders API has a database tunnel and a queue, Payments API calls an outside payment provider" src="images/board-light.png">
+</picture>
+
 Each app is a card with:
 
 - **Who starts it:** Koppler, from the terminal, or you, from your IDE.
@@ -30,9 +35,19 @@ Apps you have not cloned yet show greyed out, with the command to clone them.
 
 Pointing at a card shows its actions above it: run it alone, stop or restart it while it runs, its log, its settings, and taking it off the board.
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="images/card-dark.png">
+  <img alt="A running card: its actions above it, its branch, all its steps done, and the deployed app it still calls" src="images/card-light.png" width="320">
+</picture>
+
 ## Settings
 
 The gear on a card, on a queue or outside system, and beside the stack's name opens settings: every fact the stack holds about that thing, in tabs.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="images/settings-dark.png">
+  <img alt="An app's settings: its name, kind and slug, then tabs; Runs here shows its start command, local address, readiness check and more, each with a lock" src="images/settings-light.png" width="480">
+</picture>
 
 - Changes are a draft until **Save**, which checks the whole stack and says where anything is wrong. **Discard** drops them, and closing with changes asks first.
 - **Needs first** lists what an app needs before it runs, one row each: a tunnel, an AWS sign-in, a hosts entry, a sign-in of the stack's own, the local HTTPS certificate, a private package feed. **Add a need** asks which, then shows only that kind's fields.
@@ -80,6 +95,11 @@ Queries against production stay in your own terminal.
 **Run** shows the plan first: what starts, restarts and stops, and what you have to do before (a sign-in, a secret, a `sudo` step).
 Nothing starts, stops or restarts until you confirm it there; then Koppler runs the board by itself.
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="images/review-dark.png">
+  <img alt="The review before a Run on QA: the apps that start with their branch and who starts them, the apps that stay deployed, and the tunnel that opens" src="images/review-light.png" width="480">
+</picture>
+
 With the agent add-on, Run's menu has two more ways: **Run with a note for the agent…** passes an instruction for the whole run, and **Get a checklist instead** asks the agent for a per-app checklist instead of changing anything.
 The agent answers on the canvas, with buttons for its questions.
 The agent chip in the toolbar says where the agent is:
@@ -97,7 +117,19 @@ The agent chip in the toolbar says where the agent is:
 ## Views and shortcuts
 
 **Edit** shows every field of a card; **Live** shows what runs, with short cards.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="images/live-dark.png">
+  <img alt="The Live view: short cards with their state, every app running" src="images/live-light.png">
+</picture>
+
 Zoomed out below 60%, cards are short in Edit too: pick one and its fields open in a panel on the right of the board, where they change the card as they would on it. The × or a click on the empty board closes it.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="images/zoomed-out-dark.png">
+  <img alt="Zoomed out: short cards, and the picked Orders API's branch, who starts it and its cables in the panel on the right" src="images/zoomed-out-light.png">
+</picture>
+
 **Present** shows the board alone, full screen.
 
 | Key | What it does |

@@ -46,6 +46,11 @@ koppler canvas
 It starts the canvas server when needed and opens it in your browser.
 The agent chip in the toolbar shows whether an agent session is connected; you only need one for notes, checklists and fixes.
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="images/board-dark.png">
+  <img alt="The canvas with a board of five apps, all running" src="images/board-light.png">
+</picture>
+
 ## 5. Your first run
 
 1. Drag the apps you need from the Apps list onto the board, or load a preset.
