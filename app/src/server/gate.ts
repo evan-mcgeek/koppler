@@ -4,6 +4,7 @@ import crypto from 'node:crypto';
 import type http from 'node:http';
 import { JSON_HEADERS, serveFile } from './files.ts';
 import { ROUTES } from './routes.ts';
+import { serveConsole } from './browser-console.ts';
 
 const MAX_BODY_BYTES = 256 * 1024;
 
@@ -80,6 +81,11 @@ export function gate(req: Request, res: Response, token: string, port: string): 
   // Only this machine's own page is answered: not another site's name pointed here, nor a request another site makes.
   const own = ['127.0.0.1', 'localhost'].map(host => `${host}:${port}`);
   const { host = '', origin } = req.headers;
+  // A web app's page sends its console here from its own origin: the app's key is checked instead of the token.
+  if (own.includes(host) && (url.pathname === '/console.js' || url.pathname === '/console')) {
+    serveConsole(req, res, url);
+    return;
+  }
   if (!own.includes(host) || (origin !== undefined && !own.includes(origin.replace(/^http:\/\//, '')))) {
     refuse(403);
     return;
