@@ -2,6 +2,7 @@
 // with a status and, usually, a JSON body.
 import { runs } from '../engine/history.ts';
 import { pin } from '../engine/run-logs.ts';
+import { hotReload } from '../engine/reload.ts';
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -220,6 +221,14 @@ export const ROUTES: Record<string, Route> = {
       stdio: 'ignore',
     }).unref();
     return { status: 200, body: { asked: true } };
+  },
+  '/reload': body => {
+    const app = typeof body['app'] === 'string' ? body['app'] : '';
+    try {
+      return { status: 200, body: { said: hotReload(app, body['restart'] === true) } };
+    } catch (error) {
+      return { status: 400, body: { error: (error as Error).message } };
+    }
   },
   '/run-pin': body => {
     const id = body['id'];
