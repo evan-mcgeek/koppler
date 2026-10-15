@@ -19,7 +19,7 @@ A board file can also be opened, dropped on the page or linked from GitHub.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="images/board-dark.png">
-  <img alt="A board: a mobile app and a web shop cabled to a local Orders API, which calls a local Payments API; Orders API has a database tunnel and a queue, Payments API calls an outside payment provider" src="images/board-light.png">
+  <img alt="One feature, Checkout, worked on across four apps: the mobile app and web shop cabled to a local Orders API, which calls a local Payments API; each runs its feature/checkout branch, Orders API has a database tunnel and a local SQS queue, two apps carry a note for the agent, and everything runs" src="images/board-light.png">
 </picture>
 
 Each app is a card with:
@@ -97,7 +97,7 @@ Nothing starts, stops or restarts until you confirm it there; then Koppler runs 
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="images/review-dark.png">
-  <img alt="The review before a Run on QA: the apps that start with their branch and who starts them, the apps that stay deployed, and the tunnel that opens" src="images/review-light.png" width="480">
+  <img alt="The review before a Run on QA: the four apps that start on feature/checkout with their notes for the agent, what keeps calling deployed QA, and the tunnel that opens" src="images/review-light.png" width="480">
 </picture>
 
 With the agent add-on, Run's menu has two more ways: **Run with a note for the agent…** passes an instruction for the whole run, and **Get a checklist instead** asks the agent for a per-app checklist instead of changing anything.
