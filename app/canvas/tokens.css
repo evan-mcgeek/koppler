@@ -1,0 +1,98 @@
+:root {
+  --desk: #dce2e8;
+  --paper: #e9edf1;
+  --panel: #f7f9fb;
+  --surface: #ffffff;
+  --ink: #18222d;
+  --muted: #5b6875;
+  --chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 16 16' fill='none' stroke='%235b6875' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E");
+  --line: #c5cdd6;
+  --dot: #c9d0d8;
+  --cable: #2b59c3;
+  --cable-ink: #1b3a86;
+  --prod: #c8372d;
+  --prod-ink: #8e2119;
+  --ok: #2f855a;
+  --bad: #c8372d;
+  --warn: #a36400;
+  --on-accent: #ffffff;
+  --socket: #1a222b;
+  --socket-rim: #8a97a5;
+  --dotnet: #5737c2;
+  --flutter: #086a7e;
+  --node: #2d6e30;
+  --web: #8f4b06;
+  --lambda: #a8326f;
+  --other: #5b6673;
+  --msg: #0f7b6c;
+  /* Floating layers keep a defined edge (their border) with a short, tight lift, not a wide halo. */
+  --lift: 0 1px 2px rgb(0 0 0 / 0.12), 0 4px 8px -2px rgb(0 0 0 / 0.2);
+  --lift-high: 0 2px 4px rgb(0 0 0 / 0.16), 0 8px 8px -4px rgb(0 0 0 / 0.3);
+  --sans: 'Schibsted Grotesk', system-ui, sans-serif;
+  --mono: 'JetBrains Mono', ui-monospace, monospace;
+  color-scheme: light;
+}
+/* Dark follows the system unless the theme switch says otherwise. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --desk: #10151b;
+    --paper: #161c23;
+    --panel: #1c232b;
+    --surface: #222a33;
+    --ink: #e6ebf0;
+    --muted: #93a0ad;
+    --chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 16 16' fill='none' stroke='%2393a0ad' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E");
+    --line: #34404c;
+    --dot: #2a333d;
+    --cable: #6e93f0;
+    --cable-ink: #3f63c2;
+    --prod: #ff6b5e;
+    --prod-ink: #b83a2f;
+    --ok: #5bc48c;
+    --bad: #ff6b5e;
+    --warn: #f0b429;
+    --on-accent: #0f1722;
+    --socket: #0b0f14;
+    --socket-rim: #4a5664;
+    --dotnet: #a28bff;
+    --flutter: #3cc3db;
+    --node: #71c774;
+    --web: #f2a04a;
+    --lambda: #f07ab8;
+    --other: #9aa7b5;
+    --msg: #3cc9b4;
+    color-scheme: dark;
+  }
+}
+:root[data-theme='dark'] {
+  --desk: #10151b;
+  --paper: #161c23;
+  --panel: #1c232b;
+  --surface: #222a33;
+  --ink: #e6ebf0;
+  --muted: #93a0ad;
+  --chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 16 16' fill='none' stroke='%2393a0ad' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E");
+  --line: #34404c;
+  --dot: #2a333d;
+  --cable: #6e93f0;
+  --cable-ink: #3f63c2;
+  --prod: #ff6b5e;
+  --prod-ink: #b83a2f;
+  --ok: #5bc48c;
+  --bad: #ff6b5e;
+  --warn: #f0b429;
+  --on-accent: #0f1722;
+  --socket: #0b0f14;
+  --socket-rim: #4a5664;
+  --dotnet: #a28bff;
+  --flutter: #3cc3db;
+  --node: #71c774;
+  --web: #f2a04a;
+  --lambda: #f07ab8;
+  --other: #9aa7b5;
+  --msg: #3cc9b4;
+  color-scheme: dark;
+}
+:root[data-theme='light'] {
+  color-scheme: light;
+}
