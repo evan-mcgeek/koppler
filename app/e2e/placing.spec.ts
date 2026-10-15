@@ -4,6 +4,8 @@ import { card, expect, test } from './canvas.ts';
 test.use({ board: { env: 'qa', mode: 'auto', nodes: {}, edges: [] } });
 
 test('apps added one after another line up in a row, a gap apart', async ({ page }) => {
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send('Emulation.setCPUThrottlingRate', { rate: 6 });
   for (const name of ['Web Shop', 'Orders API', 'Payments API'])
     await page
       .getByRole('button', { name: `Add ${name} to the board`, exact: true })
