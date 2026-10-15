@@ -15,7 +15,7 @@
   import BranchPicker from './BranchPicker.svelte';
   import { Handle, NodeToolbar, Position, useViewport, type NodeProps } from '@xyflow/svelte';
   import type { Side } from '../src/core/arrange.ts';
-  import { board, FAR_ZOOM, type CardNode } from './board.svelte.ts';
+  import { board, FAR_ZOOM, STARTED_BY, type CardNode } from './board.svelte.ts';
   import { wiring } from './wiring.svelte.ts';
   import { COMMAND_ICON, openTerminal, runCommand } from './commands.ts';
   import SquareTerminal from '@lucide/svelte/icons/square-terminal';
@@ -43,10 +43,6 @@
     ['set-aside', 'Set aside', 'Kept aside while it runs the other branch, back on Stop'],
     ['take-along', 'Take along', 'Carried to the other branch, and back on Stop'],
   ] as const;
-  const STARTERS = [
-    ['cli', 'Koppler'],
-    ['ide', 'Me'],
-  ] as const;
   const viewport = useViewport();
   const far = $derived(viewport.current.zoom < FAR_ZOOM);
   /** The short card: zoomed out, or in the Live view. It shows state, not fields. */
@@ -60,7 +56,12 @@
   const app = $derived(board.app(id));
   const current = $derived(app?.current || 'current branch');
   const uncommitted = $derived(`${String(app?.dirty ?? 0)} uncommitted ${app?.dirty === 1 ? 'change' : 'changes'}`);
-  const starts = $derived(!!app?.runIn.some(([value]) => value === 'ide'));
+  const starters = $derived(
+    (app?.runIn ?? []).map(([value]) => value).filter(value => Object.hasOwn(STARTED_BY, value)),
+  );
+  const starts = $derived(starters.length > 1);
+  /** A mock answers in the app's place: no branch, libraries, calls or note of its own. */
+  const mock = $derived(data.run === 'mock');
   const tunnels = $derived(board.tunnelsOf(id));
   const queues = $derived(board.queuesOf(id));
   const hiddenQueues = $derived(queues.filter(queue => board.hiddenQueues[queue]));
@@ -78,7 +79,9 @@
   const mobile = $derived(!!app?.platforms.length && data.run === 'cli');
   const platform = $derived(app?.platforms.find(([value]) => value === data.platform)?.[1]);
   /** What the short card says about how it runs. */
-  const runLabel = $derived(data.run === 'ide' ? 'Started by you' : mobile ? platform : undefined);
+  const runLabel = $derived(
+    data.run === 'ide' ? 'Started by you' : data.run === 'mock' ? 'Mock' : mobile ? platform : undefined,
+  );
   /** Worked out when the menu is opened. */
   let cables = $state<ReturnType<typeof board.cablesOf>>({ can: [], wired: [] });
   let noting = $state(false);
@@ -320,18 +323,18 @@
   {:else}
     <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
     <div class="body" onmousedowncapture={hold} onclick={release}>
-      <label class="field">
-        Branch
-        <BranchPicker
-          value={data.branch}
-          current={app?.current ?? ''}
-          branches={app?.branches ?? []}
-          title={app?.dirty && !board.switchesOver(id) ? `Runs with your ${uncommitted}` : undefined}
-          onpick={(branch: string) => {
-            board.set(id, { branch });
-          }}
-        />
-      </label>
+      {#if !mock}<label class="field">
+          Branch
+          <BranchPicker
+            value={data.branch}
+            current={app?.current ?? ''}
+            branches={app?.branches ?? []}
+            title={app?.dirty && !board.switchesOver(id) ? `Runs with your ${uncommitted}` : undefined}
+            onpick={(branch: string) => {
+              board.set(id, { branch });
+            }}
+          />
+        </label>{/if}
       {#if board.switchesOver(id)}
         <div
           class="field"
@@ -364,11 +367,15 @@
               class="field"
               role="group"
               aria-label="Who starts it"
-              title="Koppler: the agent starts it. Me: you start it yourself (IDE, terminal, anything); the agent only prepares it."
+              title="Koppler: the agent starts it. Me: you start it yourself (IDE, terminal, anything); the agent only prepares it.{starters.includes(
+                'mock',
+              )
+                ? ' Mock: Koppler answers its mock responses from the stack in its place.'
+                : ''}"
             >
               Started by
               <span class="seg">
-                {#each STARTERS as [value, label] (value)}
+                {#each starters as value (value)}
                   <label>
                     <input
                       type="radio"
@@ -378,7 +385,7 @@
                       onchange={() => {
                         board.set(id, { run: value });
                       }}
-                    />{label}
+                    />{STARTED_BY[value]}
                   </label>
                 {/each}
               </span>
@@ -453,7 +460,7 @@
           {/if}
         </div>
       {/if}
-      {#if app?.libraries.length}
+      {#if app?.libraries.length && !mock}
         <div class="field">
           Libraries
           {#each app.libraries as library (library.name)}
@@ -477,46 +484,48 @@
           {/each}
         </div>
       {/if}
-      <label class="field">
-        Cables
-        <span class="combo">
-          <select
-            aria-label="Add or remove a cable from {data.name}"
-            onfocus={() => (cables = board.cablesOf(id))}
-            onpointerdown={() => (cables = board.cablesOf(id))}
-            onchange={wire}
-          >
-            <option value="">Add or remove…</option>
-            {#if cables.can.length}
-              <optgroup label="Call a local app">
-                {#each cables.can as other (other.id)}<option value="+{other.id}">{other.name}</option>{/each}
-              </optgroup>
-            {/if}
-            {#if cables.wired.length}
-              <optgroup label="Remove the cable to">
-                {#each cables.wired as other (other.id)}<option value="-{other.id}">{other.name}</option>{/each}
-              </optgroup>
-            {/if}
-          </select>
-        </span>
-      </label>
-      {#if data.note || noting}
+      {#if !mock}
         <label class="field">
-          Note for the agent
-          <textarea
-            rows="2"
-            placeholder="e.g. run with the new pricing flag on"
-            value={data.note}
-            {@attach grow}
-            oninput={ev => {
-              grow(ev.currentTarget);
-              board.set(id, { note: ev.currentTarget.value });
-            }}
-            onblur={() => (noting = false)}
-          ></textarea>
+          Cables
+          <span class="combo">
+            <select
+              aria-label="Add or remove a cable from {data.name}"
+              onfocus={() => (cables = board.cablesOf(id))}
+              onpointerdown={() => (cables = board.cablesOf(id))}
+              onchange={wire}
+            >
+              <option value="">Add or remove…</option>
+              {#if cables.can.length}
+                <optgroup label="Call a local app">
+                  {#each cables.can as other (other.id)}<option value="+{other.id}">{other.name}</option>{/each}
+                </optgroup>
+              {/if}
+              {#if cables.wired.length}
+                <optgroup label="Remove the cable to">
+                  {#each cables.wired as other (other.id)}<option value="-{other.id}">{other.name}</option>{/each}
+                </optgroup>
+              {/if}
+            </select>
+          </span>
         </label>
-      {:else}
-        <button class="note-toggle" type="button" onclick={() => (noting = true)}>Add a note for the agent</button>
+        {#if data.note || noting}
+          <label class="field">
+            Note for the agent
+            <textarea
+              rows="2"
+              placeholder="e.g. run with the new pricing flag on"
+              value={data.note}
+              {@attach grow}
+              oninput={ev => {
+                grow(ev.currentTarget);
+                board.set(id, { note: ev.currentTarget.value });
+              }}
+              onblur={() => (noting = false)}
+            ></textarea>
+          </label>
+        {:else}
+          <button class="note-toggle" type="button" onclick={() => (noting = true)}>Add a note for the agent</button>
+        {/if}
       {/if}
     </div>
   {/if}

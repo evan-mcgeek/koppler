@@ -1,8 +1,8 @@
 // What a Run will do: the board the user wants, compared with the board last applied and with what is really running.
 // Used by the canvas, the server and the command line, so the user is shown exactly what is then done.
 
-/** Where an app is started: by Koppler from the command line, or by the user in their IDE. */
-export type RunIn = 'cli' | 'ide';
+/** Where an app is started: by Koppler from the command line, by the user in their IDE, or a mock in its place. */
+export type RunIn = 'cli' | 'ide' | 'mock';
 
 export interface BoardNode {
   branch: string;
@@ -85,7 +85,7 @@ export interface PlanOptions {
 
 // A note or a list of changes is text; anything else that arrives in its place is dropped.
 const text = (value: unknown) => (typeof value === 'string' ? value : '');
-const nodeOf = (n: NodeInput | null): BoardNode => ({
+const appNode = (n: NodeInput | null): BoardNode => ({
   branch: n?.branch || '',
   run: n?.run || 'cli',
   ...(n?.platform && { platform: n.platform }),
@@ -97,6 +97,9 @@ const nodeOf = (n: NodeInput | null): BoardNode => ({
   ...(n?.restart === true && { restart: true as const }),
   ...(n?.watch === true && { watch: true as const }),
 });
+// A mock has no clone to switch, tunnels, queues or code of its own.
+const nodeOf = (n: NodeInput | null): BoardNode =>
+  n?.run === 'mock' ? { branch: '', run: 'mock', ...(n.restart === true && { restart: true as const }) } : appNode(n);
 
 export function board(input: BoardInput | null | undefined): Board {
   const given = input?.nodes ?? {};
@@ -117,7 +120,7 @@ const callees = (b: Board, id: string) =>
     .map(e => e.to)
     .sort();
 const upper = (env: string) => env.toUpperCase();
-const where = (run: RunIn) => (run === 'ide' ? 'your IDE' : 'the command line');
+const where = (run: RunIn) => ({ ide: 'your IDE', cli: 'the command line', mock: 'a mock' })[run];
 
 /** Why an app that runs and stays on the board has to start again; empty when it can keep running. */
 function reasonsToRestart(
@@ -134,7 +137,7 @@ function reasonsToRestart(
   const why: string[] = [];
   if (next.restart) why.push('you asked to restart it');
   if (envChange) why.push(`the environment changes from ${upper(envChange.from)} to ${upper(envChange.to)}`);
-  if (now.branch !== next.branch)
+  if (now.branch !== next.branch && now.run !== 'mock' && next.run !== 'mock')
     why.push(
       `its branch changes from ${now.branch || o.current?.(id) || 'the current one'} to ${next.branch || 'the current one'}`,
     );

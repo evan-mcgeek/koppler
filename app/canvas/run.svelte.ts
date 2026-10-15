@@ -1,6 +1,6 @@
 // Run and Stop: what the board asks for, what that changes against what is running, the review of it, and the
 // request the agent or Koppler gets once it is confirmed. The plan itself is core/plan.
-import { describe, plan, type Plan } from '../src/core/plan.ts';
+import { describe, plan, type Plan, type RunIn } from '../src/core/plan.ts';
 import { board } from './board.svelte.ts';
 import { openBoard } from './boards.ts';
 import { post, save, send } from './data.ts';
@@ -60,14 +60,14 @@ class Runs {
         const app = board.app(id);
         return {
           id,
-          branch: data.branch || null,
-          run: data.run as 'cli' | 'ide',
+          branch: (data.run !== 'mock' && data.branch) || null,
+          run: data.run as RunIn,
           ...(data.hideTunnels && board.tunnelsOf(id).length > 0 && { tunnels: false as const }),
           ...(data.showQueues && board.queuesOf(id).length > 0 && { queues: true as const }),
           ...(data.watch && data.run === 'cli' && { watch: true as const }),
           ...(board.switchesOver(id) && { changes: data.changes ?? ('set-aside' as const) }),
           ...(data.platform && data.run === 'cli' && !!app?.platforms.length && { platform: data.platform }),
-          ...(data.note.trim() && { note: data.note.trim() }),
+          ...(data.run !== 'mock' && data.note.trim() && { note: data.note.trim() }),
           ...(board.localLibraries(id).length > 0 && { libraries: board.localLibraries(id) }),
         };
       });
@@ -92,11 +92,14 @@ class Runs {
           ...asked.filter(edge => edge.from === restart && keep(edge.to)),
         ]
       : asked;
-    const deployed = nodes.flatMap(({ id }) =>
-      (board.app(id)?.calls ?? [])
-        .filter(to => !edges.some(edge => edge.from === id && edge.to === to))
-        .map(to => ({ from: id, to })),
-    );
+    // A mock calls nothing.
+    const deployed = nodes
+      .filter(node => node.run !== 'mock')
+      .flatMap(({ id }) =>
+        (board.app(id)?.calls ?? [])
+          .filter(to => !edges.some(edge => edge.from === id && edge.to === to))
+          .map(to => ({ from: id, to })),
+      );
     const queues = restart
       ? Object.fromEntries(Object.entries(was?.queues ?? {}).filter(([, where]) => where === 'local'))
       : Object.fromEntries(
@@ -139,6 +142,7 @@ class Runs {
         const platform = board.apps
           .find(app => app.id === node.id)
           ?.platforms.find(([value]) => value === node.platform);
+        if (node.run === 'mock') return [`MOCK ${name(node.id)}: Koppler answers its mock responses from the stack`];
         const how = [node.run === 'ide' ? 'IDE' : 'CLI', node.run === 'cli' ? platform?.[1].split(' ')[0] : undefined];
         return [
           `LOCAL ${name(node.id)} [${how.filter(Boolean).join(', ')}] on ${node.branch ?? 'current branch'}`,
@@ -263,6 +267,7 @@ class Runs {
             return { text: `Remembered change: ${recipe.why} (${ran})`, title: recipe.file };
           }),
         ...(node.data.run === 'ide' ? [{ text: 'You start it; the agent only prepares it' }] : []),
+        ...(node.data.run === 'mock' ? [{ text: 'A mock: its responses from the stack answer in its place' }] : []),
         ...(node.data.note ? [{ text: `Note: ${node.data.note}` }] : []),
         ...(board.localLibraries(id).length
           ? [{ text: `Uses your local ${board.localLibraries(id).join(', ')}` }]
