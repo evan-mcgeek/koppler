@@ -25,7 +25,11 @@ test("zoomed out, the picked card's choices open beside the board, change it, an
   await page.screenshot({ path: 'test-results/card-panel.png' });
 
   // Another card takes its place; two picked at once have no panel.
-  await card(page, 'web').locator('header').click();
+  // The board slid left for the panel, so Web Shop is out of view: the Apps list brings it back and picks it.
+  await page
+    .getByRole('complementary', { name: 'Board and apps' })
+    .getByRole('button', { name: 'Web Shop', exact: true })
+    .click();
   await expect(page.getByRole('complementary', { name: 'Web Shop' })).toBeVisible();
   await page.keyboard.press('ControlOrMeta+a');
   await expect(page.locator('aside[aria-labelledby="card-panel-title"]')).toHaveCount(0);
@@ -46,5 +50,42 @@ test.describe('at normal zoom', () => {
     await card(page, 'orders').locator('header').click();
     await expect(card(page, 'orders').getByLabel('Branch')).toBeVisible();
     await expect(page.getByRole('complementary', { name: 'Orders API' })).toHaveCount(0);
+  });
+});
+
+test.describe('a card at the right edge', () => {
+  test.use({
+    board: {
+      env: 'qa',
+      mode: 'auto',
+      zoom: 0.5,
+      pan: { x: 80, y: 120 },
+      nodes: { web: at(0, 0), orders: at(1500, 0) },
+      edges: [],
+    },
+  });
+  test('the board slides left by the panel, so the picked card stays in view, and back when it closes', async ({
+    page,
+  }) => {
+    const x = async () => (await card(page, 'orders').boundingBox())?.x ?? 0;
+    await expect(card(page, 'orders')).toBeVisible();
+    const before = await x();
+    await card(page, 'orders').locator('header').click();
+    const panel = page.getByRole('complementary', { name: 'Orders API' });
+    await expect.poll(x).toBe(before - 300);
+    const box = await card(page, 'orders').boundingBox();
+    const edge = (await panel.boundingBox())?.x ?? 0;
+    expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual(edge);
+    await page.screenshot({ path: 'test-results/card-panel-slide.png' });
+
+    // Panning while it is open keeps the saved view free of the slide.
+    await page.mouse.wheel(40, 0);
+    await page.waitForTimeout(400);
+    const panned = await x();
+    await panel.getByRole('button', { name: 'Close' }).click();
+    await expect.poll(x).toBe(panned + 300);
+    await page.waitForTimeout(800);
+    await page.reload();
+    await expect.poll(x).toBe(panned + 300);
   });
 });

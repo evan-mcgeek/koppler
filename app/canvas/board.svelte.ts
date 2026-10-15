@@ -59,6 +59,8 @@ export interface CardData extends Record<string, unknown> {
 export type Changes = 'set-aside' | 'take-along';
 /** Below this zoom a card is drawn in its short form. */
 export const FAR_ZOOM = 0.6;
+/** The width of the panel beside the board that holds a picked card's choices while zoomed out. */
+export const CARD_PANEL = 300;
 type Size = { w: number; h: number };
 /** Arrange's layouts, in the order it steps through them: callers on top or on the left, and each read the other way round. */
 const LAYOUTS = [
@@ -243,6 +245,12 @@ class Board {
   entering = false;
   /** Zoomed out or in Live the cards are short: the empty bands their full form needs are squeezed, on screen only. */
   brief = $state(false);
+  /** Zoomed out in Edit with one app card picked: its choices show in the panel beside the board. */
+  panelCard = $derived.by(() => {
+    if (!this.brief || this.live || this.present) return undefined;
+    const picked = this.nodes.filter(node => node.selected);
+    return picked.length === 1 ? picked[0] : undefined;
+  });
   /** Each card's height in full, as last drawn so: short, the room it needs only then is closed up. */
   fullHeights = $state.raw<Record<string, number>>({});
   /**
