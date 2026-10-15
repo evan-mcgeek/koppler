@@ -206,6 +206,11 @@ const App = z.looseObject(
       .describe(
         'It runs to completion, like a migration: the exit code it must end with (0) and the seconds it may take',
       ),
+    browserConsole: z
+      .looseObject({ file: z.string().min(1) }, { error: 'an object with the HTML file' })
+      .refine(value => insideClone(value.file), "needs file: its HTML entry file, inside the app's clone")
+      .optional()
+      .describe('Web: its browser console on its card; file is its HTML entry file, such as index.html'),
     watch: z
       .looseObject({ ignore: z.array(z.string(), { error: 'a list of paths' }).optional() }, { error: 'an object' })
       .optional()

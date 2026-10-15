@@ -101,6 +101,7 @@ const NAMES: Record<string, string> = {
   once: 'Runs to completion',
   after: 'Starts after',
   commands: 'Commands on its card',
+  browserConsole: 'Browser console on its card',
   exitCode: 'Exit code',
   consumes: 'Calls',
   publishes: 'Sends to queues',
