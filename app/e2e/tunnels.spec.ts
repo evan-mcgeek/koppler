@@ -247,6 +247,8 @@ test.describe('a shared queue under an app with a tunnel, its status late, and z
     type Box = (typeof boxes)[number] | undefined;
     const over = (a: Box, b: Box) =>
       !!a && !!b && a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
+    // Moved off the tunnel card, the queue keeps a gap under it.
+    expect(Math.round((boxes[2]?.y ?? 0) - ((boxes[1]?.y ?? 0) + (boxes[1]?.height ?? 0)))).toBeGreaterThanOrEqual(10);
     expect([over(boxes[0], boxes[1]), over(boxes[0], boxes[2]), over(boxes[1], boxes[2])]).toEqual([
       false,
       false,
