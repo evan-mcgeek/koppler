@@ -17,7 +17,7 @@ test('a cable dragged close to straight snaps straight, like a magnet', async ({
   const socket = page.locator('.ends .socket[data-cable="web>payments"]');
   const ends = async () => {
     const [a, b] = await Promise.all([plug.boundingBox(), socket.boundingBox()]);
-    return Math.round(((b?.y ?? 0) + (b?.height ?? 0) / 2 - ((a?.y ?? 0) + (a?.height ?? 0) / 2)) * 10) / 10;
+    return Math.round(((b?.y ?? 0) + (b?.height ?? 0) / 2 - ((a?.y ?? 0) + (a?.height ?? 0) / 2)) * 10) / 10 || 0;
   };
   await expect(socket).toBeVisible();
   const off = await ends();
@@ -62,7 +62,8 @@ test.describe('a tunnel card', () => {
     await expect(tunnel).toBeVisible();
     const middle = async () => {
       const [a, t] = await Promise.all([card(page, 'orders').boundingBox(), tunnel.boundingBox()]);
-      return Math.round((t?.x ?? 0) + (t?.width ?? 0) / 2 - ((a?.x ?? 0) + (a?.width ?? 0) / 2));
+      // `|| 0`: a difference under half a pixel rounds to -0.
+      return Math.round((t?.x ?? 0) + (t?.width ?? 0) / 2 - ((a?.x ?? 0) + (a?.width ?? 0) / 2)) || 0;
     };
     const box = await tunnel.boundingBox();
     if (!box) throw new Error('not on the page');

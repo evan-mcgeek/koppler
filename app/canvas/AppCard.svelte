@@ -12,10 +12,10 @@
   import X from '@lucide/svelte/icons/x';
   import Cog from './Cog.svelte';
   import Command from './Command.svelte';
-  import BranchPicker from './BranchPicker.svelte';
+  import CardFields from './CardFields.svelte';
   import { Handle, NodeToolbar, Position, useViewport, type NodeProps } from '@xyflow/svelte';
   import type { Side } from '../src/core/arrange.ts';
-  import { board, FAR_ZOOM, STARTED_BY, type CardNode } from './board.svelte.ts';
+  import { board, FAR_ZOOM, type CardNode } from './board.svelte.ts';
   import { wiring } from './wiring.svelte.ts';
   import { COMMAND_ICON, openTerminal, runCommand } from './commands.ts';
   import SquareTerminal from '@lucide/svelte/icons/square-terminal';
@@ -39,10 +39,6 @@
   };
   const bar = $derived(hovered || selected);
   const SIDES: Side[] = ['top', 'right', 'bottom', 'left'];
-  const CHANGES = [
-    ['set-aside', 'Set aside', 'Kept aside while it runs the other branch, back on Stop'],
-    ['take-along', 'Take along', 'Carried to the other branch, and back on Stop'],
-  ] as const;
   const viewport = useViewport();
   const far = $derived(viewport.current.zoom < FAR_ZOOM);
   /** The short card: zoomed out, or in the Live view. It shows state, not fields. */
@@ -55,16 +51,8 @@
   });
   const app = $derived(board.app(id));
   const current = $derived(app?.current || 'current branch');
-  const uncommitted = $derived(`${String(app?.dirty ?? 0)} uncommitted ${app?.dirty === 1 ? 'change' : 'changes'}`);
-  const starters = $derived(
-    (app?.runIn ?? []).map(([value]) => value).filter(value => Object.hasOwn(STARTED_BY, value)),
-  );
-  const starts = $derived(starters.length > 1);
-  /** A mock answers in the app's place: no branch, libraries, calls or note of its own. */
-  const mock = $derived(data.run === 'mock');
   const tunnels = $derived(board.tunnelsOf(id));
   const queues = $derived(board.queuesOf(id));
-  const hiddenQueues = $derived(queues.filter(queue => board.hiddenQueues[queue]));
   const noQueues = $derived(queues.length > 0 && !data.showQueues);
   const calls = $derived(board.deployedCalls(id));
   /** "Acme Web Portal" reads as "Web Portal" on an Acme card. */
@@ -72,19 +60,12 @@
     const [first, ...rest] = name.split(' ');
     return rest.length && first === data.name.split(' ')[0] ? rest.join(' ') : name;
   };
-  const local = $derived(board.localLibraries(id));
-  const useLocal = (name: string, on: boolean) => {
-    board.set(id, { libraries: on ? [...local, name] : local.filter(one => one !== name) });
-  };
   const mobile = $derived(!!app?.platforms.length && data.run === 'cli');
   const platform = $derived(app?.platforms.find(([value]) => value === data.platform)?.[1]);
   /** What the short card says about how it runs. */
   const runLabel = $derived(
     data.run === 'ide' ? 'Started by you' : data.run === 'mock' ? 'Mock' : mobile ? platform : undefined,
   );
-  /** Worked out when the menu is opened. */
-  let cables = $state<ReturnType<typeof board.cablesOf>>({ can: [], wired: [] });
-  let noting = $state(false);
   const up = $derived(live.up(id));
   const where = $derived(live.where(id));
   const now = $derived(live.state(id));
@@ -102,32 +83,6 @@
   let asked = $state(false);
   /** A side whose one cable sits on the port: the ring stays lit under its end. */
   const lit = (side: Side) => board.ends.onPort.some(port => port.id === id && port.side === side);
-  const wire = (ev: Event) => {
-    const menu = ev.currentTarget as HTMLSelectElement;
-    const [what, to] = [menu.value[0], menu.value.slice(1)];
-    if (what === '+') board.connect(id, to);
-    else if (what === '-') board.cut(id, to);
-    menu.value = '';
-  };
-  const fieldAt = (ev: Event) =>
-    (ev.target as Element).closest<HTMLElement>('select, textarea, input:not([type="radio"], [type="checkbox"])');
-  // The whole card drags, so a field is held back on a press and opened by the click that follows a press that did
-  // not move. One that is being typed in takes the press itself, for the caret, and the card stays.
-  const hold = (ev: MouseEvent) => {
-    const field = fieldAt(ev);
-    if (field === document.activeElement) ev.stopPropagation();
-    else if (field) ev.preventDefault();
-  };
-  const release = (ev: MouseEvent) => {
-    const field = fieldAt(ev);
-    if (!field || field === document.activeElement) return;
-    field.focus();
-    if (field instanceof HTMLSelectElement) field.showPicker();
-  };
-  const grow = (box: HTMLTextAreaElement) => {
-    box.style.height = 'auto';
-    box.style.height = `${String(box.scrollHeight + 2)}px`;
-  };
 </script>
 
 <!-- What can be done with the card, in a bar above it while it is pointed at or picked: the title keeps its room. -->
@@ -321,213 +276,7 @@
         >{/if}
     </p>
   {:else}
-    <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-    <div class="body" onmousedowncapture={hold} onclick={release}>
-      {#if !mock}<label class="field">
-          Branch
-          <BranchPicker
-            value={data.branch}
-            current={app?.current ?? ''}
-            branches={app?.branches ?? []}
-            title={app?.dirty && !board.switchesOver(id) ? `Runs with your ${uncommitted}` : undefined}
-            onpick={(branch: string) => {
-              board.set(id, { branch });
-            }}
-          />
-        </label>{/if}
-      {#if board.switchesOver(id)}
-        <div
-          class="field"
-          role="radiogroup"
-          aria-label="Your {uncommitted} on {current}"
-          title="Your {uncommitted} on {current}: set aside while it runs the other branch, or taken along. Back on Stop either way."
-        >
-          {uncommitted}
-          <span class="seg">
-            {#each CHANGES as [value, label, tip] (value)}
-              <label title={tip}>
-                <input
-                  type="radio"
-                  name="changes-{id}"
-                  {value}
-                  checked={(data.changes ?? 'set-aside') === value}
-                  onchange={() => {
-                    board.set(id, { changes: value });
-                  }}
-                />{label}
-              </label>
-            {/each}
-          </span>
-        </div>
-      {/if}
-      {#if starts || tunnels.length || queues.length}
-        <div class="row">
-          {#if starts}
-            <div
-              class="field"
-              role="group"
-              aria-label="Who starts it"
-              title="Koppler: the agent starts it. Me: you start it yourself (IDE, terminal, anything); the agent only prepares it.{starters.includes(
-                'mock',
-              )
-                ? ' Mock: Koppler answers its mock responses from the stack in its place.'
-                : ''}"
-            >
-              Started by
-              <span class="seg">
-                {#each starters as value (value)}
-                  <label>
-                    <input
-                      type="radio"
-                      name="run-{id}"
-                      {value}
-                      checked={data.run === value}
-                      onchange={() => {
-                        board.set(id, { run: value });
-                      }}
-                    />{STARTED_BY[value]}
-                  </label>
-                {/each}
-              </span>
-            </div>
-          {/if}
-          {#if mobile}
-            <label class="field">
-              Platform
-              <span class="combo">
-                <select
-                  class="mono"
-                  value={data.platform}
-                  onchange={ev => {
-                    board.set(id, { platform: ev.currentTarget.value });
-                  }}
-                >
-                  {#each app?.platforms ?? [] as [value, label] (value)}<option {value}>{label}</option>{/each}
-                </select>
-              </span>
-            </label>
-          {/if}
-          {#if tunnels.length}
-            <div class="field">
-              Tunnels
-              <label
-                class="toggle"
-                title={data.hideTunnels
-                  ? 'Off: only the API runs; calls through its tunnels fail.'
-                  : 'On: Koppler opens its tunnels. Turn off when you only need the API.'}
-              >
-                <input
-                  type="checkbox"
-                  role="switch"
-                  aria-label="Open {data.name}'s tunnels"
-                  checked={!data.hideTunnels}
-                  onchange={ev => {
-                    board.set(id, { hideTunnels: !ev.currentTarget.checked });
-                  }}
-                /><span class="track" aria-hidden="true"></span>{data.hideTunnels ? 'Off' : 'On'}
-              </label>
-            </div>
-          {/if}
-          {#if queues.length}
-            <div class="field">
-              Queues
-              <label
-                class="toggle"
-                title={noQueues
-                  ? 'Off: it is taken off its queues and keeps the deployed ones. A queue another app uses stays on the board for that app.'
-                  : 'On: its queues show on the board, where each can be switched to a local copy.'}
-              >
-                <input
-                  type="checkbox"
-                  role="switch"
-                  aria-label="Show {data.name}'s queues"
-                  checked={!noQueues}
-                  onchange={ev => {
-                    board.set(id, { showQueues: ev.currentTarget.checked });
-                  }}
-                /><span class="track" aria-hidden="true"></span>{noQueues ? 'Off' : 'On'}
-              </label>
-              {#if hiddenQueues.length && !noQueues}
-                <button
-                  class="link"
-                  type="button"
-                  onclick={() => {
-                    board.showQueues(queues, true);
-                  }}>Show {hiddenQueues.length} hidden</button
-                >
-              {/if}
-            </div>
-          {/if}
-        </div>
-      {/if}
-      {#if app?.libraries.length && !mock}
-        <div class="field">
-          Libraries
-          {#each app.libraries as library (library.name)}
-            {@const on = local.includes(library.name)}
-            <label
-              class="toggle"
-              title={on
-                ? `On: ${data.name} uses your local copy in ${library.path.replace(/^\/Users\/[^/]+/, '~')}`
-                : `Off: ${data.name} uses the published ${library.name}`}
-            >
-              <input
-                type="checkbox"
-                role="switch"
-                aria-label="Use the local {library.name}"
-                checked={on}
-                onchange={ev => {
-                  useLocal(library.name, ev.currentTarget.checked);
-                }}
-              /><span class="track" aria-hidden="true"></span>{library.name}
-            </label>
-          {/each}
-        </div>
-      {/if}
-      {#if !mock}
-        <label class="field">
-          Cables
-          <span class="combo">
-            <select
-              aria-label="Add or remove a cable from {data.name}"
-              onfocus={() => (cables = board.cablesOf(id))}
-              onpointerdown={() => (cables = board.cablesOf(id))}
-              onchange={wire}
-            >
-              <option value="">Add or remove…</option>
-              {#if cables.can.length}
-                <optgroup label="Call a local app">
-                  {#each cables.can as other (other.id)}<option value="+{other.id}">{other.name}</option>{/each}
-                </optgroup>
-              {/if}
-              {#if cables.wired.length}
-                <optgroup label="Remove the cable to">
-                  {#each cables.wired as other (other.id)}<option value="-{other.id}">{other.name}</option>{/each}
-                </optgroup>
-              {/if}
-            </select>
-          </span>
-        </label>
-        {#if data.note || noting}
-          <label class="field">
-            Note for the agent
-            <textarea
-              rows="2"
-              placeholder="e.g. run with the new pricing flag on"
-              value={data.note}
-              {@attach grow}
-              oninput={ev => {
-                grow(ev.currentTarget);
-                board.set(id, { note: ev.currentTarget.value });
-              }}
-              onblur={() => (noting = false)}
-            ></textarea>
-          </label>
-        {:else}
-          <button class="note-toggle" type="button" onclick={() => (noting = true)}>Add a note for the agent</button>
-        {/if}
-      {/if}
-    </div>
+    <CardFields {id} />
   {/if}
   {#if where}<p class="where nodrag" data-on={up ?? 'other'}>{where}</p>
   {:else if stateSaid}<p class="where nodrag" data-state={now?.state}>{stateSaid}</p>{/if}
@@ -722,71 +471,6 @@
   .tools .fill {
     fill: currentColor;
     stroke: none;
-  }
-  .body {
-    display: grid;
-    gap: 8px;
-    padding: 10px 14px 14px 16px;
-    cursor: default;
-  }
-  .row {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 8px;
-  }
-  .field {
-    display: grid;
-    gap: 3px;
-    font-size: 12px;
-    color: var(--muted);
-  }
-  .combo {
-    position: relative;
-    display: block;
-  }
-  .combo::after {
-    content: '';
-    position: absolute;
-    right: 11px;
-    top: 50%;
-    width: 6px;
-    height: 6px;
-    border-right: 1.5px solid var(--muted);
-    border-bottom: 1.5px solid var(--muted);
-    transform: translateY(-70%) rotate(45deg);
-    pointer-events: none;
-  }
-  select {
-    width: 100%;
-    height: 30px;
-    padding: 0 26px 0 8px;
-    border: 1px solid var(--line);
-    border-radius: 6px;
-    background: var(--paper);
-    color: var(--ink);
-    font: 13px var(--sans);
-    appearance: none;
-    cursor: pointer;
-    text-overflow: ellipsis;
-  }
-  select.mono {
-    font: 12px var(--mono);
-  }
-  .seg {
-    height: 30px;
-  }
-  .seg label {
-    flex: 1;
-    display: grid;
-    place-items: center;
-    padding: 0 10px;
-    font-size: 12.5px;
-  }
-  .toggle {
-    width: fit-content;
-    min-height: 30px;
-    color: var(--ink);
-    font-size: 13px;
   }
   .watch {
     display: inline-grid;
@@ -987,18 +671,6 @@
   .short .act {
     font-size: 16px;
   }
-  .link {
-    justify-self: start;
-    padding: 0;
-    border: 0;
-    background: none;
-    color: var(--cable);
-    font: 500 12px var(--sans);
-    cursor: pointer;
-  }
-  .link:hover {
-    text-decoration: underline;
-  }
   .calls {
     contain: inline-size;
     display: flex;
@@ -1082,43 +754,7 @@
     color: var(--warn);
     font: 600 15px var(--sans);
   }
-  .note-toggle {
-    display: inline-flex;
-    justify-self: start;
-    align-items: center;
-    gap: 5px;
-    min-height: 24px;
-    padding: 2px 0;
-    border: 0;
-    background: none;
-    color: var(--muted);
-    font: 500 12.5px var(--sans);
-    cursor: pointer;
-  }
-  .note-toggle::before {
-    content: '+';
-    font-size: 16px;
-    line-height: 1;
-  }
-  .note-toggle:hover {
-    color: var(--cable);
-  }
-  textarea {
-    width: 100%;
-    min-height: 52px;
-    padding: 6px 8px;
-    resize: none;
-    overflow: hidden;
-    border: 1px solid var(--line);
-    border-radius: 6px;
-    background: var(--paper);
-    color: var(--ink);
-    font: 13px/1.4 var(--sans);
-  }
-  textarea::placeholder {
-    color: var(--muted);
-  }
-  :is(select, textarea, .remove, .note-toggle):focus-visible {
+  .remove:focus-visible {
     outline: 2px solid var(--cable);
     outline-offset: 1px;
   }

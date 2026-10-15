@@ -97,6 +97,7 @@ The agent chip in the toolbar says where the agent is:
 ## Views and shortcuts
 
 **Edit** shows every field of a card; **Live** shows what runs, with short cards.
+Zoomed out below 60%, cards are short in Edit too: pick one and its fields open in a panel on the right of the board, where they change the card as they would on it. The × or a click on the empty board closes it.
 **Present** shows the board alone, full screen.
 
 | Key | What it does |

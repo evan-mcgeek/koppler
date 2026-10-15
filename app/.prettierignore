@@ -13,3 +13,4 @@ src/fonts/
 src/lambda-secrets-proxy.go
 test/*.mjs
 bin/
+.lavish/

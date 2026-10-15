@@ -410,7 +410,7 @@ test.describe('an app whose only link is to an outside system', () => {
     await expect(billing).toBeVisible();
     const off = async () => {
       const [a, b] = await Promise.all([card(page, 'payments').boundingBox(), billing.boundingBox()]);
-      return Math.round((b?.y ?? 0) + (b?.height ?? 0) / 2 - ((a?.y ?? 0) + (a?.height ?? 0) / 2));
+      return Math.round((b?.y ?? 0) + (b?.height ?? 0) / 2 - ((a?.y ?? 0) + (a?.height ?? 0) / 2)) || 0;
     };
     const grab = await card(page, 'payments').locator('header').boundingBox();
     if (!grab) throw new Error('not on the page');
