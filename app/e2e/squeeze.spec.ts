@@ -29,7 +29,8 @@ test.describe('zoomed out', () => {
       const [web, below] = [await box(page, 'web'), await box(page, 'payments')];
       return Math.round(below.y - (web.y + web.height));
     };
-    await expect.poll(gap).toBe(40);
+    // Within a pixel: the cards' sub-pixel heights round either way.
+    await expect.poll(async () => Math.abs((await gap()) - 40)).toBeLessThanOrEqual(1);
     const payments = await box(page, 'payments');
     await page.screenshot({ path: 'test-results/next-squeezed.png' });
 
