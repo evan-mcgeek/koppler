@@ -420,13 +420,17 @@
         {#each schema.enum ?? [] as one (one)}<option value={one}>{String(one)}</option>{/each}
       </select>
     {:else if kind === 'number'}
+      <!-- Text, so it can also hold an expression such as {{orders-api.port}}. -->
       <input
         {id}
-        type="number"
+        inputmode="numeric"
         disabled={locked}
         placeholder={bare ? (EXAMPLES[path.split('.').at(-1) ?? ''] ?? name) : hint}
-        value={value ?? ''}
-        onchange={ev => void save(ev.currentTarget.value === '' ? undefined : Number(ev.currentTarget.value))}
+        value={typeof value === 'number' || typeof value === 'string' ? value : ''}
+        onchange={ev => {
+          const typed = ev.currentTarget.value.trim();
+          void save(typed === '' ? undefined : Number.isFinite(Number(typed)) ? Number(typed) : typed);
+        }}
       />
     {:else if kind === 'text' && !(typeof value === 'string' && (value.length > 60 || value.includes('\n')) && !bare)}
       <input
