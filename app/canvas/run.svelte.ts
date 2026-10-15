@@ -47,27 +47,33 @@ class Runs {
   review = $state.raw<Review | null>(null);
   /** The apps the user chose to run with no cable, in the review: it stops asking. */
   onItsOwn = $state<Record<string, true>>({});
+  /** The apps the user left out of the run under review: their cards stay on the board. */
+  leftOut = $state<Record<string, true>>({});
 
   /** What the board asks for, as the agent and the plan read it; with `restart`, only what runs, with that card's settings and cables from the board. */
   graph(restart?: string) {
     const was = live.status?.live;
     const keep = (id: string) => !restart || id === restart || Object.hasOwn(was?.nodes ?? {}, id);
-    const mine = board.nodes.map(({ id, data }) => {
-      const app = board.app(id);
-      return {
-        id,
-        branch: data.branch || null,
-        run: data.run as 'cli' | 'ide',
-        ...(data.hideTunnels && board.tunnelsOf(id).length > 0 && { tunnels: false as const }),
-        ...(data.showQueues && board.queuesOf(id).length > 0 && { queues: true as const }),
-        ...(data.watch && data.run === 'cli' && { watch: true as const }),
-        ...(board.switchesOver(id) && { changes: data.changes ?? ('set-aside' as const) }),
-        ...(data.platform && data.run === 'cli' && !!app?.platforms.length && { platform: data.platform }),
-        ...(data.note.trim() && { note: data.note.trim() }),
-        ...(board.localLibraries(id).length > 0 && { libraries: board.localLibraries(id) }),
-      };
-    });
-    const asked = board.edges.map(({ source, target }) => ({ from: source, to: target }));
+    const mine = board.nodes
+      .filter(({ id }) => !this.leftOut[id])
+      .map(({ id, data }) => {
+        const app = board.app(id);
+        return {
+          id,
+          branch: data.branch || null,
+          run: data.run as 'cli' | 'ide',
+          ...(data.hideTunnels && board.tunnelsOf(id).length > 0 && { tunnels: false as const }),
+          ...(data.showQueues && board.queuesOf(id).length > 0 && { queues: true as const }),
+          ...(data.watch && data.run === 'cli' && { watch: true as const }),
+          ...(board.switchesOver(id) && { changes: data.changes ?? ('set-aside' as const) }),
+          ...(data.platform && data.run === 'cli' && !!app?.platforms.length && { platform: data.platform }),
+          ...(data.note.trim() && { note: data.note.trim() }),
+          ...(board.localLibraries(id).length > 0 && { libraries: board.localLibraries(id) }),
+        };
+      });
+    const asked = board.edges
+      .filter(({ source, target }) => !this.leftOut[source] && !this.leftOut[target])
+      .map(({ source, target }) => ({ from: source, to: target }));
     // The rest stays as it runs: their settings and cables as last applied.
     const nodes = restart
       ? mine.flatMap(node =>
@@ -190,10 +196,15 @@ class Runs {
   #asked: { note?: string; manual?: boolean; restart?: string } = {};
   /** The review again, after something it shows was changed from inside it. */
   again(): void {
+    this.#again = true;
     this.start(this.#asked);
   }
+  #again = false;
 
   start({ note, manual = false, restart }: { note?: string; manual?: boolean; restart?: string } = {}): void {
+    // A new review starts with every app on the board; one shown again keeps what was left out of it.
+    if (!this.#again) this.leftOut = {};
+    this.#again = false;
     this.#asked = { manual, ...(note && { note }), ...(restart && { restart }) };
     const asked = this.graph(restart);
     const graph = {

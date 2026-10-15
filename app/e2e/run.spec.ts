@@ -1,6 +1,6 @@
 // The new canvas's Run and Stop: the review of what changes, and what is sent once it is confirmed.
 import type { Page } from '@playwright/test';
-import { actions, at, expect, nextEdit, sent, STACK, test } from './canvas.ts';
+import { actions, at, card, expect, nextEdit, sent, STACK, test } from './canvas.ts';
 
 const review = (page: Page) => page.getByRole('dialog');
 /** What the server took from the page so far, one request a line. */
@@ -352,7 +352,12 @@ test('an app cabled to nothing on the board is flagged in the review, and cabled
   await page.getByRole('button', { name: 'Run', exact: true }).click();
   const alone = review(page).getByRole('group', { name: 'Catalog API is not cabled' });
   await expect(alone).toContainText('Not cabled to any app here');
-  await expect(alone.getByRole('button')).toHaveText(['Web Shop calls it', 'Orders API calls it', 'Run it on its own']);
+  await expect(alone.getByRole('button')).toHaveText([
+    'Web Shop calls it',
+    'Orders API calls it',
+    'Run it on its own',
+    "Don't run it",
+  ]);
   await page.screenshot({ path: 'test-results/next-review-alone.png' });
   await alone.getByRole('button', { name: 'Web Shop calls it' }).click();
   await expect(page.locator('.svelte-flow__edge[data-id="web>catalog"]')).toHaveCount(1);
@@ -366,4 +371,22 @@ test('an app cabled to nothing on the board is flagged in the review, and cabled
   await alone.getByRole('button', { name: 'Run it on its own' }).click();
   await expect(alone).toHaveCount(0);
   await expect(page.locator('.svelte-flow__edge[data-id="web>catalog"]')).toHaveCount(0);
+});
+
+test('an app cabled to nothing can be left out of the run from the review; its card stays on the board', async ({
+  page,
+}) => {
+  await page.getByRole('complementary').getByRole('button', { name: 'Catalog API', exact: true }).click();
+  await page.getByRole('button', { name: 'Run', exact: true }).click();
+  const alone = review(page).getByRole('group', { name: 'Catalog API is not cabled' });
+  const starts = review(page).locator('li', { has: page.locator('[data-verb="starts"]') });
+  await expect(starts).toContainText('Catalog API');
+  await alone.getByRole('button', { name: "Don't run it" }).click();
+  await expect(alone).toHaveCount(0);
+  await expect(starts).not.toContainText('Catalog API');
+  await expect(card(page, 'catalog')).toBeVisible();
+  // The next review starts with every app on the board again.
+  await review(page).getByRole('button', { name: 'Cancel' }).click();
+  await page.getByRole('button', { name: 'Run', exact: true }).click();
+  await expect(starts).toContainText('Catalog API');
 });
