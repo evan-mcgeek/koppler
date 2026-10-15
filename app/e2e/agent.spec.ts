@@ -36,6 +36,26 @@ test('with no agent the bar says so and shows how to connect one; a connected ag
   await expect(steps).toBeHidden();
   await expect(how).toHaveCount(0);
 
+  // It says what it works on; resting on it tells which agent session it is, and where.
+  status = {
+    apps: {},
+    agent: {
+      state: 'listening',
+      who: {
+        name: 'Fixing the cable check',
+        agent: 'Claude Code',
+        agentSession: 'c0ffee00',
+        cwd: '/Users/me/src/shop',
+      },
+    },
+    queued: 0,
+  };
+  await expect(chip).toHaveText('Agent: Fixing the cable check');
+  await expect(chip).toHaveAttribute(
+    'title',
+    /^Agent connected: Fixing the cable check\. Claude Code session c0ffee00, in ~\/src\/shop\. /,
+  );
+
   status = { apps: {}, agent: { state: 'busy' }, queued: 1 };
   await expect(chip).toHaveText('Agent working, 1 waiting');
   const ago = (minutes: number) => new Date(Date.now() - minutes * 60000).toISOString();

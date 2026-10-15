@@ -23,6 +23,10 @@ interface Listener {
   cwd?: string;
   session?: string;
   disconnected?: string;
+  /** What the agent said the session works on, and which agent and session of its own it is. */
+  name?: string;
+  agent?: string;
+  agentSession?: string;
 }
 
 const startOf = (pid: number) => {
@@ -71,6 +75,15 @@ export async function listen(argv: string[]): Promise<void> {
   const taking = inbox + '.taking';
   const listener = path.join(temp, 'listener.json');
   const lock = listener + '.lock';
+  /** The session's name and agent: given now, or kept from when it connected. */
+  const who = (current: Listener | null): Pick<Listener, 'name' | 'agent' | 'agentSession'> => {
+    const kept = takeOver ? undefined : current;
+    const claude = process.env['CLAUDE_CODE_SESSION_ID'];
+    const agent = claude ? 'Claude Code' : kept?.agent;
+    const agentSession = claude ?? kept?.agentSession;
+    const name = given ?? kept?.name;
+    return { ...(name && { name }), ...(agent && { agent }), ...(agentSession && { agentSession }) };
+  };
   const read = (): Listener | null => {
     try {
       return JSON.parse(fs.readFileSync(listener, 'utf8')) as Listener | null;
@@ -122,6 +135,8 @@ export async function listen(argv: string[]): Promise<void> {
   // again names itself, so one the user has moved away from cannot take the connection back.
   const as = argv[0] === 'as' ? argv[1] : undefined;
   const takeOver = argv[0] === 'take';
+  const named = argv.indexOf('--name');
+  const given = named < 0 ? undefined : (argv[named + 1] ?? '').replace(/\s+/g, ' ').trim().slice(0, 80) || undefined;
   const joined = locked((): { refused: string } | { refused?: undefined; since: string; session: string } => {
     const current = read();
     const running = listenerPid(current);
@@ -140,7 +155,7 @@ export async function listen(argv: string[]): Promise<void> {
     const since = other || !current?.since ? stamp() : current.since;
     const session = takeOver ? newSession() : (as ?? current?.session ?? newSession());
     // Registered before the other is stopped: on its way out it sees it is no longer the one connected.
-    write({ pid: process.pid, started: startOf(process.pid), since, cwd: process.cwd(), session });
+    write({ pid: process.pid, started: startOf(process.pid), since, cwd: process.cwd(), session, ...who(current) });
     if (other) stop(other);
     return { since, session };
   });
@@ -193,7 +208,7 @@ export async function listen(argv: string[]): Promise<void> {
       fs.unlinkSync(taking);
       // Still connected while the session works on it: the next listen keeps the same "since".
       try {
-        write({ pid: null, since, busy: stamp(), cwd: process.cwd(), session });
+        write({ pid: null, since, busy: stamp(), cwd: process.cwd(), session, ...who(read()) });
       } catch {
         // The prompts are out; the marker is a courtesy.
       }

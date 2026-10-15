@@ -42,16 +42,23 @@
   const waiting = $derived(queued > 0 && agent !== 'listening');
   // No agent is fine: runs work without one. It only warns when something waits for an agent.
   const tone = $derived(agent === 'none' && !queued ? 'off' : agent);
+  /** Which session is connected, in the agent's own words, and where it runs. */
+  const who = $derived(listening === 'none' ? undefined : live.status?.agent?.who);
+  const session = $derived(
+    who && (who.agent || who.cwd)
+      ? ` ${[who.agent && `${who.agent}${who.agentSession ? ` session ${who.agentSession}` : ''}`, who.cwd && `in ${who.cwd.replace(/^\/Users\/[^/]+/, '~')}`].filter(Boolean).join(', ')}.`
+      : '',
+  );
   const label = $derived(
     ({
-      listening: 'Agent',
+      listening: who?.name ? `Agent: ${who.name}` : 'Agent',
       busy: minutes ? `Agent working, ${String(minutes)} min` : 'Agent working',
       quiet: `Agent quiet, ${String(minutes)} min`,
       none: queued ? name : 'No agent',
     }[agent] ?? name) + (waiting ? `, ${String(queued)} waiting` : ''),
   );
   const title = $derived(
-    `${name}. ${about}${waiting ? ` ${String(queued)} ${queued === 1 ? 'request waits' : 'requests wait'} for it; only the newest run or Stop is handed over.` : ''}`,
+    `${name}${who?.name ? `: ${who.name}` : ''}.${session} ${about}${waiting ? ` ${String(queued)} ${queued === 1 ? 'request waits' : 'requests wait'} for it; only the newest run or Stop is handed over.` : ''}`,
   );
   const place = () => {
     const at = how?.getBoundingClientRect();
@@ -119,6 +126,12 @@
 {/if}
 
 <style>
+  .words {
+    max-width: 240px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
   .agent {
     display: inline-flex;
     align-items: center;
