@@ -58,6 +58,14 @@
             runs.onItsOwn[id] = true;
           }}>Run it on its own</button
         >
+        <button
+          type="button"
+          title="Leave it out of this run; its card stays on the board"
+          onclick={() => {
+            runs.leftOut[id] = true;
+            runs.again();
+          }}>Don't run it</button
+        >
       </span>
     </span>
   {/if}

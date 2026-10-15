@@ -81,6 +81,8 @@
   }
   .x {
     grid-area: 1 / 2;
+    display: grid;
+    place-items: center;
     width: 20px;
     height: 20px;
     padding: 0;
