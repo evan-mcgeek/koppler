@@ -177,3 +177,29 @@ test.describe('another board', () => {
       .toEqual([0, 20]);
   });
 });
+
+test.describe('an app whose card grows once its run shows', () => {
+  test.use({
+    board: { env: 'qa', mode: 'auto', zoom: 1, pan: { x: 120, y: 80 }, nodes: { orders: at(0, 0) }, edges: [] },
+  });
+  test('gets its tunnel card under it as it is then, never over it', async ({ page }) => {
+    const done = [
+      { label: 'Tunnels', state: 'done' },
+      { label: 'Start', state: 'done' },
+    ];
+    await page.route('**/data/status.json', async route => {
+      // The status comes late, after the cards have their first sizes.
+      await new Promise(resolve => setTimeout(resolve, 600));
+      await route.fulfill({
+        json: { live: { env: 'qa', nodes: { orders: {} } }, apps: { orders: { listening: true, steps: done } } },
+      });
+    });
+    await page.reload();
+    const tunnel = tunnels(page).first();
+    await expect(card(page, 'orders').locator('.progress')).toBeVisible();
+    await page.waitForTimeout(500);
+    const app = await card(page, 'orders').boundingBox();
+    const below = await tunnel.boundingBox();
+    expect((below?.y ?? 0) - ((app?.y ?? 0) + (app?.height ?? 0))).toBeGreaterThanOrEqual(16);
+  });
+});

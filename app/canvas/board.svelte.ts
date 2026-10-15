@@ -593,6 +593,46 @@ class Board {
     });
   }
 
+  /**
+   * The cards an app owns that hang under it stay clear of it, however it grew (its steps showing as the page filled
+   * in, a note): the first at least the usual gap under the app, the ones under it never over the one above.
+   */
+  #clear(apps: CardNode[], cards: InfraNode[]): InfraNode[] {
+    let result = cards;
+    for (const { id, position, measured } of apps) {
+      const height = measured?.height;
+      const width = measured?.width;
+      if (!height || !width) continue;
+      // Its own cards: a queue shared with other apps stays where it is put.
+      const led = new Set(this.ownedBy(id));
+      const under = result
+        .filter(card => {
+          const w = this.infraBoxes.get(card.id)?.w ?? TUNNEL.w;
+          return (
+            led.has(card.id) &&
+            card.position.y >= position.y &&
+            card.position.x < position.x + width &&
+            position.x < card.position.x + w
+          );
+        })
+        .sort((a, b) => a.position.y - b.position.y);
+      let bottom = position.y + height + TUNNEL.gap / 2;
+      const moved: Record<string, number> = {};
+      for (const card of under) {
+        const y = Math.max(card.position.y, bottom);
+        if (y !== card.position.y) moved[card.id] = y;
+        // The next one moves only where it would overlap this one: a stack keeps its own spacing.
+        bottom = y + (this.infraBoxes.get(card.id)?.h ?? TUNNEL.h);
+      }
+      if (Object.keys(moved).length)
+        result = result.map(card => {
+          const y = moved[card.id];
+          return y === undefined ? card : { ...card, position: { x: card.position.x, y } };
+        });
+    }
+    return result;
+  }
+
   /** Brings the tunnel cards in line with the plan: a card for each tunnel, new ones beside the app that leads them. */
   syncInfra(at: Record<string, Point | undefined> = {}): void {
     const before = new Map(this.infra.map(card => [card.id, card]));
@@ -869,6 +909,7 @@ class Board {
       if (from && (from.x !== position.x || from.y !== position.y))
         infra = this.followed(id, { x: position.x - from.x, y: position.y - from.y }, infra);
     }
+    if (!this.brief) infra = this.#clear(apps, infra);
     this.nodes = apps;
     this.infra = infra;
     if (this.brief && drawn.some(node => node.dragging || kept.get(node.id)?.dragging)) this.#held = this.#shape();
