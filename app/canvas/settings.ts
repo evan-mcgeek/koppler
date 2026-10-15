@@ -101,6 +101,7 @@ const NAMES: Record<string, string> = {
   once: 'Runs to completion',
   after: 'Starts after',
   commands: 'Commands on its card',
+  mock: 'Mock responses',
   browserConsole: 'Browser console on its card',
   exitCode: 'Exit code',
   consumes: 'Calls',
@@ -133,6 +134,9 @@ export function itemName(item: unknown, fallback: string): string {
   if (typeof item === 'string' && item) return item;
   if (typeof item !== 'object' || item === null) return fallback;
   const fields = item as Record<string, unknown>;
+  // A mock response: its method and path.
+  if (typeof fields['path'] === 'string' && fields['path'])
+    return `${typeof fields['method'] === 'string' ? fields['method'] : 'Any'} ${fields['path']}`;
   const found = ['what', 'name', 'tunnel', 'sso', 'signIn', 'hosts', 'env', 'file'].map(key => fields[key]);
   const named = found.find(one => typeof one === 'string' && one);
   return typeof named === 'string' ? named : fallback;
@@ -188,6 +192,7 @@ export const APP_TABS: Tab[] = [
       'once',
       'after',
       'commands',
+      'mock',
       'project',
       'launchSettings',
       'baseProfile',

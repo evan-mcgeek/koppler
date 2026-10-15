@@ -1,7 +1,7 @@
 <script lang="ts">
   // A card's choices, inside the review: what an app starts with can be changed without leaving it.
   import BranchPicker from './BranchPicker.svelte';
-  import { board } from './board.svelte.ts';
+  import { board, STARTED_BY } from './board.svelte.ts';
   import { runs } from './run.svelte.ts';
 
   const { id }: { id: string } = $props();
@@ -70,7 +70,7 @@
     </span>
   {/if}
   <span class="controls">
-    {#if app.branches.length}
+    {#if app.branches.length && data.run !== 'mock'}
       <label class="branch">
         Branch
         <BranchPicker
@@ -97,17 +97,16 @@
         </select>
       </label>
     {/if}
-    {#if app.runIn.some(([value]) => value === 'ide')}
+    {#if app.runIn.length > 1}
       <label>
         Started by
         <select
           value={data.run}
           onchange={ev => {
-            set({ run: ev.currentTarget.value === 'ide' ? 'ide' : 'cli' });
+            set({ run: ev.currentTarget.value });
           }}
         >
-          <option value="cli">Koppler</option>
-          <option value="ide">Me</option>
+          {#each app.runIn as [value] (value)}<option {value}>{STARTED_BY[value] ?? value}</option>{/each}
         </select>
       </label>
     {/if}

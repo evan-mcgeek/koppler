@@ -161,6 +161,22 @@ const AppCommand = z.looseObject(
   },
   { error: 'an object with a label and a command to run' },
 );
+const MockResponse = z.looseObject(
+  {
+    method: z
+      .enum(['GET', 'POST', 'PUT', 'PATCH', 'DELETE'], { error: 'GET, POST, PUT, PATCH or DELETE' })
+      .optional()
+      .describe('Its method; any method when left out'),
+    path: z
+      .string({ error: 'a path such as /orders' })
+      .regex(/^\//, 'a path such as /orders')
+      .describe('The path it answers; one ending in * answers every path under it'),
+    status: z.int().min(100).max(599).optional().describe('Its status, 200 by default'),
+    body: z.unknown().optional().describe('What it answers: JSON, or text'),
+    headers: z.record(z.string(), z.string(), { error: 'an object' }).optional().describe('Headers it adds'),
+  },
+  { error: 'an object with a path' },
+);
 const App = z.looseObject(
   {
     name: required.describe('Its name on the canvas'),
@@ -221,6 +237,10 @@ const App = z.looseObject(
       })
       .optional()
       .describe('Buttons such as Seed or Migrate on its card, also run with koppler do'),
+    mock: z
+      .array(MockResponse, { error: 'a list' })
+      .optional()
+      .describe('Canned responses answered on its local address in its place, when its card is set to Mock'),
     after: z
       .array(z.string(), { error: 'a list of app ids' })
       .optional()

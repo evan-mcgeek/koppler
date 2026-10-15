@@ -211,3 +211,10 @@ test('an app asked to restart restarts, and the rest keeps running', () => {
   expect(steps.restarts).toEqual([{ id: 'api', why: ['you asked to restart it'] }]);
   expect(steps.keeps.map(step => step.id)).toEqual(['web']);
 });
+
+test('a mock keeps no branch, tunnels or note, and moving to it restarts only for the move', () => {
+  const mocked = board(withNode('db-api', { run: 'mock', branch: 'main', note: 'x', tunnels: false, restart: true }));
+  expect(mocked.nodes['db-api']).toEqual({ branch: '', run: 'mock', restart: true });
+  const moved = plan(live, withNode('db-api', { run: 'mock' }), { running });
+  expect(moved.restarts.find(s => s.id === 'db-api')?.why).toEqual(['it moves from the command line to a mock']);
+});

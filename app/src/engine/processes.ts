@@ -63,6 +63,8 @@ export interface RunOptions {
   dryRun?: boolean;
   lan?: boolean;
   test?: boolean;
+  /** Answer the stack's canned responses in the app's place. */
+  mock?: boolean;
   onStop?: string[][];
   /** Started with stored secrets: the caller's code-loading variables are kept out of its environment. */
   holdsSecrets?: boolean;
@@ -101,6 +103,7 @@ const SWITCHES: Record<string, Partial<RunOptions>> = {
   '--lan': { lan: true },
   '--test': { test: true },
   '--no-test': { test: false },
+  '--mock': { mock: true },
 };
 /** Reads `<name> [options] [-- <command...>]`; throws with the reason when it cannot. */
 export function parseRun(args: string[]): RunOptions {

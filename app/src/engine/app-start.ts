@@ -4,7 +4,7 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { APPROVE, approved, startsFromStack } from './checks.ts';
 import { fail } from '../failure.ts';
-import { launchProfile, startCommand, type LaunchProfiles, type StartContext } from '../core/launch.ts';
+import { launchProfile, mockCommand, startCommand, type LaunchProfiles, type StartContext } from '../core/launch.ts';
 import { isProtected } from '../core/plan.ts';
 import type { App, Secret } from '../core/stack.ts';
 import { readClones, readStack } from '../data.ts';
@@ -143,6 +143,11 @@ export function appStart(id: string, options: RunOptions): AppStart | null {
   const env = options.env ?? first ?? '';
   if (!stack.envs.includes(env)) fail(`unknown env ${env}; the stack has ${stack.envs.join(', ')}`);
   const app = appOn(stack, id, env) ?? base;
+  if (options.mock) {
+    const mock = mockCommand(app, CODE);
+    if (mock.error !== undefined) fail(`${id}: ${mock.error}`);
+    return { cwd: undefined, command: mock.command, port: mock.port, onStop: undefined, device: undefined, env };
+  }
   // A start command written in the shared stack runs only once the user has seen and allowed it, and again after it
   // changes.
   if (startsFromStack(stack, id, env) && !approved(stack.source ?? '', stack))

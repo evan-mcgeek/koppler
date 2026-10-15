@@ -199,6 +199,20 @@ function startOther(app: App, ctx: StartContext): Start {
   return { cwd: ctx.repo, port: portOf(app.url), command: ['sh', '-c', app.start] };
 }
 
+/** A card set to Mock: the stack's canned responses, answered on the app's own local address. */
+export function mockCommand(app: App, engine = ''): Start {
+  if (!app.mock?.length) return { error: 'has no mock responses yet: add them in its settings, under Mock responses' };
+  const port = portOf(app.url);
+  if (!app.url || !port) return { error: 'needs url, its local address, for the mock to answer on' };
+  if (new URL(app.url).protocol !== 'http:')
+    return { error: `the mock answers over http only, and its url is ${app.url}` };
+  return {
+    cwd: undefined,
+    port,
+    command: ['node', `${engine}/mock-server.mjs`, String(port), JSON.stringify(app.mock)],
+  };
+}
+
 const NO_FILES: RepoView = { has: () => false, read: () => null, list: () => [] };
 function startFromRecipe(app: App, ctx: StartContext): Start {
   const recipe = recipeOf(app.kind, ctx.stack);

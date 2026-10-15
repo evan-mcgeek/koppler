@@ -30,6 +30,8 @@ export interface CableData extends Record<string, unknown> {
 }
 export type CableEdge = Edge<CableData, 'cable'> & { data: CableData };
 /** What a card holds: what the app is, and what the user chose for it. */
+/** Who starts an app, as the card and the review name it. */
+export const STARTED_BY: Record<string, string> = { cli: 'Koppler', ide: 'Me', mock: 'Mock' };
 export interface CardData extends Record<string, unknown> {
   name: string;
   kind: string;
@@ -304,8 +306,13 @@ class Board {
   /** The apps whose new tunnel cards still wait for their real place. */
   unplaced = $state.raw<string[]>([]);
 
+  /** A card set to Mock: its responses from the stack answer in its place, so it has no tunnels, queues or calls. */
+  #mock(id: string): boolean {
+    return this.nodes.some(node => node.id === id && node.data.run === 'mock');
+  }
   /** The databases and caches an app reaches through tunnels in the board's environment. */
   tunnelsOf(id: string) {
+    if (this.#mock(id)) return [];
     const app = this.#registry?.apps[id];
     const own = this.env !== this.envs[0] ? app?.envs?.[this.env]?.prereqs : undefined;
     // A port that is not a number (a broken or hostile stack file) never reaches the page.
@@ -392,6 +399,7 @@ class Board {
   }
   /** A branch other than the clone's is asked for while the clone has uncommitted changes. */
   switchesOver(id: string): boolean {
+    if (this.#mock(id)) return false;
     const branch = this.cards.find(node => node.id === id)?.data.branch;
     const app = this.app(id);
     return !!(branch && app?.current && branch !== app.current && app.dirty);
@@ -423,6 +431,7 @@ class Board {
   }
   /** An app's queues that the stack describes. */
   queuesOf(id: string): string[] {
+    if (this.#mock(id)) return [];
     return queuesOf(this.#registry, id).filter(queue => this.#registry?.queues?.[queue]);
   }
   /** The message links and the calls to outside systems, between the cards they join. */
@@ -455,6 +464,7 @@ class Board {
   }
   /** The apps this one still calls in the deployed environment: the calls the stack knows that have no cable. */
   deployedCalls(id: string): StackApp[] {
+    if (this.#mock(id)) return [];
     const called = this.app(id)?.calls ?? [];
     return called.flatMap(to => {
       const app = this.app(to);
@@ -1383,7 +1393,7 @@ class Board {
           ([from, other]) => from !== id && (other.consumes?.[id] ?? stack.found?.[from]?.[id]),
         ),
       serves: !!app.url,
-      runIn: kindOf(app, stack).runIn,
+      runIn: [...kindOf(app, stack).runIn, ...(app.mock?.length ? [['mock', 'Mock'] as const] : [])],
       platforms: kindOf(app, stack).platforms ?? [],
       current: clones[id]?.branch ?? '',
       branches: clones[id]?.branches ?? [],

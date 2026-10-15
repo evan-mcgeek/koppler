@@ -185,8 +185,9 @@ function announce(up: Up): void {
     const app = stack.apps[id];
     const branch = node(id).branch;
     if (branch) step(id, 'Branch', 'todo', `Switch to ${branch}`);
-    if (node(id).tunnels !== false && tunnelsOf(stack, id, env).length) step(id, 'Tunnels', 'todo');
-    if (Object.keys(board?.queues ?? {}).some(queue => app?.publishes?.[queue] || app?.reads?.[queue]))
+    const mock = node(id).run === 'mock';
+    if (!mock && node(id).tunnels !== false && tunnelsOf(stack, id, env).length) step(id, 'Tunnels', 'todo');
+    if (!mock && Object.keys(board?.queues ?? {}).some(queue => app?.publishes?.[queue] || app?.reads?.[queue]))
       step(id, 'Local queue', 'todo');
     const ide = node(id).run === 'ide';
     step(id, 'Start', ide ? 'user' : 'todo', ide ? 'Start it in your IDE.' : null);
@@ -309,7 +310,8 @@ function wireCables(up: Up): void {
   const { stack, env, left } = up;
   // A Lambda that finds a callee's address in its secret: those keys are set over the secret when it starts.
   const secretKeys: Record<string, Record<string, string>> = {};
-  for (const { from, to } of up.edges) {
+  // A mock answers the same whoever it would call.
+  for (const { from, to } of up.edges.filter(edge => up.node(edge.from).run !== 'mock')) {
     const wired = wireInfo(stack, up.clones, from, to, env, up.node(from).platform);
     const viaRecipe = recipesFor(stack, from).some(
       recipe => recipe.when?.calls === to && matches(recipe, { env, calls: [to] }),
@@ -344,7 +346,7 @@ function wireCables(up: Up): void {
 async function openTunnels(up: Up): Promise<void> {
   const { stack, ids, env, node } = up;
   const needs = ids
-    .filter(id => node(id).tunnels !== false && !up.skip.has(id))
+    .filter(id => node(id).tunnels !== false && node(id).run !== 'mock' && !up.skip.has(id))
     .flatMap(id => tunnelsOf(stack, id, env));
   const appPorts = ids.map(id => Number(new URL(stack.apps[id]?.url ?? 'http://x').port)).filter(Boolean);
   for (const tunnel of planTunnels(needs, appPorts)) {
@@ -516,7 +518,8 @@ async function startApps(up: Up): Promise<void> {
     else {
       const setEnv = up.setEnv[id];
       try {
-        await run([id, '--env', env, ...(platform ? ['--device', platform] : [])], setEnv ? { setEnv } : {});
+        const how = runIn === 'mock' ? ['--mock'] : platform ? ['--device', platform] : [];
+        await run([id, '--env', env, ...how], setEnv ? { setEnv } : {});
       } catch (error) {
         if (!(error instanceof Failure)) throw error;
         console.error(error.message);
