@@ -84,10 +84,16 @@ test('The cases a connection must survive, each in its own folder.', async () =>
     assert.equal(bystander.exitCode ?? bystander.signalCode, null); bystander.kill(); }
 });
 
-test('A session connects with a name; Koppler adds which agent session it is, and listening again keeps both.', async () => {
+test("A Claude Code session connects under the name Claude Code shows for it, and a rename shows when it listens again.", async () => {
   const entry = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'dist', 'koppler.mjs');
   const own = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-listen-name-'));
-  const named = { ...process.env, KOPPLER_TEMP: own, CLAUDE_CODE_SESSION_ID: 'c0ffee00-1111' };
+  const claude = path.join(own, 'claude');
+  const id = 'c0ffee00-1111-2222-3333-444455556666';
+  const transcript = path.join(claude, 'projects', '-Users-me-src', `${id}.jsonl`);
+  fs.mkdirSync(path.dirname(transcript), { recursive: true });
+  const title = record => fs.appendFileSync(transcript, JSON.stringify({ ...record, sessionId: id }) + '\n');
+  title({ type: 'ai-title', aiTitle: 'Fixing the cable check' });
+  const named = { ...process.env, KOPPLER_TEMP: own, CLAUDE_CODE_SESSION_ID: id, CLAUDE_CONFIG_DIR: claude };
   const read = () => JSON.parse(fs.readFileSync(path.join(own, 'listener.json'), 'utf8'));
   const started = [];
   const listen = (...args) => {
@@ -96,16 +102,17 @@ test('A session connects with a name; Koppler adds which agent session it is, an
     return child;
   };
   try {
-    const first = listen('take', '--name', '  Fixing   the cable check ');
+    const first = listen('take');
     await until('it connects', () => fs.existsSync(path.join(own, 'listener.json')) && read().pid === first.pid);
-    assert.deepEqual([read().name, read().agent, read().agentSession], ['Fixing the cable check', 'Claude Code', 'c0ffee00-1111']);
+    assert.deepEqual([read().name, read().agent, read().agentSession], ['Fixing the cable check', 'Claude Code', id]);
     // A request is handed over: the listener ends, and the session is marked as working on it, still named.
     fs.writeFileSync(path.join(own, 'prompts.jsonl'), JSON.stringify({ tag: 'koppler', text: 'run', data: { id: 'abcdef12' } }) + '\n');
     await until('it hands the request over', () => first.exitCode !== null);
     assert.equal(read().name, 'Fixing the cable check');
+    title({ type: 'custom-title', customTitle: 'Koppler release' });
     const back = listen('as', read().session);
     await until('it listens again', () => read().pid === back.pid);
-    assert.deepEqual([read().name, read().agent], ['Fixing the cable check', 'Claude Code']);
+    assert.equal(read().name, 'Koppler release');
   } finally {
     for (const child of started) child.kill();
   }

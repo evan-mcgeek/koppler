@@ -12,6 +12,7 @@ import { tempDir } from '../paths.ts';
 import { Failure } from '../failure.ts';
 import type { Prompt } from './history.ts';
 import { writeJson } from '../json-files.ts';
+import { claudeTitle } from './claude-title.ts';
 
 /** Who is connected to the canvas, as temp/listener.json has it. */
 interface Listener {
@@ -23,7 +24,7 @@ interface Listener {
   cwd?: string;
   session?: string;
   disconnected?: string;
-  /** What the agent said the session works on, and which agent and session of its own it is. */
+  /** The session's name in its agent, and which agent and session of its own it is. */
   name?: string;
   agent?: string;
   agentSession?: string;
@@ -75,13 +76,14 @@ export async function listen(argv: string[]): Promise<void> {
   const taking = inbox + '.taking';
   const listener = path.join(temp, 'listener.json');
   const lock = listener + '.lock';
-  /** The session's name and agent: given now, or kept from when it connected. */
+  /** The session's name and agent: read now, or kept from when it connected. */
   const who = (current: Listener | null): Pick<Listener, 'name' | 'agent' | 'agentSession'> => {
     const kept = takeOver ? undefined : current;
     const claude = process.env['CLAUDE_CODE_SESSION_ID'];
     const agent = claude ? 'Claude Code' : kept?.agent;
     const agentSession = claude ?? kept?.agentSession;
-    const name = given ?? kept?.name;
+    // The name Claude Code shows for the session, read again on every listen, so a rename shows on the next one.
+    const name = (claude && claudeTitle(claude)?.slice(0, 80)) || kept?.name;
     return { ...(name && { name }), ...(agent && { agent }), ...(agentSession && { agentSession }) };
   };
   const read = (): Listener | null => {
@@ -135,8 +137,6 @@ export async function listen(argv: string[]): Promise<void> {
   // again names itself, so one the user has moved away from cannot take the connection back.
   const as = argv[0] === 'as' ? argv[1] : undefined;
   const takeOver = argv[0] === 'take';
-  const named = argv.indexOf('--name');
-  const given = named < 0 ? undefined : (argv[named + 1] ?? '').replace(/\s+/g, ' ').trim().slice(0, 80) || undefined;
   const joined = locked((): { refused: string } | { refused?: undefined; since: string; session: string } => {
     const current = read();
     const running = listenerPid(current);

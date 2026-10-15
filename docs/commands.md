@@ -53,7 +53,7 @@ You can run these yourself too; the agent uses them to do its part.
 | `koppler run <name> [--cwd <dir>] [--port <n>] [--bind <address>] [--ready <url>] [--restart] -- <command...>` | Start any command, detached and logged; it never gets secrets. `--bind` says which local address it listens on, when two share a port |
 | `koppler switch <app> <branch> [--set-aside \| --take-along]` | Switch a clone to the board's branch; `--back` undoes it |
 | `koppler recipes [app] \| --remember <app> --why "..." [--when ...] [--any-os] [--private] \| --apply <app...> [--env <env>]` | Remembered code changes: list them, keep the last edit, apply the matching ones. A stack's own are applied only after `koppler doctor --approve` |
-| `koppler listen take [--name <text>] \| as <id> \| stop` | Wait for requests from the canvas; one agent session at a time. `--name` says what the session works on: the canvas shows it beside Agent, with the agent's own session and folder on hover |
+| `koppler listen take \| as <id> \| stop` | Wait for requests from the canvas; one agent session at a time. The canvas shows the session's name in Claude Code beside Agent, with its session id and folder on hover |
 | `koppler board new "<name>" [--add <app,...>] [--cable <caller>:<callee>]...` | Make a board of your own, with its apps and cables; an open canvas adds it to your boards |
 | `koppler board share "<name>"` | Propose one of your boards to the team: a pull request on the stack's repo on GitHub; a stack not on GitHub keeps it in its file to commit |
 | `koppler board open <file or link> [--no-open]` | Open a board from a file or a GitHub link: it joins your boards and the canvas opens on it; the board picker's Reload reads it again from there |
