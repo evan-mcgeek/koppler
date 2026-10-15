@@ -13,6 +13,7 @@ import { isProtected } from '../core/plan.ts';
 import type { App } from '../core/stack.ts';
 import { readClones, type Registry } from '../data.ts';
 import { stateDir } from '../paths.ts';
+import { alive, readRecord } from '../engine/processes.ts';
 import { declaredSecrets, secretRequest } from './secrets.ts';
 import { appOn } from '../core/stack.ts';
 
@@ -39,6 +40,8 @@ export interface Probe {
   speaks: (kind: Kind, host: string, port: number) => Promise<boolean>;
   leadsHere: (name: string) => Promise<boolean>;
   profile: (id: string, env: string) => Profile | null;
+  /** The settings Koppler started the app with, while it runs; null when it does not run as Koppler started it. */
+  started: (id: string) => Record<string, string> | null;
   login: (app: string, env: string, name: string) => Promise<{ ok?: boolean; message?: string; error?: string }>;
 }
 type Body = Record<string, unknown>;
@@ -264,8 +267,19 @@ async function testCable(
   const up = `${callee.name} answers on ${url.host} (HTTP ${String(answered.status)})`;
   const call = caller?.consumes?.[to];
   const settings = call?.how === 'env' && caller?.kind === 'dotnet' ? [call.env ?? []].flat() : [];
-  const profile = settings.length ? probe.profile(from, env) : null;
   const fine = `Answers, ${String(answered.ms)} ms`;
+  // Koppler gives the caller the address when it starts it: what it was started with is what it calls.
+  const given = settings.length ? probe.started(from) : null;
+  const setting = settings.find(one => given?.[one] !== undefined);
+  if (caller && given && setting)
+    return portOf(given[setting]) === url.port
+      ? { ok: true, text: fine, detail: `${up}, and ${caller.name} was started with ${setting} pointing at it.` }
+      : {
+          ok: false,
+          text: 'Not pointed at it',
+          detail: `${up}, but ${caller.name} was started with ${setting} pointing elsewhere. Restart ${caller.name} to call it.`,
+        };
+  const profile = settings.length ? probe.profile(from, env) : null;
   if (!profile || !caller) {
     const unchecked = caller ? ` Whether ${caller.name} is set to call it could not be checked here.` : '';
     return { ok: true, text: fine, detail: `${up}.${unchecked}` };
@@ -393,6 +407,10 @@ export async function cableTest(
     speaks,
     leadsHere,
     profile: (id, env) => (loaded ? localProfile(loaded, id, env) : null),
+    started: id => {
+      const record = readRecord(id);
+      return record && alive(record) ? (record.start?.setEnv ?? null) : null;
+    },
     login: (app, env, name) => secretRequest('test', { app, env, name }).then(answer => answer.body),
   },
 ): Promise<Tested> {
