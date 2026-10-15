@@ -2,11 +2,14 @@
 
 A version tag publishes Koppler to npm as `latest`, with provenance, and makes its GitHub Release.
 
+From `app/`, on `main`, with nothing uncommitted and nothing to pull:
+
 ```sh
-cd app
-npm version patch        # or minor, major: bumps package.json and the lock, commits and tags v<version>
-git push --follow-tags
+npm run release -- patch   # or minor, major, or an exact version such as 0.1.0
 ```
+
+It bumps the version in `app/package.json` and its lock, commits `Koppler <version>` and tags `v<version>` on `main`, and pushes both.
+Plain `npm version` is not enough here: the package is in `app/`, not at the repo's root, so npm bumps it but makes no commit or tag.
 
 The tag starts the Release workflow (`.github/workflows/release.yml`):
 
