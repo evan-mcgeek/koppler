@@ -104,12 +104,13 @@ function startDotnet(app: App, ctx: StartContext): Start {
   const lan = ctx.lan ? ['--urls', `http://0.0.0.0:${String(ctx.httpPort)}`] : [];
   const port = ctx.lan ? ctx.httpPort : portOf(app.url);
   const run = ['dotnet', 'run', '--project', app.project];
-  if (hidden.length === 0)
-    return { cwd: ctx.repo, port, secrets: true, command: [...run, '--launch-profile', name, ...lan] };
-  // Without a -LOCAL profile, the base profile's settings are passed minus the hidden ones, so the repo stays
-  // untouched. The environment's own sign-in replaces the repo's AWS_PROFILE, which names a profile on someone
-  // else's machine.
+  // The repo's AWS_PROFILE names a profile on someone else's machine: the environment's own sign-in replaces it.
+  // A -LOCAL profile is the user's own, and kept as it is.
   const sso = (app.prereqs ?? []).find(prereq => prereq.sso)?.sso;
+  const otherSignIn = !!sso && name !== local && sets('AWS_PROFILE') && vars['AWS_PROFILE'] !== sso;
+  if (hidden.length === 0 && !otherSignIn)
+    return { cwd: ctx.repo, port, secrets: true, command: [...run, '--launch-profile', name, ...lan] };
+  // Otherwise the profile's settings are passed, minus the hidden ones, so the repo stays untouched.
   const settings = {
     ...vars,
     ...(sso && { AWS_PROFILE: sso }),
