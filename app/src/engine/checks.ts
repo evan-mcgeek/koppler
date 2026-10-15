@@ -5,6 +5,7 @@
 //        koppler doctor --approve     show the stack's own check commands and allow them to run (again after they change)
 import { execFileSync } from 'node:child_process';
 import crypto from 'node:crypto';
+import { resolveExpressions } from '../core/expressions.ts';
 import fs from 'node:fs';
 import path from 'node:path';
 import { writeJson } from '../json-files.ts';
@@ -319,7 +320,7 @@ const save = (stack: LooseStack, results: Result[]) => {
 
 /** Runs the loaded stack's checks, prints them, and leaves the result for the canvas. False when something is missing. */
 export function checkStack({ quiet = false } = {}): boolean {
-  const stack = readData('registry') as LooseStack | null;
+  const stack = resolveExpressions(readData('registry')) as LooseStack | null;
   if (!stack) return true;
   const results = runChecks(stack);
   fs.mkdirSync(tempDir(), { recursive: true });
@@ -338,7 +339,7 @@ export async function checkTools({
 }: { approve?: boolean; confirm?: (question: string) => Promise<boolean> } = {}): Promise<
   { results: Result[]; error?: undefined } | { error: string }
 > {
-  const stack = readData('registry') as LooseStack | null;
+  const stack = resolveExpressions(readData('registry')) as LooseStack | null;
   if (!stack) return { error: 'no stack loaded (koppler init)' };
   const commands = stackCommands(stack);
   const source = stack.source ?? '';

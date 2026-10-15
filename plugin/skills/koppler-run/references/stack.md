@@ -88,6 +88,14 @@ To change the format: raise `VERSION`, add the `MIGRATIONS` step from the previo
 
 Other fields (`config`, `overrides`, `note`) are free-form facts for the agent to read.
 
+## Expressions
+
+A value can name another app's fact instead of repeating it: `"url": "http://localhost:{{orders-api.port}}"`, `"local": "http://{{orders-api.host}}:{{orders-api.port}}/v1"`.
+`{{<app>.<field>}}` is any field of that app (its top-level value), and `port` and `host` also come from its `url`.
+A value that is only an expression keeps the type of what it names, so `"port": "{{db-api.dbPort}}"` is a number.
+`stack.json` keeps the expressions, and Settings shows and saves them as written; Koppler fills them in where it uses the stack (runs, the board, checks).
+One that names nothing, or only itself, is a problem `koppler stack check` reports, and the stack is not saved with it.
+
 ## What the repos say
 
 Right after repos are added on the canvas, and later from "Look through the repos again" in the stack menu (`koppler discover [--apply]`), Koppler reads the clones and offers, for the user to tick:

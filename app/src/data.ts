@@ -2,6 +2,7 @@
 // found, and the board. Each is one JSON file in the run folder.
 import fs from 'node:fs';
 import path from 'node:path';
+import { resolveExpressions } from './core/expressions.ts';
 import type { Stack } from './core/stack.ts';
 import { readJson, writeJson } from './json-files.ts';
 import { tempDir } from './paths.ts';
@@ -50,8 +51,8 @@ export interface Clone {
   /** Clones of libraries the app depends on, which it can use in place of the published ones. */
   libraries?: { name: string; path: string; ecosystem: 'dart' | 'npm' }[];
 }
-/** The stack in use. It passed the stack check when it was copied here, so it is read as one. */
-export const readStack = () => readData('registry') as Registry | null;
+/** The stack in use, its expressions filled in. It passed the stack check when it was copied here, so it is read as one. */
+export const readStack = () => resolveExpressions(readData('registry')) as Registry | null;
 /** The clones the last sync found, by app. */
 export const readClones = () => (readData('local')?.['apps'] ?? {}) as Record<string, Clone | null | undefined>;
 

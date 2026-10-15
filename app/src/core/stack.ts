@@ -2,6 +2,7 @@
 // is used. One definition gives all three.
 import * as z from 'zod';
 import { loadsCode } from '../safe-env.ts';
+import { expressionProblems, resolveExpressions } from './expressions.ts';
 import { BUILT_IN_KINDS } from './kinds.ts';
 import { QUEUE_TYPES } from './plan.ts';
 import { VERSION as PRESET_VERSION } from './presets.ts';
@@ -554,14 +555,19 @@ const where = (path: PropertyKey[]) =>
  * Everything wrong with a stack, one line each, as `where: what`; empty when it can be used. Never throws, whatever it
  * is given.
  */
-export function validateStack(stack: unknown): string[] {
+export function validateStack(raw: unknown): string[] {
+  // Checked as it is used: with its expressions filled in.
+  const stack = resolveExpressions(raw);
   const parsed = StackSchema.safeParse(stack);
+  const expressions = expressionProblems(raw);
+  // A value whose expression names nothing is that problem alone.
+  const named = new Set(expressions.map(problem => problem.slice(0, problem.indexOf(': '))));
   const shape = parsed.success
     ? []
-    : parsed.error.issues.map(issue =>
-        issue.path.length > 0 ? `${where(issue.path)}: ${issue.message}` : issue.message,
-      );
-  return [...new Set([...shape, ...(isObject(stack) ? crossProblems(stack) : [])])];
+    : parsed.error.issues
+        .filter(issue => !named.has(where(issue.path)))
+        .map(issue => (issue.path.length > 0 ? `${where(issue.path)}: ${issue.message}` : issue.message));
+  return [...new Set([...expressions, ...shape, ...(isObject(stack) ? crossProblems(stack) : [])])];
 }
 
 /** An app as an environment has it: that environment's fields replace the app's own, a list whole. */

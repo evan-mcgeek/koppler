@@ -1,6 +1,7 @@
 // The board: cards and cables as Svelte Flow holds them, and the socket behaviour on top (drawing a cable through
 // waypoints, sliding an end along its side). The geometry is core/cables and core/arrange, unchanged.
 import type { Edge, Node } from '@xyflow/svelte';
+import { resolveExpressions } from '../src/core/expressions.ts';
 import { arrange, sidesFor, squeeze, type Point, type Side } from '../src/core/arrange.ts';
 import { endOffsets, orderSlots, sidePoint, SIDES, type Box, type Cable } from '../src/core/cables.ts';
 import { of as kindOf } from '../src/core/kinds.ts';
@@ -1368,7 +1369,9 @@ class Board {
     const loaded = await load();
     if (loaded) this.open(loaded);
   }
-  open({ stack, clones, roots, saved }: Loaded): void {
+  open({ stack: raw, clones, roots, saved }: Loaded): void {
+    // The board works with the facts; Settings edits the stack as written.
+    const stack = resolveExpressions(raw);
     this.#registry = stack;
     this.#guarded = stack.envs.filter(env => isProtected(stack, env));
     this.stack = stack.name ?? '';
