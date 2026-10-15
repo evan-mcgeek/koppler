@@ -6,8 +6,6 @@ on:
   pull_request:
     paths: [app/**, .github/workflows/app.yml]
   workflow_dispatch:
-  # A release runs it first: nothing is published that did not pass it.
-  workflow_call:
 
 permissions:
   contents: read
