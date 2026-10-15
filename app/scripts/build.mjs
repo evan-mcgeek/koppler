@@ -13,6 +13,38 @@ const app = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'),
 // Read as they are, not compiled.
 const asIs = name => /\.go$/.test(name);
 
+// One build at a time: two at once (the launcher after a pull, and npm pack) share dist.next and break each other.
+const lock = path.join(app, 'dist.lock');
+const owner = path.join(lock, 'pid');
+const running = pid => {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+};
+for (let waited = 0; ; waited += 200) {
+  try {
+    fs.mkdirSync(lock);
+    fs.writeFileSync(owner, String(process.pid));
+    break;
+  } catch (error) {
+    if (error.code !== 'EEXIST') throw error;
+    const pid = Number(fs.existsSync(owner) ? fs.readFileSync(owner, 'utf8') : 0);
+    // Left by a build that ended without letting go, or one still writing its pid: taken over after a moment.
+    if ((pid && !running(pid)) || (!pid && waited >= 2000)) fs.rmSync(lock, { recursive: true, force: true });
+    else {
+      if (waited === 0) console.error('waiting for another build of Koppler to finish');
+      await new Promise(done => setTimeout(done, 200));
+    }
+  }
+}
+process.on('exit', () => {
+  if (fs.existsSync(owner) && fs.readFileSync(owner, 'utf8') === String(process.pid))
+    fs.rmSync(lock, { recursive: true, force: true });
+});
+
 // Built beside the folder in use and swapped in whole at the end: a Koppler that is running keeps its files until
 // then, and a build that fails leaves it as it was.
 fs.rmSync(next, { recursive: true, force: true });

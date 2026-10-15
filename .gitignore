@@ -11,6 +11,7 @@ playwright-report/
 dist/
 dist.next/
 dist.previous/
+dist.lock/
 /app/skills/
 /app/README.md
 /app/LICENSE

@@ -11,6 +11,7 @@ export default tseslint.config(
       'dist/',
       'dist.next/',
       'dist.previous/',
+      'dist.lock/',
       'test-results/',
       'playwright-report/',
       'src/fonts/',

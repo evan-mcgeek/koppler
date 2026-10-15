@@ -3,6 +3,7 @@ node_modules/
 dist/
 dist.next/
 dist.previous/
+dist.lock/
 test-results/
 playwright-report/
 package-lock.json
