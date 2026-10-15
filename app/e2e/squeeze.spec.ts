@@ -24,10 +24,13 @@ test.describe('zoomed out', () => {
     page,
   }) => {
     await expect(card(page, 'payments')).toBeVisible();
-    const web = await box(page, 'web');
+    // Kept 100 under the full card (420 tall): drawn 100 under the short one, at 40%, once the short cards settle.
+    const gap = async () => {
+      const [web, below] = [await box(page, 'web'), await box(page, 'payments')];
+      return Math.round(below.y - (web.y + web.height));
+    };
+    await expect.poll(gap).toBe(40);
     const payments = await box(page, 'payments');
-    // Kept 100 under the full card (420 tall): drawn 100 under the short one, at 40%.
-    expect(Math.round(payments.y - (web.y + web.height))).toBe(40);
     await page.screenshot({ path: 'test-results/next-squeezed.png' });
 
     await page.mouse.move(payments.x + 30, payments.y + 10);

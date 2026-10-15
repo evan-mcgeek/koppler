@@ -29,7 +29,7 @@
   import Outside from './Outside.svelte';
   import Queue from './Queue.svelte';
   import Tunnel from './Tunnel.svelte';
-  import { board, FAR_ZOOM, type CardNode, type InfraNode } from './board.svelte.ts';
+  import { board, CARD_PANEL, FAR_ZOOM, type CardNode, type InfraNode } from './board.svelte.ts';
   import { wiring } from './wiring.svelte.ts';
   import { undo } from './undo.svelte.ts';
   import { ago, openBoard } from './boards.ts';
@@ -42,6 +42,24 @@
   board.toFlow = at => flow.screenToFlowPosition(at, { snapToGrid: false });
   board.zoom = () => flow.getZoom();
   const viewport = useViewport();
+  // The card panel takes its room from the board's right: the board slides left as far, so nothing ends up under it,
+  // and back when it closes. The view saved is the one without the slide.
+  let shift = 0;
+  let pressed = false;
+  const slide = () => {
+    const next = board.panelCard ? CARD_PANEL : 0;
+    if (next === shift) return;
+    const { x, y, zoom } = flow.getViewport();
+    void flow.setViewport({ x: x + shift - next, y, zoom });
+    shift = next;
+  };
+  $effect(() => {
+    if (!!board.panelCard === shift > 0) return;
+    // The press that picked the card ends first: slid out from under the pointer, its release would land on the empty
+    // board and drop the pick.
+    if (pressed) window.addEventListener('pointerup', () => setTimeout(slide), { once: true });
+    else slide();
+  });
   let area: HTMLElement | undefined = $state();
   board.area = () => area?.getBoundingClientRect() ?? new DOMRect();
   // Brings a card to the middle of the board, at the zoom the board is at, and picks it.
@@ -342,6 +360,8 @@
   }}
   onkeyup={hold}
   onpointermovecapture={release}
+  onpointerdowncapture={() => (pressed = true)}
+  onpointerupcapture={() => (pressed = false)}
 />
 
 <!-- A card reached with Tab is the picked one: the arrow keys move it straight away. -->
@@ -392,7 +412,7 @@
     proOptions={{ hideAttribution: true }}
     {...start}
     onmoveend={(_event, viewport) => {
-      if (!board.live) board.view = viewport;
+      if (!board.live) board.view = { ...viewport, x: viewport.x + shift };
     }}
   >
     <Background variant={BackgroundVariant.Dots} gap={24} size={2.4} bgColor="var(--paper)" patternColor="var(--dot)" />

@@ -3,14 +3,13 @@
   import X from '@lucide/svelte/icons/x';
   import CardFields from './CardFields.svelte';
   import Icon from './Icon.svelte';
-  import { board } from './board.svelte.ts';
+  import { board, CARD_PANEL } from './board.svelte.ts';
 
-  const picked = $derived(board.brief && !board.live ? board.nodes.filter(node => node.selected) : []);
-  const card = $derived(picked.length === 1 ? picked[0] : undefined);
+  const card = $derived(board.panelCard);
 </script>
 
 {#if card}
-  <aside class="kind-{card.data.kind}" aria-labelledby="card-panel-title">
+  <aside class="kind-{card.data.kind}" style:width="{CARD_PANEL}px" aria-labelledby="card-panel-title">
     <header>
       <h2 id="card-panel-title" title={card.data.name}>{card.data.name}</h2>
       <span class="kind">{card.data.kindLabel}</span>
@@ -30,7 +29,6 @@
 
 <style>
   aside {
-    width: 300px;
     flex-shrink: 0;
     overflow: hidden auto;
     scrollbar-width: thin;
