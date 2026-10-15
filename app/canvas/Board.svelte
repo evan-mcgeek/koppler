@@ -42,23 +42,44 @@
   board.toFlow = at => flow.screenToFlowPosition(at, { snapToGrid: false });
   board.zoom = () => flow.getZoom();
   const viewport = useViewport();
-  // The card panel takes its room from the board's right: the board slides left as far, so nothing ends up under it,
-  // and back when it closes. The view saved is the one without the slide.
+  // The card panel takes its room from the board's right. Opened on a card it would cover, picked with a click, the
+  // board slides left as far, and back when it closes; otherwise, and for a card moved by hand, the board stays. The
+  // view saved is the one without the slide.
   let shift = 0;
-  let pressed = false;
-  const slide = () => {
-    const next = board.panelCard ? CARD_PANEL : 0;
-    if (next === shift) return;
+  let pressed: { x: number; y: number } | null = null;
+  const panelId = $derived(board.panelCard?.id);
+  const slide = (moved: boolean) => {
     const { x, y, zoom } = flow.getViewport();
-    void flow.setViewport({ x: x + shift - next, y, zoom });
-    shift = next;
+    const id = board.panelCard?.id;
+    if (!id) {
+      if (shift) void flow.setViewport({ x: x + shift, y, zoom });
+      shift = 0;
+      return;
+    }
+    if (shift || moved) return;
+    const box = area?.querySelector(`.svelte-flow__node[data-id="${CSS.escape(id)}"]`)?.getBoundingClientRect();
+    if (!box || box.right <= board.area().right) return;
+    void flow.setViewport({ x: x - CARD_PANEL, y, zoom });
+    shift = CARD_PANEL;
   };
   $effect(() => {
-    if (!!board.panelCard === shift > 0) return;
-    // The press that picked the card ends first: slid out from under the pointer, its release would land on the empty
-    // board and drop the pick.
-    if (pressed) window.addEventListener('pointerup', () => setTimeout(slide), { once: true });
-    else slide();
+    if (panelId === undefined && !shift) return;
+    const down = pressed;
+    // After the press that picked the card, and once the panel takes its room: slid out from under the pointer, the
+    // release would land on the empty board and drop the pick.
+    if (down)
+      window.addEventListener(
+        'pointerup',
+        ev =>
+          setTimeout(() => {
+            slide(Math.hypot(ev.clientX - down.x, ev.clientY - down.y) > 4);
+          }),
+        { once: true },
+      );
+    else
+      setTimeout(() => {
+        slide(false);
+      });
   });
   let area: HTMLElement | undefined = $state();
   board.area = () => area?.getBoundingClientRect() ?? new DOMRect();
@@ -365,8 +386,8 @@
   }}
   onkeyup={hold}
   onpointermovecapture={release}
-  onpointerdowncapture={() => (pressed = true)}
-  onpointerupcapture={() => (pressed = false)}
+  onpointerdowncapture={(ev: PointerEvent) => (pressed = { x: ev.clientX, y: ev.clientY })}
+  onpointerupcapture={() => (pressed = null)}
 />
 
 <!-- A card reached with Tab is the picked one: the arrow keys move it straight away. -->

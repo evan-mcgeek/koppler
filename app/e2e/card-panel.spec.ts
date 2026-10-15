@@ -89,3 +89,40 @@ test.describe('a card at the right edge', () => {
     await expect.poll(x).toBe(panned + 300);
   });
 });
+
+test.describe('a card the panel does not cover', () => {
+  test.use({
+    board: {
+      env: 'qa',
+      mode: 'auto',
+      zoom: 0.5,
+      pan: { x: 80, y: 120 },
+      nodes: { web: at(0, 0), orders: at(1500, 0) },
+      edges: [],
+    },
+  });
+  test('opens the panel and the board stays where it is', async ({ page }) => {
+    const x = async () => (await card(page, 'web').boundingBox())?.x ?? 0;
+    await expect(card(page, 'web')).toBeVisible();
+    const before = await x();
+    await card(page, 'web').locator('header').click();
+    await expect(page.getByRole('complementary', { name: 'Web Shop' })).toBeVisible();
+    await page.waitForTimeout(500);
+    expect(await x()).toBe(before);
+  });
+
+  test('moved by hand, even under where the panel opens, the board does not move', async ({ page }) => {
+    const x = async (id: string) => (await card(page, id).boundingBox())?.x ?? 0;
+    await expect(card(page, 'orders')).toBeVisible();
+    const web = await x('web');
+    const head = await card(page, 'orders').locator('header').boundingBox();
+    if (!head) throw new Error('orders has no header');
+    await page.mouse.move(head.x + 40, head.y + head.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(head.x + 20, head.y + head.height / 2 + 30, { steps: 8 });
+    await page.mouse.up();
+    await expect(page.getByRole('complementary', { name: 'Orders API' })).toBeVisible();
+    await page.waitForTimeout(500);
+    expect(await x('web')).toBe(web);
+  });
+});
