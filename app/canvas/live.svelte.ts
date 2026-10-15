@@ -121,7 +121,11 @@ interface Status {
   startedAt?: string;
   /** Whether an agent session takes what the canvas sends: listening, busy or none. */
   /** `busy`: when it took what it works on. */
-  agent?: { state?: string; busy?: string };
+  agent?: {
+    state?: string;
+    busy?: string;
+    who?: { name?: string; agent?: string; agentSession?: string; cwd?: string };
+  };
   /** Changes made to boards from the terminal that this page has not made on its copy yet. */
   boardEdits?: { id: string; board: string; edit: BoardEdit; create?: true; preset?: StoredPreset }[];
   /** When `koppler refresh` last asked this page to read the stack and its board again. */

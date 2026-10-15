@@ -666,15 +666,18 @@ const COMMANDS: Command[] = [
   {
     name: 'listen',
     who: 'agent',
-    args: 'take | as <id> | stop',
+    args: 'take [--name <text>] | as <id> | stop',
     forms: [
-      ['take', 'connect this session, taking over from any other; prints its id'],
+      [
+        'take [--name <text>]',
+        'connect this session, taking over from any other; prints its id. The name shows on the canvas',
+      ],
       ['as <id>', 'listen again as that session'],
       ['stop', 'disconnect whichever session listens'],
     ],
     about: 'wait for requests from the canvas (one agent session at a time)',
     run: listen,
-    example: 'koppler listen take',
+    example: 'koppler listen take --name "Fixing the cable check"',
   },
   {
     name: 'board',

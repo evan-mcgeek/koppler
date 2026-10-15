@@ -181,21 +181,37 @@ function recipesByApp(): Record<string, object[]> {
   }
 }
 
+/** Which session is connected: what it works on, its agent and that agent's own session, and its folder. */
+interface AgentWho {
+  name?: string;
+  agent?: string;
+  agentSession?: string;
+  cwd?: string;
+}
 /** Whether an agent session takes Sends: listening now, working on one it took (for up to two hours), or none. */
-function agentState(): { state: string; since?: string | undefined; busy?: string } {
-  let listener: { pid: number | null; since?: string; busy?: string; started?: string | null } | null;
+function agentState(): { state: string; since?: string | undefined; busy?: string; who?: AgentWho } {
+  let listener:
+    ({ pid: number | null; since?: string; busy?: string; started?: string | null; cwd?: string } & AgentWho) | null;
   try {
     listener = readJson(path.join(tempDir(), 'listener.json')) as typeof listener;
   } catch {
     return { state: 'none' };
   }
   if (typeof listener !== 'object' || listener === null) return { state: 'none' };
-  if (listener.pid) return listenerPid(listener) ? { state: 'listening', since: listener.since } : { state: 'none' };
+  const { name, agent, agentSession, cwd } = listener;
+  const who = {
+    ...(name && { name }),
+    ...(agent && { agent }),
+    ...(agentSession && { agentSession }),
+    ...(cwd && { cwd }),
+  };
+  if (listener.pid)
+    return listenerPid(listener) ? { state: 'listening', since: listener.since, who } : { state: 'none' };
   // Working on what it took, until it marks a run done or failed after that: then it has finished and is not listening.
   const ended = Math.max(0, ...runs().map(run => Date.parse(run.endedAt ?? '') || 0));
   const took = Date.parse(listener.busy ?? '');
   return listener.busy && took > ended && Date.now() - took < 2 * 3600 * 1000
-    ? { state: 'busy', since: listener.since, busy: listener.busy }
+    ? { state: 'busy', since: listener.since, busy: listener.busy, who }
     : { state: 'none' };
 }
 
