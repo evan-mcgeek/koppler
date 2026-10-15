@@ -283,9 +283,25 @@ class Board {
     return squeeze(this.brief ? taken : [], this.brief ? needed : []);
   }
   #squeezed = squeeze([], []);
+  /**
+   * Every card's place and height when the zoomed-out board last moved by hand: while they stay so, what it closes up
+   * stays too, so a card let go never shifts the others. Zoomed in, or laid out anew (Arrange, undo, a card added,
+   * removed or resized), it is closed up again.
+   */
+  #held: string | null = null;
+  #shape = () =>
+    [...this.nodes, ...this.infra]
+      .map(
+        ({ id, position, measured }) =>
+          `${id} ${String(position.x)} ${String(position.y)} ${String(measured?.height ?? 0)}`,
+      )
+      .join('|');
   /** While a card is dragged the board holds still around it, so it stays under the pointer. */
   squeezed = $derived.by(() => {
+    const shape = this.#shape();
     if ([...this.nodes, ...this.infra].some(card => card.dragging)) return this.#squeezed;
+    if (this.brief && this.#held === shape) return this.#squeezed;
+    this.#held = null;
     this.#squeezed = this.#squeeze();
     return this.#squeezed;
   });
@@ -296,6 +312,8 @@ class Board {
   dropped(id: string, at: Point): Point {
     const inset = this.#insets.get(id) ?? 0;
     let y = this.squeezed.back(at.y) - inset;
+    // Zoomed out, the board holds still after a drop: the place is read off it as it is.
+    if (this.brief) return { x: at.x, y };
     for (let tries = 0; tries < 4; tries++)
       y = this.#squeeze((one, kept) => (one === id ? y : kept.y)).back(at.y) - inset;
     return { x: at.x, y };
@@ -853,6 +871,7 @@ class Board {
     }
     this.nodes = apps;
     this.infra = infra;
+    if (this.brief && drawn.some(node => node.dragging || kept.get(node.id)?.dragging)) this.#held = this.#shape();
     return Object.keys(grew).length > 0;
   }
 
