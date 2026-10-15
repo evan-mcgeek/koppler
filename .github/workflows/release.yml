@@ -1,0 +1,56 @@
+name: Release
+
+# A version tag (v0.0.2, made by `npm version` in app/) publishes that version to npm as `latest`, with provenance,
+# and makes its GitHub Release. npm trusts this workflow (trusted publishing); until it is set up for the package, an
+# NPM_TOKEN secret (a granular token) is used instead.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  checks:
+    uses: ./.github/workflows/app.yml
+
+  publish:
+    name: Publish
+    needs: checks
+    runs-on: ubuntu-latest
+    environment: npm
+    permissions:
+      contents: write
+      id-token: write
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          # npm 11, which publishes through trusted publishing.
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - run: npm ci
+      - name: The tag is the package's version
+        run: |
+          version="v$(node -p "require('./package.json').version")"
+          if [ "$version" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::tag $GITHUB_REF_NAME, but package.json says $version"
+            exit 1
+          fi
+      - name: Publish to npm
+        run: npm publish --provenance --access public --tag latest
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - name: GitHub Release
+        run: gh release create "$GITHUB_REF_NAME" --verify-tag --generate-notes --title "Koppler ${GITHUB_REF_NAME#v}"
+        env:
+          GH_TOKEN: ${{ github.token }}
