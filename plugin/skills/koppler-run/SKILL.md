@@ -7,8 +7,9 @@ description: Use when the user wants to connect this Claude Code session to the 
 
 ## Talking to the user on the canvas
 
-When a run started from the canvas needs the user (a decision, something only they can do) or has finished or failed, also put it on the canvas, so it is seen there and not only in the chat:
-`koppler say` with JSON on stdin: `{ "kind": "question" | "result" | "failure", "run": "<data.id of the run>", "title", "summary", "sections": [{ "title", "items": [...], "commands": [...] }], "choices": [{ "id", "label", "detail" }] }`.
+While this session is connected to the canvas (see Connect), anything that needs the user (a decision, something only they can do) and any finished or failed work goes on the canvas too, whether it started from the canvas or from the chat, so it is seen there and not only in the chat.
+When it is about a run, give its id; otherwise leave `run` out:
+`koppler say` with JSON on stdin: `{ "kind": "question" | "result" | "failure", "run"?: "<data.id of the run>", "title", "summary", "sections": [{ "title", "items": [...], "commands": [...] }], "choices": [{ "id", "label", "detail" }] }`.
 Put anything the user has to run in a section's `commands`, never in `items`: the canvas shows each command in a box with a Copy button.
 Short plain sentences; no Markdown, it is shown as text. The same question also goes in your chat reply.
 An answer from the canvas arrives as a `koppler-reply` prompt (`data.message`, `data.choice` and its `label`, or `data.text`): act on it like the user's own reply. If the user answers in the chat instead, run `koppler say --answered <message id>` so the canvas stops asking.
