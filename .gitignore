@@ -12,3 +12,5 @@ dist/
 dist.next/
 dist.previous/
 /app/skills/
+/app/README.md
+/app/LICENSE
