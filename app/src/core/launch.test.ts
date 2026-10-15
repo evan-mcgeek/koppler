@@ -78,8 +78,30 @@ test(".NET: without a -LOCAL profile, the base profile's settings go in minus wh
     'ASPNETCORE_URLS=http://localhost:58000',
     ...['dotnet', 'run', '--project', 'src/Api', '--no-launch-profile'],
   ]);
-  // No profile named after the environment: the stack's baseProfile is used.
-  expect(command(startCommand(app, { repo: '/r', env: 'qa', profiles })).at(-1)).toBe('DEV');
+  // No profile named after the environment: the stack's baseProfile is used, its AWS_PROFILE replaced too.
+  expect(command(startCommand(app, { repo: '/r', env: 'qa', profiles }))).toEqual([
+    'env',
+    'AWS_PROFILE=acct-prod-ops',
+    ...['dotnet', 'run', '--project', 'src/Api', '--no-launch-profile'],
+  ]);
+});
+
+test(".NET: a profile whose AWS_PROFILE is not the app's sign-in is passed with the sign-in, even with nothing hidden", () => {
+  const app: App = { ...api, url: 'http://localhost:5001', prereqs: [{ sso: 'acme-dev-ops' }] };
+  const profiles = {
+    QA: { environmentVariables: { AWS_PROFILE: 'dev', ASPNETCORE_ENVIRONMENT: 'QA' } },
+    'QA-LOCAL': { environmentVariables: { AWS_PROFILE: 'mine' } },
+  };
+  expect(command(startCommand(app, { repo: '/r', env: 'qa', profiles: { QA: profiles.QA } }))).toEqual([
+    'env',
+    'AWS_PROFILE=acme-dev-ops',
+    'ASPNETCORE_ENVIRONMENT=QA',
+    ...['dotnet', 'run', '--project', 'src/Api', '--no-launch-profile'],
+  ]);
+  // Already the sign-in, or the user's own -LOCAL profile: the profile is used as it is.
+  const same = { QA: { environmentVariables: { AWS_PROFILE: 'acme-dev-ops' } } };
+  expect(command(startCommand(app, { repo: '/r', env: 'qa', profiles: same })).at(-1)).toBe('QA');
+  expect(command(startCommand(app, { repo: '/r', env: 'qa', profiles })).at(-1)).toBe('QA-LOCAL');
 });
 
 test('.NET: a setting passed for this start wins over the profile', () => {
