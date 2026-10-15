@@ -731,8 +731,14 @@
   .short .marks i {
     transform: scale(1.4);
   }
+  /* Short, the row is a summary: its words keep one line, and the row itself opens the steps. */
   .short .chev {
-    font-size: 14px;
+    display: none;
+  }
+  .short .text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   .short .where {
     font-size: 16px;
@@ -746,7 +752,7 @@
   .reading.far .progress {
     font-size: 24px;
   }
-  .reading.far :is(.glance, .where, .chev) {
+  .reading.far :is(.glance, .where) {
     display: none;
   }
   .glance .off {
