@@ -154,7 +154,18 @@
       for (const one of edits.filter(one => !made[one.id])) {
         made[one.id] = true;
         const name = board.nameOf;
-        if (board.edit(one.board, one.edit, one.create))
+        if (one.preset) {
+          const out = board.importBoards(
+            one.preset,
+            typeof one.preset['source'] === 'string' ? one.preset['source'] : one.board,
+          );
+          toasts.show(
+            out.error === undefined
+              ? `Opened ${one.board} from the terminal.`
+              : `Cannot open ${one.board}. ${out.error}`,
+            out.error === undefined ? 'message' : 'warning',
+          );
+        } else if (board.edit(one.board, one.edit, one.create))
           toasts.show(
             one.create
               ? `The agent made a board, ${one.board}.`

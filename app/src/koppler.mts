@@ -665,6 +665,10 @@ const COMMANDS: Command[] = [
         'ask the user first, in the canvas inbox; nothing changes until they say yes',
       ],
       ['share "<name>"', "propose one of your boards to the team: a pull request on the stack's repo on GitHub"],
+      [
+        'open <file or link> [--no-open]',
+        'open a board from a file or a GitHub link: it joins your boards and the canvas shows it; Reload reads it again',
+      ],
     ],
     about: 'make, change or share a board, even one open on the canvas, which shows the change',
     run: boardCommand,

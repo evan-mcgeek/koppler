@@ -21,6 +21,11 @@
   let hint = $state({ text: OPEN_HINT, warn: false });
   let busy = $state(false);
   const mine = $derived(board.own.some(one => one.name === board.name));
+  /** A board opened from a link or a file, read again from there: it replaces the one kept, and opens. */
+  const reload = async (from: string, name: string) => {
+    const why = await openLink(from);
+    toasts.show(why ? `Cannot reload ${name}. ${why}` : `Reloaded ${name} from ${from}.`, why ? 'warning' : 'message');
+  };
   const shared = $derived(!mine && board.team.some(one => one.name === board.name));
   const label = $derived(
     board.name ?? (board.scratch && board.nodes[0] ? `${board.nodes[0].data.name} alone` : 'New board'),
@@ -179,6 +184,16 @@
         >
           <span class="name">{preset.name}</span><span class="meta">{size(preset)}</span>
         </button>
+        {#if group === board.own && typeof preset['source'] === 'string' && /^(https?:|\/)/.test(preset['source'])}
+          {@const from = preset['source']}
+          <button
+            class="act"
+            type="button"
+            aria-label="Reload {preset.name}"
+            title="Read it again from {from}"
+            onclick={() => void reload(from, preset.name)}>Reload</button
+          >
+        {/if}
         {#if group === board.own}
           <button
             class="act"

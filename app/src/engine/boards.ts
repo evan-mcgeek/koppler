@@ -1,6 +1,9 @@
 // Changing a board from the terminal. The change goes into state.json at once, and waits in board-edits.json for an
 // open canvas to make it on its own copy too, so the canvas shows it and never saves its older copy over it.
-import { describeEdit, editPreset, VERSION, type BoardEdit, type StoredPreset } from '../core/presets.ts';
+import path from 'node:path';
+import { describeEdit, editPreset, migrate, VERSION, type BoardEdit, type StoredPreset } from '../core/presets.ts';
+import { canvas } from '../cli/running.ts';
+import { fetchPresets } from '../server/sanitize.ts';
 import type { Edge } from '../core/plan.ts';
 import { readClones, readData, readStack, writeData } from '../data.ts';
 import { fail } from '../failure.ts';
@@ -17,6 +20,8 @@ export interface QueuedEdit {
   edit: BoardEdit;
   /** A board made from the terminal: a canvas that does not have it starts it empty. */
   create?: true;
+  /** A board opened from a file or a link: an open canvas takes it whole. */
+  preset?: StoredPreset;
 }
 
 const queued = () => (readData('board-edits')?.['edits'] ?? []) as QueuedEdit[];
@@ -32,7 +37,7 @@ export function editDone(id: unknown): void {
 
 const CHANGES =
   '[--propose] [--add <app,...>] [--remove <app,...>] [--cable <caller>:<callee>]... [--uncable <caller>:<callee>]... [--branch <app>=<branch>]... [--note <app>="<note>"]... [--arrange]';
-const USAGE = `usage: koppler board new "<name>" ${CHANGES}\n       koppler board edit "<name>" ${CHANGES}\n       koppler board share "<name>"`;
+const USAGE = `usage: koppler board new "<name>" ${CHANGES}\n       koppler board edit "<name>" ${CHANGES}\n       koppler board share "<name>"\n       koppler board open <file or link>`;
 
 /** Your own board, by name, as kept for this stack. */
 const ownBoard = (name: string): StoredPreset | undefined => {
@@ -56,6 +61,7 @@ async function share(name: string): Promise<void> {
 export function boardCommand(args: string[]): void | Promise<void> {
   const [what, name] = args;
   if (what === 'share' && name && !name.startsWith('-')) return share(name);
+  if (what === 'open' && name && !name.startsWith('-')) return openBoard(name, args.includes('--no-open'));
   if ((what !== 'edit' && what !== 'new') || !name?.trim() || name.startsWith('-')) fail(USAGE);
   const create = what === 'new';
   const values = (flag: string) => args.filter((_, at) => args[at - 1] === flag);
@@ -83,6 +89,42 @@ export function boardCommand(args: string[]): void | Promise<void> {
     ...(args.includes('--arrange') && { arrange: true }),
   };
   for (const line of changeBoard(name, edit, create, args.includes('--propose'))) console.log(line);
+}
+
+/**
+ * `koppler board open <file or link>`: a board from a file here or a link on GitHub joins your boards, and the canvas
+ * opens on it. It remembers where it came from, so the canvas can read it again (Reload).
+ */
+async function openBoard(where: string, quiet: boolean): Promise<void> {
+  const source = /^https?:\/\//.test(where) ? where : path.resolve(where);
+  if (!/^https?:/.test(source) && !source.endsWith('.json')) fail(`${where}: a board file is a .json file`);
+  const read = await fetchPresets(source);
+  if (read.error !== undefined) fail(read.error);
+  const [first] = read.presets;
+  const checked = first && migrate(first);
+  if (!first || !checked || checked.error !== undefined) fail(checked?.error ?? 'No board found in it.');
+  // Kept as the plain board it was read as.
+  const board = JSON.parse(JSON.stringify({ ...first, name: first.name.trim().slice(0, 80), source })) as StoredPreset;
+  const state = readData('state') ?? {};
+  const own = (state['presets'] ?? []) as StoredPreset[];
+  writeData('state', { ...state, presets: [...own.filter(one => one.name !== board.name), board] });
+  const now = Date.now();
+  writeData('board-edits', {
+    edits: [
+      ...queued().filter(one => now - Date.parse(one.at) < DAY),
+      {
+        id: now.toString(36) + Math.random().toString(36).slice(2, 8),
+        at: new Date(now).toISOString(),
+        stack: currentStack(),
+        board: board.name,
+        edit: {},
+        preset: board,
+      },
+    ],
+  });
+  console.log(`OPENED ${board.name} from ${source}`);
+  if (quiet) console.log(`An open canvas shows it; or: koppler canvas --board "${board.name}"`);
+  else await canvas(['--board', board.name]);
 }
 
 /** A change an agent proposed, waiting for the user's answer in the inbox. */

@@ -1,7 +1,7 @@
 // What is running right now: the status the server puts together every second and a half, and what it says about
 // the cards of the board on screen.
 import type { BoardInput } from '../src/core/plan.ts';
-import type { BoardEdit } from '../src/core/presets.ts';
+import type { BoardEdit, StoredPreset } from '../src/core/presets.ts';
 import { board } from './board.svelte.ts';
 
 export interface Step {
@@ -123,7 +123,7 @@ interface Status {
   /** `busy`: when it took what it works on. */
   agent?: { state?: string; busy?: string };
   /** Changes made to boards from the terminal that this page has not made on its copy yet. */
-  boardEdits?: { id: string; board: string; edit: BoardEdit; create?: true }[];
+  boardEdits?: { id: string; board: string; edit: BoardEdit; create?: true; preset?: StoredPreset }[];
   /** When `koppler refresh` last asked this page to read the stack and its board again. */
   refresh?: string | null;
   /** The stack's fields locked on this Mac, as paths. */

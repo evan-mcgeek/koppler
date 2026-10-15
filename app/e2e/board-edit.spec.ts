@@ -166,3 +166,26 @@ test('a proposed change waits for a yes in the inbox: accepted it is made, decli
   await expect(card(page, 'web')).toBeVisible();
   expect(Object.keys(state(canvas.temp).presets[0]?.nodes ?? {})).toContain('web');
 });
+
+test('a board opened from a file in the terminal shows on the canvas, and Reload reads the file again', async ({
+  page,
+  canvas,
+}) => {
+  await expect(card(page, 'web')).toBeVisible();
+  const file = path.join(canvas.dir, 'payments.json');
+  const write = (nodes: Record<string, unknown>) => {
+    fs.writeFileSync(file, JSON.stringify({ name: 'Payments flow', version: 1, nodes, edges: [] }));
+  };
+  write({ orders: { run: 'cli' } });
+  koppler(canvas, 'board', 'open', file, '--no-open');
+  await expect(page.getByRole('status').filter({ hasText: 'Opened Payments flow from the terminal.' })).toBeVisible();
+  await expect(page.getByRole('button', { name: /^Board: Payments flow/ })).toBeVisible();
+  await expect(card(page, 'web')).toHaveCount(0);
+  await expect(card(page, 'orders')).toBeVisible();
+
+  write({ orders: { run: 'cli' }, payments: { run: 'cli' } });
+  await page.getByRole('button', { name: /^Board: Payments flow/ }).click();
+  await page.getByRole('button', { name: 'Reload Payments flow' }).click();
+  await expect(card(page, 'payments')).toBeVisible();
+  await expect(page.getByRole('status').filter({ hasText: 'Reloaded Payments flow' })).toBeVisible();
+});
