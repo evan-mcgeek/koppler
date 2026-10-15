@@ -623,7 +623,10 @@ class Board {
       let bottom = -Infinity;
       const moved: Record<string, number> = {};
       for (const card of under) {
-        const y = Math.max(card.position.y, bottom, own.has(card.id) ? app + TUNNEL.gap / 2 : -Infinity);
+        // One that has to move gets the usual half gap; one merely close stays where it is.
+        const floor = own.has(card.id) ? app + TUNNEL.gap / 2 : -Infinity;
+        const y =
+          card.position.y >= Math.max(bottom, floor) ? card.position.y : Math.max(bottom + TUNNEL.gap / 2, floor);
         if (y !== card.position.y) moved[card.id] = y;
         // The next one moves only where it would overlap this one: a stack keeps its own spacing.
         bottom = y + (this.infraBoxes.get(card.id)?.h ?? TUNNEL.h);
