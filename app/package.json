@@ -1,6 +1,6 @@
 {
   "name": "koppler",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "Run the part of your stack you need locally, wired together, while the rest keeps calling a deployed environment.",
   "license": "MIT",
   "author": "Ivan Yanowsky",
