@@ -101,13 +101,18 @@ test('The test on a cable follows the whole path, and only ever tries this Mac\'
       api: { name: 'Orders', kind: 'dotnet', url: 'http://localhost:5001', secrets: [{ env: 'ConnectionStrings__DB', type: 'postgres' }], prereqs: [{ hosts: 'cache.acme.internal' }] },
       web: { name: 'Shop', kind: 'dotnet', consumes: { api: { how: 'env', env: ['OrdersUrl'] }, far: { how: 'edit' } } }, far: { name: 'Far', url: 'https://orders.acme.test' }, bare: { name: 'Bare' } } };
     const tried = [], probe = (over = {}) => ({ answers: async u => (tried.push(u.host), { status: 404, ms: 7 }), opens: async () => true, speaks: async () => true, leadsHere: async () => true, login: async () => ({ ok: true }),
-      profile: () => ({ name: 'QA-LOCAL', env: { OrdersUrl: 'http://localhost:5001/' } }), ...over });
+      profile: () => ({ name: 'QA-LOCAL', env: { OrdersUrl: 'http://localhost:5001/' } }), started: () => null, ...over });
     const t = async (body, over) => { const r = await cableTest(reg, body, probe(over)); return r.unsure ? `${r.text}?` : r.text; };
     // An app cable: the callee answers and the caller's local profile points at it.
     assert.deepEqual(await cableTest(reg, { env: 'qa', from: 'web', to: 'api' }, probe()), { ok: true, text: 'Answers, 7 ms', detail: "Orders answers on localhost:5001 (HTTP 404), and Shop's QA-LOCAL profile points at it." });
     assert.equal(await t({ from: 'web', to: 'api' }, { profile: () => ({ name: 'QA-LOCAL', env: { OrdersUrl: 'http://localhost:9/' } }) }), 'Not pointed at it');
     assert.equal(await t({ from: 'web', to: 'api' }, { profile: () => ({ name: 'QA-LOCAL', env: {} }) }), 'Not pointed at it');
     assert.equal(await t({ from: 'web', to: 'api' }, { profile: () => ({ name: 'QA-LOCAL', env: null }) }), 'Not pointed at it');
+    // Started by Koppler with the address as a setting, it calls the local app whatever its profiles say.
+    assert.deepEqual(await cableTest(reg, { env: 'qa', from: 'web', to: 'api' }, probe({ profile: () => ({ name: 'QA-LOCAL', env: null }), started: () => ({ OrdersUrl: 'http://localhost:5001/' }) })), { ok: true, text: 'Answers, 7 ms', detail: 'Orders answers on localhost:5001 (HTTP 404), and Shop was started with OrdersUrl pointing at it.' });
+    assert.equal(await t({ from: 'web', to: 'api' }, { started: () => ({ OrdersUrl: 'http://localhost:9/' }) }), 'Not pointed at it');
+    // Started without it (in the IDE, or before the cable), its profile still decides.
+    assert.equal(await t({ from: 'web', to: 'api' }, { profile: () => ({ name: 'QA-LOCAL', env: null }), started: () => ({}) }), 'Not pointed at it');
     assert.match((await cableTest(reg, { from: 'bare', to: 'api' }, probe())).detail, /could not be checked here/);
     // A setting written after the caller started has not been picked up yet.
     assert.equal(await t({ from: 'web', to: 'api' }, { profile: () => ({ name: 'QA-LOCAL', env: { OrdersUrl: 'http://localhost:5001/' }, changed: 200, started: 100 }) }), 'Restart needed');
