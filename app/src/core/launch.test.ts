@@ -99,7 +99,7 @@ test('.NET: opened to the network, it listens on its http port', () => {
   expect(startCommand(api, { repo: '/r', profiles: { QA: {} }, lan: true }).error).toMatch(/no http address/);
 });
 
-test('Flutter: build, install and launch on the device, then follow its log; stopping closes the app', () => {
+test('Flutter: run on the device and stay, its output the log, for hot reload; stopping closes the app', () => {
   const app: App = {
     kind: 'flutter',
     flutter: { fvm: true, flavor: true, defineFile: '.env_{env}.json' },
@@ -108,7 +108,17 @@ test('Flutter: build, install and launch on the device, then follow its log; sto
   const ios = startCommand(app, { repo: '/m', env: 'qa', device: { id: 'SIM-1', platform: 'ios' } });
   expect(command(ios).slice(0, 2)).toEqual(['sh', '-c']);
   expect(script(ios)).toBe(
-    'fvm flutter run --no-resident --flavor qa --dart-define-from-file=.env_qa.json -d SIM-1 && exec fvm flutter logs -d SIM-1',
+    'tail -f /dev/null | fvm flutter run --flavor qa --dart-define-from-file=.env_qa.json -d SIM-1',
+  );
+  // It stays, with its process id kept for hot reload.
+  const kept = startCommand(app, {
+    repo: '/m',
+    env: 'qa',
+    flutterPid: '/t/flutter-app.pid',
+    device: { id: 'SIM-1', platform: 'ios' },
+  });
+  expect(script(kept)).toBe(
+    'tail -f /dev/null | fvm flutter run --pid-file /t/flutter-app.pid --flavor qa --dart-define-from-file=.env_qa.json -d SIM-1',
   );
   expect(ios.onStop).toEqual([['xcrun', 'simctl', 'terminate', 'SIM-1', 'com.acme.app']]);
   const android = startCommand(app, { repo: '/m', env: 'prod', device: { id: 'emulator-5554', platform: 'android' } });
@@ -116,7 +126,7 @@ test('Flutter: build, install and launch on the device, then follow its log; sto
   expect(startCommand(app, { repo: '/m', env: 'qa' }).error).toMatch(/needs a device/);
   // A device id is one shell word whatever it holds.
   const odd = startCommand({ kind: 'flutter' }, { repo: '/m', env: 'qa', device: { id: "it's", platform: 'ios' } });
-  expect(script(odd)).toBe("flutter run --no-resident -d 'it'\\''s' && exec flutter logs -d 'it'\\''s'");
+  expect(script(odd)).toBe("tail -f /dev/null | flutter run -d 'it'\\''s'");
 });
 
 test("Node: the stack's script, else dev, else start", () => {

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Zap from '@lucide/svelte/icons/zap';
   import Waypoints from '@lucide/svelte/icons/waypoints';
   import RefreshCw from '@lucide/svelte/icons/refresh-cw';
   import Check from '@lucide/svelte/icons/check';
@@ -19,6 +20,7 @@
   import { COMMAND_ICON, openTerminal, runCommand } from './commands.ts';
   import SquareTerminal from '@lucide/svelte/icons/square-terminal';
   import { toasts } from './toast.svelte.ts';
+  import { post } from './data.ts';
   import { live, progress, STATE_NAMES } from './live.svelte.ts';
   import { logs } from './logs.svelte.ts';
   import { runs } from './run.svelte.ts';
@@ -83,6 +85,12 @@
   const up = $derived(live.up(id));
   const where = $derived(live.where(id));
   const now = $derived(live.state(id));
+  /** Hot reload, or hot restart, through the canvas server: the toast says how it went. */
+  const reload = async (restart: boolean) => {
+    const said = await post<{ said: string }>('reload', { app: id, restart });
+    if ('error' in said) toasts.show(said.error, 'warning');
+    else toasts.show(`${said.said}.`);
+  };
   const stateSaid = $derived(live.stateSaid(id));
   const steps = $derived(live.steps(id));
   const [tone, said] = $derived(steps.length ? progress(steps) : ['todo', '']);
@@ -203,6 +211,16 @@
       >
         <Icon of={Waypoints} size={15} />
       </a>
+    {/if}
+    {#if app?.kind === 'flutter' && data.run === 'cli' && up}
+      <button
+        type="button"
+        aria-label="Hot reload {data.name}"
+        title="Hot reload: the app takes your code changes as it runs. Shift-click to hot restart."
+        onclick={ev => void reload(ev.shiftKey)}
+      >
+        <Icon of={Zap} size={15} />
+      </button>
     {/if}
     {#if app?.cloned && !app.outside}
       <button

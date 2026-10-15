@@ -29,6 +29,8 @@ export interface AppStart {
   once?: Once;
 }
 
+/** Where a Flutter app's `flutter run` keeps its process id: hot reload signals it. */
+export const flutterPid = (id: string): string => path.join(tempDir(), `flutter-${id}.pid`);
 /** The file a run writes for a Lambda: the keys of its secret that point at local apps. */
 export const lambdaOverrides = (id: string): string => path.join(tempDir(), `lambda-${id}.json`);
 
@@ -80,6 +82,7 @@ function contextFor(
     id,
     engine: CODE,
     lambdaOverrides: lambdaOverrides(id),
+    flutterPid: flutterPid(id),
     override: Object.keys(options.setEnv ?? {}),
     envNames: [env, ...aliases],
   };

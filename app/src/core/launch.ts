@@ -35,6 +35,8 @@ export interface StartContext {
   device?: (Device & { id: string }) | null | undefined;
   /** Where a run keeps what a Lambda's secret holds for this start: local addresses of the apps it calls. */
   lambdaOverrides?: string;
+  /** Where a Flutter app's `flutter run` writes its process id, for hot reload. */
+  flutterPid?: string;
   /** The stack, for the kinds it adds. */
   stack?: { kinds?: unknown };
   platform?: string | undefined;
@@ -127,15 +129,14 @@ function startFlutter(app: App, ctx: StartContext): Start {
   const run = [
     ...flutter,
     'run',
-    '--no-resident',
+    ...(ctx.flutterPid ? ['--pid-file', ctx.flutterPid] : []),
     ...(app.flutter?.flavor ? ['--flavor', env] : []),
     ...(defines ? [`--dart-define-from-file=${defines}`] : []),
     '-d',
     device.id,
   ];
-  // `flutter run --no-resident` builds, installs and launches, then exits; `flutter logs` keeps the app's output.
-  const logs = [...flutter, 'logs', '-d', device.id];
-  const script = `${run.map(quote).join(' ')} && exec ${logs.map(quote).join(' ')}`;
+  // `flutter run` stays, its output the app's log, for hot reload: its input is held open, or it would end at once.
+  const script = `tail -f /dev/null | ${run.map(quote).join(' ')}`;
   const { iosBundleId, androidPackage } = app.mobile ?? {};
   // The app outlives the process that started it: stopping closes it on the device.
   const onStop =

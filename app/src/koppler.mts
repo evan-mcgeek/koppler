@@ -44,6 +44,7 @@ import { agentCommand } from './cli/agent.ts';
 import { doCommand } from './engine/app-commands.ts';
 import { watchCommand } from './engine/watch.ts';
 import { shellCommand } from './cli/shell.ts';
+import { reloadCommand } from './engine/reload.ts';
 import { tracesCommand } from './engine/traces.ts';
 import { checkStackFile, proposeStack, stackSchema } from './engine/stack-share.ts';
 import { wire } from './engine/wire.ts';
@@ -508,6 +509,14 @@ const COMMANDS: Command[] = [
     ],
     run: history,
     example: 'koppler history',
+  },
+  {
+    name: 'reload',
+    who: 'you',
+    args: '<app> [--restart]',
+    about: 'hot reload a Flutter app Koppler runs; --restart hot restarts it',
+    run: reloadCommand,
+    example: 'koppler reload mobile-app',
   },
   {
     name: 'shell',
