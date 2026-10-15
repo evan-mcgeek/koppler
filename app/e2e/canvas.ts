@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import net, { type AddressInfo } from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { test as base, expect, type Page } from '@playwright/test';
 
@@ -126,8 +126,16 @@ export const test = base.extend<{
     });
     write('repos', { roots: [dir], stack: stack.name, repos: [] });
     if (board) write('state', board);
+    // A Run confirmed in a test is carried out for real: the tools that reach real infrastructure fail as if missing.
+    const bin = path.join(dir, 'bin');
+    fs.mkdirSync(bin);
+    for (const tool of ['cloudflared', 'docker', 'aws', 'ssh'])
+      fs.writeFileSync(path.join(bin, tool), `#!/bin/sh\necho "${tool}: not run in tests" >&2\nexit 127\n`, {
+        mode: 0o755,
+      });
     const env = {
       ...process.env,
+      PATH: `${bin}:${process.env['PATH'] ?? ''}`,
       KOPPLER_STATE: path.join(dir, 'state'),
       KOPPLER_TEMP: temp,
       KOPPLER_LOGS: path.join(dir, 'state', 'logs'),
@@ -149,6 +157,12 @@ export const test = base.extend<{
       await use({ url: fs.readFileSync(urlFile, 'utf8').trim(), dir, temp });
     } finally {
       server.kill();
+      // What a test's run started is detached from the server: stopped here, so none outlives the test.
+      spawnSync(process.execPath, [path.join(here, '..', 'dist', 'koppler.mjs'), 'stop', '--all', '--yes'], {
+        env,
+        stdio: 'ignore',
+        timeout: 20_000,
+      });
       fs.rmSync(dir, { recursive: true, force: true });
     }
   },
