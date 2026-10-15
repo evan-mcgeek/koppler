@@ -93,3 +93,37 @@ test.describe('in Live', () => {
     await page.screenshot({ path: 'test-results/next-live-arranged.png' });
   });
 });
+
+test.describe('zoomed out, moving a card by hand', () => {
+  test.use({
+    board: {
+      env: 'qa',
+      mode: 'auto',
+      zoom: 0.5,
+      pan: { x: 560, y: 200 },
+      nodes: { web: at(0, 0, 300), orders: at(380, 120, 420) },
+      edges: [{ from: 'web', to: 'orders', fromSide: 'right', toSide: 'left' }],
+    },
+  });
+
+  test('leaves the other cards where they are, drop after drop, and each card stays where it was let go', async ({
+    page,
+  }) => {
+    await expect(card(page, 'orders')).toBeVisible();
+    const y = async (id: string) => Math.round((await box(page, id)).y);
+    const orders = await y('orders');
+    for (const by of [30, 30, 30, -40, -40, -40, -40]) {
+      const head = await card(page, 'web').locator('header').boundingBox();
+      if (!head) throw new Error('web has no header');
+      const from = { x: head.x + 40, y: head.y + head.height / 2 };
+      await page.mouse.move(from.x, from.y);
+      await page.mouse.down();
+      await page.mouse.move(from.x, from.y + by, { steps: 6 });
+      const held = await y('web');
+      await page.mouse.up();
+      await page.waitForTimeout(300);
+      expect(await y('web')).toBe(held);
+      expect(await y('orders')).toBe(orders);
+    }
+  });
+});
