@@ -105,7 +105,7 @@ Zoomed out below 60%, cards are short in Edit too: pick one and its fields open 
 | `E` / `L` | Edit view, Live view |
 | `P`, then `Esc` | Present, and back |
 | `F` | Fit the board in the window |
-| `V` / `H`, or hold `Space` | Select by dragging, or move around |
+| `V` / `H`, or hold `Space` | Select by dragging, or move around: while moving around, a click or drag never picks, lets go of or moves a card |
 | `Ctrl+Z` / `Shift+Ctrl+Z` (`Cmd` on a Mac) | Undo, redo |
 | `Tab`, arrows | Move between cards, and move the picked card |
 | `Delete` | Take the picked cards off the board |

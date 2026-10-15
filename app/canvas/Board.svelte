@@ -121,6 +121,13 @@
   });
   /** What a drag on the empty board does: select an area, or move the board. Space held moves it either way. */
   let tool = $state<'select' | 'hand'>('select');
+  let spaceHeld = $state(false);
+  /** Moving the board: cards are neither picked, let go of nor moved, so the pick stays as it was. */
+  const panning = $derived(tool === 'hand' || spaceHeld);
+  const space = (ev: KeyboardEvent) => {
+    if (ev.code !== 'Space' || (ev.target as Element).closest('input, select, textarea, button')) return;
+    spaceHeld = ev.type === 'keydown';
+  };
   const TOOLS = [
     ['select', 'Select (V): drag on the board to select an area', MousePointer2],
     ['hand', 'Hand (H): drag to move around. Or hold Space while dragging', Hand],
@@ -382,9 +389,14 @@
 <svelte:window
   onkeydown={(ev: KeyboardEvent) => {
     hold(ev);
+    space(ev);
     shortcut(ev);
   }}
-  onkeyup={hold}
+  onkeyup={(ev: KeyboardEvent) => {
+    hold(ev);
+    space(ev);
+  }}
+  onblur={() => (spaceHeld = false)}
   onpointermovecapture={release}
   onpointerdowncapture={(ev: PointerEvent) => (pressed = { x: ev.clientX, y: ev.clientY })}
   onpointerupcapture={() => (pressed = null)}
@@ -408,7 +420,7 @@
     const id = (ev.target as Element).matches('.svelte-flow__node')
       ? (ev.target as Element).getAttribute('data-id')
       : null;
-    if (id && ![...board.nodes, ...board.infra].find(node => node.id === id)?.selected) board.pick(id);
+    if (id && !panning && ![...board.nodes, ...board.infra].find(node => node.id === id)?.selected) board.pick(id);
   }}
 >
   <SvelteFlow
@@ -425,13 +437,14 @@
     edgeTypes={{ cable: Cable }}
     connectionMode={ConnectionMode.Loose}
     deleteKey={board.live ? null : ['Backspace', 'Delete']}
-    nodesDraggable={!board.live}
+    nodesDraggable={!board.live && !panning}
+    elementsSelectable={!panning}
     nodeDragThreshold={4}
     nodeClickDistance={4}
     panOnScroll
     panOnScrollSpeed={1}
-    panOnDrag={tool === 'hand' ? true : [1, 2]}
-    selectionOnDrag={tool === 'select'}
+    panOnDrag={panning ? true : [1, 2]}
+    selectionOnDrag={!panning}
     selectionMode={SelectionMode.Partial}
     colorMode={theme.now}
     minZoom={0.2}
