@@ -69,6 +69,7 @@ Everything else depends on your stack (the .NET SDK, Flutter, Docker, the AWS CL
 - [Secrets and safety](docs/security.md): how secrets are kept, and what an agent may and may not do.
 - [Commands](docs/commands.md): every `koppler` command.
 - [Stack format](plugin/skills/koppler-run/references/stack.md): the `stack.json` reference.
+- [Releasing](docs/releasing.md): how a version tag publishes Koppler to npm.
 
 ## Repository
 
