@@ -394,7 +394,7 @@ test('A command\'s help gives each way to call it a line of its own, also asked 
   const path = await import('node:path'), { fileURLToPath } = await import('node:url');
   const entry = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'dist', 'koppler.mjs');
   const help = spawnSync('node', [entry, 'listen', 'stop', '--help'], { encoding: 'utf8' }).stdout;
-  assert.match(help, /^usage:\n {2}koppler listen take \[--name <text>\] +connect this session/);
+  assert.match(help, /^usage:\n {2}koppler listen take +connect this session/);
   assert.match(help, /\n {2}koppler listen stop +disconnect/);
 });
 
