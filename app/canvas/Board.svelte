@@ -142,8 +142,13 @@
     else if (ev.key === 'v' || ev.key === 'V') tool = 'select';
     else if (ev.key === 'h' || ev.key === 'H') tool = 'hand';
   };
-  // The board opens where it was left; one that was never placed is fitted to the window.
-  const start = board.view ? { initialViewport: board.view } : { fitView: true, fitViewOptions: FIT };
+  // The board opens where it was left; one that was never placed is fitted to the window. An empty one is not: the
+  // fit would wait for the first card added and then move the view under the next ones.
+  const start = board.view
+    ? { initialViewport: board.view }
+    : board.nodes.length
+      ? { fitView: true, fitViewOptions: FIT }
+      : {};
   // A board left where none of its cards shows is brought back into view, once its cards have their sizes.
   let checked = false;
   $effect(() => {

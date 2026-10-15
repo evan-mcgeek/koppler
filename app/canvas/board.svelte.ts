@@ -1556,7 +1556,10 @@ class Board {
     const view = this.area();
     const from = this.toFlow({ x: view.left, y: view.top });
     const to = this.toFlow({ x: view.right, y: view.bottom });
-    const taken = [...this.boxes.values()];
+    // A card added a moment ago is not measured yet: it takes a card's usual room where it is.
+    const taken = this.nodes.map(
+      ({ id, position }) => this.boxes.get(id) ?? { ...this.shown(position, id), w: PLACE.w, h: PLACE.h },
+    );
     const free = (x: number, y: number) =>
       taken.every(
         box =>
@@ -1571,12 +1574,16 @@ class Board {
         { length: Math.max(0, Math.floor((end - size - start - 40) / 40) + 1) },
         (_, at) => start + 40 + at * 40,
       );
-    const rows = [...new Set([...taken.map(box => box.y), ...grid(from.y, to.y, PLACE.h)])].filter(
+    const ascending = (a: number, b: number) => a - b;
+    // The places beside the cards come first, whatever the view shows to their left.
+    const first = <T>(own: T[], rest: T[]) => [...new Set([...own, ...rest])];
+    const rows = first(taken.map(box => box.y).sort(ascending), grid(from.y, to.y, PLACE.h)).filter(
       y => y >= from.y && y + PLACE.h <= to.y,
     );
-    const columns = [...new Set([...taken.map(box => box.x + box.w + PLACE.gap), ...grid(from.x, to.x, PLACE.w)])]
-      .filter(x => x >= from.x && x + PLACE.w <= to.x)
-      .sort((a, b) => a - b);
+    const columns = first(
+      taken.map(box => box.x + box.w + PLACE.gap).sort(ascending),
+      grid(from.x, to.x, PLACE.w),
+    ).filter(x => x >= from.x && x + PLACE.w <= to.x);
     let spot: Point | undefined;
     for (const y of rows) {
       spot = columns.filter(x => free(x, y)).map(x => ({ x, y }))[0];
