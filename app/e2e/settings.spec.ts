@@ -227,6 +227,8 @@ test("the agent is asked to fill in an app's empty settings, leaving locked ones
   const panel = page.getByRole('dialog', { name: 'Orders API' });
   await tabOf(page, 'Deployed').click();
   await panel.getByRole('button', { name: 'Lock Deployed URL', exact: true }).click();
+  // Asked once the lock is kept, so the request knows the field is locked.
+  await expect(panel.getByRole('button', { name: 'Unlock Deployed URL', exact: true })).toBeVisible();
   await panel.getByRole('button', { name: 'Ask the agent to fill in' }).click();
   await expect(panel.getByRole('button', { name: 'Asked the agent' })).toBeDisabled();
   expect(sent).toHaveLength(1);
