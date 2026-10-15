@@ -1,6 +1,6 @@
 // The new canvas's tunnel cards: the databases and caches the board's apps reach, beside the app that leads them.
 import type { Page } from '@playwright/test';
-import { actions, at, card, expect, nextEdit, saved, test } from './canvas.ts';
+import { actions, at, card, expect, nextEdit, saved, STACK, test } from './canvas.ts';
 
 const tunnels = (page: Page) => page.locator('.svelte-flow__node-tunnel');
 test.use({
@@ -201,5 +201,56 @@ test.describe('an app whose card grows once its run shows', () => {
     const app = await card(page, 'orders').boundingBox();
     const below = await tunnel.boundingBox();
     expect((below?.y ?? 0) - ((app?.y ?? 0) + (app?.height ?? 0))).toBeGreaterThanOrEqual(16);
+  });
+});
+
+test.describe('a shared queue under an app with a tunnel, its status late, and zoomed out', () => {
+  const { orders, payments } = STACK.apps;
+  test.use({
+    stack: {
+      ...STACK,
+      queues: { 'order-events': { name: 'Order events', type: 'sqs', queue: 'order-events-qa' } },
+      apps: {
+        ...STACK.apps,
+        orders: { ...orders, publishes: { 'order-events': {} } },
+        payments: { ...payments, reads: { 'order-events': {} } },
+      },
+    },
+    board: {
+      env: 'qa',
+      mode: 'auto',
+      zoom: 0.5,
+      pan: { x: 120, y: 80 },
+      nodes: { orders: { ...at(0, 0), showQueues: true }, payments: { ...at(700, 0), showQueues: true } },
+      edges: [],
+    },
+  });
+  test('no card sits over another', async ({ page }) => {
+    await page.route('**/data/status.json', async route => {
+      await new Promise(resolve => setTimeout(resolve, 600));
+      const steps = [{ label: 'Start', state: 'done' }];
+      await route.fulfill({
+        json: {
+          live: { env: 'qa', nodes: { orders: {}, payments: {} } },
+          apps: { orders: { listening: true, steps }, payments: { listening: true, steps } },
+        },
+      });
+    });
+    await page.reload();
+    await expect(card(page, 'orders').locator('.progress')).toBeVisible();
+    await page.waitForTimeout(500);
+    const boxes = await Promise.all(
+      [card(page, 'orders'), tunnels(page).first(), page.locator('.svelte-flow__node-queue').first()].map(one =>
+        one.boundingBox(),
+      ),
+    );
+    type Box = (typeof boxes)[number] | undefined;
+    const over = (a: Box, b: Box) =>
+      !!a && !!b && a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
+    expect([over(boxes[0], boxes[1]), over(boxes[0], boxes[2]), over(boxes[1], boxes[2])]).toEqual([
+      false,
+      false,
+      false,
+    ]);
   });
 });

@@ -594,17 +594,18 @@ class Board {
   }
 
   /**
-   * The cards an app owns that hang under it stay clear of it, however it grew (its steps showing as the page filled
-   * in, a note): the first at least the usual gap under the app, the ones under it never over the one above.
+   * The cards an app leads that hang under it stay clear of it, however it grew (its steps showing as the page filled
+   * in, a note): its own at least the usual gap under it, and none over the card above it.
    */
   #clear(apps: CardNode[], cards: InfraNode[]): InfraNode[] {
     let result = cards;
     for (const { id, position, measured } of apps) {
-      const height = measured?.height;
+      // Zoomed out the card is short; the board is kept for its full size, when that is known.
+      const height = Math.max(measured?.height ?? 0, this.brief ? (this.fullHeights[id] ?? 0) : 0);
       const width = measured?.width;
       if (!height || !width) continue;
-      // Its own cards: a queue shared with other apps stays where it is put.
-      const led = new Set(this.ownedBy(id));
+      const own = new Set(this.ownedBy(id));
+      const led = new Set(this.ledBy(id));
       const under = result
         .filter(card => {
           const w = this.infraBoxes.get(card.id)?.w ?? TUNNEL.w;
@@ -616,10 +617,13 @@ class Board {
           );
         })
         .sort((a, b) => a.position.y - b.position.y);
-      let bottom = position.y + height + TUNNEL.gap / 2;
+      // Its own cards keep the usual gap under it. A queue shared with other apps is not the app's to push: it only
+      // never sits on one of the app's own cards above it.
+      const app = position.y + height;
+      let bottom = -Infinity;
       const moved: Record<string, number> = {};
       for (const card of under) {
-        const y = Math.max(card.position.y, bottom);
+        const y = Math.max(card.position.y, bottom, own.has(card.id) ? app + TUNNEL.gap / 2 : -Infinity);
         if (y !== card.position.y) moved[card.id] = y;
         // The next one moves only where it would overlap this one: a stack keeps its own spacing.
         bottom = y + (this.infraBoxes.get(card.id)?.h ?? TUNNEL.h);
@@ -877,6 +881,8 @@ class Board {
     // An app the library moved (a drag, the arrow keys) takes its tunnel cards along, in the same step.
     const was = new Map(this.nodes.map(node => [node.id, node.position]));
     const grew: Record<string, { bottom: number; by: number }> = {};
+    /** Apps whose card got its size or changed it now: only that clears the cards under them. */
+    const resized: string[] = [];
     let infra = all.filter(node => node.type !== 'app');
     let apps = all.filter(node => node.type === 'app');
     for (const { id, measured } of apps) {
@@ -885,6 +891,7 @@ class Board {
       const last = this.#heights[id];
       const height = measured?.height;
       if (height) this.#heights[id] = { brief, height };
+      if (height && height !== last?.height) resized.push(id);
       // Only growing in the same form moves what is under it: a change of form is squeezed on screen instead.
       const by = settled && last?.brief === brief && height ? height - last.height : 0;
       if (by) grew[id] = { bottom: last?.height ?? 0, by };
@@ -909,7 +916,10 @@ class Board {
       if (from && (from.x !== position.x || from.y !== position.y))
         infra = this.followed(id, { x: position.x - from.x, y: position.y - from.y }, infra);
     }
-    if (!this.brief) infra = this.#clear(apps, infra);
+    infra = this.#clear(
+      apps.filter(app => resized.includes(app.id)),
+      infra,
+    );
     this.nodes = apps;
     this.infra = infra;
     if (this.brief && drawn.some(node => node.dragging || kept.get(node.id)?.dragging)) this.#held = this.#shape();
