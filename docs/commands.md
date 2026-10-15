@@ -55,6 +55,7 @@ You can run these yourself too; the agent uses them to do its part.
 | `koppler listen take \| as <id> \| stop` | Wait for requests from the canvas; one agent session at a time |
 | `koppler board new "<name>" [--add <app,...>] [--cable <caller>:<callee>]...` | Make a board of your own, with its apps and cables; an open canvas adds it to your boards |
 | `koppler board share "<name>"` | Propose one of your boards to the team: a pull request on the stack's repo on GitHub; a stack not on GitHub keeps it in its file to commit |
+| `koppler board open <file or link> [--no-open]` | Open a board from a file or a GitHub link: it joins your boards and the canvas opens on it; the board picker's Reload reads it again from there |
 | `koppler board new\|edit "<name>" ... --arrange` | Lay the board out afresh, as Arrange on the canvas does: at once when it is on screen, else when it is next opened |
 | `koppler board new\|edit "<name>" ... --propose` | Ask the user first: the change shows in the canvas inbox, and is made only when they say yes |
 | `koppler board edit "<name>" [--add <app,...>] [--remove <app,...>] [--cable <caller>:<callee>]... [--uncable <caller>:<callee>]... [--branch <app>=<branch>]... [--note <app>="<note>"]...` | Change a board, even one open on the canvas: the canvas shows the change and keeps it; cards it does not touch stay put |

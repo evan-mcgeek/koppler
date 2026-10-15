@@ -1,5 +1,7 @@
 // What the page sends is never taken as it comes: a board, a layout or a prompt keeps only its known fields, each cut
 // to size, so no endpoint can be used to write anything else.
+import fs from 'node:fs';
+import path from 'node:path';
 import { githubFile, readFile } from '../github.ts';
 import { APP_ID, RUN_ID } from '../ids.ts';
 
@@ -162,9 +164,16 @@ const MAX_PRESET_BYTES = 300 * 1024;
 export async function fetchPresets(
   link: string,
 ): Promise<{ presets: Preset[]; error?: undefined } | { error: string }> {
-  const file = githubFile(link);
-  if (!file) return { error: 'Only https links to a file on GitHub can be opened.' };
-  const body = await readFile(file);
+  // A board file on this Mac, as `koppler board open` names it: a .json file, of which only the boards are read.
+  const local = path.isAbsolute(link) && link.endsWith('.json');
+  const file = local ? null : githubFile(link);
+  if (!local && !file) return { error: 'Only https links to a file on GitHub, or a board file here, can be opened.' };
+  let body: string | null;
+  try {
+    body = local ? fs.readFileSync(link, 'utf8') : file && (await readFile(file));
+  } catch {
+    body = null;
+  }
   if (body === null || body.length > MAX_PRESET_BYTES)
     return { error: 'Could not read that file. Check the link, and that gh is signed in for a private repo.' };
   let data: unknown;
