@@ -1,11 +1,10 @@
 // What the canvas page loads: its own files, its data as JSON, the stack schema, the choices for the settings panels and
 // an app's log.
 import { runLog } from '../engine/run-logs.ts';
+import { stackSchema } from '../engine/stack-share.ts';
 import fs from 'node:fs';
 import type http from 'node:http';
 import path from 'node:path';
-import * as z from 'zod';
-import { StackSchema } from '../core/stack.ts';
 import { readClones, readData, type DataName } from '../data.ts';
 import { APP_ID } from '../ids.ts';
 import { CODE, tempDir } from '../paths.ts';
@@ -63,9 +62,7 @@ export function serveFile(what: string, url: URL, res: http.ServerResponse): voi
   }
   // The shape of a stack, for the settings panels: every field they show comes from it.
   if (what === 'data/stack-schema.json') {
-    res
-      .writeHead(200, JSON_HEADERS)
-      .end(JSON.stringify(z.toJSONSchema(StackSchema, { unrepresentable: 'any', io: 'input' })));
+    res.writeHead(200, JSON_HEADERS).end(JSON.stringify(stackSchema()));
     return;
   }
   // What the settings panels offer to pick from on this machine: names only.

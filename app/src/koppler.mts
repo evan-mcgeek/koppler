@@ -33,7 +33,7 @@ import { updateClones } from './engine/clones.ts';
 import { readIndex } from './engine/config.ts';
 import { candidateRepos } from './engine/repos.ts';
 import { addApps, addOutside, editStack, stackSource, readStackAt, removeApp } from './engine/stack-file.ts';
-import { createStack } from './engine/stacks.ts';
+import { createStack, currentStack } from './engine/stacks.ts';
 import { init as initStack, stacksCommand, sync, useCommand } from './engine/sync.ts';
 import { up } from './engine/up.ts';
 import { wait } from './cli/wait.ts';
@@ -45,6 +45,7 @@ import { doCommand } from './engine/app-commands.ts';
 import { watchCommand } from './engine/watch.ts';
 import { shellCommand } from './cli/shell.ts';
 import { tracesCommand } from './engine/traces.ts';
+import { checkStackFile, proposeStack, stackSchema } from './engine/stack-share.ts';
 import { wire } from './engine/wire.ts';
 import { APP, CODE, configDir, tempDir } from './paths.ts';
 
@@ -286,6 +287,26 @@ function add(args: string[]): void {
 /** One field of the stack in use: read it, set it or take it out, checked against the stack's rules. */
 async function stackCommand(args: string[]): Promise<void> {
   const [what, at, ...rest] = args;
+  if (what === 'schema') {
+    console.log(JSON.stringify(stackSchema(), null, 2));
+    return;
+  }
+  if (what === 'check') {
+    const file =
+      at ??
+      path.join(currentStack() ?? fail('no stack in use: give the file, koppler stack check stack.json'), 'stack.json');
+    const problems = checkStackFile(file);
+    if (problems.length)
+      fail(
+        `${file}: ${String(problems.length)} ${problems.length === 1 ? 'problem' : 'problems'}\n${problems.map(one => `  ${one}`).join('\n')}`,
+      );
+    console.log(`${file}: OK`);
+    return;
+  }
+  if (what === 'propose') {
+    await proposeStack();
+    return;
+  }
   if (what === 'get') {
     const read = readStackAt(at ?? '');
     if (read.error !== undefined) fail(read.error);
@@ -311,7 +332,9 @@ async function stackCommand(args: string[]): Promise<void> {
     return;
   }
   if ((what !== 'set' && what !== 'unset') || !at || (what === 'set' && !rest.length))
-    fail('usage: koppler stack get [<path>] | set <path> <value> | unset <path> | lock <path> | unlock <path> | locks');
+    fail(
+      'usage: koppler stack get [<path>] | set <path> <value> | unset <path> | lock <path> | unlock <path> | locks | check [<file>] | schema | propose',
+    );
   const raw = rest.join(' ');
   // Typed in a terminal, 5001 may be a port or a name: whichever keeps the stack valid, JSON first.
   const values = (() => {
@@ -677,7 +700,7 @@ const COMMANDS: Command[] = [
   {
     name: 'stack',
     who: 'agent',
-    args: 'get [<path>] | set <path> <value> | unset <path> | lock <path> | unlock <path> | locks',
+    args: 'get [<path>] | set <path> <value> | unset <path> | lock <path> | unlock <path> | locks | check [<file>] | schema | propose',
     forms: [
       ['get [<path>]', 'print a field of the stack in use, or the whole stack, as JSON'],
       ['set <path> <value>', 'set a field: text, or JSON for a number, a list or an object; checked before it is kept'],
@@ -685,6 +708,9 @@ const COMMANDS: Command[] = [
       ['lock <path>', 'keep a field as it is: no command, canvas edit or agent changes it'],
       ['unlock <path>', 'let it change again; asks you in the terminal, so an agent cannot'],
       ['locks', 'list the locked fields'],
+      ['check [<file>]', "every check the stack must pass, for the team repo's CI; fails with each problem"],
+      ['schema', "the JSON Schema of stack.json, for an editor's $schema"],
+      ['propose', "a pull request on the stack's repo with what this copy changed since its last commit"],
     ],
     about: 'read and change any field of the stack, the only way to change stack.json',
     run: stackCommand,

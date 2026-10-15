@@ -9,7 +9,7 @@ import { configDir } from '../paths.ts';
 import { readJson, writeJson } from '../json-files.ts';
 
 /** A stack file, compared key by key. */
-type StackJson = Record<string, unknown> & {
+export type StackJson = Record<string, unknown> & {
   name?: string;
   apps?: Record<string, Record<string, unknown> | undefined>;
 };
