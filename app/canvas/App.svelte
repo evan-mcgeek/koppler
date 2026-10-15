@@ -22,6 +22,7 @@
   import Menu from './Menu.svelte';
   import Rail from './Rail.svelte';
   import AddOutside from './AddOutside.svelte';
+  import CardPanel from './CardPanel.svelte';
   import SettingsPanel from './SettingsPanel.svelte';
   import Repos from './Repos.svelte';
   import Review from './Review.svelte';
@@ -465,11 +466,14 @@
       {#if found}
         {#if board.present}{:else if side}<Side />{:else}<Rail open={openSide} />{/if}
         <div class="stage">
-          <div class="board">
-            <SvelteFlowProvider>
-              <Board />
-            </SvelteFlowProvider>
-            <Toast />
+          <div class="work">
+            <div class="board">
+              <SvelteFlowProvider>
+                <Board />
+              </SvelteFlowProvider>
+              <Toast />
+            </div>
+            {#if !board.present}<CardPanel />{/if}
           </div>
           {#if !board.present}<Logs />{/if}
         </div>
@@ -728,10 +732,15 @@
     flex-direction: column;
     min-width: 0;
   }
+  .work {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+  }
   .board {
     position: relative;
     flex: 1;
-    min-height: 0;
+    min-width: 0;
   }
   .empty {
     display: grid;
