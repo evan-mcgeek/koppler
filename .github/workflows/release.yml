@@ -14,13 +14,11 @@ concurrency:
   group: release
   cancel-in-progress: false
 
+# The tag is on main, whose changes passed the App workflow in their pull requests (the release commit only bumps the
+# version): the tests are not run again here.
 jobs:
-  checks:
-    uses: ./.github/workflows/app.yml
-
   publish:
     name: Publish
-    needs: checks
     runs-on: ubuntu-latest
     environment: npm
     permissions:

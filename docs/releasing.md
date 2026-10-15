@@ -13,10 +13,9 @@ Plain `npm version` is not enough here: the package is in `app/`, not at the rep
 
 The tag starts the Release workflow (`.github/workflows/release.yml`):
 
-1. It runs every check of the App workflow (lint, types, format, build, unit, CLI and canvas tests, the package's contents).
-2. It refuses a tag that is not the version in `app/package.json`.
-3. It publishes the package with `npm publish --provenance`, so npm shows the commit and the run that built it.
-4. It makes the GitHub Release, with notes from the pull requests merged since the last one.
+1. It refuses a tag that is not the version in `app/package.json`.
+2. It publishes the package with `npm publish --provenance`, so npm shows the commit and the run that built it.
+3. It makes the GitHub Release, with notes from the pull requests merged since the last one.
 
 ## How npm trusts the workflow
 
