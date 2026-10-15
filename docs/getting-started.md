@@ -48,7 +48,7 @@ The agent chip in the toolbar shows whether an agent session is connected; you o
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="images/board-dark.png">
-  <img alt="The canvas with a board of five apps, all running" src="images/board-light.png">
+  <img alt="One feature, Checkout, worked on across four apps: the mobile app and web shop cabled to a local Orders API, which calls a local Payments API; each runs its feature/checkout branch, Orders API has a database tunnel and a local SQS queue, two apps carry a note for the agent, and everything runs" src="images/board-light.png">
 </picture>
 
 ## 5. Your first run

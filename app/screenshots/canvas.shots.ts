@@ -40,7 +40,8 @@ const stack: { queues: object; apps: Apps } & typeof STACK = {
     },
   },
 };
-const at = (x: number, y: number) => ({ x, y, run: 'cli', branch: 'main', showQueues: true });
+// One feature, worked on across the apps it touches: each runs its feature branch.
+const at = (x: number, y: number) => ({ x, y, run: 'cli', branch: 'feature/checkout', showQueues: true });
 const board = {
   env: 'qa',
   mode: 'auto',
@@ -49,9 +50,10 @@ const board = {
   nodes: {
     mobile: { ...at(0, 0), platform: 'ios' },
     web: at(0, 480),
-    orders: at(560, 200),
-    payments: at(1160, 200),
+    orders: { ...at(560, 200), note: 'Seed two test orders after it starts' },
+    payments: { ...at(1160, 200), note: 'Use the sandbox merchant account, not the live one' },
   },
+  queues: { 'order-events': 'local' },
   edges: [
     { from: 'mobile', to: 'orders', fromSide: 'right', toSide: 'left' },
     { from: 'web', to: 'orders', fromSide: 'right', toSide: 'left' },
@@ -76,9 +78,15 @@ const running = (page: Page) =>
           payments: { listening: true, steps: done },
         },
         ports: { '5432': true },
-        agent: { state: 'listening', who: { name: 'Checkout flow', agent: 'Claude Code' } },
+        agent,
       },
     }),
+  );
+const agent = { state: 'listening', who: { name: 'Checkout flow', agent: 'Claude Code' } };
+/** Nothing runs yet, and an agent session is connected. */
+const ready = (page: Page) =>
+  page.route('**/data/status.json', route =>
+    route.fulfill({ json: { live: { env: 'qa', nodes: {} }, apps: {}, agent } }),
   );
 /** Each connection check passes, as on a board that works. */
 const healthy = (page: Page) =>
@@ -114,6 +122,8 @@ test('the board, running, in the Live view', async ({ page }, info) => {
 });
 
 test('the review before a Run', async ({ page }, info) => {
+  await ready(page);
+  await page.reload();
   await settle(page);
   await page.getByRole('button', { name: 'Run', exact: true }).click();
   const review = page.getByRole('dialog');
@@ -148,13 +158,7 @@ test("an app's settings", async ({ page }, info) => {
 });
 
 test.describe('zoomed out', () => {
-  // ponytail: no tunnel or queue cards here until, zoomed out, they stop sliding under their app; back with that fix.
-  const { prereqs: _tunnel, publishes: _sends, ...orders } = stack.apps['orders'] ?? {};
-  const { reads: _reads, ...payments } = stack.apps['payments'] ?? {};
-  test.use({
-    stack: { ...stack, queues: {}, apps: { ...stack.apps, orders, payments } },
-    board: { ...board, zoom: 0.5, pan: { x: 120, y: 120 } },
-  });
+  test.use({ board: { ...board, zoom: 0.5, pan: { x: 120, y: 120 } } });
   test("a picked card's choices beside the board", async ({ page }, info) => {
     await running(page);
     await healthy(page);

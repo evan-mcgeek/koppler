@@ -11,7 +11,7 @@ It helps most when you work on one app (a mobile app, a front end, one API) and 
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/images/board-dark.png">
-  <img alt="The Koppler canvas: a mobile app and a web shop cabled to a local Orders API, which calls a local Payments API, with its database tunnel and queue; every app running" src="docs/images/board-light.png">
+  <img alt="One feature, Checkout, worked on across four apps: the mobile app and web shop cabled to a local Orders API, which calls a local Payments API; each runs its feature/checkout branch, Orders API has a database tunnel and a local SQS queue, two apps carry a note for the agent, and everything runs" src="docs/images/board-light.png">
 </picture>
 
 ## How it works
@@ -26,7 +26,7 @@ It helps most when you work on one app (a mobile app, a front end, one API) and 
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/images/review-dark.png">
-  <img alt="The review before a Run: the apps that start, with their branches, what keeps calling the deployed QA environment, and the tunnel that opens" src="docs/images/review-light.png" width="520">
+  <img alt="The review before a Run on QA: the four apps that start on feature/checkout with their notes for the agent, what keeps calling deployed QA, and the tunnel that opens" src="docs/images/review-light.png" width="520">
 </picture>
 
 ## Install
