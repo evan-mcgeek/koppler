@@ -1,7 +1,12 @@
 // The new canvas keeps the board: what is changed on it comes back after a reload, from the server's copy.
+import { spawnSync } from 'node:child_process';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import type { Page } from '@playwright/test';
 import { actions, at, card, expect, saved, test } from './canvas.ts';
 
+const entry = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'dist', 'koppler.mjs');
 const view = (page: Page) => page.locator('.svelte-flow__viewport').evaluate(el => getComputedStyle(el).transform);
 const board = {
   env: 'qa',
@@ -96,4 +101,36 @@ test('a change the server did not take is sent again, not lost', async ({ page, 
     )
     .toBe('feature/checkout');
   expect(refused).toBeGreaterThan(1);
+});
+
+test('a board made in the terminal while the canvas is open is kept when the canvas saves', async ({
+  page,
+  canvas,
+}) => {
+  await expect(card(page, 'web')).toBeVisible();
+  const env = {
+    ...process.env,
+    KOPPLER_STATE: path.join(canvas.dir, 'state'),
+    KOPPLER_TEMP: canvas.temp,
+    KOPPLER_LOGS: path.join(canvas.dir, 'state', 'logs'),
+    KOPPLER_CONFIG_DIR: path.join(canvas.dir, 'config'),
+  };
+  const made = spawnSync(process.execPath, [entry, 'board', 'new', 'Payments work', '--add', 'payments'], {
+    env,
+    encoding: 'utf8',
+  });
+  expect(made.status, made.stderr).toBe(0);
+  const names = () =>
+    (
+      JSON.parse(fs.readFileSync(path.join(canvas.temp, 'state.json'), 'utf8')) as {
+        presets?: { name: string }[];
+      }
+    ).presets?.map(one => one.name) ?? [];
+  expect(names()).toContain('Payments work');
+  // The canvas saves its board after a change of its own.
+  const kept = saved(page);
+  await page.mouse.move(700, 700);
+  await page.mouse.wheel(40, 30);
+  await kept;
+  expect(names()).toEqual(expect.arrayContaining(['Checkout', 'Payments work']));
 });
