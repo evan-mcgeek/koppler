@@ -8,7 +8,7 @@ import { showBrowserConsole } from './browser-console.ts';
 import { readClones, readStack } from '../data.ts';
 
 const USAGE =
-  'usage: koppler run <app> | koppler run <name> [--cwd <dir>] [--port <n>] [--bind <address>] [--restart] -- <command...>';
+  'usage: koppler run <app> | koppler run <name> [--cwd <dir>] [--port <n>] [--bind <address>] [--keep-alive] -- <command...>';
 const shown = (word: string) => (/\s/.test(word) ? JSON.stringify(word) : word);
 
 export async function run(args: string[], extra: Partial<RunOptions> = {}): Promise<void> {

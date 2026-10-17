@@ -640,7 +640,7 @@ const COMMANDS: Command[] = [
   {
     name: 'run',
     who: 'agent',
-    args: '<app> [--env <env>] [--device ios|android|phone|<id>] [--lan] [--no-test] [--dry-run] [--mock] | <name> [--cwd <dir>] [--port <n>] [--bind <address>] [--ready <url>] [--restart] -- <command...>',
+    args: '<app> [--env <env>] [--device ios|android|phone|<id>] [--lan] [--no-test] [--dry-run] [--mock] | <name> [--cwd <dir>] [--port <n>] [--bind <address>] [--ready <url>] [--keep-alive] -- <command...>',
     about: 'start one stack app, or any command, detached and logged',
     run: args => run(args),
     example: 'koppler run orders-api --env qa',

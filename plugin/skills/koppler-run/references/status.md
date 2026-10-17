@@ -57,7 +57,7 @@ Started through `koppler`, it keeps running across agent sessions.
 |---|---|
 | The agent or the user, through `koppler run <app> ...` | written by `koppler` |
 | The user, in the foreground of their own terminal | `bin/run-logged <app> -- <command>` |
-| The user, from an IDE: a Flutter app | `koppler run <app> --cwd <repo> --restart -- fvm flutter logs -d <device id>` copies the app's output from the simulator, emulator or phone (`fvm flutter devices` lists ids). It follows the app across restarts and shows lines only when the app prints |
+| The user, from an IDE: a Flutter app | `koppler run <app> --cwd <repo> --keep-alive -- fvm flutter logs -d <device id>` copies the app's output from the simulator, emulator or phone (`fvm flutter devices` lists ids). It follows the app across restarts and shows lines only when the app prints |
 | The user, from an IDE: anything else | none; the output stays in the IDE. The card still shows the port state and checklist |
 | A web front end's browser console | not captured yet; its dev server's output is, when started through `koppler run` |
 

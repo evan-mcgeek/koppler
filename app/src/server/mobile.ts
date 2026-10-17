@@ -127,7 +127,7 @@ function followIdeLogs(): void {
     following.set(id, ide.deviceId);
     const fvm = (stack?.apps[id]?.['flutter'] as { fvm?: unknown } | undefined)?.fvm;
     const logs = [...(fvm ? ['fvm', 'flutter'] : ['flutter']), 'logs', '-d', ide.deviceId];
-    const koppler = [path.join(CODE, 'koppler.mjs'), 'run', id, '--cwd', repo, '--restart', '--', ...logs];
+    const koppler = [path.join(CODE, 'koppler.mjs'), 'run', id, '--cwd', repo, '--keep-alive', '--', ...logs];
     execFile(process.execPath, koppler, { timeout: 30000 }, () => undefined);
   }
 }

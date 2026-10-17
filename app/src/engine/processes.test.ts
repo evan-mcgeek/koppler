@@ -3,13 +3,17 @@ import { alive, commandFor, listener, parseRun, uptime } from './processes.ts';
 
 test('what koppler run was asked for', () => {
   expect(parseRun(['mobile-api'])).toEqual({ name: 'mobile-api', command: [], restart: false });
-  expect(parseRun(['db', '--port', '5436', '--restart', '--', 'cloudflared', 'access', 'tcp'])).toEqual({
+  expect(parseRun(['db', '--port', '5436', '--keep-alive', '--', 'cloudflared', 'access', 'tcp'])).toEqual({
     name: 'db',
     command: ['cloudflared', 'access', 'tcp'],
     restart: true,
     port: 5436,
   });
   expect(parseRun(['web', '--cwd', '/tmp', '--', 'npm', 'start']).cwd).toBe('/tmp');
+  // --restart read as "restart what runs"; it kept a command alive, so it says what to use instead.
+  expect(() => parseRun(['orders-api', '--restart', '--', 'dotnet', 'run'])).toThrow(
+    '--restart is now --keep-alive: it starts the command again whenever it exits. To restart orders-api while it runs: koppler stop orders-api, then run it again',
+  );
   // What follows -- is the command, whatever it looks like.
   expect(parseRun(['a', '--', 'echo', '--restart']).command).toEqual(['echo', '--restart']);
   expect(parseRun(['api', '--env', 'prod', '--device', 'ios', '--lan', '--dry-run', '--no-test'])).toMatchObject({

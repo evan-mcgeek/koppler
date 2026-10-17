@@ -381,7 +381,7 @@ async function openTunnels(up: Up): Promise<void> {
       fail(
         `${steps.name} needs its own local address first; in your terminal:\n  ${steps.sudo.join('\n  ')}\nthen run koppler up again`,
       );
-    await run([steps.name, '--port', port, '--bind', tunnel.bind, '--restart', '--', ...steps.tunnelArgs]);
+    await run([steps.name, '--port', port, '--bind', tunnel.bind, '--keep-alive', '--', ...steps.tunnelArgs]);
   }
   for (const id of new Set(needs.map(need => need.app))) {
     const mine = needs.filter(need => need.app === id).map(need => need.what ?? need.tunnel);
