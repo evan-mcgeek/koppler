@@ -9,6 +9,7 @@ import net from 'node:net';
 import path from 'node:path';
 import tls from 'node:tls';
 import { launchProfile, type LaunchProfiles } from '../core/launch.ts';
+import { inEffect } from '../core/comments.ts';
 import { isProtected } from '../core/plan.ts';
 import type { App } from '../core/stack.ts';
 import { readClones, type Registry } from '../data.ts';
@@ -42,6 +43,8 @@ export interface Probe {
   profile: (id: string, env: string) => Profile | null;
   /** The settings Koppler started the app with, while it runs; null when it does not run as Koppler started it. */
   started: (id: string) => Record<string, string> | null;
+  /** A file in the app's clone, or null when it cannot be read. */
+  reads: (id: string, file: string) => string | null;
   login: (app: string, env: string, name: string) => Promise<{ ok?: boolean; message?: string; error?: string }>;
 }
 type Body = Record<string, unknown>;
@@ -266,6 +269,24 @@ async function testCable(
     return { ok: false, text: 'No answer', detail: `Nothing answers on ${url.host}. Start ${callee.name} first.` };
   const up = `${callee.name} answers on ${url.host} (HTTP ${String(answered.status)})`;
   const call = caller?.consumes?.[to];
+  // Pointed at it by a change in a file: a line in effect, not one commented out, has its local port.
+  if (caller && call?.how === 'edit' && call.file) {
+    const text = probe.reads(from, call.file);
+    if (text !== null) {
+      const local = new RegExp(`(localhost|127\\.0\\.0\\.1):${url.port}(?!\\d)`);
+      return local.test(inEffect(text))
+        ? {
+            ok: true,
+            text: `Answers, ${String(answered.ms)} ms`,
+            detail: `${up}, and ${call.file} points ${caller.name} at it.`,
+          }
+        : {
+            ok: false,
+            text: 'Not pointed at it',
+            detail: `${up}, but ${caller.name} is not set to call it: no line in effect in ${call.file} has ${url.host}.`,
+          };
+    }
+  }
   const settings = call?.how === 'env' && caller?.kind === 'dotnet' ? [call.env ?? []].flat() : [];
   const fine = `Answers, ${String(answered.ms)} ms`;
   // Koppler gives the caller the address when it starts it: what it was started with is what it calls.
@@ -407,6 +428,15 @@ export async function cableTest(
     speaks,
     leadsHere,
     profile: (id, env) => (loaded ? localProfile(loaded, id, env) : null),
+    reads: (id, file) => {
+      const repo = readClones()[id]?.path;
+      if (!repo) return null;
+      try {
+        return fs.readFileSync(path.join(repo, file), 'utf8');
+      } catch {
+        return null;
+      }
+    },
     started: id => {
       const record = readRecord(id);
       return record && alive(record) ? (record.start?.setEnv ?? null) : null;
