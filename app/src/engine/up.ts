@@ -17,6 +17,7 @@ import { readClones, readData, readStack, type Clone, type Registry } from '../d
 import { CODE, tempDir } from '../paths.ts';
 import { readActions, writeLogged, type Action } from './actions.ts';
 import { lambdaOverrides } from './app-start.ts';
+import { inEffect } from '../core/comments.ts';
 import { switchTo, type Carry } from './branch.ts';
 import { APPROVE, approved, missingTunnels, startsFromStack } from './checks.ts';
 import { link } from './libraries.ts';
@@ -299,7 +300,7 @@ function pointsAt(up: Up, app: string, address: string, file: string | undefined
   const repo = up.clones[app]?.path;
   if (logged || !repo || !file) return logged;
   try {
-    return has(fs.readFileSync(path.join(repo, file), 'utf8'));
+    return has(inEffect(fs.readFileSync(path.join(repo, file), 'utf8')));
   } catch {
     return false;
   }
