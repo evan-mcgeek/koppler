@@ -1,6 +1,8 @@
 // Traces across local apps: one Jaeger in Docker takes OpenTelemetry from every app Koppler starts while it runs, and
 // its trace view follows one request across the apps on the board, to where it failed.
 import { spawn } from 'node:child_process';
+import fs from 'node:fs';
+import path from 'node:path';
 import { positional } from '../cli/output.ts';
 import { fail } from '../failure.ts';
 import { alive, listener, readRecord, startProcess, stopOne } from './processes.ts';
@@ -31,6 +33,60 @@ export const traceEnv = (app: string): Record<string, string> => ({
   OTEL_SERVICE_NAME: app,
   OTEL_TRACES_EXPORTER: 'otlp',
 });
+
+const read = (file: string) => {
+  try {
+    return fs.readFileSync(file, 'utf8');
+  } catch {
+    return '';
+  }
+};
+/** A .NET project and the projects it references (a few levels), whose packages it gets too. */
+function projectFiles(project: string, depth = 3): string[] {
+  const text = read(project);
+  if (!text || depth === 0) return text ? [project] : [];
+  const refs = [...text.matchAll(/<ProjectReference\s+Include="([^"]+)"/g)].map(match =>
+    path.resolve(path.dirname(project), (match[1] ?? '').replace(/\\/g, '/')),
+  );
+  return [project, ...refs.flatMap(ref => projectFiles(ref, depth - 1))];
+}
+/**
+ * Why an app sends no traces though it is given the settings: no OpenTelemetry SDK in what it is built from. Null when
+ * it has one, or when Koppler cannot tell for its kind.
+ */
+export function noTraces(
+  app: { kind?: string | undefined; project?: string | undefined },
+  repo: string | undefined,
+): string | null {
+  if (!repo) return null;
+  if (app.kind === 'dotnet') {
+    const named = app.project ? path.join(repo, app.project) : repo;
+    const csproj = () => {
+      try {
+        return fs.readdirSync(named).find(file => file.endsWith('.csproj')) ?? '';
+      } catch {
+        return '';
+      }
+    };
+    const project = named.endsWith('proj') ? named : path.join(named, csproj());
+    const shared = ['Directory.Build.props', 'Directory.Packages.props'].map(file => path.join(repo, file));
+    const text = [...projectFiles(project), ...shared].map(read).join('\n');
+    return /Include="OpenTelemetry/i.test(text)
+      ? null
+      : `no OpenTelemetry package in ${path.relative(repo, project) || 'its project'} or the projects it references; add OpenTelemetry.Exporter.OpenTelemetryProtocol with tracing set up`;
+  }
+  if (app.kind === 'node' || app.kind === 'web') {
+    const pkg = JSON.parse(read(path.join(repo, 'package.json')) || '{}') as Record<
+      string,
+      Record<string, string> | undefined
+    >;
+    const names = [...Object.keys(pkg['dependencies'] ?? {}), ...Object.keys(pkg['devDependencies'] ?? {})];
+    return names.some(name => name.startsWith('@opentelemetry/'))
+      ? null
+      : 'no @opentelemetry package in package.json; add @opentelemetry/sdk-node with the OTLP exporter';
+  }
+  return null;
+}
 
 /** Where one app's traces are, or every app's. */
 export const traceView = (app?: string): string =>

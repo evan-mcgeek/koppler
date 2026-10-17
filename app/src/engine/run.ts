@@ -3,7 +3,7 @@
 import { fail } from '../failure.ts';
 import { appStart } from './app-start.ts';
 import { parseRun, startProcess, type RunOptions } from './processes.ts';
-import { traceEnv, tracing } from './traces.ts';
+import { noTraces, traceEnv, traceView, tracing } from './traces.ts';
 import { showBrowserConsole } from './browser-console.ts';
 import { readClones, readStack } from '../data.ts';
 
@@ -34,7 +34,11 @@ export async function run(args: string[], extra: Partial<RunOptions> = {}): Prom
     const repo = readClones()[name]?.path;
     if (shown && repo) console.log(`${name}: ${showBrowserConsole(name, repo, shown.file)}`);
     // While traces are collected, the app sends its own there, under its id; what the run sets for it comes on top.
-    if (tracing()) options.setEnv = { ...traceEnv(name), ...options.setEnv };
+    if (tracing()) {
+      options.setEnv = { ...traceEnv(name), ...options.setEnv };
+      const why = noTraces(readStack()?.apps[name] ?? {}, repo);
+      console.log(why ? `${name}: sends no traces: ${why}` : `${name}: traces at ${traceView(name)}`);
+    }
     if (app.device) console.log(`device: ${app.device.name} (${app.device.platform})`);
   }
   if (options.dryRun) {
