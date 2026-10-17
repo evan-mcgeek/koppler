@@ -98,7 +98,7 @@ export function commandFor(argv: string[], restart: boolean): string[] {
 }
 
 const SWITCHES: Record<string, Partial<RunOptions>> = {
-  '--restart': { restart: true },
+  '--keep-alive': { restart: true },
   '--dry-run': { dryRun: true },
   '--lan': { lan: true },
   '--test': { test: true },
@@ -114,6 +114,10 @@ export function parseRun(args: string[]): RunOptions {
   for (let at = 1; at < head.length; at++) {
     const option = head[at] ?? '';
     const value = () => head[++at] ?? '';
+    if (option === '--restart')
+      throw new Error(
+        `--restart is now --keep-alive: it starts the command again whenever it exits. To restart ${options.name || 'it'} while it runs: koppler stop ${options.name || '<name>'}, then run it again`,
+      );
     if (Object.hasOwn(SWITCHES, option)) Object.assign(options, SWITCHES[option]);
     else if (option === '--cwd') options.cwd = value();
     else if (option === '--port') options.port = Number(value());

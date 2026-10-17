@@ -59,7 +59,7 @@ export function ports(args: string[]): void {
     console.log(`\n${tunnel.host} -> ${tunnel.bind}:${port}  (for ${tunnel.apps.map(name).join(', ')})`);
     for (const command of steps.sudo) console.log(`  you run: ${command}`);
     for (const command of steps.undo) console.log(`  undo:    ${command}`);
-    console.log(`  tunnel:  koppler run ${steps.name} --port ${port}${bind} --restart -- ${steps.tunnel}`);
+    console.log(`  tunnel:  koppler run ${steps.name} --port ${port}${bind} --keep-alive -- ${steps.tunnel}`);
     for (const { app, env: setting, value } of steps.settings)
       console.log(`  setting: ${setting}=${value} in ${name(app)}'s -LOCAL profile`);
   }
