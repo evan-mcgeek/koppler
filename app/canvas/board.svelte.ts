@@ -1503,6 +1503,7 @@ class Board {
     this.#kept = saved ?? {};
     this.name = typeof saved?.['preset'] === 'string' ? saved['preset'] : null;
     this.own = (Array.isArray(saved?.['presets']) ? saved['presets'] : []) as StoredPreset[];
+    this.#seen = this.own.map(one => one.name);
     this.scratch = saved?.['scratch'] === true;
     this.dismissed = (Array.isArray(saved?.['dismissed']) ? saved['dismissed'] : []) as string[];
     this.trash = (Array.isArray(saved?.['trash']) ? saved['trash'] : []) as Deleted[];
@@ -1545,8 +1546,14 @@ class Board {
       this.pinned,
     ];
   }
+  /**
+   * Every board of your own this page has had, sent with each save: a board the server has that the page never had
+   * (made in the terminal meanwhile) is kept, while one deleted or renamed here is not brought back.
+   */
+  #seen: string[] = [];
   /** The board as the server keeps it: what is on screen, over everything it kept that the canvas does not show yet. */
   saved(): SavedBoard {
+    this.#seen = [...new Set([...this.#seen, ...this.own.map(one => one.name)])];
     // Cards change size in Live, which nudges the cards stacked under them: what is kept is the board as Edit left it.
     if (this.live) return { ...this.#keptEdit, env: this.env };
     const before = this.#kept.nodes ?? {};
@@ -1555,6 +1562,7 @@ class Board {
       ...this.#kept,
       preset: this.name,
       presets: this.own,
+      seen: this.#seen,
       trash: this.trash,
       recent: this.recent,
       scratch: this.scratch || undefined,

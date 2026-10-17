@@ -6,7 +6,7 @@ import { hotReload } from '../engine/reload.ts';
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { readStack, writeData } from '../data.ts';
+import { readData, readStack, writeData } from '../data.ts';
 import { applyFindings, current as currentFindingsStack, discover } from '../engine/discover.ts';
 import { editDone } from '../engine/boards.ts';
 import { discardChanges, linkStack, proposeChanges, updateStack } from '../engine/linked.ts';
@@ -91,11 +91,31 @@ const secret =
     return { status, body: answer };
   };
 
+/**
+ * The page's state, with the boards of your own it has never had kept from the server's copy: made in the terminal
+ * since the page loaded them. A page that does not say what it has seen replaces them, as before.
+ */
+function keepUnseen(layout: Record<string, unknown>, seen: unknown): Record<string, unknown> {
+  if (!Array.isArray(seen)) return layout;
+  const list = (value: unknown): unknown[] => (Array.isArray(value) ? (value as unknown[]) : []);
+  const nameOf = (one: unknown) => (one as { name?: unknown } | null)?.name;
+  const known = new Set(
+    [...(seen as unknown[]), ...list(layout['presets']).map(nameOf), ...list(layout['trash']).map(nameOf)].filter(
+      name => typeof name === 'string',
+    ),
+  );
+  const missed = list(readData('state')?.['presets']).filter(one => {
+    const name = nameOf(one);
+    return typeof name === 'string' && !known.has(name);
+  });
+  return missed.length ? { ...layout, presets: [...list(layout['presets']), ...missed] } : layout;
+}
+
 export const ROUTES: Record<string, Route> = {
   '/state': body => {
     const layout = sanitizeLayout(body);
     if (!layout) return { status: 400 };
-    writeData('state', layout);
+    writeData('state', keepUnseen(layout, body['seen']));
     return { status: 204 };
   },
   '/board-edit-done': body => {
