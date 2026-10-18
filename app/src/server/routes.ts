@@ -214,27 +214,6 @@ export const ROUTES: Record<string, Route> = {
     ).unref();
     return { status: 200, body: { started: true } };
   },
-  // A terminal window from a card: a shell in the app's clone, or psql on its database. The command runs in the user's
-  // own terminal, so a protected environment's secret is asked for there.
-  '/open-terminal': body => {
-    const { app, env, query } = body;
-    const id = (value: unknown) => typeof value === 'string' && /^[a-z0-9][a-z0-9-]{0,63}$/.test(value);
-    if (!id(app) || !id(env)) return { status: 400, body: { error: 'Which app, on which environment?' } };
-    const words = ['shell', String(app), '--env', String(env), ...(query === true ? ['--query'] : [])];
-    const command = `koppler ${words.join(' ')}`;
-    if (process.platform !== 'darwin')
-      return { status: 400, body: { error: `Open a terminal and run: ${command}`, command } };
-    const quote = (word: string) => `'${word.replaceAll("'", `'\\''`)}'`;
-    const script = path.join(tempDir(), 'terminal', `${String(app)}.command`);
-    fs.mkdirSync(path.dirname(script), { recursive: true, mode: 0o700 });
-    fs.writeFileSync(
-      script,
-      `#!/bin/sh\nexec ${[process.execPath, path.join(CODE, 'koppler.mjs'), ...words].map(quote).join(' ')}\n`,
-      { mode: 0o700 },
-    );
-    spawn('open', [script], { detached: true, stdio: 'ignore' }).unref();
-    return { status: 200, body: { opened: true, command } };
-  },
   // The trace collector, started or stopped by Koppler itself; the status says when it answers.
   '/traces': body => {
     spawn(process.execPath, [path.join(CODE, 'koppler.mjs'), 'traces', body['on'] === false ? 'stop' : 'start'], {
