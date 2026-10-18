@@ -17,11 +17,11 @@
   import { untrack } from 'svelte';
   import Hand from '@lucide/svelte/icons/hand';
   import LayoutGrid from '@lucide/svelte/icons/layout-grid';
+  import Focus from '@lucide/svelte/icons/focus';
   import Maximize from '@lucide/svelte/icons/maximize';
   import Minus from '@lucide/svelte/icons/minus';
   import MousePointer2 from '@lucide/svelte/icons/mouse-pointer-2';
   import Plus from '@lucide/svelte/icons/plus';
-  import Presentation from '@lucide/svelte/icons/presentation';
   import Redo2 from '@lucide/svelte/icons/redo-2';
   import Undo2 from '@lucide/svelte/icons/undo-2';
   import Icon from './Icon.svelte';
@@ -536,7 +536,7 @@
           onclick={() => void arrange()}><Icon of={LayoutGrid} size={16} /></button
         >
         <button aria-label="Fit" title="Zoom to fit all apps (F)" onclick={() => void fit()}
-          ><Icon of={Maximize} size={16} /></button
+          ><Icon of={Focus} size={16} /></button
         >
         <div class="zoom" role="group" aria-label="Zoom">
           <button aria-label="Zoom out" title="Zoom out" onclick={zoomBy(1 / 1.2)}><Icon of={Minus} size={16} /></button
@@ -554,7 +554,7 @@
           aria-pressed={board.present}
           onclick={() => void present()}
         >
-          <Icon of={Presentation} size={16} />
+          <Icon of={Maximize} size={16} />
         </button>
         {#if !board.present}
           <button
