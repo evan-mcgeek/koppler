@@ -113,7 +113,9 @@
         {@const sum = tally(kind)}
         {#if rows.some(row => row.job.kind === kind)}
           <details open={sum.level === 'warn'}>
-            <summary>{title}<span class="tally" data-level={sum.level}>{sum.text}</span></summary>
+            <summary aria-label="{title}: {sum.text}"
+              >{title}<span class="tally" data-level={sum.level}>{sum.text}</span></summary
+            >
             {#each rest as { job, result } (job.key)}
               <button
                 class="row"

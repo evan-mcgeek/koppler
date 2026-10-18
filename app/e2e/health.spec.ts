@@ -68,6 +68,8 @@ test('the light sums up the board, and the Flow check tests every connection and
       /Cables between local apps\s*1 of 2 fails/,
       /Databases and caches\s*0 of 1 work, 1 not checked/,
     ]);
+    // Read out with the title and its count apart.
+    await expect(check.locator('summary').first()).toHaveAccessibleName('Apps: 1 of 3 fails');
     await expect(chip).toHaveText('2 things are off');
     await page.screenshot({ path: 'test-results/next-flow.png' });
 
