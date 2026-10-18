@@ -130,20 +130,31 @@ test('All apps shows every app on the board in one stream by time, and an app le
   await expect(rows).toHaveText([/Web.*order form sent/, /WARN.*Orders API.*order created slowly/, /Web.*order shown/]);
   await page.screenshot({ path: 'test-results/next-logs-all.png' });
 
+  // Times to the millisecond.
+  await expect(rows.first().locator('.t')).toHaveText(
+    new RegExp(`\\d\\d:\\d\\d:\\d\\d\\.${String(t % 1000).padStart(3, '0')}$`),
+  );
+
   await pane.getByRole('combobox', { name: 'Names' }).selectOption('change');
   await expect(pane.locator('.row .n')).toHaveCount(3);
-  await pane.getByRole('button', { name: 'Orders API', exact: true }).click();
+  const apps = pane.getByRole('group', { name: 'Apps in this log' });
+  await pane.locator('.row .n', { hasText: 'Orders API' }).click();
   await expect(rows).toHaveCount(2);
   await expect(pane.locator('.row .n')).toHaveCount(1);
-  await expect(pane.getByText('1 left out')).toBeVisible();
+  await expect(apps.getByRole('button', { name: 'Orders API', exact: true })).toHaveAttribute('aria-pressed', 'false');
+
+  await apps.getByRole('button', { name: 'Rename Web Shop in this log' }).click();
+  await apps.getByRole('textbox', { name: 'Name for Web Shop in this log' }).fill('web');
+  await apps.getByRole('textbox').press('Enter');
+  await expect(pane.locator('.row .n')).toHaveText(['web']);
 
   await page.reload();
   await (await actions(page, 'orders')).getByRole('button', { name: 'Show log' }).click();
   await pane.getByRole('tab', { name: 'All apps' }).click();
   await expect(rows).toHaveCount(2);
+  await expect(pane.locator('.row .n')).toHaveText(['web']);
   await expect(pane.getByRole('combobox', { name: 'Names' })).toHaveValue('change');
-  await pane.getByText('1 left out').click();
-  await pane.locator('.menu').getByRole('button', { name: 'Orders API' }).click();
+  await apps.getByRole('button', { name: 'Orders API', exact: true }).click();
   await expect(rows).toHaveCount(3);
-  await expect(pane.getByText('1 left out')).toHaveCount(0);
+  await page.screenshot({ path: 'test-results/next-logs-all.png' });
 });

@@ -151,5 +151,5 @@ Zoomed out below 60%, cards are short in Edit too: pick one and its fields open 
 - **History:** recent runs and Stops and how each ended.
 - **Logs:** each app's log opens as a tab under the board.
   The All apps tab shows every app on the board in one stream, in the order the lines came, each with the app's name in its colour.
-  Click a name to leave that app out; the list in the tab's header brings it back.
-  A time marked `~` is when Koppler first read the line, for a log Koppler did not write.
+  The apps are tags above it: click one to leave it out or bring it back, and the pencil gives it a short name of your own in this log, kept with the board.
+  Times are to the millisecond; one marked `~` is when Koppler first read the line, for a log Koppler did not write.

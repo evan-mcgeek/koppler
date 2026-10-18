@@ -1,6 +1,7 @@
 <script lang="ts">
   import Icon from './Icon.svelte';
   import X from '@lucide/svelte/icons/x';
+  import Pencil from '@lucide/svelte/icons/pencil';
   import { parseLog, parseStamped } from '../src/core/logfmt.ts';
   import { board } from './board.svelte.ts';
   import { live } from './live.svelte.ts';
@@ -25,9 +26,12 @@
     });
   });
   const all = $derived(active === ALL);
-  const clock = (at: number) => new Date(at).toLocaleTimeString([], { hour12: false });
+  const clock = (at: number) =>
+    `${new Date(at).toLocaleTimeString([], { hour12: false })}.${String(at % 1000).padStart(3, '0')}`;
+  // The name column fits the longest name it shows.
+  const nameWidth = $derived(Math.min(32, Math.max(4, ...board.nodes.map(node => board.logName(node.id).length))));
+  let renaming = $state<string | null>(null);
   const kindOf = $derived(Object.fromEntries(board.nodes.map(node => [node.id, node.data.kind])));
-  const hidden = $derived(board.nodes.filter(node => board.hiddenLogs[node.id]));
   const merged = $derived.by(() => {
     if (!all) return [];
     const seen: Record<string, number> = {};
@@ -171,22 +175,6 @@
       </div>
       <span class="meta">{all || (logs.past(active) ? text : live.tail(active)) ? '' : 'no log yet'}</span>
       {#if all}
-        {#if hidden.length}
-          <details class="left-out">
-            <summary>{hidden.length} left out</summary>
-            <div class="menu">
-              {#each hidden as node (node.id)}
-                <button
-                  type="button"
-                  title="Show {board.nameOf(node.id)} in this log again"
-                  onclick={() => {
-                    board.showLog(node.id, true);
-                  }}>{board.nameOf(node.id)}</button
-                >
-              {/each}
-            </div>
-          </details>
-        {/if}
         <select
           aria-label="Names"
           value={logs.names}
@@ -231,7 +219,53 @@
         }}>Close all</button
       >
     </header>
+    {#if all}
+      <div class="apps" role="group" aria-label="Apps in this log">
+        {#each board.nodes as node (node.id)}
+          {@const name = board.logName(node.id)}
+          {#if renaming === node.id}
+            <!-- svelte-ignore a11y_autofocus -->
+            <input
+              class="tag kind-{node.data.kind}"
+              aria-label="Name for {board.nameOf(node.id)} in this log"
+              value={name}
+              maxlength="24"
+              size={Math.max(4, name.length)}
+              autofocus
+              onkeydown={ev => {
+                if (ev.key === 'Enter') ev.currentTarget.blur();
+                if (ev.key === 'Escape') renaming = null;
+              }}
+              onblur={ev => {
+                if (renaming === node.id) board.aliasLog(node.id, ev.currentTarget.value);
+                renaming = null;
+              }}
+            />
+          {:else}
+            <span class="tag kind-{node.data.kind}" class:off={board.hiddenLogs[node.id]}>
+              <button
+                type="button"
+                aria-pressed={!board.hiddenLogs[node.id]}
+                title={board.hiddenLogs[node.id] ? `Show ${name} in this log` : `Leave ${name} out of this log`}
+                onclick={() => {
+                  board.showLog(node.id, !!board.hiddenLogs[node.id]);
+                }}>{name}</button
+              ><button
+                type="button"
+                class="rename"
+                aria-label="Rename {board.nameOf(node.id)} in this log"
+                title="Give it a short name in this log"
+                onclick={() => {
+                  renaming = node.id;
+                }}><Icon of={Pencil} size={11} /></button
+              >
+            </span>
+          {/if}
+        {/each}
+      </div>
+    {/if}
     <div
+      style:--name="{String(nameWidth)}ch"
       class="body"
       class:raw={logs.raw && !all}
       class:all
@@ -254,10 +288,10 @@
               <button
                 type="button"
                 class="n kind-{kindOf[row.app]}"
-                title="Leave {board.nameOf(row.app)} out of this log"
+                title="Leave {board.logName(row.app)} out of this log"
                 onclick={() => {
                   board.showLog(row.app, false);
-                }}>{board.nameOf(row.app)}</button
+                }}>{board.logName(row.app)}</button
               >
             {:else}
               <span></span>
@@ -527,7 +561,7 @@
     font-weight: 600;
   }
   .all .row {
-    grid-template-columns: 72px 50px 128px minmax(0, 1fr);
+    grid-template-columns: 13ch 50px var(--name) minmax(0, 1fr);
   }
   .all .x:not(button) {
     grid-column: 4;
@@ -556,46 +590,51 @@
     color: var(--ink);
     font: 500 13px var(--sans);
   }
-  .left-out {
-    position: relative;
-    align-self: center;
+  .apps {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 6px 14px;
+    border-bottom: 1px solid var(--line);
   }
-  .left-out summary {
-    padding: 4px 10px;
-    border-radius: 8px;
-    color: var(--ink);
-    font-weight: 600;
-    list-style: none;
+  .tag {
+    display: inline-flex;
+    align-items: center;
+    border: 1px solid color-mix(in oklab, var(--kind, var(--ink)) 40%, transparent);
+    border-radius: 999px;
+    background: color-mix(in oklab, var(--kind, var(--ink)) 12%, transparent);
+    color: var(--kind, var(--ink));
+    font: 600 12px var(--mono);
   }
-  .left-out summary:hover,
-  .left-out[open] summary {
-    background: color-mix(in oklab, var(--ink) 10%, transparent);
-  }
-  .menu {
-    position: absolute;
-    z-index: 3;
-    top: calc(100% + 4px);
-    right: 0;
-    display: grid;
-    min-width: 160px;
-    padding: 4px;
-    border: 1px solid var(--line);
-    border-radius: 8px;
-    background: var(--surface);
-    box-shadow: 0 6px 20px color-mix(in oklab, var(--ink) 16%, transparent);
-  }
-  .menu button {
-    padding: 6px 10px;
+  .tag button {
+    padding: 2px 4px 2px 10px;
     border: 0;
-    border-radius: 6px;
     background: none;
-    color: var(--ink);
-    font: 500 13px var(--sans);
-    text-align: left;
+    color: inherit;
+    font: inherit;
     cursor: pointer;
   }
-  .menu button:hover {
-    background: color-mix(in oklab, var(--ink) 8%, transparent);
+  .tag .rename {
+    display: grid;
+    place-items: center;
+    padding: 2px 8px 2px 2px;
+    opacity: 0.55;
+  }
+  .tag .rename:hover,
+  .tag .rename:focus-visible {
+    opacity: 1;
+  }
+  .tag.off {
+    border-style: dashed;
+    background: none;
+    color: var(--muted);
+  }
+  .tag.off button:first-child {
+    text-decoration: line-through;
+  }
+  input.tag {
+    padding: 2px 10px;
+    outline: 2px solid var(--cable);
   }
   .no-time .row {
     grid-template-columns: 0 58px minmax(0, 1fr);
