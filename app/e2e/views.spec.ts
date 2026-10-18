@@ -89,11 +89,12 @@ test('Present shows the board alone, and Escape brings the page back', async ({ 
   await expect(bar).toBeVisible();
 });
 
-test('the overview of the board sits over the toolbar, at the bottom right', async ({ page }) => {
+test('the toolbar sits at the bottom left and the overview of the board at the bottom right, on one line', async ({
+  page,
+}) => {
   const map = await page.getByRole('img', { name: 'Overview of the board' }).boundingBox();
   const tools = await page.getByRole('toolbar', { name: 'Board' }).boundingBox();
   if (!map || !tools) throw new Error('not on the page');
-  expect(map.y + map.height).toBeLessThan(tools.y);
-  expect(Math.round(tools.y - (map.y + map.height))).toBeLessThan(24);
-  expect(Math.abs(map.x + map.width - (tools.x + tools.width))).toBeLessThan(2);
+  expect(tools.x + tools.width).toBeLessThan(map.x);
+  expect(Math.abs(map.y + map.height - (tools.y + tools.height))).toBeLessThan(2);
 });

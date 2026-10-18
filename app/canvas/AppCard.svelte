@@ -660,36 +660,40 @@
     flex-wrap: wrap;
     align-items: center;
     gap: 6px;
-    padding: 8px 12px 10px 16px;
-    border-top: 1px dashed var(--line);
+    padding: 8px 12px 10px;
+    border-top: 1px solid var(--line);
     cursor: default;
   }
   .reading.far .calls {
     display: none;
   }
+  /* What it still calls in the deployed environment: in the deployed colour, edged in dashes. */
   .calls-label {
     margin-right: 2px;
-    color: var(--muted);
-    font-size: 12px;
+    color: var(--deployed);
+    font: 500 10px var(--mono);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
   }
   .chip {
     max-width: 180px;
-    min-height: 24px;
-    padding: 3px 8px;
+    min-height: 22px;
+    padding: 2px 6px;
     overflow: hidden;
-    border: 1px dashed color-mix(in oklab, var(--muted) 70%, transparent);
-    border-radius: 999px;
+    border: 1px dashed var(--deployed);
     background: none;
-    color: var(--ink);
-    font: 500 12px var(--sans);
+    color: var(--deployed);
+    font: 500 10px var(--mono);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
     white-space: nowrap;
     text-overflow: ellipsis;
     cursor: pointer;
   }
   .chip:hover:not(:disabled) {
     border-style: solid;
-    border-color: var(--cable);
-    color: var(--cable);
+    border-color: var(--local);
+    color: var(--local);
   }
   .chip:disabled {
     color: var(--muted);
@@ -707,9 +711,11 @@
   .short .port {
     display: none;
   }
+  /* Mono capitals run wide: the short card's status grows less than its name. */
   .short .progress {
-    padding: 12px 16px;
-    font-size: 21px;
+    padding: 10px 12px;
+    font-size: 14px;
+    letter-spacing: 0.04em;
   }
   .short .marks i {
     transform: scale(1.4);
@@ -730,10 +736,10 @@
     font-size: 16px;
   }
   .short :is(.calls-label, .chip) {
-    font-size: 15px;
+    font-size: 12px;
   }
   .reading.far .progress {
-    font-size: 24px;
+    font-size: 17px;
   }
   .reading.far :is(.glance, .where) {
     display: none;
@@ -756,10 +762,10 @@
   }
   .glance span {
     padding: 2px 8px;
-    border-radius: 6px;
-    background: color-mix(in oklab, var(--ink) 7%, transparent);
-    font: 15px var(--mono);
-    color: var(--muted);
+    border: 1px solid var(--line);
+    background: var(--desk);
+    font: 14px var(--mono);
+    color: var(--ink-muted);
   }
   .port {
     position: absolute;

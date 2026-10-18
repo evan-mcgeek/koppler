@@ -1,16 +1,17 @@
 // Scenes of the canvas for the docs, on a demo stack: nothing here reads a real stack.
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { Page, TestInfo } from '@playwright/test';
+import type { Page } from '@playwright/test';
 import { actions, card, expect, STACK, test } from '../e2e/canvas.ts';
 
 const images = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'docs', 'images');
-const shot = (
-  page: Page,
-  info: TestInfo,
-  name: string,
-  clip?: { x: number; y: number; width: number; height: number },
-) => page.screenshot({ path: path.join(images, `${name}-${info.project.name}.png`), ...(clip && { clip }) });
+// A hint left open by where the pointer rests is not part of the picture.
+const shot = async (page: Page, name: string, clip?: { x: number; y: number; width: number; height: number }) => {
+  await page.evaluate(() => {
+    for (const tip of document.querySelectorAll<HTMLElement>('[role=tooltip]:popover-open')) tip.hidePopover();
+  });
+  await page.screenshot({ path: path.join(images, `${name}.png`), ...(clip && { clip }) });
+};
 
 const { web = {}, orders = {}, payments = {}, catalog = {} } = STACK.apps;
 type Apps = Record<string, Record<string, unknown>>;
@@ -102,15 +103,15 @@ const settle = async (page: Page) => {
 
 test.use({ stack, board });
 
-test('the board, running', async ({ page }, info) => {
+test('the board, running', async ({ page }) => {
   await running(page);
   await healthy(page);
   await page.reload();
   await settle(page);
-  await shot(page, info, 'board');
+  await shot(page, 'board');
 });
 
-test('the board, running, in the Live view', async ({ page }, info) => {
+test('the board, running, in the Live view', async ({ page }) => {
   await running(page);
   await healthy(page);
   await page.reload();
@@ -118,10 +119,10 @@ test('the board, running, in the Live view', async ({ page }, info) => {
   await page.getByRole('radio', { name: 'Live' }).click();
   await page.mouse.move(1430, 850);
   await page.waitForTimeout(900);
-  await shot(page, info, 'live');
+  await shot(page, 'live');
 });
 
-test('the review before a Run', async ({ page }, info) => {
+test('the review before a Run', async ({ page }) => {
   await ready(page);
   await page.reload();
   await settle(page);
@@ -131,10 +132,10 @@ test('the review before a Run', async ({ page }, info) => {
   await page.waitForTimeout(400);
   const box = await review.boundingBox();
   if (!box) throw new Error('no review');
-  await shot(page, info, 'review', { x: box.x - 24, y: box.y - 24, width: box.width + 48, height: box.height + 48 });
+  await shot(page, 'review', { x: box.x - 24, y: box.y - 24, width: box.width + 48, height: box.height + 48 });
 });
 
-test('a card, running', async ({ page }, info) => {
+test('a card, running', async ({ page }) => {
   await running(page);
   await healthy(page);
   await page.reload();
@@ -143,10 +144,10 @@ test('a card, running', async ({ page }, info) => {
   await page.waitForTimeout(400);
   const box = await card(page, 'orders').boundingBox();
   if (!box) throw new Error('no card');
-  await shot(page, info, 'card', { x: box.x - 40, y: box.y - 64, width: box.width + 80, height: box.height + 104 });
+  await shot(page, 'card', { x: box.x - 40, y: box.y - 64, width: box.width + 80, height: box.height + 104 });
 });
 
-test("an app's settings", async ({ page }, info) => {
+test("an app's settings", async ({ page }) => {
   await settle(page);
   await (await actions(page, 'orders')).getByRole('button', { name: 'Settings for Orders API' }).click();
   const panel = page.getByRole('dialog', { name: 'Orders API' });
@@ -154,12 +155,12 @@ test("an app's settings", async ({ page }, info) => {
   await page.waitForTimeout(400);
   const box = await panel.boundingBox();
   if (!box) throw new Error('no settings');
-  await shot(page, info, 'settings', { x: box.x - 24, y: box.y - 24, width: box.width + 48, height: box.height + 48 });
+  await shot(page, 'settings', { x: box.x - 24, y: box.y - 24, width: box.width + 48, height: box.height + 48 });
 });
 
 test.describe('zoomed out', () => {
   test.use({ board: { ...board, zoom: 0.5, pan: { x: 120, y: 120 } } });
-  test("a picked card's choices beside the board", async ({ page }, info) => {
+  test("a picked card's choices beside the board", async ({ page }) => {
     await running(page);
     await healthy(page);
     await page.reload();
@@ -168,6 +169,6 @@ test.describe('zoomed out', () => {
     await expect(page.getByRole('complementary', { name: 'Orders API' })).toBeVisible();
     await page.mouse.move(700, 850);
     await page.waitForTimeout(600);
-    await shot(page, info, 'zoomed-out');
+    await shot(page, 'zoomed-out');
   });
 });

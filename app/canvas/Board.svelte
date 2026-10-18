@@ -823,13 +823,15 @@
     font-size: 12px;
   }
   /* Over the toolbar, with the other ways to move the view. */
+  /* The toolbar keeps clear of the overview of the board, bottom right, and wraps when the board is narrow. */
+  .area :global(.svelte-flow__panel.bottom.left) {
+    max-width: calc(100% - 230px);
+  }
   .area :global(.svelte-flow__minimap) {
-    margin: 0 15px 66px 0;
+    margin: 0 15px 15px 0;
     overflow: hidden;
-    border: 1px solid var(--line);
-    border-radius: 10px;
+    border: 1px solid var(--line-strong);
     background: var(--panel);
-    box-shadow: var(--lift);
   }
   .links {
     position: absolute;
@@ -1060,24 +1062,24 @@
     pointer-events: none;
   }
   /* The board's tools: words printed on one strip, each with its key. */
+  /* Each word keeps its own edge, so a strip that wraps on a narrow board stays a clean grid. */
   .tools {
     display: flex;
+    flex-wrap: wrap;
     align-items: stretch;
-    gap: 1px;
-    border: 1px solid var(--line-strong);
-    background: var(--line-strong);
+    padding: 1px 0 0 1px;
   }
   .zoom,
   .switch {
     display: flex;
-    gap: 1px;
   }
   .tools button {
     display: flex;
     align-items: center;
     gap: 6px;
+    margin: -1px 0 0 -1px;
     padding: 8px 10px;
-    border: 0;
+    border: 1px solid var(--line-strong);
     background: var(--panel);
     color: var(--ink-muted);
     font: 500 10px var(--mono);
