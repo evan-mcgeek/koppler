@@ -3,7 +3,7 @@
 .claude/
 .lavish/
 .impeccable/
-node_modules/
+node_modules
 *.log
 .env
 test-results/
