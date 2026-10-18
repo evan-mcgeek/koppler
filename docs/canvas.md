@@ -52,7 +52,7 @@ The same fields can be read and changed with `koppler stack get`, `set` and `uns
 ## Appearance
 
 The canvas is dark, with square corners and hairlines, and colour only as a signal: one colour for what runs on your machine, one for what still calls the deployed environment, amber when something needs you, and red for PROD and failures.
-The gear at the bottom of the side pane opens **Appearance**: five schemes (Mono, the default, then Patch bay, Signal, Scope and Sodium), and the local and deployed colours picked by hand over the scheme.
+The gear at the bottom of the side pane opens **Appearance**: eight schemes, five dark (Mono, the default, then Patch bay, Signal, Scope and Sodium) and three light (Paper, Blueprint and Workshop), and the local and deployed colours picked by hand over the scheme.
 Warning and PROD colours are never among the picks, so a custom colour can never be mistaken for either. PROD stays red and striped in every scheme.
 Your choice is kept in this browser.
 Nobody edits `stack.json` by hand.

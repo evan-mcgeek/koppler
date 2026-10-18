@@ -33,7 +33,7 @@ Not a backend tool for working inside a shared cluster (mirrord, Telepresence, S
 ## Capabilities and Constraints
 
 - The canvas is a Svelte 5 page with Svelte Flow, built by Vite from `app/canvas/` and served locally by `status-watch.mjs`.
-- Dark only (Patch bay): five schemes in Appearance, with the local and deployed colours pickable by hand; warning and PROD colours never change.
+- Patch bay: eight schemes in Appearance, five dark (Mono by default) and three light, with the local and deployed colours pickable by hand; warning and PROD colours follow the scheme and are never offered as picks.
 - Agent and harness agnostic wording.
 - PROD is a dangerous mode and must always look different from QA.
 - Undecided: whether "local integration testing" becomes part of the positioning.
