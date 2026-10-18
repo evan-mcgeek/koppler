@@ -1,0 +1,289 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Koppler</title>
+    <!-- The README's hero and the repository's social card, drawn from the canvas's own fonts and tokens. -->
+    <link rel="stylesheet" href="../src/fonts/fonts.css" />
+    <link rel="stylesheet" href="../canvas/tokens.css" />
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--desk);
+        color: var(--ink);
+        font-family: var(--sans);
+        -webkit-font-smoothing: antialiased;
+      }
+      .frame {
+        position: relative;
+        overflow: hidden;
+        background: var(--desk);
+      }
+      .dots {
+        background-image: radial-gradient(var(--line) 1px, transparent 1px);
+        background-size: 20px 20px;
+      }
+      .word {
+        font: 600 var(--size, 16px) var(--mono);
+        font-stretch: 87.5%;
+        letter-spacing: -0.02em;
+      }
+      .caps {
+        color: var(--ink-muted);
+        font: 500 11px var(--mono);
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+      .card {
+        position: absolute;
+        background: var(--panel);
+        border: 1px solid var(--line-strong);
+      }
+      .card .head {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 12px;
+        border-bottom: 1px solid var(--line);
+        font: 600 15px var(--sans);
+      }
+      .card .led {
+        width: 7px;
+        height: 7px;
+        background: var(--local);
+      }
+      .card .kind {
+        margin-left: auto;
+        color: var(--ink-muted);
+        font: 500 10px var(--mono);
+      }
+      .card .foot {
+        display: flex;
+        justify-content: space-between;
+        padding: 8px 12px;
+        font: 500 10px var(--mono);
+        letter-spacing: 0.06em;
+      }
+      .card .branch {
+        padding: 8px 12px;
+        color: var(--ink-muted);
+        font: 400 11px var(--mono);
+      }
+      .card.picked {
+        border-color: var(--ink);
+      }
+      .card.tunnel {
+        border: 1px dashed var(--deployed);
+      }
+      svg.cables {
+        position: absolute;
+        inset: 0;
+        overflow: visible;
+      }
+      svg.cables path {
+        fill: none;
+        stroke: var(--local);
+        stroke-width: 2;
+      }
+      svg.cables .link {
+        stroke: var(--deployed);
+        stroke-dasharray: 2 4;
+      }
+      svg.cables .ring {
+        fill: var(--desk);
+        stroke: var(--local);
+        stroke-width: 2;
+      }
+      svg.cables .socket {
+        fill: var(--local);
+      }
+      svg.cables .ring.deployed {
+        stroke: var(--deployed);
+      }
+
+      /* The README's hero. */
+      #hero {
+        width: 1440px;
+        height: 760px;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 620px;
+        border: 1px solid var(--line);
+      }
+      #hero .copy {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 26px;
+        padding: 0 56px;
+        border-right: 1px solid var(--line);
+      }
+      #hero h1 {
+        margin: 0;
+        font: 600 60px/1.08 var(--mono);
+        font-stretch: 87.5%;
+        letter-spacing: -0.02em;
+      }
+      #hero p {
+        max-width: 600px;
+        margin: 0;
+        color: var(--ink-muted);
+        font: 400 19px/1.5 var(--sans);
+      }
+      #hero .commands {
+        width: 460px;
+        border: 1px solid var(--line-strong);
+      }
+      #hero .commands div {
+        padding: 12px 16px;
+        font: 400 16px var(--mono);
+      }
+      #hero .commands div + div {
+        border-top: 1px solid var(--line);
+      }
+      #hero .commands span {
+        color: var(--ink-muted);
+      }
+      #hero .brand {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+      }
+
+      /* The repository's social card. */
+      #social {
+        width: 1280px;
+        height: 640px;
+      }
+      #social .brand {
+        position: absolute;
+        left: 92px;
+        top: 86px;
+        display: flex;
+        align-items: center;
+        gap: 22px;
+      }
+      #social .line {
+        position: absolute;
+        left: 82px;
+        bottom: 150px;
+        width: 560px;
+        margin: 0;
+        font: 600 34px/1.3 var(--sans);
+      }
+      #social .url {
+        position: absolute;
+        left: 82px;
+        bottom: 78px;
+        color: var(--ink-muted);
+        font: 400 20px var(--mono);
+      }
+    </style>
+  </head>
+  <body>
+    <template id="mark">
+      <svg viewBox="0 0 64 64" aria-hidden="true">
+        <rect x="10" y="8" width="10" height="48" rx="5" fill="var(--ink)" />
+        <path
+          d="M20 32 C 34 32, 34 14, 47 14 M20 32 C 34 32, 34 50, 47 50"
+          fill="none"
+          stroke="var(--local)"
+          stroke-width="6"
+          stroke-linecap="round"
+        />
+        <circle cx="49" cy="14" r="7.5" fill="var(--ink)" />
+        <circle cx="49" cy="50" r="7.5" fill="var(--ink)" />
+        <circle cx="49" cy="14" r="2.5" fill="var(--desk)" />
+        <circle cx="49" cy="50" r="2.5" fill="var(--desk)" />
+      </svg>
+    </template>
+
+    <section id="hero" class="frame">
+      <div class="copy">
+        <div class="brand"><span data-mark="40"></span><span class="word" style="--size: 34px">koppler</span></div>
+        <span class="caps">Local development · macOS and Linux</span>
+        <h1>Run the part of your stack you need on your own machine.</h1>
+        <p>
+          Pick apps on a canvas and plug cables between them, then press Run. Everything you leave unplugged keeps
+          calling the deployed environment you chose.
+        </p>
+        <div class="commands">
+          <div><span>$</span> npm install -g koppler</div>
+          <div><span>$</span> koppler init</div>
+          <div><span>$</span> koppler canvas</div>
+        </div>
+      </div>
+      <div class="dots" style="position: relative">
+        <svg class="cables" width="620" height="760">
+          <path d="M262 236 C 320 236, 310 386, 356 386" />
+          <path d="M262 526 C 320 526, 310 416, 356 416" />
+          <path class="link" d="M476 446 L 476 560" />
+          <circle class="ring" cx="262" cy="236" r="6" />
+          <circle class="ring" cx="262" cy="526" r="6" />
+          <circle class="socket" cx="356" cy="386" r="6" />
+          <circle class="socket" cx="356" cy="416" r="6" />
+          <circle class="ring deployed" cx="476" cy="446" r="5" />
+        </svg>
+        <div class="card" style="left: 40px; top: 186px; width: 222px">
+          <div class="head"><span class="led"></span>Mobile App</div>
+          <div class="branch">feature/checkout</div>
+        </div>
+        <div class="card" style="left: 40px; top: 476px; width: 222px">
+          <div class="head"><span class="led"></span>Web Shop</div>
+          <div class="branch">feature/checkout</div>
+        </div>
+        <div class="card picked" style="left: 356px; top: 360px; width: 240px">
+          <div class="head"><span class="led"></span>Orders API<span class="kind">.NET</span></div>
+          <div class="foot"><span>RUNNING</span><span style="color: var(--deployed)">CALLS QA</span></div>
+        </div>
+        <div class="card tunnel" style="left: 386px; top: 560px; width: 180px; background: var(--panel)">
+          <div class="head" style="border: 0; padding-bottom: 2px">Database</div>
+          <div class="branch" style="padding-top: 0; color: var(--deployed)">TUNNEL · QA</div>
+        </div>
+      </div>
+    </section>
+
+    <section id="social" class="frame dots">
+      <div class="brand"><span data-mark="96"></span><span class="word" style="--size: 88px">koppler</span></div>
+      <svg class="cables" width="1280" height="640">
+        <path d="M1032 188 C 1070 188, 1050 286, 1082 286" />
+        <path d="M1032 448 C 1070 448, 1050 316, 1082 316" />
+        <path class="link" d="M1172 326 L 1172 472" />
+        <circle class="ring" cx="1032" cy="188" r="6" />
+        <circle class="ring" cx="1032" cy="448" r="6" />
+        <circle class="socket" cx="1082" cy="286" r="6" />
+        <circle class="socket" cx="1082" cy="316" r="6" />
+        <circle class="ring deployed" cx="1172" cy="326" r="5" />
+      </svg>
+      <div class="card" style="left: 852px; top: 142px; width: 180px">
+        <div class="head"><span class="led"></span>Mobile App</div>
+        <div class="branch">feature/checkout</div>
+      </div>
+      <div class="card" style="left: 852px; top: 402px; width: 180px">
+        <div class="head"><span class="led"></span>Web Shop</div>
+        <div class="branch">feature/checkout</div>
+      </div>
+      <div class="card picked" style="left: 1082px; top: 252px; width: 182px">
+        <div class="head"><span class="led"></span>Orders API<span class="kind">.NET</span></div>
+        <div class="foot"><span>RUNNING</span></div>
+      </div>
+      <div class="card tunnel" style="left: 1082px; top: 472px; width: 182px; background: var(--panel)">
+        <div class="head" style="border: 0; padding-bottom: 2px">Database</div>
+        <div class="branch" style="padding-top: 0; color: var(--deployed)">TUNNEL · QA</div>
+      </div>
+      <p class="line">Run the part of your stack you need on your own machine.</p>
+      <span class="url">github.com/evan-mcgeek/koppler</span>
+    </section>
+
+    <script>
+      for (const slot of document.querySelectorAll('[data-mark]')) {
+        const svg = document.getElementById('mark').content.firstElementChild.cloneNode(true);
+        svg.setAttribute('width', slot.dataset.mark);
+        svg.setAttribute('height', slot.dataset.mark);
+        slot.replaceWith(svg);
+      }
+    </script>
+  </body>
+</html>

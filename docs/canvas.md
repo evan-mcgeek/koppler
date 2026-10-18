@@ -36,7 +36,7 @@ Pointing at a card shows its actions above it: run it alone, stop or restart it 
 
 ## Settings
 
-The gear on a card, on a queue or outside system, and beside the stack's name opens settings: every fact the stack holds about that thing, in tabs.
+**Settings** in a card's tools, the gear on a queue or outside system, and the gear beside the stack's name open settings: every fact the stack holds about that thing, in tabs.
 
 <img alt="An app's settings: its name, kind and slug, then tabs; Runs here shows its start command, local address, readiness check and more, each with a lock" src="images/settings.png" width="480">
 
@@ -48,6 +48,13 @@ The gear on a card, on a queue or outside system, and beside the stack's name op
 - **Ask the agent to fill in** has the agent read the repo and propose the empty fields; locked fields stay.
 
 The same fields can be read and changed with `koppler stack get`, `set` and `unset`.
+
+## Appearance
+
+The canvas is dark, with square corners and hairlines, and colour only as a signal: one colour for what runs on your machine, one for what still calls the deployed environment, amber when something needs you, and red for PROD and failures.
+The gear at the bottom of the side pane opens **Appearance**: five schemes (Mono, the default, then Patch bay, Signal, Scope and Sodium), and the local and deployed colours picked by hand over the scheme.
+Warning and PROD colours are never among the picks, so a custom colour can never be mistaken for either. PROD stays red and striped in every scheme.
+Your choice is kept in this browser.
 Nobody edits `stack.json` by hand.
 
 ## Cables
@@ -64,6 +71,7 @@ Every call without a cable goes to the deployed app of the chosen environment.
 - **Arrange** lays the board out by who calls whom.
 
 Cables are always curves, so any board you see is one you could draw yourself.
+A cable leaves its caller from a hollow ring and plugs into the app it calls at a solid socket.
 
 ## Tunnels, queues and outside systems
 
@@ -76,8 +84,9 @@ These appear next to the app that uses them, and show or hide with it.
 
 ## Environment
 
-The environment picker lists the stack's environments.
+The environment switch in the header lists the stack's environments.
 Unplugged calls, tunnels and deployed queues follow it.
+On PROD the whole page is framed in red, with a striped band under the header.
 
 On a production environment the review shows anything that blocks the run first, keeps the plan's header and footer in view, and pressing Run there is the confirmation.
 Queries against production stay in your own terminal.

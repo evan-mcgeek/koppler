@@ -33,14 +33,15 @@ Not a backend tool for working inside a shared cluster (mirrord, Telepresence, S
 ## Capabilities and Constraints
 
 - The canvas is a Svelte 5 page with Svelte Flow, built by Vite from `app/canvas/` and served locally by `status-watch.mjs`.
-- Light, dark and system themes.
+- Dark only (Patch bay): five schemes in Appearance, with the local and deployed colours pickable by hand; warning and PROD colours never change.
 - Agent and harness agnostic wording.
 - PROD is a dangerous mode and must always look different from QA.
 - Undecided: whether "local integration testing" becomes part of the positioning.
 
 ## Brand Commitments
 
-- Name: Koppler (a coupler connects separate components).
+- Name: Koppler (a coupler connects separate components), written `koppler` in Martian Mono beside its mark: a stem with two cables plugged into sockets.
+- Look: graphite hardware with its labels printed on the panel. Square corners, hairlines, mono capitals for every label. Colour is a signal: `local` for what runs here, `deployed` for what still calls the deployed environment, red for PROD and failures.
 - Voice: plain, short, sentence case; says exactly what will happen; never uses the em dash.
 
 ## Product Principles
@@ -53,4 +54,4 @@ Not a backend tool for working inside a shared cluster (mirrord, Telepresence, S
 
 ## Accessibility & Inclusion
 
-WCAG 2.2 AA: 4.5:1 text contrast in both themes, visible focus, 24px minimum targets, keyboard alternatives for board drag actions, reduced motion respected.
+WCAG 2.2 AA: 4.5:1 text contrast in every scheme, visible focus, 24px minimum targets, keyboard alternatives for board drag actions, reduced motion respected.

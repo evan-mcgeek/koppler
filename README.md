@@ -1,5 +1,7 @@
 # Koppler
 
+<img alt="koppler: run the part of your stack you need on your own machine. Pick apps on a canvas and plug cables between them, then press Run" src="docs/images/hero.png">
+
 Run the part of your stack you need on your own machine, without learning how each backend is run.
 
 Pick apps on a canvas and plug cables between them, then press **Run**.
@@ -79,7 +81,7 @@ Everything else depends on your stack (the .NET SDK, Flutter, Docker, the AWS CL
 Koppler runs from `app/dist/`, which `npm run build` makes from `app/src/` (`npm install` first).
 While working on Koppler itself, link `app/scripts/koppler-dev.mjs` as `koppler`: it rebuilds when the source is newer, then runs the build.
 Run the tests with `npm test` in `app/`; unit tests sit next to their module as `<name>.test.ts`.
-The documentation's screenshots come from `npm run screenshots` in `app/`: it drives the canvas on a demo stack and writes `docs/images/`.
+The documentation's screenshots come from `npm run screenshots` in `app/`: it drives the canvas on a demo stack and writes `docs/images/`, with the hero and the social card drawn from `app/screenshots/brand.html`.
 The canvas has tests of its own that drive it in a browser: `npm install`, `npx playwright install chromium` once, then `npm run test:canvas`.
 `npm run lint`, `npm run types` and `npm run format:check` are what CI checks besides the tests; `npm run format` formats.
 
