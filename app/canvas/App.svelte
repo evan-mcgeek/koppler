@@ -264,20 +264,21 @@
     }
   };
   // From the folded rail: its board button lands on the board picker.
-  // A pinch zooms the board only: anywhere else the browser would zoom the whole page.
+  // A pinch zooms the board only. One the board did not take (over a panel, a card's toolbar, the overview) would
+  // zoom the whole page: it is dropped.
   $effect(() => {
-    const outside = (ev: Event) => {
-      if (!(ev.target instanceof Element && ev.target.closest('.svelte-flow'))) ev.preventDefault();
-    };
     const wheel = (ev: WheelEvent) => {
-      if (ev.ctrlKey) outside(ev);
+      if (ev.ctrlKey) ev.preventDefault();
+    };
+    // Safari also sends its own pinch: dropped too, the board zooms by the wheel it sends with it.
+    const gesture = (ev: Event) => {
+      ev.preventDefault();
     };
     window.addEventListener('wheel', wheel, { passive: false });
-    // Safari's pinch.
-    window.addEventListener('gesturestart', outside);
+    window.addEventListener('gesturestart', gesture);
     return () => {
       window.removeEventListener('wheel', wheel);
-      window.removeEventListener('gesturestart', outside);
+      window.removeEventListener('gesturestart', gesture);
     };
   });
   const openSide = async (at?: 'board') => {
