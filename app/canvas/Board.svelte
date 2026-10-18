@@ -337,15 +337,30 @@
       ...board.infra.map(card => ({ ...card.position, ...(board.infraBoxes.get(card.id) ?? CARD) })),
     ];
     const drawn = () => [...board.boxes.values(), ...board.infraBoxes.values()];
+    // Close up the cards turn full a few frames later: the fit waits until their sizes have held for a few frames.
+    const measured = async () => {
+      const sizes = () => JSON.stringify([...board.boxes.values(), ...board.infraBoxes.values()]);
+      let last = '';
+      let held = 0;
+      for (let wait = 0; wait < 40 && held < 3; wait++) {
+        await frame();
+        const now = sizes();
+        held = now === last && !board.brief ? held + 1 : 0;
+        last = now;
+      }
+    };
     if (!area || !board.nodes.length) return;
     for (let tries = 0; tries < 2; tries++) {
       const close = viewFor(inFull(), FIT.maxZoom);
       if (close.zoom < FAR_ZOOM) break;
       await flow.setViewport(close, { duration: tries ? duration : 0 });
-      await frame();
-      await frame();
-      // Fitted with sizes guessed for cards never seen in full: measured now, it holds if it still fits.
-      if (viewFor(inFull(), FIT.maxZoom).zoom >= FAR_ZOOM) return;
+      await measured();
+      // Measured in full, the cards under a grown card have moved down with it: fitted to where all are drawn now.
+      const now = viewFor(drawn(), FIT.maxZoom);
+      if (now.zoom >= FAR_ZOOM) {
+        await flow.setViewport(now, { duration });
+        return;
+      }
     }
     if (!board.brief) {
       await flow.setViewport(viewFor(inFull(), FIT.maxZoom), { duration: 0 });
