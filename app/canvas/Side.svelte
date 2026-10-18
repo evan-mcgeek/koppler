@@ -7,7 +7,6 @@
   import X from '@lucide/svelte/icons/x';
   import Command from './Command.svelte';
   import BoardPicker from './BoardPicker.svelte';
-  import KindIcon from './KindIcon.svelte';
   import Needs from './Needs.svelte';
   import Summary from './Summary.svelte';
   import Settings from './Settings.svelte';
@@ -148,7 +147,7 @@
         {@const on = onBoard.includes(app.id)}
         {@const missing = !!app.outside || !app.cloned}
         <div class="app" class:on class:missing class:first-off={app === firstOff && app !== shown[0]} role="listitem">
-          <KindIcon kind={app.kind} label={app.kindLabel} />
+          <span class="kind">{app.outside ? 'Outside' : app.kindLabel}</span>
           {#if on}
             <button
               class="main"
@@ -162,9 +161,12 @@
             </button>
             {@const up = live.up(app.id)}
             {#if up !== null}
-              <span class="live" data-on={up} role="img" aria-label={up ? 'Running' : 'Not answering'}
-                >{up ? '' : '!'}</span
-              >
+              <span
+                class="led"
+                data-state={up ? 'running' : 'failed'}
+                role="img"
+                aria-label={up ? 'Running' : 'Not answering'}
+              ></span>
             {/if}
             <button
               class="act remove"
@@ -349,14 +351,17 @@
     display: flex;
     align-items: baseline;
     gap: 6px;
-    margin: 0 0 6px;
+    margin: 0 0 8px;
     padding: 0 8px;
-    font-size: 13px;
-    font-weight: 600;
+    color: var(--ink-muted);
+    font: 500 10px var(--mono);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .count::before {
+    content: '· ';
   }
   .count {
-    color: var(--muted);
-    font-weight: 500;
     font-variant-numeric: tabular-nums;
   }
   .sort {
@@ -367,10 +372,9 @@
     margin-left: auto;
     padding: 0 6px;
     border: 0;
-    border-radius: 5px;
     background: none;
-    color: var(--muted);
-    font: 500 12px var(--sans);
+    color: var(--ink-muted);
+    font: inherit;
     cursor: pointer;
   }
   .sort:hover {
@@ -400,11 +404,22 @@
     position: relative;
     display: flex;
     align-items: center;
-    gap: 9px;
-    min-height: 30px;
+    gap: 8px;
+    min-height: 34px;
     padding: 3px 8px;
-    border-radius: 6px;
-    color: var(--muted);
+    color: var(--ink-muted);
+    font-size: 14px;
+  }
+  .kind {
+    flex: none;
+    width: 62px;
+    overflow: hidden;
+    color: var(--ink-muted);
+    font: 500 10px var(--mono);
+    letter-spacing: 0.04em;
+    text-overflow: ellipsis;
+    text-transform: uppercase;
+    white-space: nowrap;
   }
   .app:hover {
     background: color-mix(in oklab, var(--ink) 6%, transparent);
@@ -498,28 +513,6 @@
   }
   .act.add {
     color: var(--cable);
-  }
-  .live {
-    flex: none;
-    display: grid;
-    place-items: center;
-    width: 14px;
-    height: 14px;
-    border-radius: 50%;
-    font-size: 12px;
-    font-weight: 700;
-    line-height: 1;
-  }
-  .live[data-on='true']::before {
-    content: '';
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: var(--ok);
-  }
-  .live[data-on='false'] {
-    background: var(--bad);
-    color: var(--on-accent);
   }
   .empty,
   .note {

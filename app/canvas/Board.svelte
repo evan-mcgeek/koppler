@@ -662,7 +662,7 @@
                 class:grabbed={wiring.grabbed?.id === edge.id && wiring.grabbed.end === 'to'}
                 cx={b.x}
                 cy={b.y}
-                r="8"
+                r="6"
                 onpointerdown={ev => {
                   pressedAt = { x: ev.clientX, y: ev.clientY };
                   wiring.grabEnd(ev, edge.id, 'to');
@@ -948,13 +948,14 @@
   .reordering * {
     cursor: grabbing;
   }
+  /* Where a cable leaves: a hollow ring. Where it plugs in: a solid socket. */
   .plug {
-    fill: var(--cable);
-    stroke: var(--surface);
+    fill: var(--desk);
+    stroke: var(--cable);
     stroke-width: 2;
   }
   .plug.idle {
-    fill: color-mix(in oklab, var(--cable) 38%, var(--line));
+    stroke: color-mix(in oklab, var(--cable) 45%, var(--line-strong));
   }
   .plug.cut {
     fill: var(--bad);
@@ -963,8 +964,8 @@
     r: 7.5px;
   }
   .socket {
-    fill: var(--socket);
-    stroke: var(--socket-rim);
+    fill: var(--local);
+    stroke: var(--desk);
     stroke-width: 2;
   }
   .socket.press {
@@ -979,7 +980,7 @@
     r: 10px;
   }
   .light {
-    fill: var(--socket-rim);
+    fill: var(--local);
   }
   .light[data-state='ok'] {
     fill: var(--ok);

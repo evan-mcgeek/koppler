@@ -132,8 +132,9 @@
     stroke: var(--cable);
     stroke-width: 2;
   }
-  /* A solid head with a notched back; its thin outline only rounds the corners. */
+  /* No head: the solid socket at its end says where it plugs in. */
   .head {
+    display: none;
     fill: var(--cable);
     stroke: var(--cable);
     stroke-width: 1.5;
