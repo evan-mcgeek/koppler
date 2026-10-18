@@ -256,3 +256,26 @@ test.describe('a shared queue under an app with a tunnel, its status late, and z
     ]);
   });
 });
+
+test('a running tunnel is restarted from its card, and says so', async ({ page }) => {
+  await page.route('**/data/status.json', route =>
+    route.fulfill({
+      json: { live: { env: 'qa', nodes: { orders: {} } }, apps: { orders: {} }, ports: { '5432': true } },
+    }),
+  );
+  let asked: unknown;
+  await page.route('**/restart-tunnel?*', async route => {
+    asked = route.request().postDataJSON();
+    await route.fulfill({ json: { ok: true } });
+  });
+  await page.reload();
+  const restart = tunnels(page).getByRole('button', { name: 'Restart the Database (Postgres) tunnel' });
+  await restart.click();
+  await expect(page.getByText('The Database (Postgres) tunnel started again.')).toBeVisible();
+  expect(asked).toEqual({ port: 5432 });
+});
+
+test('a tunnel that is not running has no Restart', async ({ page }) => {
+  await expect(tunnels(page)).toHaveCount(1);
+  await expect(tunnels(page).getByRole('button', { name: /^Restart/ })).toHaveCount(0);
+});

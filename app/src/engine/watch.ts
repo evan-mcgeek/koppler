@@ -5,7 +5,7 @@ import path from 'node:path';
 import { positional } from '../cli/output.ts';
 import { readClones, readStack } from '../data.ts';
 import { fail } from '../failure.ts';
-import { NAME, readRecord, startProcess, stopOne } from './processes.ts';
+import { NAME, readRecord, restartOne } from './processes.ts';
 
 /** What changes all the time without being a change to the app: its tools' and builds' own folders. */
 const NOISE = [
@@ -54,8 +54,7 @@ export function watchCommand(args: string[]): void {
     busy = true;
     console.log(`${new Date().toLocaleTimeString()} ${changed} changed: restarting ${id}`);
     try {
-      console.log(await stopOne(record));
-      await startProcess(record.start);
+      console.log(await restartOne(record));
     } catch (error) {
       console.log(`${id} did not start again: ${(error as Error).message}`);
     }

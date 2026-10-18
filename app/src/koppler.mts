@@ -9,7 +9,7 @@ import { doctor, ports, secret } from './cli/doctor.ts';
 import { confirm, flagValue, positional } from './cli/output.ts';
 import { actionsCommand, stepCommand } from './cli/records.ts';
 import { fail, Failure } from './failure.ts';
-import { canvas, logs, status, stop } from './cli/running.ts';
+import { canvas, logs, restart, status, stop } from './cli/running.ts';
 import { readData, readStack } from './data.ts';
 import { switchCommand } from './engine/branch.ts';
 import { APPROVE, stackCommands } from './engine/checks.ts';
@@ -496,6 +496,14 @@ const COMMANDS: Command[] = [
       'stop by name, or --all every app and tunnel; changes stay (down reverts them, canvas stop stops the canvas)',
     run: stop,
     example: 'koppler stop orders-api',
+  },
+  {
+    name: 'restart',
+    who: 'you',
+    args: '<name>',
+    about: 'stop an app or tunnel and start it again the way it was started',
+    run: restart,
+    example: 'koppler restart tunnel-db-qa-acme-example-5432',
   },
   {
     name: 'history',

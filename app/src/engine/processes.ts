@@ -390,6 +390,14 @@ const runAll = (commands: string[][]) => {
   for (const [command, ...args] of commands) if (command) sh(command, args);
 };
 /** Stops one process and everything it started, and says in a line what happened. */
+/** Stops a process and starts it again the way it was started. */
+export async function restartOne(record: ProcessRecord): Promise<string> {
+  const start = record.start;
+  if (!start) throw new Error(`${record.name} was started before Koppler kept how; stop it and start it again`);
+  const stopped = await stopOne(record);
+  await startProcess(start);
+  return `${stopped}, started again`;
+}
 export async function stopOne(record: ProcessRecord): Promise<string> {
   const forget = () => {
     // Some apps outlive their process, e.g. a mobile app on a simulator: close them too.
