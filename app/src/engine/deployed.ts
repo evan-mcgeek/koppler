@@ -81,7 +81,7 @@ interface QueueStack {
 /** Every Terraform folder of a clone, read per environment; a SAM app's samconfig.toml adds its domains. */
 export function readRepo(repo: string, workspaces: string[] = []): Module[] {
   const byDir = new Map<string, { name: string; text: string }[]>();
-  for (const file of findFiles(repo, name => /\.(tf|tfvars)$/.test(name), 7)) {
+  for (const file of findFiles(repo, name => /\.(tf|tfvars|tfvars\.json)$/.test(name), 7)) {
     let text: string;
     try {
       text = fs.readFileSync(file, 'utf8');
@@ -91,10 +91,22 @@ export function readRepo(repo: string, workspaces: string[] = []): Module[] {
     const dir = path.dirname(file);
     byDir.set(dir, [...(byDir.get(dir) ?? []), { name: path.basename(file), text }]);
   }
+  // A module folder without variable files of its own is given its parents' (the root module that calls it passes
+  // them on), the nearest last so it wins.
+  const varFiles = (dir: string) => (byDir.get(dir) ?? []).filter(file => !file.name.endsWith('.tf'));
+  const inherited = (dir: string) => {
+    const above: { name: string; text: string }[] = [];
+    for (let up = path.dirname(dir); up.startsWith(repo) && up !== dir; dir = up, up = path.dirname(up))
+      above.unshift(...varFiles(up));
+    return above;
+  };
   const terraform = [...byDir]
     .filter(([, files]) => files.some(file => file.name.endsWith('.tf')))
     .flatMap(([dir, files]) =>
-      readModule(files, workspaces).map(module => ({ ...module, dir: path.relative(repo, dir) })),
+      readModule(varFiles(dir).length ? files : [...inherited(dir), ...files], workspaces).map(module => ({
+        ...module,
+        dir: path.relative(repo, dir),
+      })),
     );
   let sam: Module[] = [];
   try {

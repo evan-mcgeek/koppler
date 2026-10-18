@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { test } from 'vitest';
 import { readModule } from '../core/terraform.ts';
-import { draftApp, linkQueues, queueDraft } from './deployed.ts';
+import { draftApp, linkQueues, queueDraft, readRepo } from './deployed.ts';
 
 // One app's Terraform: Kafka topics piped onto its bus, and a rule forwarding to a bus in another account.
 const SENDER = {
@@ -86,4 +89,50 @@ test('Kafka topics, pipes, rules and subscriptions are read into what feeds what
   const draft = queueDraft(linked, {});
   assert.deepEqual((draft.queues['orders-created'] as { feeds?: unknown }).feeds, { 'orders-events': { via: 'pipe' } });
   assert.deepEqual(draft.apps['shop']?.reads?.['shop-bus'], { via: 'rule to Lambda' });
+});
+
+test("a pipe in a module folder reads the topics of a map in its parent's .tfvars.json, and its send right is not the app's", () => {
+  const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-feeds-'));
+  const listener = path.join(repo, 'infra', 'listener');
+  fs.mkdirSync(listener, { recursive: true });
+  fs.writeFileSync(
+    path.join(repo, 'infra', 'deployment.tfvars.json'),
+    JSON.stringify({ kafka: { topics: { product: 'Juno_Product', destination: 'Juno_Destination' } } }),
+  );
+  fs.writeFileSync(path.join(repo, 'infra', 'main.tf'), 'module "listener" {\n  source = "./listener"\n}\n');
+  fs.writeFileSync(
+    path.join(listener, 'pipes.tf'),
+    `
+module "sqs" {
+  source = "git@github.com:acme/modules.git//modules/sqs"
+  name   = "catalog-kafka-sqs"
+}
+resource "awscc_pipes_pipe" "listener" {
+  for_each = var.kafka.topics
+  source   = "smk://broker:9096"
+  target   = module.sqs.arn
+  source_parameters = {
+    self_managed_kafka_parameters = {
+      topic_name = each.value
+    }
+  }
+}
+data "aws_iam_policy_document" "pipe" {
+  statement {
+    actions   = ["sqs:SendMessage"]
+    resources = [module.sqs.arn]
+  }
+}
+resource "aws_lambda_event_source_mapping" "reader" {
+  event_source_arn = module.sqs.arn
+}`,
+  );
+  const drafts = { catalog: draftApp('catalog', readRepo(repo), stack, new Map()) };
+  const linked = linkQueues(drafts, stack);
+  const at = (id: string) => linked.find(queue => queue.id === id);
+  assert.deepEqual(at('juno-product')?.feeds, { 'catalog-kafka': 'pipe' });
+  assert.deepEqual(at('juno-destination')?.feeds, { 'catalog-kafka': 'pipe' });
+  assert.deepEqual(at('catalog-kafka')?.reads, ['catalog']);
+  assert.deepEqual(at('catalog-kafka')?.sends, []);
+  fs.rmSync(repo, { recursive: true, force: true });
 });

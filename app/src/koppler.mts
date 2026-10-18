@@ -14,6 +14,7 @@ import { readData, readStack } from './data.ts';
 import { switchCommand } from './engine/branch.ts';
 import { APPROVE, stackCommands } from './engine/checks.ts';
 import { deployed } from './engine/deployed.ts';
+import { awsCheck } from './engine/aws-check.ts';
 import { discoverCommand } from './engine/discover.ts';
 import { down } from './engine/down.ts';
 import { investigate } from './engine/investigate.ts';
@@ -193,7 +194,13 @@ async function discover(args: string[]): Promise<void> {
   discoverCommand(args.filter(arg => arg === '--apply'));
   if (args.includes('--deployed')) {
     console.log('');
-    deployed(positional(args, ['--find']));
+    deployed(positional(args, ['--find', '--env']));
+    if (args.includes('--aws')) {
+      const stack = readStack() ?? fail('no stack loaded (koppler init)');
+      const env = flagValue(args, '--env') ?? stack.envs[0] ?? '';
+      if (!stack.envs.includes(env)) fail(`--env is one of ${stack.envs.join(', ')}`);
+      awsCheck(stack, env);
+    }
   }
 }
 
@@ -570,7 +577,7 @@ const COMMANDS: Command[] = [
   {
     name: 'discover',
     who: 'agent',
-    args: '[app...] [--deployed] [--apply] [--find "<name,...>"] [--no-fetch] [--no-github]',
+    args: '[app...] [--deployed [--aws [--env <env>]]] [--apply] [--find "<name,...>"] [--no-fetch] [--no-github]',
     about: 'what the repos say: ports, tunnels, calls, deployed addresses, gaps',
     run: discover,
     example: 'koppler discover --deployed',

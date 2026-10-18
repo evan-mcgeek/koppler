@@ -38,8 +38,8 @@ export interface QueueUse {
   feeds: Feed[];
   /** How its app reads it when not by itself: a pipe or rule to a Lambda or an API destination. */
   via?: string;
-  /** Its name is a list of names, one queue each (Kafka topics a pipe reads). */
-  list?: true;
+  /** Its name is a list or map of names, one queue each (Kafka topics a pipe reads): its keys, or its values. */
+  list?: 'key' | 'value';
 }
 
 export type NamedQueue = QueueUse & { name: string | null };
@@ -322,13 +322,13 @@ export function queueUses(tf: string): QueueUse[] {
   for (const { match, body } of pipes) {
     const topic = /topic_name\s*=\s*([^\n,}]+)/.exec(body)?.[1]?.trim();
     if (!topic) continue;
-    const each = /^each\.(key|value)$/.test(topic)
-      ? /toset\(\s*([\w.]+)\s*\)|^\s*([\w.]+)\s*$/.exec(assigned(body, 'for_each') ?? '')
-      : null;
+    const pick = /^each\.(key|value)$/.exec(topic)?.[1] as 'key' | 'value' | undefined;
+    const each = pick ? /toset\(\s*([\w.-]+)\s*\)|^\s*([\w.-]+)\s*$/.exec(assigned(body, 'for_each') ?? '') : null;
     const address = `kafka.${match[2] ?? ''}`;
     add(address, 'kafka', each ? (each[1] ?? each[2] ?? null) : topic);
     const queue = found.get(address);
-    if (queue && each) queue.list = true;
+    // A set's keys and values are the same items.
+    if (queue && each && pick) queue.list = each[1] ? 'value' : pick;
   }
   const refTo = (address: string) =>
     new RegExp(`${address.replace(/\./g, '\\.')}(?:\\[[^\\]]*\\])?\\.(?:arn|url|id|name)\\b`, 'g');
@@ -357,12 +357,16 @@ export function queueUses(tf: string): QueueUse[] {
   // What a pipe or rule hands its events to that is not a queue: a Lambda or an API destination of this app.
   const endOf = (raw: string | undefined) =>
     /aws_lambda_function\./.test(raw ?? '') ? 'Lambda' : /api_destination/i.test(raw ?? '') ? 'API destination' : null;
+  // Queues a pipe, rule or subscription here fills: the right to send to them is that one's, not the app's.
+  const filled = new Set<string>();
   const feed = (from: Found | undefined, to: string | undefined, via: FeedVia, other: Feed['to'] | null = null) => {
     if (!from) return;
     const target = queueIn(to);
     const end = endOf(to);
-    if (target && target !== from) from.feeds.push({ to: target.address, via });
-    else if (other) from.feeds.push({ to: other, via });
+    if (target && target !== from) {
+      from.feeds.push({ to: target.address, via });
+      filled.add(target.address);
+    } else if (other) from.feeds.push({ to: other, via });
     else if (end) {
       from.reads = true;
       from.via = `${via} to ${end}`;
@@ -401,7 +405,12 @@ export function queueUses(tf: string): QueueUse[] {
   ];
   for (const queue of found.values())
     for (const [name, raw] of settings) if (refTo(queue.address).test(raw)) queue.env.add(name);
-  return [...found.values()].map(queue => ({ ...queue, env: [...queue.env].sort(), fedBy: [...queue.fedBy] }));
+  return [...found.values()].map(queue => ({
+    ...queue,
+    sends: queue.sends && (!filled.has(queue.address) || queue.env.size > 0),
+    env: [...queue.env].sort(),
+    fedBy: [...queue.fedBy],
+  }));
 }
 
 /** Another account's bus a rule sends to, by the ARN written for it: `name:<bus>`; a map per environment gives its first. */
@@ -416,11 +425,39 @@ function busNamed(raw: string | undefined, tf: string): string | null {
   return bus ? `name:${bus}` : null;
 }
 
-/** The names a list variable holds, as written; commented-out items are left out. */
-const namesIn = (raw: string | null | undefined, context: Context): string[] => {
-  const reference = /^var\.([\w-]+)$/.exec(raw?.trim() ?? '')?.[1];
-  const written = reference ? context.vars[reference] : raw;
-  return [...(written ?? '').replace(/(\/\/|#)[^\n]*/g, '').matchAll(/"([^"\n]+)"/g)].map(match => match[1] ?? '');
+/**
+ * The names a list or map variable holds, a field of one too (`var.kafka.topics`): a list's items, a map's keys or
+ * values. Written in a .tfvars file or a .tfvars.json one; commented-out items are left out.
+ */
+const namesIn = (raw: string | null | undefined, context: Context, pick: 'key' | 'value'): string[] => {
+  const [, name = '', path = ''] = /^var\.([\w-]+)((?:\.[\w-]+)*)$/.exec(raw?.trim() ?? '') ?? [];
+  const fields = path.split('.').filter(Boolean);
+  const written = name ? context.vars[name] : raw;
+  try {
+    const value = fields.reduce<unknown>(
+      (at, field) => (at && typeof at === 'object' ? (at as Record<string, unknown>)[field] : undefined),
+      JSON.parse(written ?? ''),
+    );
+    const items = Array.isArray(value)
+      ? value
+      : value && typeof value === 'object'
+        ? pick === 'key'
+          ? Object.keys(value)
+          : Object.values(value)
+        : [];
+    return items.filter((item): item is string => typeof item === 'string');
+  } catch {
+    // Written as Terraform, not JSON.
+  }
+  let text = (written ?? '').replace(/(\/\/|#)[^\n]*/g, '');
+  for (const field of fields)
+    text =
+      assignments(text.slice(text.indexOf('{') + 1, text.lastIndexOf('}'))).find(([key]) => key === field)?.[1] ?? '';
+  if (text.trim().startsWith('{'))
+    return assignments(text.slice(text.indexOf('{') + 1, text.lastIndexOf('}')))
+      .map(([key, value]) => (pick === 'key' ? key : value.replace(/^"|"$/g, '')))
+      .filter(Boolean);
+  return [...text.matchAll(/"([^"\n]+)"/g)].map(match => match[1] ?? '');
 };
 
 export const hostOf = (address: string) => {
@@ -447,9 +484,22 @@ export function readModule(files: { name: string; text: string }[], workspaces: 
     }),
   );
   const locals = Object.fromEntries(blocks(tf, /(^|\n)\s*locals\s*\{/g).flatMap(block => assignments(block.body)));
+  const varsOf = (file: { name: string; text: string }): Record<string, string> => {
+    if (!file.name.endsWith('.json')) return Object.fromEntries(assignments(file.text));
+    try {
+      return Object.fromEntries(
+        Object.entries(JSON.parse(file.text) as Record<string, unknown>).map(([key, value]) => [
+          key,
+          JSON.stringify(value),
+        ]),
+      );
+    } catch {
+      return {};
+    }
+  };
   const varFiles = files
-    .filter(file => file.name.endsWith('.tfvars'))
-    .map(file => ({ token: tokenIn(file.name), vars: Object.fromEntries(assignments(file.text)) }));
+    .filter(file => /\.tfvars(\.json)?$/.test(file.name))
+    .map(file => ({ token: tokenIn(file.name.replace(/\.json$/, '')), vars: varsOf(file) }));
   const shared = varFiles.reduce((all, file) => (file.token ? all : { ...all, ...file.vars }), defaults);
   const perEnv = varFiles.flatMap(file => (file.token ? [{ token: file.token, vars: file.vars }] : []));
   const asVariables = (token: string) =>
@@ -506,7 +556,11 @@ export function readModule(files: { name: string; text: string }[], workspaces: 
     queues: queues
       .flatMap(queue =>
         queue.list
-          ? namesIn(queue.raw, context).map(name => ({ ...queue, address: `${queue.address}["${name}"]`, name }))
+          ? namesIn(queue.raw, context, queue.list).map(name => ({
+              ...queue,
+              address: `${queue.address}["${name}"]`,
+              name,
+            }))
           : [{ ...queue, name: named(queue.raw, context) }],
       )
       .filter(queue => !DEAD_LETTER.test(queue.name ?? '')),
