@@ -3,6 +3,8 @@
 interface SchemeOf {
   name: string;
   note: string;
+  /** Its board, for the swatch in Appearance. */
+  desk: string;
   local: string;
   deployed: string;
   live: string;
@@ -10,6 +12,7 @@ interface SchemeOf {
 }
 export const SCHEMES = {
   mono: {
+    desk: '#0d0d0d',
     name: 'Mono',
     note: 'No hue until something needs you',
     local: '#ffffff',
@@ -17,6 +20,7 @@ export const SCHEMES = {
     live: '#4ade80',
   },
   lime: {
+    desk: '#0e0f10',
     name: 'Patch bay',
     note: 'Lime local, periwinkle deployed',
     local: '#c8f03c',
@@ -24,6 +28,7 @@ export const SCHEMES = {
     live: '#4fd6c4',
   },
   signal: {
+    desk: '#100e0c',
     name: 'Signal',
     note: 'Orange local, steel deployed, warm black',
     local: '#ff8a1f',
@@ -31,6 +36,7 @@ export const SCHEMES = {
     live: '#5bd97a',
   },
   scope: {
+    desk: '#0a0d0b',
     name: 'Scope',
     note: 'Phosphor green local, cyan deployed',
     local: '#52f29a',
@@ -38,6 +44,7 @@ export const SCHEMES = {
     live: '#ffffff',
   },
   sodium: {
+    desk: '#0c0e12',
     name: 'Sodium',
     note: 'Yellow local, violet deployed, cool slate',
     local: '#ffd43b',
@@ -45,6 +52,7 @@ export const SCHEMES = {
     live: '#4ade80',
   },
   paper: {
+    desk: '#f4f4f2',
     name: 'Paper',
     note: 'Light, ink local',
     local: '#141414',
@@ -53,6 +61,7 @@ export const SCHEMES = {
     light: true,
   },
   blueprint: {
+    desk: '#edf1f5',
     name: 'Blueprint',
     note: 'Light, blue local, violet deployed, cool grey',
     local: '#1f4fd8',
@@ -61,6 +70,7 @@ export const SCHEMES = {
     light: true,
   },
   workshop: {
+    desk: '#f5f1ea',
     name: 'Workshop',
     note: 'Light, burnt orange local, teal deployed, warm paper',
     local: '#b4490a',

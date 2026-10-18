@@ -2,7 +2,7 @@
   import Icon from './Icon.svelte';
   import Settings from '@lucide/svelte/icons/settings';
   import { debug } from './debug.svelte.ts';
-  import { appearance, picksFor, SCHEMES, type Scheme } from './appearance.svelte.ts';
+  import { appearance, isLight, picksFor, SCHEMES, type Scheme } from './appearance.svelte.ts';
   import { toasts } from './toast.svelte.ts';
   import { post } from './data.ts';
 
@@ -33,6 +33,10 @@
   };
 
   const schemes = Object.entries(SCHEMES) as [Scheme, (typeof SCHEMES)[Scheme]][];
+  const groups = [
+    ['Dark', schemes.filter(([id]) => !isLight(id))],
+    ['Light', schemes.filter(([id]) => isLight(id))],
+  ] as const;
   const picks = $derived([
     [
       'Local',
@@ -98,26 +102,31 @@
     {/if}
   </div>
   <section class="appearance" aria-label="Appearance">
-    <h2>Appearance · scheme</h2>
-    <div class="schemes" role="radiogroup" aria-label="Scheme">
-      {#each schemes as [id, scheme] (id)}
-        <button
-          type="button"
-          role="radio"
-          class="scheme"
-          aria-checked={appearance.now.scheme === id}
-          onclick={() => {
-            appearance.pickScheme(id);
-          }}
-        >
-          <span class="mark" aria-hidden="true"></span>
-          <span class="swatch" aria-hidden="true"
-            ><i style:background="var(--desk)"></i><i style:background={scheme.local}></i><i
-              style:background={scheme.deployed}
-            ></i></span
-          >
-          <span class="words"><b>{scheme.name}</b><small>{scheme.note}</small></span>
-        </button>
+    <h2>Appearance</h2>
+    <div role="radiogroup" aria-label="Scheme">
+      {#each groups as [group, list] (group)}
+        <span class="group">{group}</span>
+        <div class="schemes">
+          {#each list as [id, scheme] (id)}
+            <button
+              type="button"
+              role="radio"
+              class="scheme"
+              aria-checked={appearance.now.scheme === id}
+              onclick={() => {
+                appearance.pickScheme(id);
+              }}
+            >
+              <span class="mark" aria-hidden="true"></span>
+              <span class="swatch" aria-hidden="true"
+                ><i style:background={scheme.desk}></i><i style:background={scheme.local}></i><i
+                  style:background={scheme.deployed}
+                ></i></span
+              >
+              <span class="words"><b>{scheme.name}</b><small>{scheme.note}</small></span>
+            </button>
+          {/each}
+        </div>
       {/each}
     </div>
     {#each picks as [label, hexes, now, pick] (label)}
@@ -267,8 +276,18 @@
     border: 1px solid var(--line-strong);
   }
   .scheme[aria-checked='true'] .mark {
-    border-color: var(--ink);
-    background: radial-gradient(var(--ink) 0 3px, transparent 3.5px);
+    border: 1.5px solid var(--ink);
+    background: var(--ink);
+    box-shadow: inset 0 0 0 1.5px var(--panel);
+  }
+  .group {
+    display: block;
+    margin: 10px 0 6px;
+    color: var(--ink-muted);
+    font: 12px var(--sans);
+  }
+  .group:first-child {
+    margin-top: 0;
   }
   .swatch {
     display: flex;
