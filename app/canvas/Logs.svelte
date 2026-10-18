@@ -26,8 +26,8 @@
     });
   });
   const NAMES = [
-    ['every', 'Name on every line'],
-    ['change', 'Name when the app changes'],
+    ['every', 'Every line'],
+    ['change', 'App changes'],
   ] as const;
   const SPANS = [
     ['run', 'Since the run'],
@@ -36,7 +36,7 @@
   ] as const;
   const choices = $derived([
     {
-      label: 'Names',
+      label: 'Name',
       value: logs.names as string,
       choices: NAMES,
       set: (value: string) => {
@@ -44,7 +44,7 @@
       },
     },
     {
-      label: 'How much',
+      label: 'Show',
       value: logs.since as string,
       choices: SPANS,
       set: (value: string) => {
@@ -271,6 +271,7 @@
         {/each}
         <span class="opts">
           {#each choices as group (group.label)}
+            <span class="opt-label" aria-hidden="true">{group.label}</span>
             <span class="seg" role="radiogroup" aria-label={group.label}>
               {#each group.choices as [value, text] (value)}
                 <label>
@@ -696,6 +697,12 @@
     display: flex;
     gap: 8px;
     margin-left: auto;
+  }
+  .opt-label {
+    align-self: center;
+    margin-left: 6px;
+    color: var(--muted);
+    font: 500 12px var(--sans);
   }
   .opts .seg label {
     padding: 2px 10px;
