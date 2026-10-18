@@ -135,7 +135,7 @@ test('All apps shows every app on the board in one stream by time, and an app le
     new RegExp(`\\d\\d:\\d\\d:\\d\\d\\.${String(t % 1000).padStart(3, '0')}$`),
   );
 
-  await pane.getByRole('combobox', { name: 'Names' }).selectOption('change');
+  await pane.getByRole('radio', { name: 'Name when the app changes' }).check();
   await expect(pane.locator('.switch .n')).toHaveCount(3);
   const apps = pane.getByRole('group', { name: 'Apps in this log' });
   await pane.locator('.switch .n', { hasText: 'Orders API' }).click();
@@ -153,7 +153,7 @@ test('All apps shows every app on the board in one stream by time, and an app le
   await pane.getByRole('tab', { name: 'All apps' }).click();
   await expect(rows).toHaveCount(2);
   await expect(pane.locator('.switch .n')).toHaveText(['web']);
-  await expect(pane.getByRole('combobox', { name: 'Names' })).toHaveValue('change');
+  await expect(pane.getByRole('radio', { name: 'Name when the app changes' })).toBeChecked();
   await apps.getByRole('button', { name: 'Orders API', exact: true }).click();
   await expect(rows).toHaveCount(3);
   await page.screenshot({ path: 'test-results/next-logs-all.png' });

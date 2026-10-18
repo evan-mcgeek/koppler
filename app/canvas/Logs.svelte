@@ -25,6 +25,33 @@
       return { ...row, key: `${said}#${String(count)}` };
     });
   });
+  const NAMES = [
+    ['every', 'Name on every line'],
+    ['change', 'Name when the app changes'],
+  ] as const;
+  const SPANS = [
+    ['run', 'Since the run'],
+    ['hour', 'Last hour'],
+    ['lines', 'Last 2,000 lines'],
+  ] as const;
+  const choices = $derived([
+    {
+      label: 'Names',
+      value: logs.names as string,
+      choices: NAMES,
+      set: (value: string) => {
+        logs.setNames(value as Names);
+      },
+    },
+    {
+      label: 'How much',
+      value: logs.since as string,
+      choices: SPANS,
+      set: (value: string) => {
+        logs.setSince(value as Span);
+      },
+    },
+  ]);
   const all = $derived(active === ALL);
   const clock = (at: number) =>
     `${new Date(at).toLocaleTimeString([], { hour12: false })}.${String(at % 1000).padStart(3, '0')}`;
@@ -176,29 +203,7 @@
         {/each}
       </div>
       <span class="meta">{all || (logs.past(active) ? text : live.tail(active)) ? '' : 'no log yet'}</span>
-      {#if all}
-        <select
-          aria-label="Names"
-          value={logs.names}
-          onchange={ev => {
-            logs.setNames(ev.currentTarget.value as Names);
-          }}
-        >
-          <option value="every">Name on every line</option>
-          <option value="change">Name when the app changes</option>
-        </select>
-        <select
-          aria-label="How much"
-          value={logs.since}
-          onchange={ev => {
-            logs.setSince(ev.currentTarget.value as Span);
-          }}
-        >
-          <option value="run">Since the run started</option>
-          <option value="hour">Last hour</option>
-          <option value="lines">Last 2,000 lines</option>
-        </select>
-      {:else}
+      {#if all}{:else}
         <button
           type="button"
           title="Hide what is in this log so far; new lines keep coming. The log file is not touched."
@@ -264,6 +269,25 @@
             </span>
           {/if}
         {/each}
+        <span class="opts">
+          {#each choices as group (group.label)}
+            <span class="seg" role="radiogroup" aria-label={group.label}>
+              {#each group.choices as [value, text] (value)}
+                <label>
+                  <input
+                    type="radio"
+                    name="log-{group.label}"
+                    {value}
+                    checked={group.value === value}
+                    onchange={() => {
+                      group.set(value);
+                    }}
+                  />{text}
+                </label>
+              {/each}
+            </span>
+          {/each}
+        </span>
       </div>
     {/if}
     <div
@@ -296,8 +320,11 @@
             </div>
           {/if}
           <div class="row" data-level={row.level}>
-            <span class="t" title={row.approx ? 'Approximate: the time Koppler first read this line' : undefined}
-              >{row.approx ? '~' : ''}{clock(row.at)}</span
+            <span
+              class="t"
+              class:approx={row.approx}
+              title={row.approx ? 'Approximate: the time Koppler first read this line' : undefined}
+              >{clock(row.at)}</span
             ><span class="l">{LABEL[row.level] ?? ''}</span>
             {#if byChange}
               <!-- The app's name is on the line above. -->
@@ -576,13 +603,13 @@
     font-weight: 600;
   }
   .all .row {
-    grid-template-columns: 13ch 50px var(--name) minmax(0, 1fr);
+    grid-template-columns: calc(12ch + 12px) 50px var(--name) minmax(0, 1fr);
   }
   .all .x:not(button) {
     grid-column: 4;
   }
   .by-change .row {
-    grid-template-columns: 13ch 50px minmax(0, 1fr);
+    grid-template-columns: calc(12ch + 12px) 50px minmax(0, 1fr);
   }
   .by-change .x:not(button) {
     grid-column: 3;
@@ -603,7 +630,12 @@
   .switch + .row {
     border-top: 0;
   }
+  .t.approx {
+    font-style: italic;
+    opacity: 0.55;
+  }
   .n {
+    align-self: start;
     overflow: hidden;
     padding: 0;
     border: 0;
@@ -617,15 +649,6 @@
   }
   .n:hover {
     text-decoration: line-through;
-  }
-  header > select {
-    align-self: center;
-    padding: 3px 6px;
-    border: 1px solid var(--line);
-    border-radius: 8px;
-    background: var(--surface);
-    color: var(--ink);
-    font: 500 13px var(--sans);
   }
   .apps {
     display: flex;
@@ -668,6 +691,15 @@
   }
   .tag.off button:first-child {
     text-decoration: line-through;
+  }
+  .opts {
+    display: flex;
+    gap: 8px;
+    margin-left: auto;
+  }
+  .opts .seg label {
+    padding: 2px 10px;
+    font: 600 12px var(--sans);
   }
   input.tag {
     padding: 2px 10px;
