@@ -90,14 +90,13 @@
   select {
     width: 100%;
     min-width: 0;
-    height: 28px;
+    height: 32px;
     box-sizing: border-box;
-    padding: 4px 8px;
+    padding: 7px 10px;
     border: 1px solid var(--line);
-    border-radius: 6px;
-    background: var(--paper);
+    background: var(--desk);
     color: var(--ink);
-    font: 13px var(--sans);
+    font: 12px var(--mono);
   }
   select {
     padding-right: 26px;
@@ -107,7 +106,8 @@
     background-position: right 9px center;
   }
   input::placeholder {
-    color: color-mix(in oklab, var(--muted) 70%, transparent);
+    color: color-mix(in oklab, var(--ink-muted) 65%, transparent);
+    font: 13px var(--sans);
   }
   :disabled {
     opacity: 0.7;

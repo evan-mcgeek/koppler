@@ -1,9 +1,6 @@
 <script lang="ts">
   import Icon from './Icon.svelte';
-  import Lock from '@lucide/svelte/icons/lock';
-  import LockOpen from '@lucide/svelte/icons/lock-open';
   import ChevronRight from '@lucide/svelte/icons/chevron-right';
-  import X from '@lucide/svelte/icons/x';
   // One field of the stack in a settings panel, edited the way it is best edited: picked where Koppler knows what it
   // can be, a row with a sentence where it is one of a list, else by its schema (text, a number, a switch, a group).
   // Each keeps its value through the panel, which checks it; a lock keeps it as it is.
@@ -148,18 +145,12 @@
     {#if drop && !locked}
       <button class="words" type="button" onclick={() => void save(undefined)}>{drop}</button>
     {:else if value !== undefined && !required && !locked}
-      <button
-        class="icon"
-        type="button"
-        aria-label="Remove {called}"
-        title="Remove"
-        onclick={() => void save(undefined)}
+      <button class="words remove" type="button" aria-label="Remove {called}" onclick={() => void save(undefined)}
+        >Remove</button
       >
-        <Icon of={X} size={11} />
-      </button>
     {/if}
     <button
-      class="icon lock"
+      class="words lock"
       class:on={locked}
       type="button"
       aria-pressed={locked}
@@ -169,7 +160,7 @@
         ctx.lock(path, !locked);
       }}
     >
-      <Icon of={locked ? Lock : LockOpen} size={12} />
+      {locked ? 'Locked' : 'Lock'}
     </button>
   </span>
 {/snippet}
@@ -282,7 +273,7 @@
 {/snippet}
 
 {#if inline}
-  <div class="field line" class:locked class:wide={depth > 1 || bare}>
+  <div class="field line" class:locked class:changed={ctx.changed?.(path)} class:wide={depth > 1 || bare}>
     {#if depth <= 1}<span class="name" title={hint}>{name}</span>{/if}
     <fieldset class="parts" disabled={locked}>
       <legend class="sr">{called}</legend>
@@ -336,7 +327,7 @@
     </fieldset>
   </details>
 {:else}
-  <div class="field" class:locked class:bare>
+  <div class="field" class:locked class:changed={ctx.changed?.(path)} class:bare>
     <label class="name" class:sr={bare} for={id} title={hint}>{name}</label>
     {#if control === 'kind' && choice}
       <KindPick {id} value={text(value)} options={choice.options} disabled={locked} onpick={next => void save(next)} />
@@ -553,16 +544,31 @@
   .row .name {
     flex: 1;
   }
+  /* Its name and its lock on one line, what it holds below. */
   .field {
     display: grid;
-    grid-template-columns: 132px minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr) auto;
     align-items: center;
-    column-gap: 10px;
-    row-gap: 2px;
+    gap: 6px 10px;
     min-width: 0;
   }
-  .field .name {
-    font-weight: 500;
+  .field > :global(*) {
+    grid-column: 1 / -1;
+  }
+  .field > .name {
+    grid-row: 1;
+    grid-column: 1;
+    color: var(--ink-muted);
+    font: 500 10px var(--mono);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .field > .acts {
+    grid-row: 1;
+    grid-column: 2;
+  }
+  .line.wide > :global(*) {
+    grid-column: auto;
   }
   .about {
     color: var(--muted);
@@ -571,37 +577,37 @@
   .acts {
     display: flex;
     justify-content: flex-end;
-    gap: 2px;
-    min-width: 46px;
-  }
-  .icon {
-    display: grid;
-    place-items: center;
-    width: 22px;
-    height: 22px;
-    padding: 0;
-    border: 0;
-    border-radius: 5px;
-    background: none;
-    color: var(--muted);
-    cursor: pointer;
-  }
-  .icon:hover {
-    background: color-mix(in oklab, var(--ink) 8%, transparent);
-    color: var(--ink);
+    gap: 4px;
   }
   .words {
-    padding: 2px 8px;
-    border: 1px solid var(--line);
-    border-radius: 6px;
+    padding: 3px 5px;
+    border: 1px solid var(--line-strong);
     background: none;
-    color: var(--ink);
-    font: 600 12px var(--sans);
+    color: var(--ink-muted);
+    font: 500 9px var(--mono);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
     white-space: nowrap;
     cursor: pointer;
   }
+  .words:hover {
+    border-color: var(--ink);
+    color: var(--ink);
+  }
   .lock.on {
-    color: var(--warn);
+    border-color: var(--ink);
+    background: var(--ink);
+    color: var(--desk);
+  }
+  /* Taking a value out is there when you are at the field. */
+  .remove {
+    opacity: 0;
+  }
+  .field:hover > .acts .remove,
+  .field:focus-within > .acts .remove,
+  summary:hover .remove,
+  .remove:focus-visible {
+    opacity: 1;
   }
   input:not([type='checkbox']),
   select,
@@ -609,16 +615,26 @@
     width: 100%;
     min-width: 0;
     box-sizing: border-box;
-    padding: 4px 8px;
+    padding: 7px 10px;
     border: 1px solid var(--line);
-    border-radius: 6px;
-    background: var(--paper);
+    background: var(--desk);
     color: var(--ink);
-    font: 13px var(--sans);
+    font: 12px var(--mono);
   }
   input:not([type='checkbox']),
   select {
-    height: 28px;
+    height: 32px;
+  }
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible {
+    border-color: var(--ink-muted);
+    outline: none;
+  }
+  .changed > :global(input),
+  .changed > :global(select),
+  .changed > :global(textarea) {
+    border-color: var(--ink);
   }
   select {
     padding-right: 26px;
@@ -629,7 +645,8 @@
   }
   input::placeholder,
   textarea::placeholder {
-    color: color-mix(in oklab, var(--muted) 70%, transparent);
+    color: color-mix(in oklab, var(--ink-muted) 65%, transparent);
+    font: 13px var(--sans);
   }
   textarea {
     resize: vertical;
@@ -680,7 +697,7 @@
     gap: 6px;
   }
   .error {
-    grid-column: 2 / -1;
+    grid-column: 1 / -1;
     color: var(--bad);
     font-size: 12px;
   }
@@ -714,7 +731,7 @@
     color: var(--muted);
   }
   .note {
-    grid-column: 2 / -1;
+    grid-column: 1 / -1;
     color: var(--muted);
     font-size: 12px;
   }

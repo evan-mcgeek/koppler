@@ -1,17 +1,14 @@
 <script lang="ts">
   import ChevronRight from '@lucide/svelte/icons/chevron-right';
   import Icon from './Icon.svelte';
-  import WandSparkles from '@lucide/svelte/icons/wand-sparkles';
-  import X from '@lucide/svelte/icons/x';
   // Settings for one part of the stack (an app, a queue, an outside system, the whole stack), opened from the gear next
-  // to it. What it is sits on top; the rest is in tabs, in plain words; every field its schema has is there. Edits are a
-  // draft until Save, which checks the whole stack and writes it at once; Discard drops them. A lock keeps a field as it
-  // is, for the user and the agent.
+  // to it. Its tabs are numbered channels down the side, in plain words, starting with what it is; every field its
+  // schema has is there. Edits are a draft until Save, which checks the whole stack and writes it at once; Discard drops
+  // them. A lock keeps a field as it is, for the user and the agent.
   import { KINDS } from '../src/core/kinds.ts';
   import { SECRET_TYPES } from '../src/core/secret-types.ts';
   import { getAt, parsePath, setAt } from '../src/core/stack-path.ts';
   import EnvOverrides from './EnvOverrides.svelte';
-  import KindIcon from './KindIcon.svelte';
   import SettingsField from './SettingsField.svelte';
   import { board } from './board.svelte.ts';
   import { post } from './data.ts';
@@ -27,6 +24,7 @@
     KIND_FIELDS,
     label,
     lockedBy,
+    OTHER_ABOUT,
     OUTSIDE_TABS,
     problemsByPath,
     rowOf,
@@ -84,10 +82,15 @@
   const value = $derived((at ? getAt(draft, parts(at)) : draft) as Record<string, unknown> | undefined);
   const app = $derived(/^apps\.[a-z0-9-]+$/.test(at) ? at.slice(5) : null);
   const outside = $derived(!!app && !!value?.['outside']);
-  // What it is on top, then tabs; a part with no tabs of its own (a queue) shows all its fields in one.
+  // What it is first, then tabs; a part with no tabs of its own (a queue) shows all its fields in one.
   const head = $derived(app ? APP_HEAD : at ? [] : STACK_HEAD);
   const tabs = $derived.by((): Tab[] => {
-    const own = app ? (outside ? OUTSIDE_TABS : APP_TABS) : at ? [] : STACK_TABS;
+    const identity: Tab = {
+      name: 'Identity',
+      about: app ? 'What it is called, and where its code is' : 'What the stack is called',
+      keys: head,
+    };
+    const own = app ? [identity, ...(outside ? OUTSIDE_TABS : APP_TABS)] : at ? [] : [identity, ...STACK_TABS];
     const named = new Set([...head, ...own.flatMap(one => one.keys)]);
     const rest = [...Object.keys(shape.properties ?? {}), ...Object.keys(value ?? {})].filter(key => !named.has(key));
     const other = [...new Set(rest)];
@@ -95,12 +98,27 @@
     const row = at ? rowOf(at, value, draft) : undefined;
     if (row) return [{ name: 'Settings', keys: [...new Set([...row.fields, ...Object.keys(value ?? {})])] }];
     if (!own.length) return [{ name: 'Settings', keys: other }];
-    return other.length ? [...own, { name: 'Other', keys: other }] : own;
+    return other.length ? [...own, { name: 'Other', about: OTHER_ABOUT, keys: other }] : own;
   });
   const shown = $derived(tabs[Math.min(tab, tabs.length - 1)]);
   const count = $derived(changes(stack, draft));
+  const valueAt = (from: unknown, path: string) => (path ? getAt(from, parts(path)) : from);
+  const changedAt = (path: string) => changes(valueAt(stack, path), valueAt(draft, path)) > 0;
+  const changedIn = (keys: string[]) => keys.filter(key => changedAt(child(at, key)));
+  /** The fields with a change, by name. */
+  const named = $derived.by(() => {
+    const kept = (valueAt(stack, at) ?? {}) as Record<string, unknown>;
+    return changedIn([...new Set([...Object.keys(kept), ...Object.keys(value ?? {})])]).map(key => label(key, !at));
+  });
   const wrongIn = (keys: string[]) =>
     [...problems.keys()].filter(place => keys.some(key => within(place, child(at, key)))).length;
+  const sub = $derived.by(() => {
+    if (!app || !value) return '';
+    const kind = typeof value['kind'] === 'string' ? value['kind'] : '';
+    const said = (Object.hasOwn(KINDS, kind) ? KINDS[kind]?.label : null) ?? kind;
+    return [said, typeof value['slug'] === 'string' ? value['slug'] : ''].filter(Boolean).join(' · ');
+  });
+  const two = (index: number) => String(index + 1).padStart(2, '0');
 
   export async function open(what: { title: string; path: string }): Promise<void> {
     title = what.title;
@@ -109,7 +127,8 @@
     asked = false;
     saved = false;
     leaving = false;
-    tab = 0;
+    // Past what it is, to the first tab of settings.
+    tab = 1;
     problems = new Map();
     locks = live.status?.locks ?? [];
     const id = /^apps\.([a-z0-9-]+)$/.exec(what.path)?.[1] ?? '';
@@ -195,6 +214,7 @@
       return null;
     },
     problem: path => problems.get(path),
+    changed: changedAt,
     options: optionsFor,
     stack: () => draft,
   };
@@ -243,7 +263,11 @@
   }}
 >
   <header>
-    <h2 id="settings-title">{title}</h2>
+    {#if app && live.up(app)}<span class="led" title="Running"></span>{/if}
+    <div class="who">
+      <h2 id="settings-title">{title}</h2>
+      {#if sub}<span class="sub">{sub}</span>{/if}
+    </div>
     {#if app && !outside}
       <button
         type="button"
@@ -256,99 +280,98 @@
             Object.keys(shape.properties ?? {}).filter(key => value?.[key] === undefined && key !== 'outside'),
             locks.filter(one => one.startsWith(`apps.${app}.`)),
           );
-        }}><Icon of={WandSparkles} size={14} />{asked ? 'Asked the agent' : 'Ask the agent to fill in'}</button
+        }}>{asked ? 'Asked the agent' : 'Ask the agent to fill in'}</button
       >
     {/if}
-    <button class="x" type="button" aria-label="Close" onclick={close}><Icon of={X} size={14} /></button>
+    <button class="x" type="button" aria-label="Close" onclick={close}>×</button>
   </header>
   {#if schema && draft}
-    {#if head.length}
-      <div class="head">
-        {#each head as key (key)}
-          <SettingsField
-            path={child(at, key)}
-            name={label(key, !at)}
-            schema={shape.properties?.[key] ?? {}}
-            value={value?.[key]}
-            {ctx}
-            required={!!shape.required?.includes(key)}
-            depth={1}
-          />
-        {/each}
-      </div>
-    {/if}
-    {#if tabs.length > 1}
-      <div class="tabs" role="tablist" aria-label="{title} settings">
-        {#each tabs as one, index (one.name)}
-          {@const wrong = wrongIn(one.keys)}
-          <button
-            type="button"
-            role="tab"
-            aria-selected={shown === one}
-            class:wrong={wrong > 0}
-            onclick={() => (tab = index)}
-            >{one.name}{#if wrong}<span class="badge" aria-label="{wrong} to fix">{wrong}</span>{/if}</button
-          >
-        {/each}
-      </div>
-    {/if}
-    <div class="body" role="tabpanel" aria-label={shown?.name}>
-      {#if shown?.view === 'envs' && app && value}
-        <EnvOverrides path={at} app={value} schema={shape} envs={board.envs} {ctx} />
-      {:else if shown?.view === 'apps'}
-        <ul class="apps">
-          {#each Object.entries((value?.['apps'] ?? {}) as Record<string, { name?: string; kind?: string }>) as [id, one] (id)}
-            <li>
-              <KindIcon kind={one.kind ?? 'other'} label="" />
-              <span class="name">{one.name ?? id}</span>
-              <span class="kind"
-                >{(Object.hasOwn(KINDS, one.kind ?? '') ? KINDS[one.kind ?? '']?.label : null) ?? one.kind ?? ''}</span
-              >
-              <button
-                type="button"
-                disabled={count > 0}
-                title={count ? 'Save or discard your changes first' : undefined}
-                onclick={() => void open({ title: one.name ?? id, path: `apps.${id}` })}>Settings</button
-              >
-            </li>
-          {/each}
-        </ul>
-      {:else if shown}
-        {@const kind = typeof value?.['kind'] === 'string' ? value['kind'] : ''}
-        {@const mine = BY_KIND[kind] ?? []}
-        {@const others = shown.keys.filter(
-          key => KIND_FIELDS.includes(key) && !mine.includes(key) && value?.[key] === undefined,
-        )}
-        {#each shown.keys.filter(key => !others.includes(key)) as key (key)}
-          <SettingsField
-            path={child(at, key)}
-            name={label(key, !at)}
-            schema={shape.properties?.[key] ?? {}}
-            value={value?.[key]}
-            {ctx}
-            required={!!shape.required?.includes(key)}
-            depth={shown.keys.length === 1 ? 0 : 1}
-          />
-        {/each}
-        {#if others.length}
-          <!-- Fields for how other kinds of app start: not this one's, but nothing is hidden. -->
-          <details class="others">
-            <summary
-              ><span class="chev"><Icon of={ChevronRight} size={10} /></span>Fields for other kinds of app</summary
+    <div class="main" class:single={tabs.length < 2}>
+      {#if tabs.length > 1}
+        <div class="tabs" role="tablist" aria-orientation="vertical" aria-label="{title} settings">
+          {#each tabs as one, index (one.name)}
+            {@const wrong = wrongIn(one.keys)}
+            {@const edited = changedIn(one.keys).length}
+            <button
+              type="button"
+              role="tab"
+              aria-selected={shown === one}
+              class:wrong={wrong > 0}
+              onclick={() => (tab = index)}
+              ><span class="n" aria-hidden="true">{two(index)}</span>{one.name}{#if wrong}<span
+                  class="mark bad"
+                  aria-label="{wrong} to fix">!</span
+                >{:else if edited}<span class="mark" aria-label="{edited} changed">{edited}</span>{/if}</button
             >
-            {#each others as key (key)}
-              <SettingsField
-                path={child(at, key)}
-                name={label(key)}
-                schema={shape.properties?.[key] ?? {}}
-                value={value?.[key]}
-                {ctx}
-                depth={1}
-              />
-            {/each}
-          </details>
-        {/if}
+          {/each}
+        </div>
       {/if}
+      <div class="body" role="tabpanel" aria-label={shown?.name}>
+        {#if tabs.length > 1 && shown}
+          <div class="sec">
+            <span class="caps">{two(tabs.indexOf(shown))} · {shown.name}</span>{#if shown.about}<span class="about"
+                >{shown.about}</span
+              >{/if}
+          </div>
+        {/if}
+        {#if shown?.view === 'envs' && app && value}
+          <EnvOverrides path={at} app={value} schema={shape} envs={board.envs} {ctx} />
+        {:else if shown?.view === 'apps'}
+          <ul class="apps">
+            {#each Object.entries((value?.['apps'] ?? {}) as Record<string, { name?: string; kind?: string }>) as [id, one] (id)}
+              <li>
+                <span class="name">{one.name ?? id}</span>
+                <span class="kind"
+                  >{(Object.hasOwn(KINDS, one.kind ?? '') ? KINDS[one.kind ?? '']?.label : null) ??
+                    one.kind ??
+                    ''}</span
+                >
+                <button
+                  type="button"
+                  disabled={count > 0}
+                  title={count ? 'Save or discard your changes first' : undefined}
+                  onclick={() => void open({ title: one.name ?? id, path: `apps.${id}` })}>Settings</button
+                >
+              </li>
+            {/each}
+          </ul>
+        {:else if shown}
+          {@const kind = typeof value?.['kind'] === 'string' ? value['kind'] : ''}
+          {@const mine = BY_KIND[kind] ?? []}
+          {@const others = shown.keys.filter(
+            key => KIND_FIELDS.includes(key) && !mine.includes(key) && value?.[key] === undefined,
+          )}
+          {#each shown.keys.filter(key => !others.includes(key)) as key (key)}
+            <SettingsField
+              path={child(at, key)}
+              name={label(key, !at)}
+              schema={shape.properties?.[key] ?? {}}
+              value={value?.[key]}
+              {ctx}
+              required={!!shape.required?.includes(key)}
+              depth={shown.keys.length === 1 ? 0 : 1}
+            />
+          {/each}
+          {#if others.length}
+            <!-- Fields for how other kinds of app start: not this one's, but nothing is hidden. -->
+            <details class="others">
+              <summary
+                ><span class="chev"><Icon of={ChevronRight} size={10} /></span>Fields for other kinds of app</summary
+              >
+              {#each others as key (key)}
+                <SettingsField
+                  path={child(at, key)}
+                  name={label(key)}
+                  schema={shape.properties?.[key] ?? {}}
+                  value={value?.[key]}
+                  {ctx}
+                  depth={1}
+                />
+              {/each}
+            </details>
+          {/if}
+        {/if}
+      </div>
     </div>
     <footer class:dirty={count > 0}>
       {#if leaving && count}
@@ -367,7 +390,7 @@
           {#if problems.size}
             {problems.get('') ?? `${String(problems.size)} to fix before it can be saved`}
           {:else if count}
-            {count} {count === 1 ? 'change' : 'changes'}, not saved yet
+            {count} {count === 1 ? 'change' : 'changes'}{named.length ? ` · ${named.join(', ')}` : ''}
           {:else if saved}
             Saved
           {:else}
@@ -387,18 +410,17 @@
   dialog {
     position: fixed;
     inset: 0 0 0 auto;
-    width: min(560px, 100vw);
+    width: min(640px, 100vw);
     max-width: none;
     height: 100vh;
     max-height: none;
     margin: 0;
     padding: 0;
     border: 0;
-    border-left: 1px solid var(--line);
-    background: var(--surface);
+    border-left: 1px solid var(--line-strong);
+    background: var(--panel);
     color: var(--ink);
-    box-shadow: var(--lift-high);
-    font: 13px/1.45 var(--sans);
+    font: 14px/1.4 var(--sans);
   }
   dialog[open] {
     display: flex;
@@ -407,115 +429,159 @@
   dialog::backdrop {
     background: color-mix(in oklab, var(--desk) 40%, transparent);
   }
+  .caps,
+  .sub,
+  .tabs button,
+  .say {
+    font: 500 10px var(--mono);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
   header {
     display: flex;
     align-items: center;
-    gap: 10px;
-    padding: 14px 14px 10px 20px;
+    gap: 12px;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--line);
+  }
+  .led {
+    flex: none;
+    width: 7px;
+    height: 7px;
+    background: var(--local);
+  }
+  .who {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-width: 0;
   }
   h2 {
-    flex: 1;
-    min-width: 0;
     margin: 0;
     overflow: hidden;
-    font-size: 17px;
+    font: 600 18px var(--sans);
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  .x {
-    width: 28px;
-    height: 28px;
-    border: 0;
-    border-radius: 7px;
-    background: none;
-    color: var(--muted);
-    font-size: 18px;
-    cursor: pointer;
+  .sub {
+    overflow: hidden;
+    color: var(--ink-muted);
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
-  .ask {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 5px 12px;
-    border: 1px solid transparent;
-    border-radius: 7px;
-    background: var(--cable);
-    color: var(--on-accent);
-    font: 600 12px var(--sans);
+  header button,
+  footer button,
+  .apps button {
+    padding: 8px 14px;
+    border: 1px solid var(--line-strong);
+    background: none;
+    color: var(--ink);
+    font: 600 12px var(--mono);
     white-space: nowrap;
     cursor: pointer;
   }
-  .ask:hover:not(:disabled) {
-    background: color-mix(in oklab, var(--cable) 85%, var(--ink));
+  header button:hover:not(:disabled),
+  footer button:hover:not(:disabled),
+  .apps button:hover:not(:disabled) {
+    border-color: var(--ink);
   }
-  .ask:focus-visible {
-    outline: 2px solid var(--cable);
-    outline-offset: 2px;
+  .ask {
+    border-style: dashed;
   }
   .ask:disabled {
-    border-color: var(--line);
-    background: none;
-    color: var(--muted);
+    color: var(--ink-muted);
     cursor: default;
   }
-  .head {
+  .x {
+    padding: 8px 10px;
+  }
+  .main {
     display: grid;
-    gap: 6px;
-    padding: 0 20px 12px;
+    flex: 1;
+    grid-template-columns: 196px minmax(0, 1fr);
+    min-height: 0;
+  }
+  .main.single {
+    grid-template-columns: minmax(0, 1fr);
   }
   .tabs {
     display: flex;
-    gap: 2px;
-    overflow-x: auto;
-    padding: 0 16px;
-    border-bottom: 1px solid var(--line);
+    flex-direction: column;
+    overflow-y: auto;
+    border-right: 1px solid var(--line);
   }
-  [role='tab'] {
-    display: inline-flex;
+  .tabs button {
+    display: flex;
     align-items: center;
-    gap: 6px;
-    padding: 8px 10px;
+    gap: 8px;
+    padding: 10px 14px;
     border: 0;
-    border-bottom: 2px solid transparent;
+    border-bottom: 1px solid var(--line);
     background: none;
-    color: var(--muted);
-    font: 600 13px var(--sans);
+    color: var(--ink-muted);
+    text-align: left;
     white-space: nowrap;
     cursor: pointer;
   }
-  [role='tab']:hover {
+  .tabs button:hover {
     color: var(--ink);
   }
-  [role='tab'][aria-selected='true'] {
-    border-bottom-color: var(--cable);
+  .tabs button[aria-selected='true'] {
+    background: var(--desk);
+    box-shadow: inset 2px 0 0 var(--local);
     color: var(--ink);
   }
-  [role='tab'].wrong {
-    color: var(--bad);
+  .n {
+    color: color-mix(in oklab, var(--ink-muted) 60%, transparent);
   }
-  .badge {
-    min-width: 16px;
-    padding: 0 5px;
-    border-radius: 999px;
-    background: var(--bad);
-    color: var(--on-accent);
-    font-size: 11px;
-    line-height: 16px;
-    text-align: center;
+  .mark {
+    margin-left: auto;
+    color: var(--ink);
+  }
+  .mark.bad,
+  .tabs button.wrong {
+    color: var(--warn);
   }
   .body {
-    display: grid;
-    flex: 1;
-    align-content: start;
-    gap: 6px;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
     overflow-y: auto;
-    padding: 14px 20px 20px;
+    padding-bottom: 20px;
+  }
+  .sec {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    padding: 14px 20px 8px;
+    border-bottom: 1px solid var(--line);
+  }
+  .sec .caps {
+    flex: none;
+    color: var(--ink);
+  }
+  .about {
+    min-width: 0;
+    color: var(--ink-muted);
+    font-size: 12px;
+  }
+  /* Each field is a row between hairlines; a fold sits in the gutter. */
+  .body > :global(.field),
+  .body > :global(fieldset.top) {
+    padding: 12px 20px;
+    border-bottom: 1px solid var(--line);
+  }
+  .body > :global(details),
+  .body > :global(section),
+  .body > :global(.apps),
+  .body > :global(p),
+  .others {
+    margin: 10px 20px 0;
   }
   .others {
     display: grid;
     gap: 6px;
-    margin-top: 6px;
-    color: var(--muted);
+    color: var(--ink-muted);
   }
   .others[open] {
     color: var(--ink);
@@ -524,7 +590,7 @@
     display: flex;
     align-items: center;
     gap: 6px;
-    color: var(--muted);
+    color: var(--ink-muted);
     font-weight: 600;
     list-style: none;
     cursor: pointer;
@@ -541,72 +607,64 @@
   }
   .apps {
     display: grid;
-    gap: 2px;
-    margin: 0;
     padding: 0;
     list-style: none;
   }
   .apps li {
     display: grid;
-    grid-template-columns: auto minmax(0, 1fr) auto auto;
+    grid-template-columns: minmax(0, 1fr) auto auto;
     align-items: center;
     gap: 10px;
-    padding: 4px 0;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--line);
   }
   .apps .name {
     overflow: hidden;
-    font-weight: 500;
+    font-weight: 600;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
   .apps .kind {
-    color: var(--muted);
-    font-size: 12px;
+    color: var(--ink-muted);
+    font: 500 10px var(--mono);
+    text-transform: uppercase;
+  }
+  .apps button {
+    padding: 4px 10px;
+    font-size: 11px;
   }
   footer {
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 12px 20px;
+    padding: 14px 20px;
     border-top: 1px solid var(--line);
-    background: var(--surface);
+    background: var(--panel);
   }
   .say {
     flex: 1;
     min-width: 0;
-    color: var(--muted);
+    overflow: hidden;
+    color: var(--ink-muted);
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   .dirty .say {
     color: var(--ink);
-    font-weight: 600;
-  }
-  footer button,
-  .apps button {
-    padding: 6px 14px;
-    border: 1px solid var(--line);
-    border-radius: 8px;
-    background: none;
-    color: var(--ink);
-    font: 600 13px var(--sans);
-    cursor: pointer;
-  }
-  .apps button {
-    padding: 3px 10px;
-    font-size: 12px;
   }
   footer .go {
-    border-color: transparent;
-    background: var(--cable);
-    color: var(--on-accent);
+    border-color: var(--local);
+    background: var(--local);
+    color: var(--desk);
   }
   footer .bad {
-    border-color: transparent;
-    background: var(--bad);
-    color: var(--on-accent);
+    border-color: var(--prod);
+    background: var(--prod);
+    color: var(--ink);
   }
   footer button:disabled,
   .apps button:disabled {
-    opacity: 0.5;
+    opacity: 0.4;
     cursor: default;
   }
 </style>

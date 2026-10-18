@@ -29,7 +29,6 @@ test('an app card opens its settings: edits wait for Save, a broken one is refus
   const read = stackFile(canvas.dir);
   await (await actions(page, 'orders')).getByRole('button', { name: 'Settings for Orders API' }).click();
   const panel = page.getByRole('dialog', { name: 'Orders API' });
-  await expect(panel.getByLabel('Name', { exact: true })).toHaveValue('Orders API');
   await expect(tabOf(page, 'Runs here')).toHaveAttribute('aria-selected', 'true');
   const url = panel.getByLabel('URL', { exact: true });
   await expect(url).toHaveValue('http://localhost:5001');
@@ -37,14 +36,17 @@ test('an app card opens its settings: edits wait for Save, a broken one is refus
 
   await url.fill('http://localhost:5011');
   await url.press('Tab');
-  await expect(panel.getByRole('status')).toHaveText('1 change, not saved yet');
+  await expect(panel.getByRole('status')).toHaveText('1 change · URL');
+  await expect(tabOf(page, 'Runs here')).toContainText('1');
   expect(read().apps['orders']?.['url']).toBe('http://localhost:5001');
   await panel.getByRole('button', { name: 'Discard' }).click();
   await expect(url).toHaveValue('http://localhost:5001');
 
   await url.fill('http://localhost:5011');
   await url.press('Tab');
+  await tabOf(page, 'Identity').click();
   const name = panel.getByLabel('Name', { exact: true });
+  await expect(name).toHaveValue('Orders API');
   await name.fill('');
   await name.press('Tab');
   await panel.getByRole('button', { name: 'Save' }).click();
@@ -56,6 +58,7 @@ test('an app card opens its settings: edits wait for Save, a broken one is refus
   await panel.getByRole('button', { name: 'Save' }).click();
   await expect(panel.getByRole('status')).toHaveText('Saved');
   expect(read().apps['orders']?.['url']).toBe('http://localhost:5011');
+  await tabOf(page, 'Runs here').click();
 
   await panel.getByRole('button', { name: 'Lock URL', exact: true }).click();
   await expect(url).toBeDisabled();
@@ -132,7 +135,7 @@ test('a need is a row that says what it is; a new one asks its type and shows on
   await page.screenshot({ path: 'test-results/next-settings-needs.png' });
   await fresh.getByRole('button', { name: 'Keep' }).click();
   await expect(needs.locator('details.rowed').filter({ hasText: 'acme-dev, account 123456789012' })).toBeVisible();
-  await expect(panel.getByRole('status')).toHaveText('1 change, not saved yet');
+  await expect(panel.getByRole('status')).toHaveText('1 change · Needs first');
   await panel.getByRole('button', { name: 'Close' }).click();
   await expect(panel.getByRole('alert')).toHaveText('Close without saving 1 change?');
   await panel.getByRole('button', { name: 'Keep editing' }).click();
@@ -162,6 +165,7 @@ test('what Koppler knows is picked, not typed: the kind, the launch profile from
   await (await actions(page, 'orders')).getByRole('button', { name: 'Settings for Orders API' }).click();
   const panel = page.getByRole('dialog', { name: 'Orders API' });
 
+  await tabOf(page, 'Identity').click();
   const kind = panel.getByLabel('Kind', { exact: true });
   await expect(kind).toHaveText('.NET');
   await kind.click();
@@ -172,6 +176,7 @@ test('what Koppler knows is picked, not typed: the kind, the launch profile from
   await panel.getByRole('option', { name: '.NET' }).click();
 
   // Its own kind's fields; those of other kinds are folded away below.
+  await tabOf(page, 'Runs here').click();
   const runs = panel.locator('.body > .field');
   await runs.getByLabel('Project', { exact: true }).selectOption('src/Api/Api.csproj');
   await panel.getByLabel('Launch settings', { exact: true }).selectOption('src/Api/Properties/launchSettings.json');
@@ -242,6 +247,7 @@ test('the stack has its own settings, beside its name, with its apps a click awa
   const read = stackFile(canvas.dir);
   await page.getByRole('button', { name: 'Stack settings' }).click();
   const panel = page.getByRole('dialog', { name: 'Acme Shop settings' });
+  await tabOf(page, 'Identity').click();
   const name = panel.getByLabel('Name', { exact: true });
   await expect(name).toHaveValue('Acme Shop');
   await name.fill('Acme Store');
@@ -251,8 +257,10 @@ test('the stack has its own settings, beside its name, with its apps a click awa
   await tabOf(page, 'Apps').click();
   await page.screenshot({ path: 'test-results/next-stack-settings.png' });
   // An app's settings open in the same panel: never over changes that are not saved yet.
+  await tabOf(page, 'Identity').click();
   await name.fill('Acme Shop 2');
   await name.press('Tab');
+  await tabOf(page, 'Apps').click();
   const toOrders = panel
     .getByRole('listitem')
     .filter({ hasText: 'Orders API' })
@@ -354,6 +362,7 @@ test('closed after a save, the board takes what was saved without reloading the 
     (await actions(page, 'orders')).getByRole('button', { name: 'Settings for Orders API' }).click();
   await open();
   const panel = page.getByRole('dialog', { name: 'Orders API' });
+  await tabOf(page, 'Identity').click();
   const name = panel.getByLabel('Name', { exact: true });
   await name.fill('Orders Service');
   await name.press('Tab');
