@@ -3,6 +3,7 @@
 import { runs } from '../engine/history.ts';
 import { pin } from '../engine/run-logs.ts';
 import { hotReload } from '../engine/reload.ts';
+import { records } from '../engine/processes.ts';
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -341,6 +342,16 @@ export const ROUTES: Record<string, Route> = {
       .split('\n')
       .filter(line => / stopped/.test(line));
     return { status: failed ? 500 : 200, body: { stopped: stopped.map(line => line.split(':')[0]) } };
+  },
+  // A tunnel started again, found by the local port it listens on.
+  '/restart-tunnel': async body => {
+    const port = body['port'];
+    const tunnel = records().find(one => one.name.startsWith('tunnel-') && one.port === port);
+    if (!tunnel) return { status: 404, body: { error: 'No tunnel Koppler runs listens on that port.' } };
+    const { failed, out } = await koppler(['restart', tunnel.name], 60000);
+    return failed
+      ? { status: 500, body: { error: out.trim().split('\n').at(-1) ?? 'It did not start again.' } }
+      : { status: 200, body: { ok: true } };
   },
   // Shut down: the agent's listener, then this server through koppler (so its record goes too). Apps and tunnels keep
   // running.

@@ -4,7 +4,18 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { readClones, readData, readStack } from '../data.ts';
-import { alive, listener, NAME, readRecord, records, sh, sleep, stopOne, uptime } from '../engine/processes.ts';
+import {
+  alive,
+  listener,
+  NAME,
+  readRecord,
+  records,
+  restartOne,
+  sh,
+  sleep,
+  stopOne,
+  uptime,
+} from '../engine/processes.ts';
 import { run } from '../engine/run.ts';
 import { appendNote, live } from '../engine/history.ts';
 import { runLog } from '../engine/run-logs.ts';
@@ -37,6 +48,19 @@ export async function stop(args: string[]): Promise<void> {
   // Stopping in bulk is not a run, so the history gets a note of it: later it says why nothing runs any more.
   const stopped = targets.map(record => record.name);
   if (all) appendNote('stop-apps', stopped);
+}
+
+export async function restart(args: string[]): Promise<void> {
+  const [name = ''] = positional(args);
+  if (!name) fail('usage: koppler restart <name>');
+  if (!NAME.test(name)) fail(notAName(name));
+  if (name === 'canvas') fail('to restart the canvas: koppler canvas stop && koppler canvas');
+  const record = readRecord(name) ?? fail(`${name} is not started by koppler`);
+  try {
+    console.log(await restartOne(record));
+  } catch (error) {
+    fail(`${name}: ${(error as Error).message}`);
+  }
 }
 
 /** The canvas: started when it is not running, then opened in the browser. */

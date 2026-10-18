@@ -23,6 +23,7 @@ Apps and tunnels that `koppler` starts run detached, so they keep running after 
 | `koppler reload <app> [--restart]` | Hot reload a Flutter app Koppler runs (Started by Koppler), or with `--restart` hot restart it; the card's lightning button does the same, Shift-click restarts |
 | `koppler traces start\|stop\|open [<app>]` | Collect traces from the apps Koppler starts (Jaeger in Docker; each app is given the standard `OTEL_EXPORTER_OTLP_*` settings and its id as `OTEL_SERVICE_NAME`) and follow one request across them to where it failed; the bar's Traces button and each card's do the same |
 | `koppler stop <name...> \| --all` | Stop by name, or every app and tunnel (asks first); changes stay until `koppler down` |
+| `koppler restart <name>` | Stop an app or tunnel and start it again the way it was started |
 | `koppler history [session \| done [<id>] [--failed "<why>"] \| pin\|unpin <id>]` | Recent runs and Stops and how they ended; `session` gathers what happened since the last Stop, for a bug report; `done` marks a run finished. Each run keeps its apps' logs (History opens them); the newest 20 runs keep theirs, and `pin` keeps a run's for good |
 | `koppler query <app> [--env <env>] [--secret <NAME>] "<sql>"` | A read-only query with the app's stored connection; on production, in your own terminal only |
 
