@@ -31,6 +31,8 @@
   // The name column fits the longest name it shows.
   const nameWidth = $derived(Math.min(32, Math.max(4, ...board.nodes.map(node => board.logName(node.id).length))));
   let renaming = $state<string | null>(null);
+  // Name when the app changes: a line of its own above the app's lines, and no name column.
+  const byChange = $derived(logs.names === 'change');
   const kindOf = $derived(Object.fromEntries(board.nodes.map(node => [node.id, node.data.kind])));
   const merged = $derived.by(() => {
     if (!all) return [];
@@ -269,6 +271,7 @@
       class="body"
       class:raw={logs.raw && !all}
       class:all
+      class:by-change={all && byChange}
       class:no-time={!all && !rows.some(row => row.time)}
       role="log"
       bind:this={body}
@@ -280,11 +283,25 @@
           </p>
         {/if}
         {#each merged as row (row.key)}
+          {#if byChange && row.named}
+            <div class="switch kind-{kindOf[row.app]}">
+              <button
+                type="button"
+                class="n"
+                title="Leave {board.logName(row.app)} out of this log"
+                onclick={() => {
+                  board.showLog(row.app, false);
+                }}>{board.logName(row.app)}</button
+              >
+            </div>
+          {/if}
           <div class="row" data-level={row.level}>
             <span class="t" title={row.approx ? 'Approximate: the time Koppler first read this line' : undefined}
               >{row.approx ? '~' : ''}{clock(row.at)}</span
             ><span class="l">{LABEL[row.level] ?? ''}</span>
-            {#if row.named}
+            {#if byChange}
+              <!-- The app's name is on the line above. -->
+            {:else if row.named}
               <button
                 type="button"
                 class="n kind-{kindOf[row.app]}"
@@ -293,8 +310,6 @@
                   board.showLog(row.app, false);
                 }}>{board.logName(row.app)}</button
               >
-            {:else}
-              <span></span>
             {/if}
             {#if row.items}
               <details class="m"><summary>{row.text}</summary><span class="x">{row.items.join('\n')}</span></details>
@@ -565,6 +580,28 @@
   }
   .all .x:not(button) {
     grid-column: 4;
+  }
+  .by-change .row {
+    grid-template-columns: 13ch 50px minmax(0, 1fr);
+  }
+  .by-change .x:not(button) {
+    grid-column: 3;
+  }
+  .switch {
+    margin-top: 6px;
+    padding: 3px 14px;
+    border-top: 1px solid color-mix(in oklab, var(--kind, var(--ink)) 45%, transparent);
+    background: color-mix(in oklab, var(--kind, var(--ink)) 10%, transparent);
+  }
+  .switch:first-child {
+    margin-top: 0;
+    border-top: 0;
+  }
+  .switch .n {
+    color: var(--kind, var(--ink));
+  }
+  .switch + .row {
+    border-top: 0;
   }
   .n {
     overflow: hidden;

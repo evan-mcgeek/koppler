@@ -136,23 +136,23 @@ test('All apps shows every app on the board in one stream by time, and an app le
   );
 
   await pane.getByRole('combobox', { name: 'Names' }).selectOption('change');
-  await expect(pane.locator('.row .n')).toHaveCount(3);
+  await expect(pane.locator('.switch .n')).toHaveCount(3);
   const apps = pane.getByRole('group', { name: 'Apps in this log' });
-  await pane.locator('.row .n', { hasText: 'Orders API' }).click();
+  await pane.locator('.switch .n', { hasText: 'Orders API' }).click();
   await expect(rows).toHaveCount(2);
-  await expect(pane.locator('.row .n')).toHaveCount(1);
+  await expect(pane.locator('.switch .n')).toHaveCount(1);
   await expect(apps.getByRole('button', { name: 'Orders API', exact: true })).toHaveAttribute('aria-pressed', 'false');
 
   await apps.getByRole('button', { name: 'Rename Web Shop in this log' }).click();
   await apps.getByRole('textbox', { name: 'Name for Web Shop in this log' }).fill('web');
   await apps.getByRole('textbox').press('Enter');
-  await expect(pane.locator('.row .n')).toHaveText(['web']);
+  await expect(pane.locator('.switch .n')).toHaveText(['web']);
 
   await page.reload();
   await (await actions(page, 'orders')).getByRole('button', { name: 'Show log' }).click();
   await pane.getByRole('tab', { name: 'All apps' }).click();
   await expect(rows).toHaveCount(2);
-  await expect(pane.locator('.row .n')).toHaveText(['web']);
+  await expect(pane.locator('.switch .n')).toHaveText(['web']);
   await expect(pane.getByRole('combobox', { name: 'Names' })).toHaveValue('change');
   await apps.getByRole('button', { name: 'Orders API', exact: true }).click();
   await expect(rows).toHaveCount(3);
