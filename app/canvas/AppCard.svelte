@@ -1,23 +1,15 @@
 <script lang="ts">
-  import Zap from '@lucide/svelte/icons/zap';
-  import Waypoints from '@lucide/svelte/icons/waypoints';
   import RefreshCw from '@lucide/svelte/icons/refresh-cw';
   import Check from '@lucide/svelte/icons/check';
   import Icon from './Icon.svelte';
   import GripVertical from '@lucide/svelte/icons/grip-vertical';
-  import Logs from '@lucide/svelte/icons/logs';
-  import Play from '@lucide/svelte/icons/play';
-  import RotateCw from '@lucide/svelte/icons/rotate-cw';
-  import Square from '@lucide/svelte/icons/square';
-  import X from '@lucide/svelte/icons/x';
-  import Cog from './Cog.svelte';
   import Command from './Command.svelte';
   import CardFields from './CardFields.svelte';
   import { Handle, NodeToolbar, Position, useViewport, type NodeProps } from '@xyflow/svelte';
   import type { Side } from '../src/core/arrange.ts';
   import { board, FAR_ZOOM, type CardNode } from './board.svelte.ts';
   import { wiring } from './wiring.svelte.ts';
-  import { COMMAND_ICON, runCommand } from './commands.ts';
+  import { runCommand } from './commands.ts';
   import { toasts } from './toast.svelte.ts';
   import { post } from './data.ts';
   import { live, progress, STATE_NAMES } from './live.svelte.ts';
@@ -85,7 +77,7 @@
 </script>
 
 <!-- What can be done with the card, in a bar above it while it is pointed at or picked: the title keeps its room. -->
-<NodeToolbar isVisible={bar && !dragging} position={Position.Top} align="end" offset={6}>
+<NodeToolbar isVisible={bar && !dragging} position={Position.Top} align="start" offset={8}>
   <span
     class="tools nodrag"
     data-card={id}
@@ -104,7 +96,7 @@
         title="Stop this app; its changes stay"
         onclick={() => void runs.stopApp(id)}
       >
-        <Icon of={Square} size={15} filled />
+        Stop
       </button>
       <button
         type="button"
@@ -114,7 +106,7 @@
           runs.start({ restart: id });
         }}
       >
-        <Icon of={RotateCw} size={15} />
+        Restart
       </button>
     {:else}
       <button
@@ -125,7 +117,7 @@
           runs.alone(id);
         }}
       >
-        <Icon of={Play} size={15} filled />
+        Run alone
       </button>
     {/if}
     {#if live.hasLog(id)}
@@ -137,7 +129,7 @@
           logs.open(id);
         }}
       >
-        <Icon of={Logs} size={15} />
+        Log
       </button>
     {/if}
     {#each board.commandsOf(id) as [key, command] (key)}
@@ -154,7 +146,7 @@
             });
         }}
       >
-        <Icon of={COMMAND_ICON[command.icon ?? 'terminal']} size={15} />
+        {command.label}
       </button>
     {/each}
     {#if live.status?.traces?.state === 'on' && live.sent(id)}
@@ -166,7 +158,7 @@
         aria-label="Traces of {data.name}"
         title="Its requests, followed across your local apps"
       >
-        <Icon of={Waypoints} size={15} />
+        Traces
       </a>
     {/if}
     {#if app?.kind === 'flutter' && data.run === 'cli' && up}
@@ -176,7 +168,7 @@
         title="Hot reload: the app takes your code changes as it runs. Shift-click to hot restart."
         onclick={ev => void reload(ev.shiftKey)}
       >
-        <Icon of={Zap} size={15} />
+        Reload
       </button>
     {/if}
     {#if data.run === 'cli'}
@@ -191,7 +183,7 @@
           board.set(id, { watch: !data.watch });
         }}
       >
-        <Icon of={RefreshCw} size={15} />
+        Auto-restart
       </button>
     {/if}
     <button
@@ -200,7 +192,7 @@
       title="Settings: every fact the stack has about it"
       onclick={() => void dialogs.settings?.open({ title: data.name, path: `apps.${id}` })}
     >
-      <Cog size={15} />
+      Settings
     </button>
     <button
       class="remove"
@@ -211,7 +203,7 @@
         board.remove(id);
       }}
     >
-      <Icon of={X} size={15} />
+      ×
     </button>
   </span>
 </NodeToolbar>
@@ -352,24 +344,24 @@
     width: max-content;
     min-width: 260px;
     max-width: 380px;
-    background: var(--surface);
-    border: 1px solid var(--line);
-    border-radius: 10px;
+    background: var(--panel);
+    border: 1px solid var(--line-strong);
     color: var(--ink);
     font: 14px/1.4 var(--sans);
     user-select: none;
   }
   .card.selected,
   :global(.svelte-flow__node:focus-visible) .card {
-    outline: 2px solid var(--cable);
+    border-color: var(--ink);
+    outline: 1px solid var(--ink);
     /* On the border itself: one frame, not a ring around a frame. */
     outline-offset: -1px;
   }
   .card.drop-ok {
-    box-shadow: 0 0 0 3px var(--ok);
+    outline: 2px solid var(--local);
   }
   .card.drop-bad {
-    box-shadow: 0 0 0 3px var(--bad);
+    outline: 2px solid var(--prod);
   }
   /* Only the title sets a card's width: everything below it fits whatever width the title makes. */
   .body,
@@ -380,8 +372,8 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    min-height: 44px;
-    padding: 6px 8px 6px 16px;
+    min-height: 40px;
+    padding: 8px 12px;
     border-bottom: 1px solid var(--line);
     cursor: grab;
   }
@@ -390,24 +382,24 @@
   }
   .grip {
     display: grid;
-    margin-left: -6px;
-    fill: var(--muted);
-    opacity: 0.6;
+    margin: 0 -4px 0 -6px;
+    color: var(--line-strong);
   }
   .kind {
     flex: none;
     margin-left: 10px;
-    padding: 1px 7px;
-    border-radius: 999px;
-    font: 600 12px/1.5 var(--sans);
+    padding: 2px 5px;
+    border: 1px solid var(--line-strong);
+    color: var(--ink-muted);
+    font: 500 10px/1.3 var(--mono);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
     white-space: nowrap;
-    color: var(--kind);
-    background: color-mix(in oklab, var(--kind) 14%, transparent);
   }
   .name {
     flex: 1;
     min-width: 0;
-    font-weight: 700;
+    font-weight: 600;
     font-size: 15px;
     line-height: 1.2;
     text-wrap: balance;
@@ -421,14 +413,12 @@
     min-width: min-content;
     font-size: 22px;
   }
+  /* Its tools: words printed on one strip above it. */
   .tools {
     display: flex;
     gap: 1px;
-    padding: 3px;
-    border: 1px solid var(--line);
-    border-radius: 9px;
-    background: var(--panel);
-    box-shadow: var(--lift);
+    border: 1px solid var(--line-strong);
+    background: var(--line-strong);
   }
   .tools.reading .remove {
     display: none;
@@ -436,26 +426,28 @@
   .tools :is(button, .tool) {
     display: grid;
     place-items: center;
-    width: 26px;
+    min-width: 26px;
     height: 26px;
-    padding: 0;
+    padding: 0 8px;
     border: 0;
-    border-radius: 6px;
-    background: none;
-    color: var(--muted);
+    background: var(--panel);
+    color: var(--ink);
+    font: 500 10px var(--mono);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    white-space: nowrap;
     cursor: pointer;
   }
   .tools :is(button, .tool):hover,
   .tools :is(button, .tool):focus-visible {
-    background: color-mix(in oklab, var(--ink) 8%, transparent);
-    color: var(--ink);
+    background: var(--line-strong);
   }
   .tools button[aria-pressed='true'] {
-    background: color-mix(in oklab, var(--cable) 14%, transparent);
-    color: var(--cable);
+    background: var(--ink);
+    color: var(--desk);
   }
   .tools :is(.remove, .stop):hover {
-    color: var(--bad);
+    color: var(--prod);
   }
   .tools .fill {
     fill: currentColor;
@@ -466,19 +458,22 @@
     flex: none;
     color: var(--muted);
   }
+  /* A square LED: filled local when it runs, outlined amber while it starts, red when it fails. */
   .live {
     flex: none;
-    width: 9px;
-    height: 9px;
-    border-radius: 50%;
+    width: 7px;
+    height: 7px;
+    border: 1.5px solid var(--bad);
     background: var(--bad);
   }
   .live[data-on='true'],
   .live[data-state='running'] {
+    border-color: var(--ok);
     background: var(--ok);
   }
   .live:is([data-state='waiting'], [data-state='building']) {
-    background: var(--warn);
+    border-color: var(--warn);
+    background: none;
   }
   .live:is(
     [data-state='unhealthy'],
@@ -514,12 +509,14 @@
     align-items: center;
     gap: 8px;
     width: 100%;
-    padding: 9px 14px 9px 16px;
+    padding: 8px 12px;
     border: 0;
     border-top: 1px solid var(--line);
     background: none;
     color: var(--ink);
-    font: 600 12.5px var(--sans);
+    font: 500 10px var(--mono);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
     text-align: left;
     cursor: pointer;
   }
@@ -531,10 +528,9 @@
     gap: 4px;
   }
   .marks i {
-    width: 9px;
-    height: 9px;
-    border-radius: 50%;
-    background: var(--line);
+    width: 10px;
+    height: 3px;
+    background: var(--line-strong);
   }
   .marks i[data-state='done'] {
     background: var(--ok);
@@ -556,9 +552,7 @@
     color: var(--bad);
   }
   .chev {
-    color: var(--muted);
-    font-size: 12px;
-    font-weight: 500;
+    color: var(--ink-muted);
   }
   .why {
     contain: inline-size;
@@ -769,13 +763,12 @@
   }
   .port {
     position: absolute;
-    width: 16px;
-    height: 16px;
-    margin: -8px 0 0 -8px;
+    width: 12px;
+    height: 12px;
+    margin: -6px 0 0 -6px;
     padding: 0;
-    border: 2px solid var(--ink);
-    border-radius: 50%;
-    background: var(--surface);
+    border: 2px solid var(--local);
+    background: var(--desk);
     opacity: 0;
     cursor: crosshair;
     transition: opacity 0.1s;
@@ -786,7 +779,7 @@
     opacity: 1;
   }
   .port:hover {
-    border-color: var(--cable);
+    background: var(--local);
   }
   /* On the card's outer edge, where its cables end: one pixel out from where the border's inside puts them. */
   .port.top {

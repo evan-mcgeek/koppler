@@ -6,6 +6,7 @@
   border-radius: 0 !important;
 }
 .svelte-flow__handle,
+.port,
 .round {
   border-radius: 50% !important;
 }
@@ -80,21 +81,20 @@ details[open] > summary:not(:has(.chev))::before {
   rotate: 0deg;
 }
 
-/* A segmented choice: radio inputs inside labels, one shown as picked. */
+/* A segmented choice: radio inputs inside labels in a hairline box, the picked one filled. */
 .seg {
   display: flex;
-  gap: 2px;
-  padding: 2px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: color-mix(in oklab, var(--ink) 5%, transparent);
+  border: 1px solid var(--line-strong);
+  background: var(--panel);
 }
 .seg label {
   position: relative;
-  border-radius: 6px;
-  color: var(--muted);
-  font-weight: 600;
+  color: var(--ink-muted);
+  font-weight: 400;
   cursor: pointer;
+}
+.seg label + label {
+  border-left: 1px solid var(--line-strong);
 }
 .seg input {
   position: absolute;
@@ -103,15 +103,16 @@ details[open] > summary:not(:has(.chev))::before {
   opacity: 0;
   cursor: pointer;
 }
-.seg label:has(input:checked) {
-  background: var(--surface);
+.seg label:hover {
   color: var(--ink);
-  box-shadow:
-    0 0 0 1px var(--line),
-    0 1px 2px rgb(0 0 0 / 0.12);
+}
+.seg label:has(input:checked) {
+  background: var(--line-strong);
+  color: var(--ink);
+  font-weight: 600;
 }
 .seg label:has(input:focus-visible) {
-  outline: 2px solid var(--cable);
+  outline: 2px solid var(--local);
   outline-offset: -2px;
 }
 .seg label[aria-disabled='true'],
@@ -120,13 +121,13 @@ details[open] > summary:not(:has(.chev))::before {
   cursor: not-allowed;
 }
 
-/* An on/off switch: a checkbox over its label, drawn as the track beside it. */
+/* An on/off switch: a checkbox over its label, drawn as a square track beside it, filled when on. */
 .toggle {
   position: relative;
   display: flex;
   align-items: center;
   gap: 8px;
-  font-weight: 600;
+  font-weight: 400;
   cursor: pointer;
 }
 .toggle input {
@@ -145,32 +146,31 @@ details[open] > summary:not(:has(.chev))::before {
 .track {
   position: relative;
   flex: none;
-  width: 28px;
-  height: 16px;
-  border-radius: 999px;
-  background: color-mix(in oklab, var(--ink) 22%, transparent);
-  transition: background 0.15s;
+  width: 26px;
+  height: 14px;
+  border: 1px solid var(--line-strong);
+  transition: background 0.12s;
 }
 .track::after {
   content: '';
   position: absolute;
   top: 2px;
   left: 2px;
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  background: var(--surface);
-  box-shadow: 0 1px 2px rgb(0 0 0 / 0.3);
-  transition: translate 0.15s;
+  width: 8px;
+  height: 8px;
+  background: var(--line-strong);
+  transition: translate 0.12s;
 }
 .toggle input:checked + .track {
-  background: var(--cable);
+  border-color: var(--ink);
+  background: var(--ink);
 }
 .toggle input:checked + .track::after {
   translate: 12px;
+  background: var(--panel);
 }
 .toggle input:focus-visible + .track {
-  outline: 2px solid var(--cable);
+  outline: 2px solid var(--local);
   outline-offset: 2px;
 }
 @media (prefers-reduced-motion: reduce) {
@@ -178,6 +178,33 @@ details[open] > summary:not(:has(.chev))::before {
   .track::after {
     transition: none;
   }
+}
+
+/* A status light: a small square, filled when on. Paired with words, never alone. */
+.led {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border: 1.5px solid var(--ink-muted);
+}
+.led[data-state='running'],
+.led[data-state='done'] {
+  border-color: var(--local);
+  background: var(--local);
+}
+.led[data-state='starting'] {
+  border-color: var(--warn);
+}
+.led[data-state='user'] {
+  border-color: var(--warn);
+  background: var(--warn);
+}
+.led[data-state='failed'] {
+  border-color: var(--prod);
+  background: var(--prod);
+}
+.led[data-state='absent'] {
+  border-style: dashed;
 }
 
 /* While one app card is picked, what it does not touch fades back. */

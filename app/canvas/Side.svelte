@@ -122,11 +122,6 @@
 <aside aria-label="Board and apps" class:protected={board.protected}>
   <div class="head">
     <BoardPicker />
-    <div class="seg" role="radiogroup" aria-label="Environment">
-      {#each board.envs as env (env)}
-        <label><input type="radio" name="env" value={env} bind:group={board.env} />{env.toUpperCase()}</label>
-      {/each}
-    </div>
   </div>
   <section aria-labelledby="apps-title">
     <h2 id="apps-title">

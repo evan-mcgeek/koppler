@@ -280,11 +280,19 @@
     grid-template-columns: 1fr 1fr;
     gap: 8px;
   }
+  /* Its label printed on the panel: small mono capitals; what it labels keeps its own type. */
   .field {
     display: grid;
-    gap: 3px;
-    font-size: 12px;
-    color: var(--muted);
+    gap: 5px;
+    color: var(--ink-muted);
+    font: 500 10px var(--mono);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .field > :global(*) {
+    font: 400 12px var(--sans);
+    letter-spacing: normal;
+    text-transform: none;
   }
   .combo {
     position: relative;

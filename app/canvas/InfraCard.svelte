@@ -84,21 +84,26 @@
     min-width: 200px;
     max-width: 420px;
     padding: 9px 8px 11px 12px;
-    border: 1px solid color-mix(in oklab, var(--muted) 45%, var(--line));
-    border-radius: 10px;
-    background: var(--surface);
+    border: 1px solid var(--line-strong);
+    background: var(--panel);
     color: var(--ink);
     font: 12.5px/1.4 var(--sans);
     user-select: none;
     cursor: grab;
   }
+  /* What stays deployed has a dashed edge: a tunnel to it, or a system that never runs here. */
+  .infra:is(.tunnel, .outside) {
+    border: 1px dashed var(--deployed);
+  }
+  .infra.outside {
+    background: var(--desk);
+  }
   .infra.active {
-    border-color: var(--msg);
-    box-shadow: 0 0 0 1px var(--msg);
+    border: 1px solid var(--local);
   }
   .infra.selected,
   :global(.svelte-flow__node:focus-visible) .infra {
-    outline: 2px solid var(--cable);
+    outline: 1px solid var(--ink);
     /* On the border itself: one frame, not a ring around a frame. */
     outline-offset: -1px;
   }
@@ -110,15 +115,16 @@
   }
   .dot {
     flex: none;
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: var(--line);
+    width: 7px;
+    height: 7px;
+    border: 1.5px solid var(--ink-muted);
   }
   .dot[data-on='true'] {
+    border-color: var(--ok);
     background: var(--ok);
   }
   .dot[data-on='false'] {
+    border-color: var(--bad);
     background: var(--bad);
   }
   .name {
@@ -129,8 +135,9 @@
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    font: 12px var(--mono);
-    color: var(--muted);
+    color: var(--deployed);
+    font: 500 10px var(--mono);
+    letter-spacing: 0.04em;
     white-space: nowrap;
   }
   .detail.warn {
@@ -164,7 +171,7 @@
   }
   .body {
     min-width: 0;
-    font: 12px var(--mono);
+    font: 11px var(--mono);
     color: var(--muted);
     overflow-wrap: anywhere;
   }

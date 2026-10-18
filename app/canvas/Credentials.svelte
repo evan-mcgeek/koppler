@@ -1,7 +1,6 @@
 <script lang="ts">
   import Info from '@lucide/svelte/icons/info';
   import Icon from './Icon.svelte';
-  import KeyRound from '@lucide/svelte/icons/key-round';
   import Lock from '@lucide/svelte/icons/lock';
   import X from '@lucide/svelte/icons/x';
   // Credentials: what the apps on the board need stored for this environment. The page can set, test and remove a
@@ -110,7 +109,7 @@
     : 'What the apps on the board need stored'}
   popovertarget={id}
 >
-  <Icon of={KeyRound} size={16} />
+  Credentials
 </button>
 <div
   bind:this={pop}

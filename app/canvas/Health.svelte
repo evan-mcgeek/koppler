@@ -157,26 +157,23 @@
     display: inline-flex;
     align-items: center;
     gap: 7px;
-    height: 32px;
+    height: 30px;
     padding: 0 10px;
     border: 1px solid transparent;
-    border-radius: 8px;
     background: none;
-    color: var(--muted);
-    font: 500 12.5px var(--sans);
+    color: var(--ink);
+    font: 400 13px var(--sans);
     white-space: nowrap;
     cursor: pointer;
   }
   .chip:hover,
   .chip[aria-expanded='true'] {
-    border-color: var(--line);
-    color: var(--ink);
+    border-color: var(--line-strong);
   }
   .dot {
-    width: 8px;
-    height: 8px;
-    border: 1.5px solid var(--muted);
-    border-radius: 50%;
+    width: 7px;
+    height: 7px;
+    border: 1.5px solid var(--ink-muted);
   }
   [data-state='ok'] .dot {
     border-color: var(--ok);
@@ -191,8 +188,7 @@
     background: var(--warn);
   }
   [data-state='busy'] .dot {
-    border-color: var(--line);
-    border-top-color: var(--cable);
+    border-color: var(--warn);
     animation: turning 0.7s linear infinite;
   }
   .chip[data-state='bad'] {

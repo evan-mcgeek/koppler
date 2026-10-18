@@ -1,13 +1,4 @@
 <script lang="ts">
-  import Minus from '@lucide/svelte/icons/minus';
-  import Plus from '@lucide/svelte/icons/plus';
-  import Icon from './Icon.svelte';
-  import Hand from '@lucide/svelte/icons/hand';
-  import Maximize from '@lucide/svelte/icons/maximize';
-  import Minimize from '@lucide/svelte/icons/minimize';
-  import MousePointer2 from '@lucide/svelte/icons/mouse-pointer-2';
-  import Redo2 from '@lucide/svelte/icons/redo-2';
-  import Undo2 from '@lucide/svelte/icons/undo-2';
   import {
     Background,
     BackgroundVariant,
@@ -128,8 +119,8 @@
     spaceHeld = ev.type === 'keydown';
   };
   const TOOLS = [
-    ['select', 'Select (V): drag on the board to select an area', MousePointer2],
-    ['hand', 'Hand (H): drag to move around. Or hold Space while dragging', Hand],
+    ['select', 'Select (V): drag on the board to select an area', 'Select', 'V'],
+    ['hand', 'Hand (H): drag to move around. Or hold Space while dragging', 'Move', 'H'],
   ] as const;
   // A key the system takes over mid-press (a screenshot shortcut) never sends its key-up, and the board would keep
   // selecting instead of moving cards: the mouse says which keys are really held.
@@ -459,7 +450,7 @@
       if (!board.live) board.view = { ...viewport, x: viewport.x + shift };
     }}
   >
-    <Background variant={BackgroundVariant.Dots} gap={24} size={2.4} bgColor="var(--paper)" patternColor="var(--dot)" />
+    <Background variant={BackgroundVariant.Dots} gap={20} size={1.4} bgColor="var(--desk)" patternColor="var(--line)" />
     <Panel position="top-left">
       <div
         class="views"
@@ -489,10 +480,10 @@
         </label>
       </div>
     </Panel>
-    <Panel position="bottom-right">
+    <Panel position="bottom-left">
       <div class="tools" role="toolbar" aria-label="Board">
         <div class="switch" role="radiogroup" aria-label="Dragging on the board">
-          {#each TOOLS as [name, title, icon] (name)}
+          {#each TOOLS as [name, title, word, key] (name)}
             <button
               class="tool"
               type="button"
@@ -502,11 +493,10 @@
               {title}
               onclick={() => (tool = name)}
             >
-              <Icon of={icon} size={15} />
+              {word} <kbd>{key}</kbd>
             </button>
           {/each}
         </div>
-        <span class="sep" aria-hidden="true"></span>
         <button
           class="tool"
           type="button"
@@ -517,7 +507,7 @@
             undo.undo();
           }}
         >
-          <Icon of={Undo2} size={15} />
+          Undo
         </button>
         <button
           class="tool"
@@ -529,20 +519,17 @@
             undo.redo();
           }}
         >
-          <Icon of={Redo2} size={15} />
+          Redo
         </button>
-        <span class="sep" aria-hidden="true"></span>
         <button title="Arrange cards by who calls whom, callers on top" onclick={() => void arrange()}>Arrange</button>
-        <button title="Zoom to fit all apps (F)" onclick={() => void fit()}>Fit</button>
-        <span class="sep" aria-hidden="true"></span>
+        <button title="Zoom to fit all apps (F)" onclick={() => void fit()}>Fit <kbd>F</kbd></button>
         <div class="zoom" role="group" aria-label="Zoom">
-          <button aria-label="Zoom out" onclick={zoomBy(1 / 1.2)}><Icon of={Minus} size={13} /></button>
+          <button aria-label="Zoom out" onclick={zoomBy(1 / 1.2)}>−</button>
           <button class="percent" title="Reset to 100%" onclick={() => void flow.setZoom(1, { duration: 200 })}>
             {Math.round(viewport.current.zoom * 100)}%
           </button>
-          <button aria-label="Zoom in" onclick={zoomBy(1.2)}><Icon of={Plus} size={13} /></button>
+          <button aria-label="Zoom in" onclick={zoomBy(1.2)}>+</button>
         </div>
-        <span class="sep" aria-hidden="true"></span>
         <button
           class="tool"
           type="button"
@@ -551,10 +538,9 @@
           aria-pressed={board.present}
           onclick={() => void present()}
         >
-          <Icon of={board.present ? Minimize : Maximize} size={15} />
+          {board.present ? 'Back' : 'Present'} <kbd>{board.present ? 'Esc' : 'P'}</kbd>
         </button>
         {#if !board.present}
-          <span class="sep" aria-hidden="true"></span>
           <button
             class="clear"
             title="Remove every card from this board. Undo brings them back."
@@ -586,9 +572,9 @@
       width={168}
       height={112}
       ariaLabel="Overview of the board"
-      nodeBorderRadius={8}
+      nodeBorderRadius={0}
       nodeStrokeWidth={0}
-      nodeColor={node => (node.type === 'app' ? 'color-mix(in oklab, var(--cable) 60%, var(--panel))' : 'var(--line)')}
+      nodeColor={node => (node.type === 'app' ? 'var(--ink-muted)' : 'var(--line-strong)')}
       bgColor="var(--panel)"
       maskColor="color-mix(in oklab, var(--desk) 72%, transparent)"
       maskStrokeColor="var(--line)"
@@ -1072,59 +1058,58 @@
   .area:has(.ends.still) :global(.svelte-flow__edge) {
     pointer-events: none;
   }
+  /* The board's tools: words printed on one strip, each with its key. */
   .tools {
     display: flex;
-    align-items: center;
-    gap: 2px;
-    padding: 3px;
-    border: 1px solid var(--line);
-    border-radius: 10px;
-    background: var(--panel);
+    align-items: stretch;
+    gap: 1px;
+    border: 1px solid var(--line-strong);
+    background: var(--line-strong);
   }
-  .zoom {
+  .zoom,
+  .switch {
     display: flex;
-    gap: 2px;
-  }
-  .tools .percent {
-    width: 62px;
-    padding-inline: 0;
-    font-variant-numeric: tabular-nums;
+    gap: 1px;
   }
   .tools button {
-    padding: 6px 12px;
-    border: 1px solid transparent;
-    border-radius: 8px;
-    background: none;
-    color: var(--ink);
-    font: 600 13px var(--sans);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 10px;
+    border: 0;
+    background: var(--panel);
+    color: var(--ink-muted);
+    font: 500 10px var(--mono);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
     white-space: nowrap;
     cursor: pointer;
   }
   .tools button:hover {
-    background: color-mix(in oklab, var(--ink) 7%, transparent);
-  }
-  .switch {
-    display: flex;
-    gap: 2px;
-  }
-  .tools .tool {
-    display: grid;
-    place-items: center;
-    width: 30px;
-    height: 28px;
-    padding: 0;
-    color: var(--muted);
-  }
-  .tools .tool[aria-checked='true'] {
-    background: color-mix(in oklab, var(--cable) 22%, transparent);
     color: var(--ink);
   }
-  .tools .tool:disabled {
-    opacity: 0.35;
+  .tools kbd {
+    color: var(--ink-muted);
+    font: inherit;
+    opacity: 0.7;
+  }
+  .tools .percent {
+    min-width: 52px;
+    justify-content: center;
+    color: var(--ink);
+    font-variant-numeric: tabular-nums;
+  }
+  .tools .tool[aria-checked='true'],
+  .tools .tool[aria-pressed='true'] {
+    background: var(--line-strong);
+    color: var(--ink);
+  }
+  .tools button:disabled {
+    color: color-mix(in oklab, var(--ink-muted) 45%, transparent);
     cursor: default;
   }
   .tools .clear:hover {
-    color: var(--bad);
+    color: var(--prod);
   }
   .line path {
     fill: none;

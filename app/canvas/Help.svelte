@@ -1,6 +1,4 @@
 <script lang="ts">
-  import Icon from './Icon.svelte';
-  import CircleHelp from '@lucide/svelte/icons/circle-question-mark';
   let sheet: HTMLElement | undefined = $state();
   const shortcut = (ev: KeyboardEvent) => {
     if (ev.key !== '?' || (ev.target as Element).closest('input, select, textarea')) return;
@@ -17,7 +15,7 @@
   aria-label="Shortcuts and legend"
   title="Shortcuts and legend (?)"
 >
-  <Icon of={CircleHelp} size={16} />
+  ?
 </button>
 <div class="sheet" id="help" popover bind:this={sheet} aria-label="Shortcuts and legend">
   <h2>Shortcuts</h2>

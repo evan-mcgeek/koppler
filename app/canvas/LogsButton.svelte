@@ -1,6 +1,4 @@
 <script lang="ts">
-  import LogsIcon from '@lucide/svelte/icons/logs';
-  import Icon from './Icon.svelte';
   import { ALL, logs } from './logs.svelte.ts';
 
   const open = $derived(logs.active === ALL);
@@ -15,7 +13,7 @@
     logs.active = open ? null : ALL;
   }}
 >
-  <Icon of={LogsIcon} size={15} />Logs
+  Logs
 </button>
 
 <style>

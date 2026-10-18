@@ -110,10 +110,10 @@
   }
   /* Dashed until the apps at both ends run. */
   .idle :is(.wire, .head) {
-    stroke: color-mix(in oklab, var(--cable) 38%, var(--line));
+    stroke: color-mix(in oklab, var(--cable) 45%, var(--line-strong));
   }
   .idle .head {
-    fill: color-mix(in oklab, var(--cable) 38%, var(--line));
+    fill: color-mix(in oklab, var(--cable) 45%, var(--line-strong));
   }
   .idle .wire {
     stroke-dasharray: 6 6;
@@ -130,7 +130,7 @@
   }
   .wire {
     stroke: var(--cable);
-    stroke-width: 2.5;
+    stroke-width: 2;
   }
   /* A solid head with a notched back; its thin outline only rounds the corners. */
   .head {
@@ -141,8 +141,8 @@
   :global(.svelte-flow__edge.selected) .wire,
   :global(.svelte-flow__edge:focus-visible) .wire,
   .lit .wire {
-    stroke: var(--cable-ink);
-    stroke-width: 4;
+    stroke: var(--cable);
+    stroke-width: 3;
   }
   /* Snapped straight while a card is dragged: the cable goes a shade darker, nothing more. */
   .snapped .wire {

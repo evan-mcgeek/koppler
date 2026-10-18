@@ -85,22 +85,22 @@
     cursor: pointer;
   }
   .more.stop {
-    border-color: color-mix(in oklab, var(--prod) 45%, transparent);
+    border-color: var(--line-strong);
     background: none;
-    color: var(--prod);
+    color: var(--ink);
   }
   .more.stop:hover,
   .more.stop[aria-expanded='true'] {
-    background: color-mix(in oklab, var(--prod) 12%, transparent);
+    background: color-mix(in oklab, var(--ink) 8%, transparent);
   }
   .more.run {
-    border-left-color: color-mix(in oklab, var(--on-accent) 35%, transparent);
-    background: var(--cable);
-    color: var(--on-accent);
+    border-left-color: var(--desk);
+    background: var(--local);
+    color: var(--desk);
   }
   .more.run:hover,
   .more.run[aria-expanded='true'] {
-    background: color-mix(in oklab, var(--cable) 85%, var(--ink));
+    background: color-mix(in oklab, var(--local) 85%, var(--desk));
   }
   :global(.protected) .more.run {
     background: var(--prod);
@@ -111,10 +111,8 @@
     width: 300px;
     margin: 0;
     padding: 4px;
-    border: 1px solid var(--line);
-    border-radius: 10px;
-    background: var(--surface);
-    box-shadow: var(--lift);
+    border: 1px solid var(--line-strong);
+    background: var(--panel);
   }
   .menu button {
     display: grid;
