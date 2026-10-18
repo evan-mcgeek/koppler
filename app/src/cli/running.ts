@@ -83,7 +83,7 @@ export async function canvas(args: string[]): Promise<void> {
 /** The log of every app on the board in one stream, as the canvas's All apps tab shows it; `-f` follows it. */
 function allLogs(args: string[]): void {
   const state = readData('state') ?? {};
-  const hidden = new Set(Object.keys((state['hiddenLogs'] ?? {})));
+  const hidden = new Set(Object.keys(state['hiddenLogs'] ?? {}));
   const except = new Set((flagValue(args, '--except') ?? '').split(',').filter(Boolean));
   const apps = Object.keys((state['nodes'] ?? {}) as Record<string, unknown>).filter(
     app => !hidden.has(app) && !except.has(app),

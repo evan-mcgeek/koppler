@@ -153,19 +153,32 @@ function add<T extends Row>(rows: T[], line: string, make: (row: Row) => T, join
     last.items.push(row.text);
     last.text = `${String(last.items.length)} build warnings`;
   } else if (row.build && row.level === 'warn') {
-    rows.push(make({ time: '', level: 'warn', group: 'build', items: [row.text], text: '1 build warning', detail: '' }));
+    rows.push(
+      make({ time: '', level: 'warn', group: 'build', items: [row.text], text: '1 build warning', detail: '' }),
+    );
   } else rows.push(make(row));
 }
 /** The merged lines as rows, as `parseLog` makes them: a line continues only a row of its own app. */
 export function parseStamped(entries: { app: string; at: number; approx: boolean; line: string }[]): StampedRow[] {
   const rows: StampedRow[] = [];
   for (const { app, at, approx, line } of entries)
-    add(rows, line, row => ({ ...row, app, at, approx }), last => last.app === app);
+    add(
+      rows,
+      line,
+      row => ({ ...row, app, at, approx }),
+      last => last.app === app,
+    );
   return rows;
 }
 
 export function parseLog(log: string | null | undefined): Row[] {
   const rows: Row[] = [];
-  for (const line of (log ?? '').split('\n')) add(rows, line, row => row, () => true);
+  for (const line of (log ?? '').split('\n'))
+    add(
+      rows,
+      line,
+      row => row,
+      () => true,
+    );
   return rows;
 }
