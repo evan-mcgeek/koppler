@@ -20,6 +20,7 @@
   import Traces from './Traces.svelte';
   import Logs from './Logs.svelte';
   import LogsButton from './LogsButton.svelte';
+  import Tip from './Tip.svelte';
   import Menu from './Menu.svelte';
   import Rail from './Rail.svelte';
   import AddOutside from './AddOutside.svelte';
@@ -488,6 +489,8 @@
   </main>
   {#if !board.present}<Inbox />{/if}
 </div>
+
+<Tip />
 
 <style>
   header[hidden] {

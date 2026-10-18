@@ -168,3 +168,13 @@ test('the All apps log opens from the top bar, and closes from there too', async
   await button.click();
   await expect(pane).toHaveCount(0);
 });
+
+test('a hint shows soon after pointing at a button, and goes when the pointer leaves', async ({ page }) => {
+  const button = page.getByRole('button', { name: 'Logs', exact: true });
+  await button.hover();
+  const tip = page.getByRole('tooltip');
+  await expect(tip).toHaveText('The log of every app on the board, in one stream', { timeout: 800 });
+  await page.mouse.move(5, 500);
+  await expect(tip).toBeHidden();
+  await expect(button).toHaveAttribute('title', 'The log of every app on the board, in one stream');
+});
