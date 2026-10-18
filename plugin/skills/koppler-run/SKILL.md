@@ -11,6 +11,7 @@ While this session is connected to the canvas (see Connect), anything that needs
 When it is about a run, give its id; otherwise leave `run` out:
 `koppler say` with JSON on stdin: `{ "kind": "question" | "result" | "failure", "run"?: "<data.id of the run>", "title", "summary", "sections": [{ "title", "items": [...], "commands": [...] }], "choices": [{ "id", "label", "detail" }] }`.
 Put anything the user has to run in a section's `commands`, never in `items`: the canvas shows each command in a box with a Copy button.
+When something blocks you or a run (Claude Code's auto mode refusing a command, a permission prompt denied, an expired sign-in), the message also says how to keep it from happening again, in a section titled "So it does not happen again", when there is a way: for auto mode, the allow rule from `references/permissions.md` as a command to copy, and where it goes. Say it in the chat reply too.
 Short plain sentences; no Markdown, it is shown as text. The same question also goes in your chat reply.
 An answer from the canvas arrives as a `koppler-reply` prompt (`data.message`, `data.choice` and its `label`, or `data.text`): act on it like the user's own reply. If the user answers in the chat instead, run `koppler say --answered <message id>` so the canvas stops asking.
 
