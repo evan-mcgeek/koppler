@@ -11,14 +11,19 @@ const stack = {
       name: 'Orders created',
       type: 'kafka',
       queue: 'Orders_Created',
-      feeds: { 'orders-bus': { via: 'pipe' } },
+      feeds: { 'orders-bus': { via: 'pipe' }, elsewhere: { via: 'pipe' } },
     },
     'orders-bus': { name: 'Orders bus', type: 'eventbridge', feeds: { 'shop-bus': { via: 'rule' } } },
     'shop-bus': { name: 'Shop bus', type: 'eventbridge', queue: 'shop_bus_qa' },
     unrelated: { name: 'Unrelated topic', type: 'kafka', feeds: { elsewhere: { via: 'pipe' } } },
     elsewhere: { name: 'Elsewhere', type: 'sqs' },
   },
-  apps: { ...STACK.apps, orders: { ...STACK.apps.orders, reads: { 'shop-bus': { via: 'rule to Lambda' } } } },
+  apps: {
+    ...STACK.apps,
+    orders: { ...STACK.apps.orders, reads: { 'shop-bus': { via: 'rule to Lambda' } } },
+    // Reads the same topic and bus, but is not on the board: nothing of it shows.
+    payments: { ...STACK.apps.payments, reads: { 'orders-created': {}, 'shop-bus': {}, elsewhere: {} } },
+  },
 };
 test.use({
   stack,
@@ -35,7 +40,10 @@ test.use({
 test('the topic and the buses that feed a queue an app reads stack above it, each link saying how', async ({
   page,
 }) => {
+  // Only what joins Orders API: not the unrelated topic, not Elsewhere though the topic also feeds it.
   await expect(queue(page)).toHaveCount(3);
+  await expect(queue(page).filter({ hasText: /Unrelated|Elsewhere/ })).toHaveCount(0);
+  await expect(page.locator('.svelte-flow__node[data-id="payments"]')).toHaveCount(0);
   const named = (name: string) => queue(page).filter({ hasText: name });
   const [topic, bus, shop] = [named('Orders created'), named('Orders bus'), named('Shop bus')];
   const top = async (card: Locator) => (await card.boundingBox())?.y ?? 0;
@@ -51,6 +59,7 @@ test('the topic and the buses that feed a queue an app reads stack above it, eac
   await expect(page.getByRole('tooltip')).toContainText('Stays deployed on QA: it feeds Orders bus.');
   const labels = page.locator('.links .flow .via');
   await expect(labels).toHaveCount(3);
+  await expect(page.locator('.links .flow')).toHaveCount(3);
   expect((await labels.allTextContents()).sort()).toEqual(['pipe', 'rule', 'rule to Lambda']);
   await page.screenshot({ path: 'test-results/next-queue-feeds.png' });
 });

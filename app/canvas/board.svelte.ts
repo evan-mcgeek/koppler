@@ -814,7 +814,9 @@ class Board {
     );
   }
   #fedNames(feeds: Record<string, unknown> | undefined): string {
+    // Only what this board shows: a queue it also feeds elsewhere is not this board's.
     return Object.keys(feeds ?? {})
+      .filter(id => this.shownQueues.some(one => one.id === id))
       .map(id => this.queueName(id))
       .join(' and ');
   }
