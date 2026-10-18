@@ -38,3 +38,16 @@ Make them only after the user's yes, with `koppler stack set` (never by writing 
 A shared stack's change is for the user to commit (or `koppler link pr` for a linked one).
 
 Queues, topics and event buses go under `queues`, with `publishes` / `reads` on each app (`references/stack.md`); confirm both ends from the repos and the Terraform, as for a call.
+
+## Trace what feeds a queue
+
+A queue an app reads is often the end of a chain: a Kafka topic piped onto an event bus, whose rule forwards to another account's bus, which a rule hands to a Lambda.
+`koppler discover --deployed` drafts what it can read from the Terraform; trace the rest by hand, in every clone, and record each link with `koppler stack set queues.<id>.feeds.<other> '{"via":"pipe"}'`:
+- **Kafka topics read:** `aws_pipes_pipe` and `awscc_pipes_pipe` with `self_managed_kafka_parameters` or `managed_streaming_kafka_parameters`; `topic_name`, often `each.key` over a list variable whose values are in the `.tfvars` (a commented-out item is not read). Also Lambda event source mappings on an MSK or Kafka source.
+- **Kafka topics written:** app settings such as `KafkaSettings/Topic`, `Kafka__Topic` and `BootstrapServers` in the Terraform locals and `appsettings*.json`; the app `publishes` that topic.
+- **Event buses:** `aws_cloudwatch_event_bus`; its rules (`aws_cloudwatch_event_rule` with `event_bus_name`) and their targets (`aws_cloudwatch_event_target`): a queue, a Lambda, an API destination, or another account's bus by its ARN (`event-bus/<name>`, often in a map per environment in the locals).
+- **The other end of a bus forwarded by ARN:** search every clone for the bus name without its environment word (`customer_service_bus`); the repo that declares it holds the rules that read it.
+- **SNS:** `aws_sns_topic_subscription` (`protocol` sqs, lambda or https, and its `endpoint`); an https subscription is a call to that app.
+- **Pipes from SQS:** an `aws_pipes_pipe` whose `source` is a queue (often through `terraform_remote_state` outputs) and whose `target` is an API destination or a Lambda: that queue is read, with `via`.
+- **Who reads at the end:** a Lambda in an app's repo targeted by a pipe or rule is that app reading the queue: `reads.<queue>.via` (`"rule to Lambda"`), not a card of its own.
+Never read a secret on the way (Kafka credentials, connection strings): only names, addresses and topic names.

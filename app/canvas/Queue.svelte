@@ -48,37 +48,45 @@
         title={data.about.slice(1).join('\n')}><Icon of={TriangleAlert} size={13} /></span
       >{/if}
   {/snippet}
-  <span class="seg nodrag" class:local={data.local} role="radiogroup" aria-label="Which {data.name} its apps use">
-    <label title="The {env} queue">
-      <input
-        type="radio"
-        name="queue-{data.queue}"
-        checked={!data.local}
-        onchange={() => {
-          board.setQueue(data.queue, false);
-        }}
-      />Deployed
-    </label>
-    <label
-      aria-disabled={!data.can}
-      title={data.can
-        ? 'Koppler runs it on your Mac and points its apps at it'
-        : `Koppler cannot run a ${data.kind} queue locally yet`}
-    >
-      <input
-        type="radio"
-        name="queue-{data.queue}"
-        checked={data.local}
-        disabled={!data.can}
-        onchange={() => {
-          board.setQueue(data.queue, true);
-        }}
-      />Local
-    </label>
-  </span>
+  {#if data.upstream}
+    <span class="stays">Stays deployed</span>
+  {:else}
+    <span class="seg nodrag" class:local={data.local} role="radiogroup" aria-label="Which {data.name} its apps use">
+      <label title="The {env} queue">
+        <input
+          type="radio"
+          name="queue-{data.queue}"
+          checked={!data.local}
+          onchange={() => {
+            board.setQueue(data.queue, false);
+          }}
+        />Deployed
+      </label>
+      <label
+        aria-disabled={!data.can}
+        title={data.can
+          ? 'Koppler runs it on your Mac and points its apps at it'
+          : `Koppler cannot run a ${data.kind} queue locally yet`}
+      >
+        <input
+          type="radio"
+          name="queue-{data.queue}"
+          checked={data.local}
+          disabled={!data.can}
+          onchange={() => {
+            board.setQueue(data.queue, true);
+          }}
+        />Local
+      </label>
+    </span>
+  {/if}
 </InfraCard>
 
 <style>
+  .stays {
+    color: var(--muted);
+    font: 500 12px var(--sans);
+  }
   .seg {
     display: inline-flex;
     font-family: var(--sans);

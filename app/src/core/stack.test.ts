@@ -117,3 +117,23 @@ test('a stack declares its own sign-ins, and an app names one that exists', () =
     /signIns\.acme-dev\.check/,
   );
 });
+
+test('a queue feeds other queues by a pipe, a rule or a subscription, and an app says how it reads one', () => {
+  const queues = {
+    topic: { name: 'Orders created', type: 'kafka', feeds: { bus: { via: 'pipe' } } },
+    bus: { name: 'Orders bus', type: 'eventbridge' },
+  };
+  const reads = web({ reads: { bus: { via: 'rule to Lambda' } } });
+  expect(validateStack(stack({ queues, apps: reads.apps }))).toEqual([]);
+  const wrong = (extra: object, at: string) =>
+    expect(validateStack(stack({ queues: { ...queues, ...extra } })).join('\n')).toContain(at);
+  wrong({ topic: { ...queues.topic, feeds: { ghost: { via: 'pipe' } } } }, 'queues.topic.feeds.ghost: no such queue');
+  wrong(
+    { topic: { ...queues.topic, feeds: { topic: { via: 'pipe' } } } },
+    'queues.topic.feeds.topic: a queue cannot feed itself',
+  );
+  wrong({ topic: { ...queues.topic, feeds: { bus: { via: 'carrier pigeon' } } } }, 'pipe, rule or subscription');
+  expect(validateStack(stack({ queues, apps: web({ reads: { bus: { via: 7 } } }).apps })).join('\n')).toContain(
+    'apps.web.reads.bus.via: how it is read',
+  );
+});

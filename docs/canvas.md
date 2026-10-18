@@ -80,6 +80,7 @@ These appear next to the app that uses them, and show or hide with it.
 
 - **Tunnels** carry an app to a deployed database or service. Koppler opens one per host and port, shared by the apps that need it, and moves a clashing one to a free port. Each can be left out of a run, and one that runs can be restarted from its card when calls through it hang.
 - **Queues** (SQS, SNS, EventBridge, Kafka) show which apps publish and read. A switch on the card picks **Deployed** (local apps use the environment's queue) or **Local** (Koppler starts an SQS emulator or a Kafka broker in Docker and points every app on that queue at it). A queue can be hidden and shown again from its app.
+  What feeds a queue an app reads stacks above it, however far up: a Kafka topic piped onto an event bus, a rule forwarding to another bus, an SNS topic's subscription. Each link says how (`pipe`, `rule`, `subscription`, `rule to Lambda`); those upstream cards stay deployed.
 - **Outside systems** (for example a payment provider) are dashed cards: things the apps call, or that call them, and that never run locally. Add one with **Add outside system…** under the Apps list; click it in the list to keep its card on the board even when none of its callers is there.
 
 ## Environment

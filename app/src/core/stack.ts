@@ -334,6 +334,14 @@ const Queue = z.looseObject(
     queue: queueName.optional(),
     envs: z.record(z.string(), z.looseObject({ queue: queueName.optional() })).optional(),
     note: z.string().optional(),
+    feeds: z
+      .record(
+        z.string(),
+        z.looseObject({ via: z.enum(['pipe', 'rule', 'subscription'], { error: 'pipe, rule or subscription' }) }),
+        { error: 'an object keyed by queue id' },
+      )
+      .optional()
+      .describe('The queues, topics and buses it feeds, and how: a pipe, a rule or a subscription'),
   },
   { error: 'an object' },
 );
@@ -440,8 +448,12 @@ function appProblems(id: string, app: Loose, stack: Loose, envs: string[]): stri
   for (const [n, dep] of list(app['after']).entries())
     if (typeof dep !== 'string' || !has(stack['apps'], dep)) problems.push(`${at}.after[${String(n)}]: no such app`);
   for (const key of ['publishes', 'reads'])
-    for (const [queue] of entries(app[key]))
+    for (const [queue, use] of entries(app[key])) {
       if (!has(stack['queues'], queue)) problems.push(`${at}.${key}.${queue}: no such queue under "queues"`);
+      const via = isObject(use) ? use['via'] : undefined;
+      if (via !== undefined && (typeof via !== 'string' || !via || via.length > 80))
+        problems.push(`${at}.${key}.${queue}.via: how it is read, as text of at most 80 characters`);
+    }
   for (const [env] of entries(app['envs']))
     if (!envs.includes(env)) problems.push(`${at}.envs.${env}: not one of envs (${envs.join(', ')})`);
 
@@ -525,8 +537,12 @@ function crossProblems(stack: Loose): string[] {
     if (!/^[a-z0-9-]{1,32}$/.test(id)) problems.push(`kinds.${id}: id must be lowercase letters, digits and dashes`);
     else if (BUILT_IN_KINDS.includes(id)) problems.push(`kinds.${id}: Koppler already has a kind with this id`);
   }
-  for (const [id] of entries(stack['queues']))
+  for (const [id, queue] of entries(stack['queues'])) {
     if (!/^[a-z0-9-]{1,64}$/.test(id)) problems.push(`queues.${id}: id must be lowercase letters, digits and dashes`);
+    for (const [to] of entries(isObject(queue) ? queue['feeds'] : undefined))
+      if (to === id) problems.push(`queues.${id}.feeds.${to}: a queue cannot feed itself`);
+      else if (!has(stack['queues'], to)) problems.push(`queues.${id}.feeds.${to}: no such queue under "queues"`);
+  }
   for (const [id, app] of entries(stack['apps'])) {
     if (!ID.test(id)) problems.push(`apps.${id}: id must be lowercase letters, digits and dashes`);
     if (isObject(app)) problems.push(...appProblems(id, app, stack, envs));
