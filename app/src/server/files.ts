@@ -10,6 +10,7 @@ import { APP_ID } from '../ids.ts';
 import { CODE, tempDir } from '../paths.ts';
 import { awsProfiles, cloneChoices } from './choices.ts';
 import { tail } from './logs.ts';
+import { sharedLog } from './shared-log.ts';
 import { logFile, SOURCE, statusJson } from './status.ts';
 
 export const JSON_HEADERS = { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' };
@@ -58,6 +59,21 @@ export function serveFile(what: string, url: URL, res: http.ServerResponse): voi
     const text = tail(file, 2 * 1024 * 1024, 2000);
     const headers = { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' };
     res.writeHead(text === null ? 404 : 200, headers).end(text ?? '');
+    return;
+  }
+  // The log of every app the page names, in one stream: its All apps tab.
+  if (what === 'log-all') {
+    const apps = (url.searchParams.get('apps') ?? '')
+      .split(',')
+      .filter(id => APP_ID.test(id))
+      .slice(0, 100);
+    const since = url.searchParams.get('since');
+    const lines = Number(url.searchParams.get('lines')) || undefined;
+    const entries = sharedLog(apps, {
+      since: since === 'hour' || since === 'all' ? since : 'run',
+      ...(lines && { lines: Math.min(lines, 100_000) }),
+    });
+    res.writeHead(200, { ...JSON_HEADERS, 'cache-control': 'no-store' }).end(JSON.stringify(entries));
     return;
   }
   // The shape of a stack, for the settings panels: every field they show comes from it.

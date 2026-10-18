@@ -1,9 +1,10 @@
 <script lang="ts">
   import Icon from './Icon.svelte';
   import X from '@lucide/svelte/icons/x';
-  import { parseLog } from '../src/core/logfmt.ts';
+  import { parseLog, parseStamped } from '../src/core/logfmt.ts';
+  import { board } from './board.svelte.ts';
   import { live } from './live.svelte.ts';
-  import { logs } from './logs.svelte.ts';
+  import { ALL, logs, type Names, type Span } from './logs.svelte.ts';
 
   const LABEL: Record<string, string> = {
     debug: 'DEBUG',
@@ -21,6 +22,20 @@
       const said = `${row.time} ${row.text}`;
       const count = (seen[said] = (seen[said] ?? 0) + 1);
       return { ...row, key: `${said}#${String(count)}` };
+    });
+  });
+  const all = $derived(active === ALL);
+  const clock = (at: number) => new Date(at).toLocaleTimeString([], { hour12: false });
+  const kindOf = $derived(Object.fromEntries(board.nodes.map(node => [node.id, node.data.kind])));
+  const hidden = $derived(board.nodes.filter(node => board.hiddenLogs[node.id]));
+  const merged = $derived.by(() => {
+    if (!all) return [];
+    const seen: Record<string, number> = {};
+    return parseStamped(logs.all.filter(entry => !board.hiddenLogs[entry.app])).map((row, at, rows) => {
+      const said = `${row.app} ${String(row.at)} ${row.text}`;
+      const count = (seen[said] = (seen[said] ?? 0) + 1);
+      const named = logs.names === 'every' || rows[at - 1]?.app !== row.app;
+      return { ...row, named, key: `${said}#${String(count)}` };
     });
   });
   let body: HTMLElement | undefined = $state();
@@ -79,11 +94,16 @@
   $effect(() => {
     if (live.status) logs.refresh();
   });
+  // Read again at once on opening the tab, or leaving an app out or bringing it back.
+  $effect(() => {
+    logs.reload();
+  });
   // Stays at the newest line unless scrolled up; a tab just opened starts at its end.
   $effect.pre(() => {
     if (!body) return;
     // Read on every new text, so the pane follows it.
-    const pinned = shown !== active || !text || body.scrollHeight - body.scrollTop - body.clientHeight < 24;
+    const filled = all ? merged.length : text;
+    const pinned = shown !== active || !filled || body.scrollHeight - body.scrollTop - body.clientHeight < 24;
     shown = active;
     const pane = body;
     if (pinned)
@@ -115,6 +135,16 @@
     ></div>
     <header>
       <div class="tabs" role="tablist">
+        <span class="tab" class:on={all}>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={all}
+            onclick={() => {
+              logs.active = ALL;
+            }}>{logs.label(ALL)}</button
+          >
+        </span>
         {#each logs.tabs as id (id)}
           {@const up = logs.past(id) ? null : live.up(id)}
           <span class="tab" class:on={id === active}>
@@ -139,20 +169,60 @@
           </span>
         {/each}
       </div>
-      <span class="meta">{(logs.past(active) ? text : live.tail(active)) ? '' : 'no log yet'}</span>
-      <button
-        type="button"
-        title="Hide what is in this log so far; new lines keep coming. The log file is not touched."
-        onclick={() => {
-          logs.clear();
-        }}>Clear</button
-      >
-      <button
-        type="button"
-        aria-pressed={logs.raw}
-        title="Show the log exactly as the app wrote it"
-        onclick={() => (logs.raw = !logs.raw)}>Raw</button
-      >
+      <span class="meta">{all || (logs.past(active) ? text : live.tail(active)) ? '' : 'no log yet'}</span>
+      {#if all}
+        {#if hidden.length}
+          <details class="left-out">
+            <summary>{hidden.length} left out</summary>
+            <div class="menu">
+              {#each hidden as node (node.id)}
+                <button
+                  type="button"
+                  title="Show {board.nameOf(node.id)} in this log again"
+                  onclick={() => {
+                    board.showLog(node.id, true);
+                  }}>{board.nameOf(node.id)}</button
+                >
+              {/each}
+            </div>
+          </details>
+        {/if}
+        <select
+          aria-label="Names"
+          value={logs.names}
+          onchange={ev => {
+            logs.setNames(ev.currentTarget.value as Names);
+          }}
+        >
+          <option value="every">Name on every line</option>
+          <option value="change">Name when the app changes</option>
+        </select>
+        <select
+          aria-label="How much"
+          value={logs.since}
+          onchange={ev => {
+            logs.setSince(ev.currentTarget.value as Span);
+          }}
+        >
+          <option value="run">Since the run started</option>
+          <option value="hour">Last hour</option>
+          <option value="lines">Last 2,000 lines</option>
+        </select>
+      {:else}
+        <button
+          type="button"
+          title="Hide what is in this log so far; new lines keep coming. The log file is not touched."
+          onclick={() => {
+            logs.clear();
+          }}>Clear</button
+        >
+        <button
+          type="button"
+          aria-pressed={logs.raw}
+          title="Show the log exactly as the app wrote it"
+          onclick={() => (logs.raw = !logs.raw)}>Raw</button
+        >
+      {/if}
       <button type="button" onclick={toggleSize}>{big ? 'Shrink' : 'Expand'}</button>
       <button
         type="button"
@@ -161,8 +231,46 @@
         }}>Close all</button
       >
     </header>
-    <div class="body" class:raw={logs.raw} class:no-time={!rows.some(row => row.time)} role="log" bind:this={body}>
-      {#if !text}
+    <div
+      class="body"
+      class:raw={logs.raw && !all}
+      class:all
+      class:no-time={!all && !rows.some(row => row.time)}
+      role="log"
+      bind:this={body}
+    >
+      {#if all}
+        {#if !merged.length}
+          <p class="empty">
+            {logs.allApps().length ? 'No lines yet from the apps on the board.' : 'No apps on the board to show.'}
+          </p>
+        {/if}
+        {#each merged as row (row.key)}
+          <div class="row" data-level={row.level}>
+            <span class="t" title={row.approx ? 'Approximate: the time Koppler first read this line' : undefined}
+              >{row.approx ? '~' : ''}{clock(row.at)}</span
+            ><span class="l">{LABEL[row.level] ?? ''}</span>
+            {#if row.named}
+              <button
+                type="button"
+                class="n kind-{kindOf[row.app]}"
+                title="Leave {board.nameOf(row.app)} out of this log"
+                onclick={() => {
+                  board.showLog(row.app, false);
+                }}>{board.nameOf(row.app)}</button
+              >
+            {:else}
+              <span></span>
+            {/if}
+            {#if row.items}
+              <details class="m"><summary>{row.text}</summary><span class="x">{row.items.join('\n')}</span></details>
+            {:else}
+              <span class="m">{row.text}</span>
+              {#if row.detail}<span class="x">{row.detail}</span>{/if}
+            {/if}
+          </div>
+        {/each}
+      {:else if !text}
         <p class="empty">
           {logs.cleared[active]
             ? 'Cleared. New lines show up here.'
@@ -417,6 +525,77 @@
   }
   .row[data-level='start'] .m {
     font-weight: 600;
+  }
+  .all .row {
+    grid-template-columns: 72px 50px 128px minmax(0, 1fr);
+  }
+  .all .x:not(button) {
+    grid-column: 4;
+  }
+  .n {
+    overflow: hidden;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--kind, var(--ink));
+    font: 600 12px/1.55 var(--mono);
+    text-align: left;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    cursor: pointer;
+  }
+  .n:hover {
+    text-decoration: line-through;
+  }
+  header > select {
+    align-self: center;
+    padding: 3px 6px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--surface);
+    color: var(--ink);
+    font: 500 13px var(--sans);
+  }
+  .left-out {
+    position: relative;
+    align-self: center;
+  }
+  .left-out summary {
+    padding: 4px 10px;
+    border-radius: 8px;
+    color: var(--ink);
+    font-weight: 600;
+    list-style: none;
+  }
+  .left-out summary:hover,
+  .left-out[open] summary {
+    background: color-mix(in oklab, var(--ink) 10%, transparent);
+  }
+  .menu {
+    position: absolute;
+    z-index: 3;
+    top: calc(100% + 4px);
+    right: 0;
+    display: grid;
+    min-width: 160px;
+    padding: 4px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--surface);
+    box-shadow: 0 6px 20px color-mix(in oklab, var(--ink) 16%, transparent);
+  }
+  .menu button {
+    padding: 6px 10px;
+    border: 0;
+    border-radius: 6px;
+    background: none;
+    color: var(--ink);
+    font: 500 13px var(--sans);
+    text-align: left;
+    cursor: pointer;
+  }
+  .menu button:hover {
+    background: color-mix(in oklab, var(--ink) 8%, transparent);
   }
   .no-time .row {
     grid-template-columns: 0 58px minmax(0, 1fr);

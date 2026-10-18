@@ -104,3 +104,46 @@ test('a failed start offers to ask the agent, which gets the app and the step', 
     { connection: 'Orders API', result: 'Failed to start', detail: 'Start: The port is taken.', app: 'orders' },
   ]);
 });
+
+test('All apps shows every app on the board in one stream by time, and an app left out stays out', async ({
+  page,
+  canvas,
+}) => {
+  const logs = path.join(canvas.dir, 'state', 'logs');
+  fs.mkdirSync(logs, { recursive: true });
+  const t = Date.now() - 60_000;
+  const write = (app: string, lines: [number, string][]) => {
+    fs.writeFileSync(path.join(logs, `${app}.log`), lines.map(([, line]) => `${line}\n`).join(''));
+    fs.writeFileSync(path.join(logs, `${app}.log.times`), lines.map(([at]) => `${String(t + at)}\n`).join(''));
+  };
+  write('web', [
+    [0, 'info: order form sent'],
+    [2000, 'info: order shown'],
+  ]);
+  write('orders', [[1000, 'warn: order created slowly']]);
+  fs.writeFileSync(path.join(canvas.temp, 'status.json'), JSON.stringify({ apps: { orders: { port: 1 } } }));
+
+  await (await actions(page, 'orders')).getByRole('button', { name: 'Show log' }).click();
+  const pane = page.getByRole('region', { name: 'App log' });
+  await pane.getByRole('tab', { name: 'All apps' }).click();
+  const rows = pane.locator('.row');
+  await expect(rows).toHaveText([/Web.*order form sent/, /WARN.*Orders API.*order created slowly/, /Web.*order shown/]);
+  await page.screenshot({ path: 'test-results/next-logs-all.png' });
+
+  await pane.getByRole('combobox', { name: 'Names' }).selectOption('change');
+  await expect(pane.locator('.row .n')).toHaveCount(3);
+  await pane.getByRole('button', { name: 'Orders API', exact: true }).click();
+  await expect(rows).toHaveCount(2);
+  await expect(pane.locator('.row .n')).toHaveCount(1);
+  await expect(pane.getByText('1 left out')).toBeVisible();
+
+  await page.reload();
+  await (await actions(page, 'orders')).getByRole('button', { name: 'Show log' }).click();
+  await pane.getByRole('tab', { name: 'All apps' }).click();
+  await expect(rows).toHaveCount(2);
+  await expect(pane.getByRole('combobox', { name: 'Names' })).toHaveValue('change');
+  await pane.getByText('1 left out').click();
+  await pane.locator('.menu').getByRole('button', { name: 'Orders API' }).click();
+  await expect(rows).toHaveCount(3);
+  await expect(pane.getByText('1 left out')).toHaveCount(0);
+});

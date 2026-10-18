@@ -13,6 +13,8 @@ import { redact, scrub } from '../scrub.ts';
 import { confirm, flagValue, positional, table } from './output.ts';
 import { fail } from '../failure.ts';
 import { newToken } from '../server/token.ts';
+import { sharedLog } from '../server/shared-log.ts';
+import type { Entry } from '../core/shared-log.ts';
 
 const notAName = (name: string) => `${name} is not a name Koppler gives its processes`;
 
@@ -78,8 +80,50 @@ export async function canvas(args: string[]): Promise<void> {
   console.log('The canvas is open in your browser.');
 }
 
+/** The log of every app on the board in one stream, as the canvas's All apps tab shows it; `-f` follows it. */
+function allLogs(args: string[]): void {
+  const state = readData('state') ?? {};
+  const hidden = new Set(Object.keys((state['hiddenLogs'] ?? {})));
+  const except = new Set((flagValue(args, '--except') ?? '').split(',').filter(Boolean));
+  const apps = Object.keys((state['nodes'] ?? {}) as Record<string, unknown>).filter(
+    app => !hidden.has(app) && !except.has(app),
+  );
+  if (!apps.length) fail('no app on the board to show the log of (koppler use --boards lists the boards)');
+  const asked = flagValue(args, '--since');
+  if (asked !== undefined && !['run', '1h', 'all'].includes(asked)) fail('--since is run, 1h or all');
+  const since = asked === '1h' ? 'hour' : asked === 'all' ? 'all' : 'run';
+  const lines = Number(flagValue(args, '--lines')) || undefined;
+  const names = readStack()?.apps ?? {};
+  const width = Math.max(...apps.map(app => (names[app]?.name ?? app).length));
+  const time = (at: number) => new Date(at).toTimeString().slice(0, 8) + `.${String(at % 1000).padStart(3, '0')}`;
+  const shown = (entry: Entry) =>
+    `${entry.approx ? '~' : ' '}${time(entry.at)} ${(names[entry.app]?.name ?? entry.app).padEnd(width)}  ${entry.line}`;
+  const key = (entry: Entry) => `${entry.app}\u0000${String(entry.at)}\u0000${entry.line}`;
+  const first = sharedLog(apps, { since, ...(lines && { lines }) });
+  for (const entry of first) console.log(shown(entry));
+  if (!args.includes('-f') && !args.includes('--follow')) return;
+  // Followed by time: what came after the last line shown, and what came at its time and was not shown yet.
+  let last = first.at(-1)?.at ?? Date.now();
+  let atLast = new Set(first.filter(entry => entry.at === last).map(key));
+  setInterval(() => {
+    const fresh = sharedLog(apps, { since: 'all' }).filter(
+      entry => entry.at > last || (entry.at === last && !atLast.has(key(entry))),
+    );
+    for (const entry of fresh) console.log(shown(entry));
+    const newest = fresh.at(-1)?.at;
+    if (newest === undefined) return;
+    if (newest !== last) atLast = new Set();
+    last = newest;
+    for (const entry of fresh.filter(one => one.at === last)) atLast.add(key(entry));
+  }, 1000);
+}
+
 /** A log, with secrets masked as on the card; `-f` follows it. */
 export function logs(args: string[]): void {
+  if (args.includes('--all')) {
+    allLogs(args);
+    return;
+  }
   const [want] = positional(args, ['-n', '--run']);
   const lines = Number(flagValue(args, '-n')) || 50;
   if (!want) fail('usage: koppler logs <name> [-f] [-n <lines>] [--run <id>]');
