@@ -23,3 +23,16 @@ Leave these asking every time, because they start or stop things, change code, b
 `koppler stack unlock` asks the person at the terminal, like approval.
 `koppler doctor --approve` cannot be allowed at all: it asks the person at the terminal, and refuses anywhere else.
 On PROD the user's Run on PROD on the canvas is the confirmation; `koppler query` stays in the user's own terminal.
+
+## Auto mode in Claude Code
+
+In auto mode, Claude Code refuses a command that may change production, such as `koppler up` on PROD, and offers no prompt to approve it.
+An answer on the canvas does not change that: only your Claude Code settings do.
+To let the agent start PROD runs, allow the command in `permissions.allow`, in `~/.claude/settings.json` for every project or in the project's `.claude/settings.json`:
+
+```json
+{ "permissions": { "allow": ["Bash(koppler up:*)"] } }
+```
+
+An allowed command skips the auto mode check, on every environment, so only add it if the Run on PROD you confirm on the canvas is the check you want.
+Without the rule, start the run yourself: press Run on the canvas again, or run the `koppler up --run <id>` the agent gives you in your own terminal.
