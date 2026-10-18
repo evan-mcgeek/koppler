@@ -341,12 +341,6 @@
     border-bottom: 1px solid var(--line);
     background: var(--panel);
   }
-  .seg label {
-    flex: 1;
-    padding: 3px 12px;
-    text-align: center;
-    white-space: nowrap;
-  }
   h2 {
     display: flex;
     align-items: baseline;
@@ -526,10 +520,6 @@
     gap: 8px;
     margin-top: auto;
     padding: 0 2px;
-  }
-  .protected .seg label:has(input:checked) {
-    background: var(--prod);
-    color: var(--on-accent);
   }
   .unsaved {
     margin: 0;

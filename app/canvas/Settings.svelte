@@ -221,11 +221,6 @@
   .row button:hover {
     background: color-mix(in oklab, var(--ink) 7%, transparent);
   }
-  .row button[aria-checked='true'] {
-    border-color: var(--line);
-    background: var(--paper);
-    color: var(--ink);
-  }
   .address .warn {
     flex: 1;
     max-width: 200px;

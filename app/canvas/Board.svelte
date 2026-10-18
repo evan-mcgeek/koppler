@@ -1097,7 +1097,7 @@
     opacity: 0.7;
   }
   .tools .percent {
-    min-width: 52px;
+    width: 64px;
     justify-content: center;
     color: var(--ink);
     font-variant-numeric: tabular-nums;
