@@ -6,7 +6,7 @@ import https from 'node:https';
 import path from 'node:path';
 import { execFileSync, spawn } from 'node:child_process';
 import { fail, Failure } from '../failure.ts';
-import { logsDir, stateDir } from '../paths.ts';
+import { CODE, logsDir, stateDir } from '../paths.ts';
 import { appEnv } from '../safe-env.ts';
 import { redact } from '../scrub.ts';
 import { keepRunLog } from './run-logs.ts';
@@ -278,7 +278,9 @@ export async function startProcess(options: RunOptions): Promise<ProcessRecord> 
   keepPreviousLog(log);
   const fd = fs.openSync(log, 'w', 0o600);
   fs.writeSync(fd, `${new Date().toLocaleString('sv-SE')} $ ${display}\n`);
-  const argv = commandFor(command, options.restart);
+  // Each line's time, beside the log: the first is this header's.
+  fs.writeFileSync(`${log}.times`, `${String(Date.now())}\n`, { mode: 0o600 });
+  const argv = [process.execPath, path.join(CODE, 'stamp.mjs'), log, '--', ...commandFor(command, options.restart)];
   const cwd = path.resolve(options.cwd ?? process.cwd());
   // An app started with its secrets does not inherit variables that would make its runtime load the caller's code.
   const given = { ...process.env, ...options.setEnv };
@@ -288,7 +290,7 @@ export async function startProcess(options: RunOptions): Promise<ProcessRecord> 
   const child = spawn(argv[0] ?? '', argv.slice(1), {
     cwd,
     detached: true,
-    stdio: ['ignore', fd, fd],
+    stdio: ['ignore', 'ignore', 'ignore'],
     env: safe?.env ?? given,
   });
   let spawnError: Error | null = null as Error | null;

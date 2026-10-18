@@ -478,8 +478,9 @@ const COMMANDS: Command[] = [
   {
     name: 'logs',
     who: 'you',
-    args: '<name> [-f] [-n <lines>] [--run <id>]',
-    about: 'show or follow a log, secrets masked; --run shows the one a past run kept',
+    args: '<name> [-f] [-n <lines>] [--run <id>] | --all [-f] [--since run|1h|all] [--lines <n>] [--except <app,app>]',
+    about:
+      'show or follow a log, secrets masked; --run shows the one a past run kept; --all shows every app on the board in one stream, in the order its lines came',
     run: logs,
     example: 'koppler logs orders-api -f',
   },

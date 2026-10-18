@@ -223,6 +223,8 @@ class Board {
   hiddenQueues = $state.raw<Record<string, true>>({});
   /** Outside systems taken off the board, though an app on it calls them or reads their queue. */
   hiddenOutside = $state.raw<Record<string, true>>({});
+  /** Apps left out of the log of every app, kept with the board. */
+  hiddenLogs = $state.raw<Record<string, true>>({});
   /** The outside systems put on the board by hand: shown even when none of their apps is. */
   pinned = $state.raw<string[]>([]);
   pin(id: string): void {
@@ -1316,6 +1318,7 @@ class Board {
     this.queues = {};
     this.hiddenQueues = {};
     this.hiddenOutside = {};
+    this.hiddenLogs = {};
     this.pinned = [];
   }
   /**
@@ -1354,6 +1357,7 @@ class Board {
     this.queues = {};
     this.hiddenQueues = {};
     this.hiddenOutside = {};
+    this.hiddenLogs = {};
     this.pinned = Array.isArray(given['outside'])
       ? (given['outside'] as unknown[]).filter((id): id is string => typeof id === 'string')
       : [];
@@ -1512,6 +1516,7 @@ class Board {
     this.queues = (saved?.['queues'] ?? {}) as Record<string, 'local'>;
     this.hiddenQueues = (saved?.['hiddenQueues'] ?? {}) as Record<string, true>;
     this.hiddenOutside = (saved?.['hiddenOutside'] ?? {}) as Record<string, true>;
+    this.hiddenLogs = (saved?.['hiddenLogs'] ?? {}) as Record<string, true>;
     this.pinned = (Array.isArray(saved?.['outside']) ? saved['outside'] : []) as string[];
     this.syncInfra((saved?.infra ?? {}) as Record<string, Point | undefined>);
     const { zoom, pan } = saved ?? {};
@@ -1543,6 +1548,7 @@ class Board {
       this.queues,
       this.hiddenQueues,
       this.hiddenOutside,
+      this.hiddenLogs,
       this.pinned,
     ];
   }
@@ -1599,6 +1605,7 @@ class Board {
       queues: this.queues,
       hiddenQueues: this.hiddenQueues,
       hiddenOutside: Object.keys(this.hiddenOutside).length ? this.hiddenOutside : undefined,
+      hiddenLogs: Object.keys(this.hiddenLogs).length ? this.hiddenLogs : undefined,
       outside: this.pinned.length ? this.pinned : undefined,
       infra: Object.fromEntries(
         this.infra.map(({ id, position }) => [id, { x: Math.round(position.x), y: Math.round(position.y) }]),
@@ -1676,6 +1683,11 @@ class Board {
     this.nodes = [...this.nodes.map(unselected), { ...card, selected: true }];
   }
 
+  /** Leaves an app out of the log of every app, or brings it back. */
+  showLog(id: string, show: boolean): void {
+    const { [id]: _was, ...others } = this.hiddenLogs;
+    this.hiddenLogs = show ? others : { ...others, [id]: true };
+  }
   /** Takes an outside system off the board, even one an app on it uses, or puts it back. */
   showOutside(id: string, show: boolean): void {
     const { [id]: _was, ...others } = this.hiddenOutside;

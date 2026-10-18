@@ -137,23 +137,48 @@ const FLUTTER_TRACE = /^flutter: (#\d+\s|<asynchronous suspension>|\s*-- \S)/;
 const continues = (line: string, last: Row) =>
   (FLUTTER_TRACE.test(line) && last.level === 'error') || /^\s+(at |---|\.\.\.)/.test(line) || /^\s{2,}\S/.test(line);
 
+/** A row of the log of every app: the app it came from, and when its first line arrived. */
+export type StampedRow = Row & { app: string; at: number; approx: boolean };
+/** Adds a line to the rows: to the row above when it continues it, else as a row of its own. */
+function add<T extends Row>(rows: T[], line: string, make: (row: Row) => T, joins: (last: T) => boolean): void {
+  if (!line.trim()) return;
+  const last = rows.at(-1);
+  if (last && joins(last) && continues(line, last)) {
+    last.detail += (last.detail ? '\n' : '') + line.replace(/^flutter: /, '').trim();
+    return;
+  }
+  const row = parseLine(line);
+  // A run of compiler warnings is one row that says how many; the list stays one click away.
+  if (row.build && row.level === 'warn' && last && joins(last) && last.group === 'build' && last.items) {
+    last.items.push(row.text);
+    last.text = `${String(last.items.length)} build warnings`;
+  } else if (row.build && row.level === 'warn') {
+    rows.push(
+      make({ time: '', level: 'warn', group: 'build', items: [row.text], text: '1 build warning', detail: '' }),
+    );
+  } else rows.push(make(row));
+}
+/** The merged lines as rows, as `parseLog` makes them: a line continues only a row of its own app. */
+export function parseStamped(entries: { app: string; at: number; approx: boolean; line: string }[]): StampedRow[] {
+  const rows: StampedRow[] = [];
+  for (const { app, at, approx, line } of entries)
+    add(
+      rows,
+      line,
+      row => ({ ...row, app, at, approx }),
+      last => last.app === app,
+    );
+  return rows;
+}
+
 export function parseLog(log: string | null | undefined): Row[] {
   const rows: Row[] = [];
-  for (const line of (log ?? '').split('\n')) {
-    if (!line.trim()) continue;
-    const last = rows.at(-1);
-    if (last && continues(line, last)) {
-      last.detail += (last.detail ? '\n' : '') + line.replace(/^flutter: /, '').trim();
-      continue;
-    }
-    const row = parseLine(line);
-    // A run of compiler warnings is one row that says how many; the list stays one click away.
-    if (row.build && row.level === 'warn' && last?.group === 'build' && last.items) {
-      last.items.push(row.text);
-      last.text = `${String(last.items.length)} build warnings`;
-    } else if (row.build && row.level === 'warn') {
-      rows.push({ time: '', level: 'warn', group: 'build', items: [row.text], text: '1 build warning', detail: '' });
-    } else rows.push(row);
-  }
+  for (const line of (log ?? '').split('\n'))
+    add(
+      rows,
+      line,
+      row => row,
+      () => true,
+    );
   return rows;
 }
