@@ -2,7 +2,7 @@
  * Patch bay: graphite hardware with its labels printed on the panel. Dark only. Colour is a signal: `local` for a
  * local cable and the one filled button, `deployed` for what still calls the deployed environment, `live` for what
  * runs, `warn` when something needs you, and `prod` for PROD and failures. A scheme sets them; the local and deployed
- * colours can also be picked by hand (Appearance), while `live`, `warn` and `prod` never change.
+ * colours can also be picked by hand (Appearance), while `live`, `warn` and `prod` follow the scheme only.
  */
 :root {
   --desk: #0d0d0d;
@@ -57,6 +57,7 @@
   --ink-muted: #a9a8a1;
   --local: #c8f03c;
   --deployed: #8ea2ff;
+  --live: #4fd6c4;
   --warn: #f5b841;
   --prod: #ff4a3d;
   --prod-strong: #e0362a;
@@ -70,6 +71,7 @@
   --ink-muted: #ada497;
   --local: #ff8a1f;
   --deployed: #7fc4d8;
+  --live: #5bd97a;
   --warn: #f2d14b;
   --prod: #ff3b6b;
   --prod-strong: #e02656;
@@ -83,6 +85,7 @@
   --ink-muted: #98a89c;
   --local: #52f29a;
   --deployed: #5cc8ff;
+  --live: #ffffff;
   --warn: #ffb547;
   --prod: #ff4a4a;
   --prod-strong: #e03636;
@@ -96,6 +99,7 @@
   --ink-muted: #a0a5b3;
   --local: #ffd43b;
   --deployed: #a98bff;
+  --live: #4ade80;
   --warn: #ff9f43;
   --prod: #ff3b5c;
   --prod-strong: #e0254a;
