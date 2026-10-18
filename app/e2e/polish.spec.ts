@@ -85,7 +85,7 @@ test('a protected environment marks the frame, and an emptied board says how to 
   await expect(page.getByText('Click the apps you want to run together.')).toBeVisible();
 });
 
-test('the shortcuts sheet opens with ?, and the theme is picked in Settings and kept', async ({ page }) => {
+test('the shortcuts sheet opens with ?, and the appearance is picked in Settings and kept', async ({ page }) => {
   const sheet = page.locator('#help');
   await expect(sheet).toBeHidden();
   await page.keyboard.press('?');
@@ -98,13 +98,25 @@ test('the shortcuts sheet opens with ?, and the theme is picked in Settings and 
   await page.keyboard.press('Escape');
 
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  await page.getByRole('radio', { name: 'Dark' }).click();
-  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+  await page.getByRole('radio', { name: /^Scope/ }).click();
+  await expect(page.locator('html')).toHaveAttribute('data-scheme', 'scope');
+  // A local colour picked by hand stays over the scheme; a scheme picked again drops it.
+  await page.getByRole('radio', { name: 'Local #ffd43b' }).click();
+  const local = () =>
+    page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--local').trim());
+  expect(await local()).toBe('#ffd43b');
   await page.reload();
-  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+  await expect(page.locator('html')).toHaveAttribute('data-scheme', 'scope');
+  expect(await local()).toBe('#ffd43b');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  await expect(page.getByRole('radio', { name: 'Dark' })).toBeChecked();
-  await page.screenshot({ path: 'test-results/next-dark.png' });
+  await expect(page.getByRole('radio', { name: /^Scope/ })).toBeChecked();
+  await expect(page.getByRole('radio', { name: 'Local #ffd43b' })).toBeChecked();
+  await page.screenshot({ path: 'test-results/next-appearance.png' });
+  await page.getByRole('button', { name: 'Scheme default' }).click();
+  expect(await local()).toBe('#52f29a');
+  await page.getByRole('radio', { name: /^Mono/ }).click();
+  await expect(page.locator('html')).not.toHaveAttribute('data-scheme');
+  expect(await local()).toMatch(/^#f{3}(f{3})?$/);
 });
 
 test('the keyboard: Space presses the focused button, and shortcuts stay off under an open menu', async ({ page }) => {

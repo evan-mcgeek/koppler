@@ -81,7 +81,7 @@
     aria-expanded={inbox.open}
     onclick={() => (inbox.open = !inbox.open)}
   >
-    <span class="dot" aria-hidden="true"></span><span class="words">{label}</span>
+    <span class="dot round" aria-hidden="true"></span><span class="words">{label}</span>
   </button>
   {#if listening === 'none' || listening === 'quiet'}
     <button

@@ -1,11 +1,8 @@
 <script lang="ts">
   import Icon from './Icon.svelte';
-  import Monitor from '@lucide/svelte/icons/monitor';
-  import Moon from '@lucide/svelte/icons/moon';
-  import Sun from '@lucide/svelte/icons/sun';
   import Settings from '@lucide/svelte/icons/settings';
   import { debug } from './debug.svelte.ts';
-  import { theme } from './theme.svelte.ts';
+  import { appearance, DEPLOYEDS, LOCALS, SCHEMES, type Scheme } from './appearance.svelte.ts';
   import { toasts } from './toast.svelte.ts';
   import { post } from './data.ts';
 
@@ -35,11 +32,26 @@
     else toasts.show("Copy is blocked here: the log is debug.jsonl in Koppler's run folder", 'warning');
   };
 
-  const THEMES = [
-    ['system', 'Like your system', Monitor],
-    ['light', 'Light', Sun],
-    ['dark', 'Dark', Moon],
-  ] as const;
+  const schemes = Object.entries(SCHEMES) as [Scheme, (typeof SCHEMES)[Scheme]][];
+  const picks = $derived([
+    [
+      'Local',
+      LOCALS,
+      appearance.local,
+      (hex: string) => {
+        appearance.pickLocal(hex);
+      },
+    ],
+    [
+      'Deployed',
+      DEPLOYEDS,
+      appearance.deployed,
+      (hex: string) => {
+        appearance.pickDeployed(hex);
+      },
+    ],
+  ] as const);
+  const custom = $derived(!!(appearance.now.local ?? appearance.now.deployed));
 </script>
 
 <button class="open" type="button" popovertarget="settings" aria-label="Settings" title="Settings">
@@ -85,23 +97,59 @@
       >
     {/if}
   </div>
-  <div class="row" role="radiogroup" aria-label="Theme">
-    <span>Theme</span>
-    {#each THEMES as [name, title, icon] (name)}
-      <button
-        type="button"
-        role="radio"
-        aria-checked={theme.now === name}
-        aria-label={title}
-        {title}
-        onclick={() => {
-          theme.pick(name);
-        }}
-      >
-        <Icon of={icon} size={14} />
-      </button>
+  <section class="appearance" aria-label="Appearance">
+    <h2>Appearance · scheme</h2>
+    <div class="schemes" role="radiogroup" aria-label="Scheme">
+      {#each schemes as [id, scheme] (id)}
+        <button
+          type="button"
+          role="radio"
+          class="scheme"
+          aria-checked={appearance.now.scheme === id}
+          onclick={() => {
+            appearance.pickScheme(id);
+          }}
+        >
+          <span class="mark" aria-hidden="true"></span>
+          <span class="swatch" aria-hidden="true"
+            ><i style:background="var(--desk)"></i><i style:background={scheme.local}></i><i
+              style:background={scheme.deployed}
+            ></i></span
+          >
+          <span class="words"><b>{scheme.name}</b><small>{scheme.note}</small></span>
+        </button>
+      {/each}
+    </div>
+    {#each picks as [label, hexes, now, pick] (label)}
+      <div class="picks-head">
+        <h2>{label}</h2>
+        {#if label === 'Local' && custom}
+          <button
+            class="link"
+            type="button"
+            onclick={() => {
+              appearance.schemeDefault();
+            }}>Scheme default</button
+          >
+        {/if}
+      </div>
+      <div class="picks" role="radiogroup" aria-label="{label} colour">
+        {#each hexes as hex (hex)}
+          <button
+            type="button"
+            role="radio"
+            aria-checked={now === hex}
+            aria-label="{label} {hex}"
+            style:--hex={hex}
+            onclick={() => {
+              pick(hex);
+            }}
+          ></button>
+        {/each}
+      </div>
     {/each}
-  </div>
+    <p>Warning and PROD colours are left out of both rows, so a custom pick can never be mistaken for either.</p>
+  </section>
 </div>
 
 <style>
@@ -183,6 +231,106 @@
     max-width: 200px;
     color: var(--muted);
     font-size: 12px;
+  }
+  .appearance {
+    width: 340px;
+    margin-top: 8px;
+    padding-top: 10px;
+    border-top: 1px solid var(--line);
+  }
+  h2 {
+    margin: 0 0 8px;
+    color: var(--ink-muted);
+    font: 500 10px var(--mono);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .schemes {
+    display: grid;
+    border: 1px solid var(--line-strong);
+  }
+  .scheme {
+    display: grid;
+    grid-template-columns: 12px 56px minmax(0, 1fr);
+    align-items: center;
+    gap: 12px;
+    padding: 8px 12px;
+    border: 0;
+    border-bottom: 1px solid var(--line);
+    background: none;
+    color: var(--ink);
+    text-align: left;
+    cursor: pointer;
+  }
+  .scheme:last-child {
+    border-bottom: 0;
+  }
+  .scheme:hover {
+    background: color-mix(in oklab, var(--ink) 5%, transparent);
+  }
+  .mark {
+    width: 12px;
+    height: 12px;
+    border: 1px solid var(--line-strong);
+  }
+  .scheme[aria-checked='true'] .mark {
+    border-color: var(--ink);
+    background: radial-gradient(var(--ink) 0 3px, transparent 3.5px);
+  }
+  .swatch {
+    display: flex;
+    height: 24px;
+    border: 1px solid var(--line-strong);
+  }
+  .swatch i {
+    flex: 1;
+  }
+  .words {
+    display: grid;
+  }
+  .words b {
+    font: 600 14px var(--sans);
+  }
+  .words small {
+    color: var(--ink-muted);
+    font: 12px var(--sans);
+  }
+  .picks-head {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 14px;
+  }
+  .link {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--ink-muted);
+    font: 12px var(--sans);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    cursor: pointer;
+  }
+  .picks {
+    display: flex;
+    gap: 10px;
+  }
+  .picks button {
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    border: 3px solid transparent;
+    background: var(--hex) content-box;
+    outline: 1px solid transparent;
+    cursor: pointer;
+  }
+  .picks button[aria-checked='true'] {
+    outline-color: var(--ink);
+    outline-offset: 0;
+  }
+  .appearance p {
+    margin: 12px 0 0;
+    color: var(--ink-muted);
+    font: 12px/1.45 var(--sans);
   }
   .address .go {
     color: var(--bad);

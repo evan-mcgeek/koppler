@@ -36,7 +36,6 @@
   import { live } from './live.svelte.ts';
   import { probes, type Job, type Probe } from './probes.svelte.ts';
   import { runs } from './run.svelte.ts';
-  import { theme } from './theme.svelte.ts';
 
   const flow = useSvelteFlow();
   board.toFlow = at => flow.screenToFlowPosition(at, { snapToGrid: false });
@@ -452,7 +451,7 @@
     panOnDrag={panning ? true : [1, 2]}
     selectionOnDrag={!panning}
     selectionMode={SelectionMode.Partial}
-    colorMode={theme.now}
+    colorMode="dark"
     minZoom={0.2}
     proOptions={{ hideAttribution: true }}
     {...start}

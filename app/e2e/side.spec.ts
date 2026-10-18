@@ -85,7 +85,7 @@ test('the environment is switched in the panel, and the panel folds away', async
   await expect(rail.getByRole('button', { name: 'Board and environment: PROD' })).toHaveText('PROD');
   await expect(rail.getByRole('button', { name: 'Apps: 2 of 4 on the board' })).toHaveText('2/4');
   await rail.getByRole('button', { name: 'Settings' }).click();
-  await expect(page.getByRole('radiogroup', { name: 'Theme' })).toBeVisible();
+  await expect(page.getByRole('radiogroup', { name: 'Scheme' })).toBeVisible();
   await page.screenshot({ path: 'test-results/next-rail.png' });
   await page.keyboard.press('Escape');
   await rail.getByRole('button', { name: /^Apps/ }).click();

@@ -2,6 +2,12 @@
 *::before,
 *::after {
   box-sizing: border-box;
+  /* Square corners everywhere: only sockets and the agent's dot are round. */
+  border-radius: 0 !important;
+}
+.svelte-flow__handle,
+.round {
+  border-radius: 50% !important;
 }
 html,
 body,
@@ -14,8 +20,16 @@ body,
   flex-direction: column;
 }
 body {
-  background: var(--paper);
+  background: var(--desk);
+  color: var(--ink);
   font-family: var(--sans);
+  -webkit-font-smoothing: antialiased;
+}
+/* A label printed on the panel: mono, small, in capitals. */
+.caps {
+  font: 500 10px var(--mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 .kind-dotnet {
   --kind: var(--dotnet);
