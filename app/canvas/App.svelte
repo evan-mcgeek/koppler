@@ -326,7 +326,7 @@
       title="Stack settings: its environments, apps, queues, sign-ins and team boards"
       onclick={() => void dialogs.settings?.open({ title: `${board.stack} settings`, path: '' })}
     >
-      <Cog size={16} />
+      <Cog size={16} /><span class="words">Settings</span>
     </button>
     <div class="seg env" role="radiogroup" aria-label="Environment">
       {#each board.envs as env (env)}
@@ -532,9 +532,8 @@
     gap: 10px;
   }
   .word {
-    font: 600 16px var(--mono);
-    font-stretch: 87.5%;
-    letter-spacing: -0.02em;
+    font: 600 20px var(--display);
+    letter-spacing: -0.005em;
   }
   .slash {
     margin: 0 -8px;
@@ -542,11 +541,6 @@
   }
   .env label {
     padding: 6px 12px;
-    font: 600 12px var(--mono);
-  }
-  .env label:has(input:checked) {
-    background: var(--ink);
-    color: var(--desk);
   }
   .env label.prod:has(input:checked) {
     background: var(--prod-stripes);
@@ -573,10 +567,8 @@
     padding: 8px 10px;
     border: 0;
     background: var(--panel);
-    color: var(--ink-muted);
-    font: 500 10px var(--mono);
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
+    color: var(--ink);
+    font: 600 12px var(--sans);
     cursor: pointer;
   }
   .strip > :global(button:hover),
@@ -625,7 +617,7 @@
     gap: 8px;
     padding: 7px 14px;
     border: 1px solid transparent;
-    font: 600 12px var(--mono);
+    font: 600 13px var(--sans);
     cursor: pointer;
   }
   /* A main button and the arrow beside it read as one. */
@@ -702,6 +694,11 @@
     background: var(--local);
     color: var(--desk);
   }
+  /* The ring stands off the white fill so it reads against it. */
+  .run:focus-visible {
+    outline-color: var(--local);
+    outline-offset: 3px;
+  }
   .run:hover {
     background: color-mix(in oklab, var(--local) 85%, var(--desk));
   }
@@ -733,7 +730,13 @@
     background: color-mix(in oklab, var(--ink) 7%, transparent);
   }
   .gear {
+    display: inline-flex;
+    gap: 6px;
+    width: auto;
     margin: 0 0 0 -8px;
+    padding: 0 8px;
+    color: var(--ink);
+    font: 600 12px var(--sans);
   }
   .dropping {
     position: fixed;

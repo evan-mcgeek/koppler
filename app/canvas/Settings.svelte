@@ -235,10 +235,8 @@
   }
   h2 {
     margin: 0 0 8px;
-    color: var(--ink-muted);
-    font: 500 10px var(--mono);
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
+    color: var(--ink);
+    font: 600 13px var(--sans);
   }
   .schemes {
     display: grid;

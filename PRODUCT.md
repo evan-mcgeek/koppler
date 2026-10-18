@@ -40,8 +40,11 @@ Not a backend tool for working inside a shared cluster (mirrord, Telepresence, S
 
 ## Brand Commitments
 
-- Name: Koppler (a coupler connects separate components), written `koppler` in Martian Mono beside its mark: a stem with two cables plugged into sockets.
-- Look: graphite hardware with its labels printed on the panel. Square corners, hairlines, mono capitals for every label. Colour is a signal: `local` for what runs here, `deployed` for what still calls the deployed environment, red for PROD and failures.
+- Name: Koppler (a coupler connects separate components), written `koppler` in Barlow Semi Condensed beside its mark: a stem with two cables plugged into sockets.
+- Look: graphite hardware with its labels printed on the panel. Square corners and hairlines.
+- Type: Barlow for words (labels, buttons, names), Sometype Mono for values you could copy (branches, hosts, ports), and mono capitals only for codes (a kind such as .NET, the environment, the PROD banner).
+- Colour is a signal: `local` for a local cable and the one filled button, `deployed` for what still calls the deployed environment, green for what runs, amber for what needs you, red for PROD and failures.
+- Icons for canvas tools people know from other tools; words for Koppler's own actions, and always for anything touching PROD or that cannot be undone.
 - Voice: plain, short, sentence case; says exactly what will happen; never uses the em dash.
 
 ## Product Principles

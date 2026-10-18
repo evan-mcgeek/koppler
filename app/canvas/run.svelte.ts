@@ -330,7 +330,7 @@ class Runs {
         ...(Object.keys(called).length
           ? [
               {
-                verb: 'calls',
+                verb: 'deployed',
                 label: `Calls ${board.protected ? env : `deployed ${env}`}`,
                 items: Object.entries(called).map(([to, from]) => {
                   const callee = board.app(to);

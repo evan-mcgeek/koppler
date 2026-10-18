@@ -50,21 +50,36 @@
   {id}
   kind="tunnel"
   name={data.what}
-  detail={data.local}
-  detailWarn={data.moved}
+  tag="Tunnel"
   hasDot
   dot={on}
   dotTitle={on ? 'Tunnel is up' : on === false ? 'Nothing is listening on this port' : 'Not running'}
+  status={on ? 'Connected' : on === false ? 'Nothing is listening' : 'Not running'}
   title={[data.host, ...data.about].join('\n')}
   {selected}
   {actions}
 >
+  <span class="label">Local port</span>
+  <span class="well" class:moved={data.moved}>{data.local}</span>
+  <span class="label">Goes to</span>
   <span class="host">{data.host}</span>
 </InfraCard>
 
 <style>
+  .well {
+    padding: 6px 8px;
+    border: 1px solid var(--line);
+    background: var(--desk);
+    font: 12px var(--mono);
+  }
+  .well.moved {
+    border-color: var(--warn);
+    color: var(--warn);
+  }
   .host {
     display: block;
     max-width: 34ch;
+    color: var(--ink-muted);
+    font: 12px var(--mono);
   }
 </style>

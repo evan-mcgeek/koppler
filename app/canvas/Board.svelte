@@ -15,6 +15,16 @@
   import type { Side } from '../src/core/arrange.ts';
   import { cablePath, sidePoint, SIDES, throughPath, type Box } from '../src/core/cables.ts';
   import { untrack } from 'svelte';
+  import Hand from '@lucide/svelte/icons/hand';
+  import LayoutGrid from '@lucide/svelte/icons/layout-grid';
+  import Maximize from '@lucide/svelte/icons/maximize';
+  import Minus from '@lucide/svelte/icons/minus';
+  import MousePointer2 from '@lucide/svelte/icons/mouse-pointer-2';
+  import Plus from '@lucide/svelte/icons/plus';
+  import Presentation from '@lucide/svelte/icons/presentation';
+  import Redo2 from '@lucide/svelte/icons/redo-2';
+  import Undo2 from '@lucide/svelte/icons/undo-2';
+  import Icon from './Icon.svelte';
   import AppCard from './AppCard.svelte';
   import Cable from './Cable.svelte';
   import Outside from './Outside.svelte';
@@ -119,8 +129,8 @@
     spaceHeld = ev.type === 'keydown';
   };
   const TOOLS = [
-    ['select', 'Select (V): drag on the board to select an area', 'Select', 'V'],
-    ['hand', 'Hand (H): drag to move around. Or hold Space while dragging', 'Move', 'H'],
+    ['select', 'Select (V): drag on the board to select an area', MousePointer2],
+    ['hand', 'Hand (H): drag to move around. Or hold Space while dragging', Hand],
   ] as const;
   // A key the system takes over mid-press (a screenshot shortcut) never sends its key-up, and the board would keep
   // selecting instead of moving cards: the mouse says which keys are really held.
@@ -246,7 +256,6 @@
         board.boxes.has(key) && !!board.ledBy(key).length && board.infraSide(key) === side;
       if (!own && (taken(from, sides[0]) || taken(to, sides[1]))) sides = level;
       const [start, end] = [sidePoint(a, sides[0]), sidePoint(b, sides[1])];
-      const [x, y] = SIDES[sides[1]];
       return [
         {
           key: `${from}>${to}`,
@@ -254,8 +263,7 @@
           to,
           d: cablePath(start, sides[0], end, sides[1]),
           start,
-          // No socket sits at this end: the tip touches the card's edge.
-          head: `translate(${String(end.x + x * 2)} ${String(end.y + y * 2)}) rotate(${String((Math.atan2(-y, -x) * 180) / Math.PI)})`,
+          end,
           kind: queue ? (board.queues[queue] === 'local' ? 'msg local' : 'msg') : 'ext',
           via,
           // Beside the link, not on it: right of one running up or down, over one running across.
@@ -483,7 +491,7 @@
     <Panel position="bottom-left">
       <div class="tools" role="toolbar" aria-label="Board">
         <div class="switch" role="radiogroup" aria-label="Dragging on the board">
-          {#each TOOLS as [name, title, word, key] (name)}
+          {#each TOOLS as [name, title, icon] (name)}
             <button
               class="tool"
               type="button"
@@ -493,7 +501,7 @@
               {title}
               onclick={() => (tool = name)}
             >
-              {word} <kbd>{key}</kbd>
+              <Icon of={icon} size={16} />
             </button>
           {/each}
         </div>
@@ -507,7 +515,7 @@
             undo.undo();
           }}
         >
-          Undo
+          <Icon of={Undo2} size={16} />
         </button>
         <button
           class="tool"
@@ -519,16 +527,23 @@
             undo.redo();
           }}
         >
-          Redo
+          <Icon of={Redo2} size={16} />
         </button>
-        <button title="Arrange cards by who calls whom, callers on top" onclick={() => void arrange()}>Arrange</button>
-        <button title="Zoom to fit all apps (F)" onclick={() => void fit()}>Fit <kbd>F</kbd></button>
+        <button
+          aria-label="Arrange"
+          title="Arrange cards by who calls whom, callers on top"
+          onclick={() => void arrange()}><Icon of={LayoutGrid} size={16} /></button
+        >
+        <button aria-label="Fit" title="Zoom to fit all apps (F)" onclick={() => void fit()}
+          ><Icon of={Maximize} size={16} /></button
+        >
         <div class="zoom" role="group" aria-label="Zoom">
-          <button aria-label="Zoom out" onclick={zoomBy(1 / 1.2)}>−</button>
+          <button aria-label="Zoom out" title="Zoom out" onclick={zoomBy(1 / 1.2)}><Icon of={Minus} size={16} /></button
+          >
           <button class="percent" title="Reset to 100%" onclick={() => void flow.setZoom(1, { duration: 200 })}>
             {Math.round(viewport.current.zoom * 100)}%
           </button>
-          <button aria-label="Zoom in" onclick={zoomBy(1.2)}>+</button>
+          <button aria-label="Zoom in" title="Zoom in" onclick={zoomBy(1.2)}><Icon of={Plus} size={16} /></button>
         </div>
         <button
           class="tool"
@@ -538,7 +553,7 @@
           aria-pressed={board.present}
           onclick={() => void present()}
         >
-          {board.present ? 'Back' : 'Present'} <kbd>{board.present ? 'Esc' : 'P'}</kbd>
+          <Icon of={Presentation} size={16} />
         </button>
         {#if !board.present}
           <button
@@ -602,7 +617,7 @@
           >
             <path class="under" d={flow.d} />
             <path class="wire" d={flow.d} />
-            <path class="head" d="M-9,-4.5 L0,0 L-9,4.5 L-6.75,0 Z" transform={flow.head} />
+            <circle class="socket" cx={flow.end.x} cy={flow.end.y} r="5" />
             <circle class="plug" cx={flow.start.x} cy={flow.start.y} r="5" />
             {#if flow.via}<text class="via" x={flow.label.x} y={flow.label.y} text-anchor={flow.label.anchor}
                 >{flow.via}</text
@@ -870,13 +885,13 @@
   .flow .wire {
     stroke-width: 2;
   }
-  .flow .head {
+  .flow .socket {
     stroke-width: 1.5;
   }
-  .flow.msg :is(.wire, .head) {
+  .flow.msg :is(.wire, .socket) {
     stroke: var(--msg);
   }
-  .flow.msg .head {
+  .flow.msg .socket {
     fill: var(--msg);
   }
   .flow.msg .wire {
@@ -892,11 +907,11 @@
     stroke: var(--surface);
     stroke-width: 2;
   }
-  .flow.ext :is(.wire, .head) {
+  .flow.ext :is(.wire, .socket) {
     stroke: var(--socket-rim);
     stroke-width: 1.5;
   }
-  .flow.ext .head {
+  .flow.ext .socket {
     fill: var(--socket-rim);
   }
   .flow.ext .wire {
@@ -908,30 +923,30 @@
   /* The picked card's own links stand out like its cables. */
   /* Snapped straight while a card is dragged: the line goes a shade darker, nothing more. */
   .link.snapped,
-  .flow.ext.snapped :is(.wire, .head) {
+  .flow.ext.snapped :is(.wire, .socket) {
     stroke: var(--ink);
   }
-  .flow.ext.snapped .head {
+  .flow.ext.snapped .socket {
     fill: var(--ink);
   }
-  .flow.msg.snapped :is(.wire, .head) {
+  .flow.msg.snapped :is(.wire, .socket) {
     stroke: color-mix(in oklab, var(--msg) 60%, var(--ink));
   }
-  .flow.msg.snapped .head {
+  .flow.msg.snapped .socket {
     fill: color-mix(in oklab, var(--msg) 60%, var(--ink));
   }
   .link.lit,
-  .flow.ext.lit :is(.wire, .head) {
+  .flow.ext.lit :is(.wire, .socket) {
     stroke: var(--ink);
     stroke-width: 2.5;
   }
-  .flow.ext.lit .head {
+  .flow.ext.lit .socket {
     fill: var(--ink);
   }
   .flow.msg.lit .wire {
     stroke-width: 3.5;
   }
-  .flow.msg.lit .head {
+  .flow.msg.lit .socket {
     stroke-width: 2.5;
   }
   .ends {
@@ -1047,7 +1062,7 @@
       0 1px 2px rgb(0 0 0 / 0.12);
   }
   .views label:has(input:focus-visible) {
-    outline: 2px solid var(--cable);
+    outline: 2px solid var(--ink);
     outline-offset: -2px;
   }
   /* In Live nothing on the board is pulled or unplugged. */
@@ -1073,33 +1088,32 @@
   .switch {
     display: flex;
   }
+  /* Canvas tools as icons in square cells, as in other canvas tools; Clear stays a word. */
   .tools button {
     display: flex;
     align-items: center;
-    gap: 6px;
+    justify-content: center;
+    min-width: 32px;
+    height: 32px;
     margin: -1px 0 0 -1px;
-    padding: 8px 10px;
+    padding: 0 8px;
     border: 1px solid var(--line-strong);
     background: var(--panel);
-    color: var(--ink-muted);
-    font: 500 10px var(--mono);
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
+    color: var(--ink);
+    font: 600 12px var(--sans);
     white-space: nowrap;
     cursor: pointer;
   }
-  .tools button:hover {
-    color: var(--ink);
+  .tools button:hover:not(:disabled) {
+    background: color-mix(in oklab, var(--ink) 8%, var(--panel));
   }
-  .tools kbd {
-    color: var(--ink-muted);
-    font: inherit;
-    opacity: 0.7;
+  .tools button:focus-visible {
+    position: relative;
+    z-index: 1;
   }
   .tools .percent {
-    width: 64px;
-    justify-content: center;
-    color: var(--ink);
+    width: 56px;
+    font: 400 12px var(--mono);
     font-variant-numeric: tabular-nums;
   }
   .tools .tool[aria-checked='true'],

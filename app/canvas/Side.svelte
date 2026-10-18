@@ -1,6 +1,5 @@
 <script lang="ts">
   import Icon from './Icon.svelte';
-  import ArrowDown from '@lucide/svelte/icons/arrow-down';
   import Play from '@lucide/svelte/icons/play';
   import Plus from '@lucide/svelte/icons/plus';
   import Trash from '@lucide/svelte/icons/trash';
@@ -129,8 +128,7 @@
         <span class="count">{onBoard.length} of {board.apps.length} on the board</span>
       {/if}
       <button class="sort" type="button" onclick={toggleSort} title={sortHint} aria-label={sortHint}>
-        <Icon of={ArrowDown} size={11} />
-        {sort === 'name' ? 'Az' : 'Added'}
+        Sort: {sort === 'name' ? 'A–Z' : 'Added'}
       </button>
     </h2>
     <input
@@ -347,32 +345,26 @@
     gap: 6px;
     margin: 0 0 8px;
     padding: 0 8px;
-    color: var(--ink-muted);
-    font: 500 10px var(--mono);
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-  }
-  .count::before {
-    content: '· ';
+    color: var(--ink);
+    font: 600 13px var(--sans);
   }
   .count {
+    color: var(--ink-muted);
+    font: 400 12px var(--sans);
     font-variant-numeric: tabular-nums;
   }
   .sort {
-    display: inline-flex;
-    align-items: center;
-    gap: 3px;
-    min-height: 24px;
     margin-left: auto;
-    padding: 0 6px;
+    padding: 0;
     border: 0;
     background: none;
     color: var(--ink-muted);
-    font: inherit;
+    font: 400 12px var(--sans);
+    text-decoration: underline;
+    text-underline-offset: 3px;
     cursor: pointer;
   }
   .sort:hover {
-    background: color-mix(in oklab, var(--ink) 8%, transparent);
     color: var(--ink);
   }
   .search {
@@ -497,13 +489,15 @@
     padding: 6px 4px;
     border: 0;
     background: none;
-    color: var(--cable-ink);
-    font: 600 13px var(--sans);
+    color: var(--ink);
+    font: 400 13px var(--sans);
     text-align: left;
+    text-decoration: underline;
+    text-underline-offset: 3px;
     cursor: pointer;
   }
   .add-repos:hover {
-    text-decoration: underline;
+    color: var(--local);
   }
   .act.add {
     color: var(--cable);
@@ -579,7 +573,7 @@
     margin-top: 8px;
   }
   :focus-visible {
-    outline: 2px solid var(--cable);
+    outline: 2px solid var(--ink);
     outline-offset: 2px;
   }
 </style>

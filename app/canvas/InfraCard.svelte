@@ -10,8 +10,9 @@
 </script>
 
 <script lang="ts">
-  // The card of everything on the board that is not an app: a tunnel, a queue, an outside system. One frame, one
-  // header (state, name, a detail, its buttons), and a second row for what is particular to it.
+  // The card of everything on the board that is not an app: a tunnel, a queue, an outside system. The same frame as
+  // an app card: its state, name and kind tag on top with its buttons, what is particular to it below, and a status
+  // line at the foot.
   import Cog from './Cog.svelte';
   import Icon from './Icon.svelte';
   import { board } from './board.svelte.ts';
@@ -20,14 +21,13 @@
     id,
     kind,
     name,
-    detail = '',
-    detailWarn = false,
+    tag,
     dot,
     dotTitle = '',
     hasDot = false,
+    status = '',
     title = '',
     selected = false,
-    active = false,
     actions,
     flag,
     children,
@@ -35,28 +35,30 @@
     id: string;
     kind: 'tunnel' | 'queue' | 'outside';
     name: string;
-    detail?: string;
-    detailWarn?: boolean;
+    /** What it is, as a code: Tunnel, SQS, Outside. */
+    tag: string;
     /** Whether it answers, for a card that shows it (`hasDot`): true, false, or not known yet. */
     dot?: boolean | null | undefined;
     hasDot?: boolean;
     dotTitle?: string;
+    /** Its state in words, at its foot. */
+    status?: string;
     title?: string;
     selected?: boolean;
-    /** Switched to run locally: marked by its edge. */
-    active?: boolean;
     actions: CardAction[];
-    /** Something to notice, shown before the detail. */
+    /** Something to notice, shown beside the name. */
     flag?: Snippet;
     children?: Snippet;
   } = $props();
 </script>
 
-<div class="infra {kind}" class:active class:selected class:dimmed={board.dimmed(id)} {title}>
+<div class="infra {kind}" class:selected class:dimmed={board.dimmed(id)} {title}>
   <span class="head">
-    {#if hasDot}<span class="dot" data-on={dot ?? null} title={dotTitle}></span>{/if}
+    {#if hasDot}<span class="led" data-state={dot ? 'running' : dot === false ? 'failed' : undefined} title={dotTitle}
+      ></span>{/if}
     <span class="name">{name}</span>
-    {#if flag || detail}<span class="detail" class:warn={detailWarn}>{@render flag?.()}{detail}</span>{/if}
+    {@render flag?.()}
+    <span class="tag">{tag}</span>
     <span class="acts">
       {#each actions as action (action.label)}
         <button
@@ -68,42 +70,36 @@
             action.run();
           }}
         >
-          {#if action.icon === 'cog'}<Cog size={13} />{:else}<Icon of={action.icon} size={13} />{/if}
+          {#if action.icon === 'cog'}<Cog size={16} />{:else}<Icon of={action.icon} size={16} />{/if}
         </button>
       {/each}
     </span>
   </span>
-  {#if children}<div class="body" class:under-dot={hasDot}>{@render children()}</div>{/if}
+  {#if children}<div class="body">{@render children()}</div>{/if}
+  {#if status}<p class="foot">{status}</p>{/if}
 </div>
 
 <style>
   .infra {
     display: grid;
-    row-gap: 6px;
     width: max-content;
-    min-width: 200px;
+    min-width: 240px;
     max-width: 420px;
-    padding: 9px 8px 11px 12px;
     border: 1px solid var(--line-strong);
     background: var(--panel);
     color: var(--ink);
-    font: 12.5px/1.4 var(--sans);
+    font: 400 12px/1.4 var(--sans);
     user-select: none;
     cursor: grab;
   }
-  /* What stays deployed has a dashed edge: a tunnel to it, or a system that never runs here. */
-  .infra:is(.tunnel, .outside) {
-    border: 1px dashed var(--deployed);
-  }
+  /* A system that never runs here has a dashed edge, in the deployed colour. */
   .infra.outside {
+    border: 1px dashed var(--deployed);
     background: var(--desk);
-  }
-  .infra.active {
-    border: 1px solid var(--local);
   }
   .infra.selected,
   :global(.svelte-flow__node:focus-visible) .infra {
-    outline: 1px solid var(--ink);
+    outline: 2px solid var(--ink);
     /* On the border itself: one frame, not a ring around a frame. */
     outline-offset: -1px;
   }
@@ -111,72 +107,51 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    min-height: 24px;
-  }
-  .dot {
-    flex: none;
-    width: 7px;
-    height: 7px;
-    border: 1.5px solid var(--ink-muted);
-  }
-  .dot[data-on='true'] {
-    border-color: var(--ok);
-    background: var(--ok);
-  }
-  .dot[data-on='false'] {
-    border-color: var(--bad);
-    background: var(--bad);
+    min-height: 40px;
+    padding: 4px 4px 4px 12px;
+    border-bottom: 1px solid var(--line);
   }
   .name {
-    font-weight: 600;
+    font: 600 15px var(--sans);
     white-space: nowrap;
   }
-  .detail {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    color: var(--deployed);
-    font: 500 10px var(--mono);
+  .tag {
+    margin-left: auto;
+    padding: 2px 5px;
+    border: 1px solid var(--line-strong);
+    color: var(--ink-muted);
+    font: 500 10px/1.3 var(--mono);
     letter-spacing: 0.04em;
+    text-transform: uppercase;
     white-space: nowrap;
-  }
-  .detail.warn {
-    color: var(--warn);
   }
   .acts {
     display: flex;
-    gap: 2px;
-    margin-left: auto;
-    padding-left: 4px;
   }
   .acts button {
     display: grid;
     place-items: center;
-    width: 24px;
-    height: 24px;
+    width: 32px;
+    height: 32px;
     padding: 0;
     border: 0;
-    border-radius: 5px;
     background: none;
-    color: var(--muted);
+    color: var(--ink);
     cursor: pointer;
   }
   .acts button:hover {
     background: color-mix(in oklab, var(--ink) 9%, transparent);
-    color: var(--ink);
-  }
-  .acts button:focus-visible {
-    outline: 2px solid var(--cable);
-    outline-offset: 1px;
   }
   .body {
+    display: grid;
+    gap: 6px;
     min-width: 0;
-    font: 11px var(--mono);
-    color: var(--muted);
+    padding: 10px 12px 12px;
     overflow-wrap: anywhere;
   }
-  /* Lined up with the name, not the state dot before it. */
-  .body.under-dot {
-    padding-left: 16px;
+  .foot {
+    margin: 0;
+    padding: 8px 12px;
+    border-top: 1px solid var(--line);
   }
 </style>

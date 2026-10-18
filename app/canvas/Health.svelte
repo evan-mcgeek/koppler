@@ -159,7 +159,7 @@
     gap: 7px;
     height: 30px;
     padding: 0 10px;
-    border: 1px solid transparent;
+    border: 1px solid var(--line-strong);
     background: none;
     color: var(--ink);
     font: 400 13px var(--sans);
@@ -168,7 +168,7 @@
   }
   .chip:hover,
   .chip[aria-expanded='true'] {
-    border-color: var(--line-strong);
+    background: color-mix(in oklab, var(--ink) 6%, transparent);
   }
   .dot {
     width: 7px;

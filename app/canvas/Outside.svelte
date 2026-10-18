@@ -12,6 +12,7 @@
   {id}
   kind="outside"
   name={data.name}
+  tag="Outside"
   title={data.about.join('\n')}
   {selected}
   actions={[
@@ -31,5 +32,12 @@
     },
   ]}
 >
-  {data.where}
+  <span class="where">{data.where}</span>
 </InfraCard>
+
+<style>
+  .where {
+    color: var(--ink-muted);
+    font: 12px var(--mono);
+  }
+</style>

@@ -559,9 +559,7 @@
     grid-row: 1;
     grid-column: 1;
     color: var(--ink-muted);
-    font: 500 10px var(--mono);
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
+    font: 400 12px var(--sans);
   }
   .field > .acts {
     grid-row: 1;
@@ -584,9 +582,7 @@
     border: 1px solid var(--line-strong);
     background: none;
     color: var(--ink-muted);
-    font: 500 9px var(--mono);
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
+    font: 600 11px var(--sans);
     white-space: nowrap;
     cursor: pointer;
   }

@@ -27,15 +27,12 @@
         background-size: 20px 20px;
       }
       .word {
-        font: 600 var(--size, 16px) var(--mono);
-        font-stretch: 87.5%;
-        letter-spacing: -0.02em;
+        font: 600 var(--size, 16px) var(--display);
+        letter-spacing: -0.005em;
       }
-      .caps {
+      .eyebrow {
         color: var(--ink-muted);
-        font: 500 11px var(--mono);
-        letter-spacing: 0.08em;
-        text-transform: uppercase;
+        font: 400 16px var(--sans);
       }
       .card {
         position: absolute;
@@ -53,7 +50,7 @@
       .card .led {
         width: 7px;
         height: 7px;
-        background: var(--local);
+        background: var(--live);
       }
       .card .kind {
         margin-left: auto;
@@ -64,8 +61,7 @@
         display: flex;
         justify-content: space-between;
         padding: 8px 12px;
-        font: 500 10px var(--mono);
-        letter-spacing: 0.06em;
+        font: 400 12px var(--sans);
       }
       .card .branch {
         padding: 8px 12px;
@@ -122,9 +118,8 @@
       }
       #hero h1 {
         margin: 0;
-        font: 600 60px/1.08 var(--mono);
-        font-stretch: 87.5%;
-        letter-spacing: -0.02em;
+        font: 600 64px/1.05 var(--display);
+        letter-spacing: -0.005em;
       }
       #hero p {
         max-width: 600px;
@@ -203,7 +198,7 @@
     <section id="hero" class="frame">
       <div class="copy">
         <div class="brand"><span data-mark="40"></span><span class="word" style="--size: 34px">koppler</span></div>
-        <span class="caps">Local development · macOS and Linux</span>
+        <span class="eyebrow">Local development on macOS and Linux</span>
         <h1>Run the part of your stack you need on your own machine.</h1>
         <p>
           Pick apps on a canvas and plug cables between them, then press Run. Everything you leave unplugged keeps
@@ -236,11 +231,11 @@
         </div>
         <div class="card picked" style="left: 356px; top: 360px; width: 240px">
           <div class="head"><span class="led"></span>Orders API<span class="kind">.NET</span></div>
-          <div class="foot"><span>RUNNING</span><span style="color: var(--deployed)">CALLS QA</span></div>
+          <div class="foot"><span>Running</span><span style="color: var(--deployed)">Calls QA</span></div>
         </div>
         <div class="card tunnel" style="left: 386px; top: 560px; width: 180px; background: var(--panel)">
           <div class="head" style="border: 0; padding-bottom: 2px">Database</div>
-          <div class="branch" style="padding-top: 0; color: var(--deployed)">TUNNEL · QA</div>
+          <div class="branch" style="padding-top: 0; color: var(--deployed)">Tunnel to QA</div>
         </div>
       </div>
     </section>
@@ -267,11 +262,11 @@
       </div>
       <div class="card picked" style="left: 1082px; top: 252px; width: 182px">
         <div class="head"><span class="led"></span>Orders API<span class="kind">.NET</span></div>
-        <div class="foot"><span>RUNNING</span></div>
+        <div class="foot"><span>Running</span></div>
       </div>
       <div class="card tunnel" style="left: 1082px; top: 472px; width: 182px; background: var(--panel)">
         <div class="head" style="border: 0; padding-bottom: 2px">Database</div>
-        <div class="branch" style="padding-top: 0; color: var(--deployed)">TUNNEL · QA</div>
+        <div class="branch" style="padding-top: 0; color: var(--deployed)">Tunnel to QA</div>
       </div>
       <p class="line">Run the part of your stack you need on your own machine.</p>
       <span class="url">github.com/evan-mcgeek/koppler</span>

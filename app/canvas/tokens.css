@@ -1,8 +1,8 @@
 /*
- * Patch bay: graphite hardware with its labels printed on the panel. Dark only. Colour is a signal: `local` for what
- * runs here, `deployed` for what still calls the deployed environment, `warn` when something needs you, and `prod` for
- * PROD and failures. A scheme sets them; the local and deployed colours can also be picked by hand (Appearance), while
- * `warn` and `prod` never change.
+ * Patch bay: graphite hardware with its labels printed on the panel. Dark only. Colour is a signal: `local` for a
+ * local cable and the one filled button, `deployed` for what still calls the deployed environment, `live` for what
+ * runs, `warn` when something needs you, and `prod` for PROD and failures. A scheme sets them; the local and deployed
+ * colours can also be picked by hand (Appearance), while `live`, `warn` and `prod` never change.
  */
 :root {
   --desk: #0d0d0d;
@@ -13,6 +13,7 @@
   --ink-muted: #a3a3a3;
   --local: #ffffff;
   --deployed: #9a9a9a;
+  --live: #4ade80;
   --warn: #ffc940;
   --prod: #ff3b30;
   --prod-strong: #db2a20;
@@ -26,7 +27,7 @@
   --cable: var(--local);
   --cable-ink: var(--local);
   --prod-ink: var(--prod-strong);
-  --ok: var(--local);
+  --ok: var(--live);
   --bad: var(--prod);
   --msg: var(--deployed);
   --on-accent: var(--desk);
@@ -42,8 +43,9 @@
   /* Hairlines, no shadows: a floating layer is set apart by its edge. */
   --lift: none;
   --lift-high: none;
-  --sans: 'Instrument Sans', system-ui, sans-serif;
-  --mono: 'Martian Mono', ui-monospace, monospace;
+  --sans: 'Barlow', system-ui, sans-serif;
+  --display: 'Barlow Semi Condensed', 'Barlow', system-ui, sans-serif;
+  --mono: 'Sometype Mono', ui-monospace, monospace;
   color-scheme: dark;
 }
 :root[data-scheme='lime'] {

@@ -112,13 +112,11 @@
   });
   const wrongIn = (keys: string[]) =>
     [...problems.keys()].filter(place => keys.some(key => within(place, child(at, key)))).length;
-  const sub = $derived.by(() => {
-    if (!app || !value) return '';
-    const kind = typeof value['kind'] === 'string' ? value['kind'] : '';
-    const said = (Object.hasOwn(KINDS, kind) ? KINDS[kind]?.label : null) ?? kind;
-    return [said, typeof value['slug'] === 'string' ? value['slug'] : ''].filter(Boolean).join(' · ');
+  const kindSaid = $derived.by(() => {
+    const kind = app && typeof value?.['kind'] === 'string' ? value['kind'] : '';
+    return (Object.hasOwn(KINDS, kind) ? KINDS[kind]?.label : null) ?? kind;
   });
-  const two = (index: number) => String(index + 1).padStart(2, '0');
+  const slug = $derived(app && typeof value?.['slug'] === 'string' ? value['slug'] : '');
 
   export async function open(what: { title: string; path: string }): Promise<void> {
     title = what.title;
@@ -266,7 +264,12 @@
     {#if app && live.up(app)}<span class="led" title="Running"></span>{/if}
     <div class="who">
       <h2 id="settings-title">{title}</h2>
-      {#if sub}<span class="sub">{sub}</span>{/if}
+      {#if kindSaid || slug}
+        <span class="sub">
+          {#if kindSaid}<span class="tag">{kindSaid}</span>{/if}
+          {#if slug}<span class="slug">{slug}</span>{/if}
+        </span>
+      {/if}
     </div>
     {#if app && !outside}
       <button
@@ -298,10 +301,9 @@
               aria-selected={shown === one}
               class:wrong={wrong > 0}
               onclick={() => (tab = index)}
-              ><span class="n" aria-hidden="true">{two(index)}</span>{one.name}{#if wrong}<span
-                  class="mark bad"
-                  aria-label="{wrong} to fix">!</span
-                >{:else if edited}<span class="mark" aria-label="{edited} changed">{edited}</span>{/if}</button
+              ><span class="marker" aria-hidden="true"></span>{one.name}{#if wrong}<span class="mark bad"
+                  >{wrong} to fix</span
+                >{:else if edited}<span class="mark">{edited} {edited === 1 ? 'change' : 'changes'}</span>{/if}</button
             >
           {/each}
         </div>
@@ -309,9 +311,7 @@
       <div class="body" role="tabpanel" aria-label={shown?.name}>
         {#if tabs.length > 1 && shown}
           <div class="sec">
-            <span class="caps">{two(tabs.indexOf(shown))} · {shown.name}</span>{#if shown.about}<span class="about"
-                >{shown.about}</span
-              >{/if}
+            <span class="title">{shown.name}</span>{#if shown.about}<span class="about">{shown.about}</span>{/if}
           </div>
         {/if}
         {#if shown?.view === 'envs' && app && value}
@@ -429,13 +429,17 @@
   dialog::backdrop {
     background: color-mix(in oklab, var(--desk) 40%, transparent);
   }
-  .caps,
-  .sub,
-  .tabs button,
-  .say {
-    font: 500 10px var(--mono);
-    letter-spacing: 0.08em;
+  .tag {
+    padding: 1px 4px;
+    border: 1px solid var(--line-strong);
+    color: var(--ink-muted);
+    font: 500 10px/1.3 var(--mono);
+    letter-spacing: 0.04em;
     text-transform: uppercase;
+  }
+  .slug {
+    color: var(--ink-muted);
+    font: 12px var(--mono);
   }
   header {
     display: flex;
@@ -459,14 +463,16 @@
   h2 {
     margin: 0;
     overflow: hidden;
-    font: 600 18px var(--sans);
+    font: 600 20px var(--display);
     text-overflow: ellipsis;
     white-space: nowrap;
   }
   .sub {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 3px;
     overflow: hidden;
-    color: var(--ink-muted);
-    text-overflow: ellipsis;
     white-space: nowrap;
   }
   header button,
@@ -476,7 +482,7 @@
     border: 1px solid var(--line-strong);
     background: none;
     color: var(--ink);
-    font: 600 12px var(--mono);
+    font: 600 13px var(--sans);
     white-space: nowrap;
     cursor: pointer;
   }
@@ -513,34 +519,49 @@
   .tabs button {
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 10px 14px;
+    gap: 10px;
+    padding: 9px 14px;
     border: 0;
     border-bottom: 1px solid var(--line);
     background: none;
-    color: var(--ink-muted);
+    color: var(--ink);
+    font: 400 13px var(--sans);
     text-align: left;
     white-space: nowrap;
     cursor: pointer;
   }
   .tabs button:hover {
-    color: var(--ink);
+    background: color-mix(in oklab, var(--ink) 5%, transparent);
   }
   .tabs button[aria-selected='true'] {
     background: var(--desk);
-    box-shadow: inset 2px 0 0 var(--local);
-    color: var(--ink);
+    box-shadow: inset 2px 0 0 var(--ink);
   }
-  .n {
-    color: color-mix(in oklab, var(--ink-muted) 60%, transparent);
+  .tabs button:focus-visible {
+    outline-offset: -2px;
+  }
+  /* A square that says what is there: filled for the open section, amber where something needs you. */
+  .marker {
+    flex: none;
+    width: 6px;
+    height: 6px;
+    border: 1px solid var(--line-strong);
+  }
+  [aria-selected='true'] .marker {
+    border-color: var(--ink);
+    background: var(--ink);
+  }
+  .wrong .marker {
+    border-color: var(--warn);
+    background: var(--warn);
   }
   .mark {
     margin-left: auto;
-    color: var(--ink);
+    font: 11px var(--mono);
   }
-  .mark.bad,
-  .tabs button.wrong {
+  .mark.bad {
     color: var(--warn);
+    font: 12px var(--sans);
   }
   .body {
     display: flex;
@@ -556,7 +577,8 @@
     padding: 14px 20px 8px;
     border-bottom: 1px solid var(--line);
   }
-  .sec .caps {
+  .sec .title {
+    font: 600 13px var(--sans);
     flex: none;
     color: var(--ink);
   }
@@ -646,6 +668,7 @@
     min-width: 0;
     overflow: hidden;
     color: var(--ink-muted);
+    font: 400 12px var(--sans);
     text-overflow: ellipsis;
     white-space: nowrap;
   }

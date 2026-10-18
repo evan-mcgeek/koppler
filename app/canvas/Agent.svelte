@@ -149,15 +149,18 @@
   .agent[aria-expanded='true'] {
     background: color-mix(in oklab, var(--ink) 6%, transparent);
   }
-  .agent[data-state='question'] {
-    border-color: var(--warn);
+  .agent[data-state='listening'] .dot,
+  .agent[data-state='busy'] .dot {
+    color: var(--live);
+  }
+  .agent[data-state='question'] .dot {
     color: var(--warn);
   }
   .agent[data-state='none'] {
     border-style: dashed;
     color: var(--ink-muted);
   }
-  .agent[data-state='quiet'] {
+  .agent[data-state='quiet'] .dot {
     color: var(--warn);
   }
   .dot {

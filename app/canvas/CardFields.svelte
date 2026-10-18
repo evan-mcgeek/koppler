@@ -112,7 +112,7 @@
               : ''}"
           >
             Started by
-            <span class="seg">
+            <span class="seg" role="radiogroup" aria-label="Started by">
               {#each starters as value (value)}
                 <label>
                   <input
@@ -285,14 +285,10 @@
     display: grid;
     gap: 5px;
     color: var(--ink-muted);
-    font: 500 10px var(--mono);
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
+    font: 400 12px var(--sans);
   }
   .field > :global(*) {
     font: 400 12px var(--sans);
-    letter-spacing: normal;
-    text-transform: none;
   }
   .combo {
     position: relative;
@@ -391,7 +387,7 @@
     color: var(--muted);
   }
   :is(select, textarea, .note-toggle):focus-visible {
-    outline: 2px solid var(--cable);
+    outline: 2px solid var(--ink);
     outline-offset: 1px;
   }
 </style>

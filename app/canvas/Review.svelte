@@ -120,17 +120,14 @@
     text-transform: uppercase;
   }
   .kicker {
-    margin: 0 0 6px;
+    margin: 0 0 4px;
     color: var(--ink-muted);
-    font: 500 10px var(--mono);
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
+    font: 400 12px var(--sans);
   }
   h2 {
     margin: 0;
-    font: 600 28px/1.15 var(--mono);
-    font-stretch: 87.5%;
-    letter-spacing: -0.01em;
+    font: 600 30px/1.15 var(--display);
+    letter-spacing: -0.005em;
   }
   .prod h2 {
     color: var(--prod);
@@ -170,11 +167,17 @@
     column-gap: 16px;
   }
   .verb {
-    padding-top: 3px;
+    padding-top: 1px;
     color: var(--ink-muted);
-    font: 500 10px/1.6 var(--mono);
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
+    font: 600 12px/1.6 var(--sans);
+  }
+  /* What still calls the deployed environment: in its colour, under a dashed rule like a deployed edge. */
+  .lines:has(.verb[data-verb='deployed']) {
+    border-top: 1px dashed var(--deployed);
+    margin-top: -1px;
+  }
+  .verb[data-verb='deployed'] {
+    color: var(--deployed);
   }
   .verb[data-verb='restarts'] {
     color: var(--warn);
@@ -194,7 +197,7 @@
     border: 1px solid var(--line-strong);
     background: none;
     color: var(--ink);
-    font: 600 11px var(--mono);
+    font: 600 12px var(--sans);
     cursor: pointer;
   }
   small {
@@ -229,7 +232,7 @@
     border: 1px solid var(--line-strong);
     background: none;
     color: var(--ink);
-    font: 600 12px var(--mono);
+    font: 600 13px var(--sans);
     cursor: pointer;
   }
   button:hover {
@@ -239,6 +242,10 @@
     border-color: var(--local);
     background: var(--local);
     color: var(--desk);
+  }
+  .ok:focus-visible {
+    outline-color: var(--local);
+    outline-offset: 3px;
   }
   .ok:hover {
     background: color-mix(in oklab, var(--local) 85%, var(--desk));
@@ -259,7 +266,7 @@
     color: var(--prod);
   }
   :focus-visible {
-    outline: 2px solid var(--local);
+    outline: 2px solid var(--ink);
     outline-offset: 2px;
   }
 </style>

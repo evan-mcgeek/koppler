@@ -70,7 +70,7 @@ test('a missing credential is set, tested and removed, and its value never reach
   // The debug log is on here; nothing done in this panel is kept in it, least of all the value.
   await page.keyboard.press('Escape');
   await page.getByRole('button', { name: 'Fit' }).click();
-  await expect.poll(() => logged.join('').includes('Zoom to fit'), { timeout: 10000 }).toBe(true);
+  await expect.poll(() => logged.join('').includes('button \\"Fit\\"'), { timeout: 10000 }).toBe(true);
   expect(logged.join('')).not.toContain('not-a-real-value-123');
   expect(logged.join('')).not.toContain('ConnectionStrings__Orders');
 });

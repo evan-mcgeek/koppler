@@ -26,11 +26,36 @@ body {
   font-family: var(--sans);
   -webkit-font-smoothing: antialiased;
 }
-/* A label printed on the panel: mono, small, in capitals. */
+/* A code printed on the panel (a kind, an environment): mono, small, in capitals. Words are never set this way. */
 .caps {
   font: 500 10px var(--mono);
   letter-spacing: 0.08em;
   text-transform: uppercase;
+}
+/* A label for a field or a group: small sentence-case sans. */
+.label {
+  color: var(--ink-muted);
+  font: 400 12px var(--sans);
+}
+/* Anything clickable that is not a button: underlined sans. */
+.link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font: 400 12px var(--sans);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.link:hover {
+  color: var(--local);
+}
+
+/* One focus style everywhere: a square ink outline off the edge. */
+:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
 }
 .kind-dotnet {
   --kind: var(--dotnet);
@@ -90,7 +115,7 @@ details[open] > summary:not(:has(.chev))::before {
 .seg label {
   position: relative;
   color: var(--ink-muted);
-  font-weight: 400;
+  font: 600 13px var(--sans);
   cursor: pointer;
 }
 .seg label + label {
@@ -109,11 +134,11 @@ details[open] > summary:not(:has(.chev))::before {
 .seg label:has(input:checked) {
   background: var(--line-strong);
   color: var(--ink);
-  font-weight: 600;
 }
 .seg label:has(input:focus-visible) {
-  outline: 2px solid var(--local);
-  outline-offset: -2px;
+  z-index: 1;
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
 }
 .seg label[aria-disabled='true'],
 .seg label[aria-disabled='true'] input {
@@ -170,7 +195,7 @@ details[open] > summary:not(:has(.chev))::before {
   background: var(--panel);
 }
 .toggle input:focus-visible + .track {
-  outline: 2px solid var(--local);
+  outline: 2px solid var(--ink);
   outline-offset: 2px;
 }
 @media (prefers-reduced-motion: reduce) {
@@ -180,7 +205,8 @@ details[open] > summary:not(:has(.chev))::before {
   }
 }
 
-/* A status light: a small square, filled when on. Paired with words, never alone. */
+/* A status light: a small square, filled when on. Paired with words, never alone. Running is `live`; starting is a
+   hollow warn square, failed a filled prod one, and an app not on this board a dashed outline. */
 .led {
   flex: none;
   width: 7px;
@@ -189,8 +215,8 @@ details[open] > summary:not(:has(.chev))::before {
 }
 .led[data-state='running'],
 .led[data-state='done'] {
-  border-color: var(--local);
-  background: var(--local);
+  border-color: var(--live);
+  background: var(--live);
 }
 .led[data-state='starting'] {
   border-color: var(--warn);

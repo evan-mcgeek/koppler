@@ -2,6 +2,12 @@
   import RefreshCw from '@lucide/svelte/icons/refresh-cw';
   import Check from '@lucide/svelte/icons/check';
   import Icon from './Icon.svelte';
+  import Logs from '@lucide/svelte/icons/logs';
+  import Play from '@lucide/svelte/icons/play';
+  import RotateCw from '@lucide/svelte/icons/rotate-cw';
+  import Settings from '@lucide/svelte/icons/settings';
+  import Square from '@lucide/svelte/icons/square';
+  import X from '@lucide/svelte/icons/x';
   import GripVertical from '@lucide/svelte/icons/grip-vertical';
   import Command from './Command.svelte';
   import CardFields from './CardFields.svelte';
@@ -96,7 +102,7 @@
         title="Stop this app; its changes stay"
         onclick={() => void runs.stopApp(id)}
       >
-        Stop
+        <Icon of={Square} size={14} />Stop
       </button>
       <button
         type="button"
@@ -106,7 +112,7 @@
           runs.start({ restart: id });
         }}
       >
-        Restart
+        <Icon of={RotateCw} size={14} />Restart
       </button>
     {:else}
       <button
@@ -117,7 +123,7 @@
           runs.alone(id);
         }}
       >
-        Run alone
+        <Icon of={Play} size={14} />Run alone
       </button>
     {/if}
     {#if live.hasLog(id)}
@@ -129,7 +135,7 @@
           logs.open(id);
         }}
       >
-        Log
+        <Icon of={Logs} size={14} />Log
       </button>
     {/if}
     {#each board.commandsOf(id) as [key, command] (key)}
@@ -192,7 +198,7 @@
       title="Settings: every fact the stack has about it"
       onclick={() => void dialogs.settings?.open({ title: data.name, path: `apps.${id}` })}
     >
-      Settings
+      <Icon of={Settings} size={14} />Settings
     </button>
     <button
       class="remove"
@@ -203,7 +209,7 @@
         board.remove(id);
       }}
     >
-      ×
+      <Icon of={X} size={14} />
     </button>
   </span>
 </NodeToolbar>
@@ -424,17 +430,18 @@
     display: none;
   }
   .tools :is(button, .tool) {
-    display: grid;
-    place-items: center;
-    min-width: 26px;
-    height: 26px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-width: 28px;
+    height: 28px;
     padding: 0 8px;
     border: 0;
     background: var(--panel);
     color: var(--ink);
-    font: 500 10px var(--mono);
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
+    font: 600 12px var(--sans);
+    text-decoration: none;
     white-space: nowrap;
     cursor: pointer;
   }
@@ -443,8 +450,8 @@
     background: var(--line-strong);
   }
   .tools button[aria-pressed='true'] {
-    background: var(--ink);
-    color: var(--desk);
+    background: var(--line-strong);
+    box-shadow: inset 0 -2px 0 var(--ink);
   }
   .tools :is(.remove, .stop):hover {
     color: var(--prod);
@@ -514,9 +521,7 @@
     border-top: 1px solid var(--line);
     background: none;
     color: var(--ink);
-    font: 500 10px var(--mono);
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
+    font: 400 12px var(--sans);
     text-align: left;
     cursor: pointer;
   }
@@ -552,7 +557,8 @@
     color: var(--bad);
   }
   .chev {
-    color: var(--ink-muted);
+    text-decoration: underline;
+    text-underline-offset: 3px;
   }
   .why {
     contain: inline-size;
@@ -671,9 +677,7 @@
   .calls-label {
     margin-right: 2px;
     color: var(--deployed);
-    font: 500 10px var(--mono);
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
+    font: 400 12px var(--sans);
   }
   .chip {
     max-width: 180px;
@@ -683,9 +687,7 @@
     border: 1px dashed var(--deployed);
     background: none;
     color: var(--deployed);
-    font: 500 10px var(--mono);
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
+    font: 400 12px var(--sans);
     white-space: nowrap;
     text-overflow: ellipsis;
     cursor: pointer;
@@ -711,11 +713,9 @@
   .short .port {
     display: none;
   }
-  /* Mono capitals run wide: the short card's status grows less than its name. */
   .short .progress {
     padding: 10px 12px;
-    font-size: 14px;
-    letter-spacing: 0.04em;
+    font-size: 16px;
   }
   .short .marks i {
     transform: scale(1.4);
@@ -736,10 +736,10 @@
     font-size: 16px;
   }
   .short :is(.calls-label, .chip) {
-    font-size: 12px;
+    font-size: 14px;
   }
   .reading.far .progress {
-    font-size: 17px;
+    font-size: 20px;
   }
   .reading.far :is(.glance, .where) {
     display: none;
@@ -750,7 +750,7 @@
     font: 600 15px var(--sans);
   }
   .remove:focus-visible {
-    outline: 2px solid var(--cable);
+    outline: 2px solid var(--ink);
     outline-offset: 1px;
   }
   .glance {
