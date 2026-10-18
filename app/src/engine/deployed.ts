@@ -16,6 +16,7 @@ import {
   type Domain,
   ENV_TOKEN,
   type EnvStack,
+  type FeedVia,
   hostOf,
   type Module,
   type NamedQueue,
@@ -60,6 +61,10 @@ export interface LinkedQueue {
   address: string;
   owner: string;
   namedIn?: string[];
+  /** The queues, topics and buses it feeds, by their ids, and how. */
+  feeds: Record<string, FeedVia>;
+  /** Per app that reads it not by itself, how: a pipe or rule to a Lambda or an API destination. */
+  via: Record<string, string>;
 }
 
 type AppsStack = EnvStack & {
@@ -152,6 +157,7 @@ export function draftApp(
     for (const queue of (module.queues as NamedQueue[] | undefined) ?? []) {
       const key = queue.name ?? `${module.dir ?? ''}:${queue.address}`;
       const had = into.queues.get(key);
+      const via = queue.via ?? had?.via;
       into.queues.set(key, {
         type: queue.type,
         name: queue.name,
@@ -160,6 +166,15 @@ export function draftApp(
         sends: had?.sends || queue.sends,
         env: union(had?.env, queue.env).sort(),
         fedBy: union(had?.fedBy, queue.fedBy),
+        // What it feeds, by name: a queue of this module by its own name (`@<address>` when it has none), or another's bus.
+        feeds: [
+          ...(had?.feeds ?? []),
+          ...queue.feeds.map(({ to, via }) => {
+            const target = to.startsWith('name:') ? null : module.queues.find(other => other.address === to);
+            return { to: to.startsWith('name:') ? to.slice(5) : (target?.name ?? `@${to}`), via };
+          }),
+        ],
+        ...(via ? { via } : {}),
       });
     }
   }
@@ -197,7 +212,10 @@ export function draftApp(
           secrets: secrets.flatMap(({ store, name }) => (name ? [{ store, name }] : [])),
           unnamedSecrets: secrets.filter(secret => !secret.name).length,
           calls,
-          queues: [...found.queues.values()],
+          // A queue read with its name and again from a context that could not name it is the one queue.
+          queues: [...found.queues.values()].filter(
+            (queue, _, all) => queue.name || !all.some(other => other.name && other.address === queue.address),
+          ),
         },
       ];
     }),
@@ -221,6 +239,9 @@ export function linkQueues(drafts: Drafts, stack: EnvStack): LinkedQueue[] {
     users: Map<string, User>;
     fedBy: Set<string>;
     envs: Record<string, string>;
+    /** Feeds by the key of what it feeds; that key is resolved to an entry once all are read. */
+    feeds: Map<string, FeedVia>;
+    via: Map<string, string>;
   }
   const [first = ''] = stack.envs;
   const byName = new Map<string, Entry>();
@@ -237,6 +258,8 @@ export function linkQueues(drafts: Drafts, stack: EnvStack): LinkedQueue[] {
       users: new Map(),
       fedBy: new Set(),
       envs: {},
+      feeds: new Map(),
+      via: new Map(),
     };
     const user = entry.users.get(app) ?? { reads: false, sends: false, env: new Set<string>() };
     entry.users.set(app, {
@@ -245,6 +268,8 @@ export function linkQueues(drafts: Drafts, stack: EnvStack): LinkedQueue[] {
       env: new Set([...user.env, ...queue.env]),
     });
     for (const feeder of queue.fedBy) entry.fedBy.add(feeder);
+    for (const { to, via } of queue.feeds) entry.feeds.set(to.startsWith('@') ? `${app}:${to.slice(1)}` : to, via);
+    if (queue.via) entry.via.set(app, queue.via);
     byName.set(key, entry);
   }
   // The same queue's name in the other environments, from the app that declares it.
@@ -254,21 +279,60 @@ export function linkQueues(drafts: Drafts, stack: EnvStack): LinkedQueue[] {
     const entry = name ? byName.get(name) : undefined;
     if (entry && queue.name && queue.name !== name) entry.envs[env] = queue.name;
   }
+  // What a queue feeds is found by its name, or by the same name for another environment (`bus_dev` for `bus_qa`); a bus
+  // only named, in another account, gets an entry of its own.
+  const fed = new Set<Entry>();
+  const target = new Map<Entry, Map<Entry, FeedVia>>();
+  for (const entry of [...byName.values()]) {
+    const out = new Map<Entry, FeedVia>();
+    for (const [key, via] of entry.feeds) {
+      // An unnamed one (its name built at deploy time) is matched by its Terraform resource name.
+      const same = (other: Entry) => queueId(other.queue ?? other.address.split('.').pop() ?? '') === queueId(key);
+      let to = byName.get(key) ?? [...byName.values()].find(same);
+      if (!to) {
+        to = {
+          queue: key,
+          address: key,
+          type: 'eventbridge',
+          users: new Map(),
+          fedBy: new Set(),
+          envs: {},
+          feeds: new Map(),
+          via: new Map(),
+        };
+        byName.set(key, to);
+      }
+      if (to === entry) continue;
+      out.set(to, via);
+      fed.add(to);
+    }
+    target.set(entry, out);
+  }
   // A queue or topic no app sends to or reads, and nothing feeds (an alarm topic, a spare dead-letter queue), is not a link.
   const used = (user: User) => user.reads || user.sends || user.env.size > 0;
+  const idOf = (entry: Entry) => {
+    const owner = [...entry.users.keys()][0] ?? '';
+    const resourceName = (entry.address.split('.').pop() ?? '').replace(/_/g, '-');
+    return entry.queue ? queueId(entry.queue) : `${owner}-${resourceName}`;
+  };
   return [...byName.values()]
-    .filter(entry => entry.fedBy.size || [...entry.users.values()].some(used))
+    .filter(
+      entry => entry.fedBy.size || fed.has(entry) || target.get(entry)?.size || [...entry.users.values()].some(used),
+    )
     .map(entry => {
       const users = [...entry.users];
       const owner = users[0]?.[0] ?? '';
-      const resourceName = (entry.address.split('.').pop() ?? '').replace(/_/g, '-');
       const reads = users.filter(([, user]) => user.reads).map(([app]) => app);
       // An app that only carries the address and neither sends nor reads by itself is taken to send.
       const sends = users.filter(([, user]) => user.sends || (!user.reads && user.env.size)).map(([app]) => app);
       // Internal: one app both sends and reads, and nothing outside feeds it. One side unknown is a link still to find.
-      const internal = users.length === 1 && !entry.fedBy.size && reads.length && sends.length;
+      const feeds = target.get(entry) ?? new Map<Entry, FeedVia>();
+      const linked = feeds.size || fed.has(entry);
+      const internal = users.length === 1 && !entry.fedBy.size && !linked && reads.length && sends.length;
       return {
-        id: entry.queue ? queueId(entry.queue) : `${owner}-${resourceName}`,
+        id: idOf(entry),
+        feeds: Object.fromEntries([...feeds].map(([to, via]) => [idOf(to), via])),
+        via: Object.fromEntries(entry.via),
         queue: entry.queue,
         type: entry.type,
         envs: entry.envs,
@@ -308,10 +372,18 @@ const titled = (id: string) =>
 export function queueDraft(queues: LinkedQueue[], stack: QueueStack) {
   const out: {
     queues: Record<string, object>;
-    apps: Record<string, Partial<Record<'publishes' | 'reads', Record<string, { env?: string[] }>>>>;
-  } = { queues: {}, apps: {} };
+    apps: Record<string, Partial<Record<'publishes' | 'reads', Record<string, { env?: string[]; via?: string }>>>>;
+    /** What queues the stack has already feed, for `queues.<id>.feeds`. */
+    feeds: Record<string, Record<string, { via: FeedVia }>>;
+  } = { queues: {}, apps: {}, feeds: {} };
+  const feedsOf = (queue: LinkedQueue) =>
+    Object.fromEntries(Object.entries(queue.feeds).map(([to, via]) => [to, { via }]));
   for (const queue of queues) {
-    if (queue.inside || inStack(queue, stack)) continue;
+    if (queue.inside) continue;
+    if (inStack(queue, stack)) {
+      if (Object.keys(queue.feeds).length) out.feeds[queue.id] = feedsOf(queue);
+      continue;
+    }
     const perEnv = Object.entries(queue.envs).map(([env, name]) => [env, { queue: name }]);
     out.queues[queue.id] = {
       name: titled(queue.id),
@@ -319,6 +391,7 @@ export function queueDraft(queues: LinkedQueue[], stack: QueueStack) {
       ...(queue.queue && { queue: queue.queue }),
       ...(perEnv.length && { envs: Object.fromEntries(perEnv) as object }),
       ...(queue.fedBy.length && { note: `Fed by ${queue.fedBy.join(' and ')}` }),
+      ...(Object.keys(queue.feeds).length && { feeds: feedsOf(queue) }),
     };
     for (const [key, apps] of [
       ['publishes', queue.sends],
@@ -326,7 +399,8 @@ export function queueDraft(queues: LinkedQueue[], stack: QueueStack) {
     ] as const)
       for (const app of apps) {
         const env = queue.env[app];
-        ((out.apps[app] ??= {})[key] ??= {})[queue.id] = env?.length ? { env } : {};
+        const via = key === 'reads' ? queue.via[app] : undefined;
+        ((out.apps[app] ??= {})[key] ??= {})[queue.id] = { ...(env?.length && { env }), ...(via && { via }) };
       }
   }
   return out;

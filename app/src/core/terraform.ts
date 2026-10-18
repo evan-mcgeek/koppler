@@ -12,7 +12,14 @@ export interface Context {
 
 type Resolved = string | Record<string, string> | null;
 
-type QueueType = 'sqs' | 'sns';
+type QueueType = 'sqs' | 'sns' | 'eventbridge' | 'kafka';
+export type FeedVia = 'pipe' | 'rule' | 'subscription';
+
+/** One queue, topic or bus feeding another: `to` is another's Terraform address here, or `name:<its name>` elsewhere. */
+export interface Feed {
+  to: string;
+  via: FeedVia;
+}
 
 /** A queue or topic a Terraform folder declares or looks up, and how its app uses it. */
 export interface QueueUse {
@@ -27,6 +34,12 @@ export interface QueueUse {
   env: string[];
   /** Outside systems that feed it. */
   fedBy: string[];
+  /** The queues, topics and buses it feeds. */
+  feeds: Feed[];
+  /** How its app reads it when not by itself: a pipe or rule to a Lambda or an API destination. */
+  via?: string;
+  /** Its name is a list of names, one queue each (Kafka topics a pipe reads). */
+  list?: true;
 }
 
 export type NamedQueue = QueueUse & { name: string | null };
@@ -281,20 +294,41 @@ export function queueUses(tf: string): QueueUse[] {
     fedBy: Set<string>;
   }
   const found = new Map<string, Found>();
-  const add = (address: string, type: QueueType, body: string) => {
+  const add = (address: string, type: QueueType, raw: string | null) => {
     if (DEAD_LETTER.test(address)) return;
-    const raw = assigned(body, 'name') ?? null;
-    found.set(address, { address, type, raw, reads: false, sends: false, env: new Set(), fedBy: new Set() });
+    found.set(address, { address, type, raw, reads: false, sends: false, env: new Set(), fedBy: new Set(), feeds: [] });
   };
-  for (const { match, body } of blocks(tf, /(resource|data)\s+"(aws_sqs_queue|aws_sns_topic)"\s+"([\w-]+)"\s*\{/g))
+  const TYPES: Record<string, QueueType> = {
+    aws_sqs_queue: 'sqs',
+    aws_sns_topic: 'sns',
+    aws_cloudwatch_event_bus: 'eventbridge',
+  };
+  for (const { match, body } of blocks(
+    tf,
+    /(resource|data)\s+"(aws_sqs_queue|aws_sns_topic|aws_cloudwatch_event_bus)"\s+"([\w-]+)"\s*\{/g,
+  ))
     add(
       `${match[1] === 'data' ? 'data.' : ''}${match[2] ?? ''}.${match[3] ?? ''}`,
-      match[2] === 'aws_sns_topic' ? 'sns' : 'sqs',
-      body,
+      TYPES[match[2] ?? ''] ?? 'sqs',
+      assigned(body, 'name') ?? null,
     );
   for (const { match, body } of blocks(tf, /module\s+"([\w-]+)"\s*\{/g)) {
     const source = assigned(body, 'source') ?? '';
-    if (/\b(sqs|sns)\b/i.test(source)) add(`module.${match[1] ?? ''}`, /\bsns\b/i.test(source) ? 'sns' : 'sqs', body);
+    if (/\b(sqs|sns)\b/i.test(source))
+      add(`module.${match[1] ?? ''}`, /\bsns\b/i.test(source) ? 'sns' : 'sqs', assigned(body, 'name') ?? null);
+  }
+  // A pipe that reads Kafka: its topic is a queue of its own (one per topic when it reads a list of them).
+  const pipes = blocks(tf, /resource\s+"(aws_pipes_pipe|awscc_pipes_pipe)"\s+"([\w-]+)"\s*\{/g);
+  for (const { match, body } of pipes) {
+    const topic = /topic_name\s*=\s*([^\n,}]+)/.exec(body)?.[1]?.trim();
+    if (!topic) continue;
+    const each = /^each\.(key|value)$/.test(topic)
+      ? /toset\(\s*([\w.]+)\s*\)|^\s*([\w.]+)\s*$/.exec(assigned(body, 'for_each') ?? '')
+      : null;
+    const address = `kafka.${match[2] ?? ''}`;
+    add(address, 'kafka', each ? (each[1] ?? each[2] ?? null) : topic);
+    const queue = found.get(address);
+    if (queue && each) queue.list = true;
   }
   const refTo = (address: string) =>
     new RegExp(`${address.replace(/\./g, '\\.')}(?:\\[[^\\]]*\\])?\\.(?:arn|url|id|name)\\b`, 'g');
@@ -316,6 +350,43 @@ export function queueUses(tf: string): QueueUse[] {
         }
       }
   }
+  const queueIn = (raw: string | undefined) =>
+    raw
+      ? [...found.values()].find(queue => refTo(queue.address).test(raw) || raw.includes(`${queue.address}.`))
+      : undefined;
+  // What a pipe or rule hands its events to that is not a queue: a Lambda or an API destination of this app.
+  const endOf = (raw: string | undefined) =>
+    /aws_lambda_function\./.test(raw ?? '') ? 'Lambda' : /api_destination/i.test(raw ?? '') ? 'API destination' : null;
+  const feed = (from: Found | undefined, to: string | undefined, via: FeedVia, other: Feed['to'] | null = null) => {
+    if (!from) return;
+    const target = queueIn(to);
+    const end = endOf(to);
+    if (target && target !== from) from.feeds.push({ to: target.address, via });
+    else if (other) from.feeds.push({ to: other, via });
+    else if (end) {
+      from.reads = true;
+      from.via = `${via} to ${end}`;
+    }
+  };
+  for (const { match, body } of pipes) {
+    const source = found.get(`kafka.${match[2] ?? ''}`) ?? queueIn(assigned(body, 'source'));
+    feed(source, assigned(body, 'target'), 'pipe');
+  }
+  // A rule belongs to a bus; its targets are what the bus feeds.
+  const ruleBus = new Map<string, Found | undefined>(
+    blocks(tf, /resource\s+"aws_cloudwatch_event_rule"\s+"([\w-]+)"\s*\{/g).map(
+      ({ match, body }) =>
+        [`aws_cloudwatch_event_rule.${match[1] ?? ''}`, queueIn(assigned(body, 'event_bus_name'))] as const,
+    ),
+  );
+  for (const { body } of blocks(tf, resource('aws_cloudwatch_event_target'))) {
+    const rule = /aws_cloudwatch_event_rule\.[\w-]+/.exec(assigned(body, 'rule') ?? '')?.[0];
+    const bus = (rule ? ruleBus.get(rule) : undefined) ?? queueIn(assigned(body, 'event_bus_name'));
+    const arn = assigned(body, 'arn');
+    feed(bus, arn, 'rule', busNamed(arn, tf));
+  }
+  for (const { body } of blocks(tf, resource('aws_sns_topic_subscription')))
+    feed(queueIn(assigned(body, 'topic_arn')), assigned(body, 'endpoint'), 'subscription');
   // Settings whose value is the queue's address: what a local run sets to the local queue.
   const settings = [
     ...blocks(tf, /resource\s+"aws_lambda_function"\s+"[\w-]+"\s*\{/g)
@@ -332,6 +403,25 @@ export function queueUses(tf: string): QueueUse[] {
     for (const [name, raw] of settings) if (refTo(queue.address).test(raw)) queue.env.add(name);
   return [...found.values()].map(queue => ({ ...queue, env: [...queue.env].sort(), fedBy: [...queue.fedBy] }));
 }
+
+/** Another account's bus a rule sends to, by the ARN written for it: `name:<bus>`; a map per environment gives its first. */
+function busNamed(raw: string | undefined, tf: string): string | null {
+  const local = /^local\.([\w-]+)/.exec(raw?.trim() ?? '')?.[1];
+  const written = local
+    ? blocks(tf, /(^|\n)\s*locals\s*\{/g)
+        .flatMap(block => assignments(block.body))
+        .find(([name]) => name === local)?.[1]
+    : raw;
+  const bus = /event-bus\/([\w.-]+)/.exec(written ?? '')?.[1];
+  return bus ? `name:${bus}` : null;
+}
+
+/** The names a list variable holds, as written; commented-out items are left out. */
+const namesIn = (raw: string | null | undefined, context: Context): string[] => {
+  const reference = /^var\.([\w-]+)$/.exec(raw?.trim() ?? '')?.[1];
+  const written = reference ? context.vars[reference] : raw;
+  return [...(written ?? '').replace(/(\/\/|#)[^\n]*/g, '').matchAll(/"([^"\n]+)"/g)].map(match => match[1] ?? '');
+};
 
 export const hostOf = (address: string) => {
   try {
@@ -414,7 +504,11 @@ export function readModule(files: { name: string; text: string }[], workspaces: 
   return contexts.map(context => ({
     token: context.token,
     queues: queues
-      .map(queue => ({ ...queue, name: named(queue.raw, context) }))
+      .flatMap(queue =>
+        queue.list
+          ? namesIn(queue.raw, context).map(name => ({ ...queue, address: `${queue.address}["${name}"]`, name }))
+          : [{ ...queue, name: named(queue.raw, context) }],
+      )
       .filter(queue => !DEAD_LETTER.test(queue.name ?? '')),
     account: accountOf(context),
     domains: declared.domains.flatMap(({ raw, from: source }): Domain[] => {

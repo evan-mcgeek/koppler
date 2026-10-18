@@ -240,7 +240,7 @@
   ]);
   /** A message link or a call to an outside system, between the sides of its two cards that face each other. */
   const flows = $derived(
-    board.flows.flatMap(({ from, to, queue }) => {
+    board.flows.flatMap(({ from, to, queue, via }) => {
       const box = (key: string) => board.boxes.get(key) ?? board.infraBoxes.get(key);
       const [a, b] = [box(from), box(to)];
       if (!a || !b) return [];
@@ -267,6 +267,12 @@
           // No socket sits at this end: the tip touches the card's edge.
           head: `translate(${String(end.x + x * 2)} ${String(end.y + y * 2)}) rotate(${String((Math.atan2(-y, -x) * 180) / Math.PI)})`,
           kind: queue ? (board.queues[queue] === 'local' ? 'msg local' : 'msg') : 'ext',
+          via,
+          // Beside the link, not on it: right of one running up or down, over one running across.
+          label:
+            SIDES[sides[0]][0] === 0
+              ? { x: (start.x + end.x) / 2 + 8, y: (start.y + end.y) / 2, anchor: 'start' }
+              : { x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 - 9, anchor: 'middle' },
         },
       ];
     }),
@@ -613,6 +619,9 @@
             <path class="wire" d={flow.d} />
             <path class="head" d="M-9,-4.5 L0,0 L-9,4.5 L-6.75,0 Z" transform={flow.head} />
             <circle class="plug" cx={flow.start.x} cy={flow.start.y} r="5" />
+            {#if flow.via}<text class="via" x={flow.label.x} y={flow.label.y} text-anchor={flow.label.anchor}
+                >{flow.via}</text
+              >{/if}
           </g>
         {/each}
       </svg>
@@ -857,6 +866,15 @@
     stroke-linecap: butt;
   }
   /* Message links are teal, dashed while the queue is the deployed one; calls to an outside system are dotted grey. */
+  .flow .via {
+    fill: var(--muted);
+    font: 600 11px var(--mono);
+    dominant-baseline: middle;
+    paint-order: stroke;
+    stroke: var(--paper);
+    stroke-width: 5px;
+    stroke-linejoin: round;
+  }
   .flow .under {
     stroke: var(--desk);
     stroke-width: 7;
