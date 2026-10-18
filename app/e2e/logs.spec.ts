@@ -158,3 +158,13 @@ test('All apps shows every app on the board in one stream by time, and an app le
   await expect(rows).toHaveCount(3);
   await page.screenshot({ path: 'test-results/next-logs-all.png' });
 });
+
+test('the All apps log opens from the top bar, and closes from there too', async ({ page }) => {
+  const button = page.getByRole('button', { name: 'All apps log' });
+  await button.click();
+  const pane = page.getByRole('region', { name: 'App log' });
+  await expect(pane.getByRole('tab', { name: 'All apps' })).toHaveAttribute('aria-selected', 'true');
+  await expect(button).toHaveAttribute('aria-pressed', 'true');
+  await button.click();
+  await expect(pane).toHaveCount(0);
+});
