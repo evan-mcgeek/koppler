@@ -160,7 +160,7 @@ test('All apps shows every app on the board in one stream by time, and an app le
 });
 
 test('the All apps log opens from the top bar, and closes from there too', async ({ page }) => {
-  const button = page.getByRole('button', { name: 'All apps log' });
+  const button = page.getByRole('button', { name: 'Logs', exact: true });
   await button.click();
   const pane = page.getByRole('region', { name: 'App log' });
   await expect(pane.getByRole('tab', { name: 'All apps' })).toHaveAttribute('aria-selected', 'true');

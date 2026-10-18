@@ -329,8 +329,8 @@
     <span class="env" class:prod={board.protected}>{board.env.toUpperCase()}</span>
   {/if}
   <span class="spacer"></span>
-  {#if board.stack}<Health /><Agent />{/if}
-  {#if board.stack}<LogsButton /><History /><Traces /><Credentials />{/if}
+  {#if board.stack}<Health /><Agent /><LogsButton />{/if}
+  {#if board.stack}<History /><Traces /><Credentials />{/if}
   <Help />
   {#if board.stack}
     <span class="split" inert={!!loading}>

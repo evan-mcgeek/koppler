@@ -1,5 +1,5 @@
 <script lang="ts">
-  import ScrollText from '@lucide/svelte/icons/scroll-text';
+  import LogsIcon from '@lucide/svelte/icons/logs';
   import Icon from './Icon.svelte';
   import { ALL, logs } from './logs.svelte.ts';
 
@@ -9,27 +9,28 @@
 <button
   class="open"
   type="button"
-  aria-label="All apps log"
   aria-pressed={open}
   title="The log of every app on the board, in one stream"
   onclick={() => {
     logs.active = open ? null : ALL;
   }}
 >
-  <Icon of={ScrollText} size={16} />
+  <Icon of={LogsIcon} size={15} />Logs
 </button>
 
 <style>
   .open {
-    display: grid;
-    place-items: center;
-    width: 32px;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
     height: 32px;
-    padding: 0;
+    padding: 0 10px;
     border: 1px solid transparent;
     border-radius: 8px;
     background: none;
     color: var(--muted);
+    font: 500 12.5px var(--sans);
+    white-space: nowrap;
     cursor: pointer;
   }
   .open:hover,
