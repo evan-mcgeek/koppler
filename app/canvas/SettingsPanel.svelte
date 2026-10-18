@@ -683,7 +683,7 @@
   footer .bad {
     border-color: var(--prod);
     background: var(--prod);
-    color: var(--ink);
+    color: var(--on-prod);
   }
   footer button:disabled,
   .apps button:disabled {

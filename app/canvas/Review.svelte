@@ -114,7 +114,7 @@
     margin: 0 -28px 20px;
     padding: 6px 28px;
     background: var(--prod-stripes);
-    color: var(--desk);
+    color: var(--on-prod);
     font: 700 11px var(--mono);
     letter-spacing: 0.08em;
     text-transform: uppercase;
@@ -253,7 +253,7 @@
   .ok.prod {
     border-color: var(--prod);
     background: var(--prod);
-    color: var(--desk);
+    color: var(--on-prod);
   }
   .ok:disabled {
     border: 1px dashed var(--line-strong);

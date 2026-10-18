@@ -117,6 +117,18 @@ test('the shortcuts sheet opens with ?, and the appearance is picked in Settings
   await page.getByRole('radio', { name: /^Mono/ }).click();
   await expect(page.locator('html')).not.toHaveAttribute('data-scheme');
   expect(await local()).toMatch(/^#f{3}(f{3})?$/);
+
+  // A light scheme: the page turns light, and the colours offered by hand are ones that read on it.
+  await page.getByRole('radio', { name: /^Paper/ }).click();
+  await expect(page.locator('html')).toHaveAttribute('data-scheme', 'paper');
+  expect(await page.evaluate(() => getComputedStyle(document.body).backgroundColor)).toBe('rgb(244, 244, 242)');
+  await expect(page.getByRole('radio', { name: 'Local #1f4fd8' })).toBeVisible();
+  await expect(page.getByRole('radio', { name: 'Local #ffd43b' })).toHaveCount(0);
+  // A green local cable would read as running: the running light takes the ink colour then.
+  await page.getByRole('radio', { name: 'Local #1a6e2e' }).click();
+  const live = () => page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--live').trim());
+  expect(await live()).toBe('#141414');
+  await page.screenshot({ path: 'test-results/next-appearance-light.png' });
 });
 
 test('the keyboard: Space presses the focused button, and shortcuts stay off under an open menu', async ({ page }) => {

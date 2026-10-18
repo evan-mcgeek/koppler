@@ -2,7 +2,7 @@
   import Icon from './Icon.svelte';
   import Settings from '@lucide/svelte/icons/settings';
   import { debug } from './debug.svelte.ts';
-  import { appearance, DEPLOYEDS, LOCALS, SCHEMES, type Scheme } from './appearance.svelte.ts';
+  import { appearance, picksFor, SCHEMES, type Scheme } from './appearance.svelte.ts';
   import { toasts } from './toast.svelte.ts';
   import { post } from './data.ts';
 
@@ -36,7 +36,7 @@
   const picks = $derived([
     [
       'Local',
-      LOCALS,
+      picksFor(appearance.now.scheme).locals,
       appearance.local,
       (hex: string) => {
         appearance.pickLocal(hex);
@@ -44,7 +44,7 @@
     ],
     [
       'Deployed',
-      DEPLOYEDS,
+      picksFor(appearance.now.scheme).deployeds,
       appearance.deployed,
       (hex: string) => {
         appearance.pickDeployed(hex);

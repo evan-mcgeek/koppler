@@ -25,6 +25,7 @@
   import Redo2 from '@lucide/svelte/icons/redo-2';
   import Undo2 from '@lucide/svelte/icons/undo-2';
   import Icon from './Icon.svelte';
+  import { appearance, isLight } from './appearance.svelte.ts';
   import AppCard from './AppCard.svelte';
   import Cable from './Cable.svelte';
   import Outside from './Outside.svelte';
@@ -450,7 +451,7 @@
     panOnDrag={panning ? true : [1, 2]}
     selectionOnDrag={!panning}
     selectionMode={SelectionMode.Partial}
-    colorMode="dark"
+    colorMode={isLight(appearance.now.scheme) ? 'light' : 'dark'}
     minZoom={0.2}
     proOptions={{ hideAttribution: true }}
     {...start}
@@ -674,10 +675,11 @@
                 class:dimmed={board.dimmedLink(edge.source, edge.target)}
                 class:tested
                 data-cable={edge.id}
+                data-state={tested ? probe?.state : undefined}
                 class:grabbed={wiring.grabbed?.id === edge.id && wiring.grabbed.end === 'to'}
                 cx={b.x}
                 cy={b.y}
-                r="6"
+                r="7"
                 onpointerdown={ev => {
                   pressedAt = { x: ev.clientX, y: ev.clientY };
                   wiring.grabEnd(ev, edge.id, 'to');
@@ -715,6 +717,7 @@
               }}
               class="socket tested press nodrag nopan"
               data-link={link.key}
+              data-state={probe?.state}
               cx={link.end.x}
               cy={link.end.y}
               r="7"
@@ -965,7 +968,7 @@
   .reordering * {
     cursor: grabbing;
   }
-  /* Where a cable leaves: a hollow ring. Where it plugs in: a solid socket. */
+  /* Where a cable leaves: a small ring. Where it plugs in: a larger ring whose hole holds the last connection test. */
   .plug {
     fill: var(--desk);
     stroke: var(--cable);
@@ -981,9 +984,15 @@
     r: 7.5px;
   }
   .socket {
-    fill: var(--local);
-    stroke: var(--desk);
+    fill: var(--desk);
+    stroke: var(--local);
     stroke-width: 2;
+  }
+  .socket.tested:hover {
+    stroke: var(--ink);
+  }
+  .socket[data-state='bad'] {
+    stroke: var(--prod);
   }
   .socket.press {
     cursor: pointer;
@@ -996,28 +1005,40 @@
   .socket.grabbed {
     r: 10px;
   }
+  /* The test's result has a shape of its own, never colour alone: nothing until tested, a turning arc while it
+     tests, a solid dot when it works, a hollow ring when it answered oddly, and red when it fails. */
   .light {
-    fill: var(--local);
+    display: none;
+    fill: none;
+    stroke-width: 1.5;
+  }
+  .light[data-state='ok'],
+  .light[data-state='bad'] {
+    display: inline;
+    r: 3.4px;
   }
   .light[data-state='ok'] {
-    fill: var(--ok);
-  }
-  .light[data-state='warn'] {
-    fill: var(--warn);
+    fill: var(--live);
   }
   .light[data-state='bad'] {
-    fill: var(--bad);
-    stroke: color-mix(in oklab, var(--bad) 35%, transparent);
-    stroke-width: 5;
-    paint-order: stroke;
+    fill: var(--prod);
+  }
+  .light[data-state='warn'],
+  .light[data-state='busy'] {
+    display: inline;
+    r: 2.65px;
+    stroke: var(--warn);
   }
   .light[data-state='busy'] {
-    fill: var(--warn);
-    animation: testing 0.9s ease-in-out infinite alternate;
+    /* Three quarters of the ring. */
+    stroke-dasharray: 12.5 16.7;
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: testing 0.9s linear infinite;
   }
   @keyframes testing {
     to {
-      opacity: 0.25;
+      rotate: 360deg;
     }
   }
   @media (prefers-reduced-motion: reduce) {

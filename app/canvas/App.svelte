@@ -545,7 +545,7 @@
   }
   .env label.prod:has(input:checked) {
     background: var(--prod-stripes);
-    color: var(--desk);
+    color: var(--on-prod);
     font-weight: 700;
   }
   .env:has(.prod) {
@@ -606,7 +606,7 @@
     min-height: 30px;
     padding: 0 16px;
     background: repeating-linear-gradient(-45deg, var(--prod) 0 12px, var(--prod-strong) 12px 24px);
-    color: var(--desk);
+    color: var(--on-prod);
     font: 700 11px var(--mono);
     letter-spacing: 0.08em;
     text-transform: uppercase;
@@ -706,7 +706,7 @@
   .protected .run,
   .protected .run + :global(.more.run) {
     background: var(--prod);
-    color: var(--desk);
+    color: var(--on-prod);
   }
   .run:disabled {
     border: 1px dashed var(--line-strong);

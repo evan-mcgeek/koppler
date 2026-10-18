@@ -1,15 +1,89 @@
 // Appearance, remembered in this browser: a scheme, and the local and deployed colours picked by hand over it. Warning
 // and PROD colours are not among the picks, so a custom colour can never be mistaken for either.
+interface SchemeOf {
+  name: string;
+  note: string;
+  local: string;
+  deployed: string;
+  live: string;
+  light?: true;
+}
 export const SCHEMES = {
-  mono: { name: 'Mono', note: 'No hue until something needs you', local: '#ffffff', deployed: '#9a9a9a' },
-  lime: { name: 'Patch bay', note: 'Lime local, periwinkle deployed', local: '#c8f03c', deployed: '#8ea2ff' },
-  signal: { name: 'Signal', note: 'Orange local, steel deployed, warm black', local: '#ff8a1f', deployed: '#7fc4d8' },
-  scope: { name: 'Scope', note: 'Phosphor green local, cyan deployed', local: '#52f29a', deployed: '#5cc8ff' },
-  sodium: { name: 'Sodium', note: 'Yellow local, violet deployed, cool slate', local: '#ffd43b', deployed: '#a98bff' },
-} as const;
+  mono: {
+    name: 'Mono',
+    note: 'No hue until something needs you',
+    local: '#ffffff',
+    deployed: '#9a9a9a',
+    live: '#4ade80',
+  },
+  lime: {
+    name: 'Patch bay',
+    note: 'Lime local, periwinkle deployed',
+    local: '#c8f03c',
+    deployed: '#8ea2ff',
+    live: '#4fd6c4',
+  },
+  signal: {
+    name: 'Signal',
+    note: 'Orange local, steel deployed, warm black',
+    local: '#ff8a1f',
+    deployed: '#7fc4d8',
+    live: '#5bd97a',
+  },
+  scope: {
+    name: 'Scope',
+    note: 'Phosphor green local, cyan deployed',
+    local: '#52f29a',
+    deployed: '#5cc8ff',
+    live: '#ffffff',
+  },
+  sodium: {
+    name: 'Sodium',
+    note: 'Yellow local, violet deployed, cool slate',
+    local: '#ffd43b',
+    deployed: '#a98bff',
+    live: '#4ade80',
+  },
+  paper: {
+    name: 'Paper',
+    note: 'Light, ink local',
+    local: '#141414',
+    deployed: '#6b6b6b',
+    live: '#1a8f4c',
+    light: true,
+  },
+  blueprint: {
+    name: 'Blueprint',
+    note: 'Light, blue local, violet deployed, cool grey',
+    local: '#1f4fd8',
+    deployed: '#7652c2',
+    live: '#15803d',
+    light: true,
+  },
+  workshop: {
+    name: 'Workshop',
+    note: 'Light, burnt orange local, teal deployed, warm paper',
+    local: '#b4490a',
+    deployed: '#22738a',
+    live: '#2b8048',
+    light: true,
+  },
+} satisfies Record<string, SchemeOf>;
 export type Scheme = keyof typeof SCHEMES;
-export const LOCALS = ['#ffffff', '#c8f03c', '#52f29a', '#5ce1e6', '#ffd43b', '#ff8a1f'] as const;
-export const DEPLOYEDS = ['#9a9a9a', '#8ea2ff', '#a98bff', '#7fc4d8', '#5cc8ff', '#e6a3d8'] as const;
+const DARK = {
+  locals: ['#ffffff', '#c8f03c', '#52f29a', '#5ce1e6', '#ffd43b', '#ff8a1f'],
+  deployeds: ['#9a9a9a', '#8ea2ff', '#a98bff', '#7fc4d8', '#5cc8ff', '#e6a3d8'],
+};
+const LIGHT = {
+  locals: ['#141414', '#1f4fd8', '#b4490a', '#0f766e', '#7a3fc8', '#1a6e2e'],
+  deployeds: ['#6b6b6b', '#7652c2', '#22738a', '#4a5fb5', '#8a5a2b', '#a3407a'],
+};
+/** The local and deployed colours a scheme offers to pick by hand: light ones for a light scheme. */
+export const isLight = (scheme: Scheme) => !!(SCHEMES[scheme] as SchemeOf).light;
+export const picksFor = (scheme: Scheme) => (isLight(scheme) ? LIGHT : DARK);
+// A green local cable would read as running: the running light then takes the ink colour instead.
+const GREEN_LOCALS = ['#c8f03c', '#52f29a', '#1a6e2e'];
+const GREEN_LIVES = ['#4ade80', '#5bd97a', '#1a8f4c', '#15803d', '#2b8048'];
 
 interface Kept {
   scheme: Scheme;
@@ -22,16 +96,23 @@ const remembered = (): Kept => {
     const kept = JSON.parse(localStorage.getItem(KEY) ?? '{}') as Partial<Kept>;
     const pick = (value: unknown, from: readonly string[]) =>
       typeof value === 'string' && from.includes(value) ? value : undefined;
-    const local = pick(kept.local, LOCALS);
-    const deployed = pick(kept.deployed, DEPLOYEDS);
+    const scheme = kept.scheme && kept.scheme in SCHEMES ? kept.scheme : 'mono';
+    const local = pick(kept.local, picksFor(scheme).locals);
+    const deployed = pick(kept.deployed, picksFor(scheme).deployeds);
     return {
-      scheme: kept.scheme && kept.scheme in SCHEMES ? kept.scheme : 'mono',
+      scheme,
       ...(local && { local }),
       ...(deployed && { deployed }),
     };
   } catch {
     return { scheme: 'mono' };
   }
+};
+/** The running colour beside a local colour: never two greens. */
+const liveFor = (scheme: Scheme, local: string | undefined): string | undefined => {
+  const own = SCHEMES[scheme] as SchemeOf;
+  if (!local || !GREEN_LOCALS.includes(local) || !GREEN_LIVES.includes(own.live)) return undefined;
+  return own.light ? '#141414' : '#ffffff';
 };
 
 class Appearance {
@@ -76,6 +157,7 @@ class Appearance {
     for (const [name, value] of [
       ['--local', this.now.local],
       ['--deployed', this.now.deployed],
+      ['--live', liveFor(this.now.scheme, this.now.local)],
     ] as const)
       if (value) root.style.setProperty(name, value);
       else root.style.removeProperty(name);
