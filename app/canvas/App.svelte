@@ -19,6 +19,8 @@
   import History from './History.svelte';
   import Traces from './Traces.svelte';
   import Logs from './Logs.svelte';
+  import LogsButton from './LogsButton.svelte';
+  import Tip from './Tip.svelte';
   import Menu from './Menu.svelte';
   import Rail from './Rail.svelte';
   import AddOutside from './AddOutside.svelte';
@@ -328,7 +330,7 @@
     <span class="env" class:prod={board.protected}>{board.env.toUpperCase()}</span>
   {/if}
   <span class="spacer"></span>
-  {#if board.stack}<Health /><Agent />{/if}
+  {#if board.stack}<Health /><Agent /><LogsButton />{/if}
   {#if board.stack}<History /><Traces /><Credentials />{/if}
   <Help />
   {#if board.stack}
@@ -487,6 +489,8 @@
   </main>
   {#if !board.present}<Inbox />{/if}
 </div>
+
+<Tip />
 
 <style>
   header[hidden] {

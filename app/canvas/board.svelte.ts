@@ -225,6 +225,8 @@ class Board {
   hiddenOutside = $state.raw<Record<string, true>>({});
   /** Apps left out of the log of every app, kept with the board. */
   hiddenLogs = $state.raw<Record<string, true>>({});
+  /** Short names of the user's own for apps in the log of every app. */
+  logAliases = $state.raw<Record<string, string>>({});
   /** The outside systems put on the board by hand: shown even when none of their apps is. */
   pinned = $state.raw<string[]>([]);
   pin(id: string): void {
@@ -1319,6 +1321,7 @@ class Board {
     this.hiddenQueues = {};
     this.hiddenOutside = {};
     this.hiddenLogs = {};
+    this.logAliases = {};
     this.pinned = [];
   }
   /**
@@ -1358,6 +1361,7 @@ class Board {
     this.hiddenQueues = {};
     this.hiddenOutside = {};
     this.hiddenLogs = {};
+    this.logAliases = {};
     this.pinned = Array.isArray(given['outside'])
       ? (given['outside'] as unknown[]).filter((id): id is string => typeof id === 'string')
       : [];
@@ -1517,6 +1521,7 @@ class Board {
     this.hiddenQueues = (saved?.['hiddenQueues'] ?? {}) as Record<string, true>;
     this.hiddenOutside = (saved?.['hiddenOutside'] ?? {}) as Record<string, true>;
     this.hiddenLogs = (saved?.['hiddenLogs'] ?? {}) as Record<string, true>;
+    this.logAliases = (saved?.['logAliases'] ?? {}) as Record<string, string>;
     this.pinned = (Array.isArray(saved?.['outside']) ? saved['outside'] : []) as string[];
     this.syncInfra((saved?.infra ?? {}) as Record<string, Point | undefined>);
     const { zoom, pan } = saved ?? {};
@@ -1549,6 +1554,7 @@ class Board {
       this.hiddenQueues,
       this.hiddenOutside,
       this.hiddenLogs,
+      this.logAliases,
       this.pinned,
     ];
   }
@@ -1606,6 +1612,7 @@ class Board {
       hiddenQueues: this.hiddenQueues,
       hiddenOutside: Object.keys(this.hiddenOutside).length ? this.hiddenOutside : undefined,
       hiddenLogs: Object.keys(this.hiddenLogs).length ? this.hiddenLogs : undefined,
+      logAliases: Object.keys(this.logAliases).length ? this.logAliases : undefined,
       outside: this.pinned.length ? this.pinned : undefined,
       infra: Object.fromEntries(
         this.infra.map(({ id, position }) => [id, { x: Math.round(position.x), y: Math.round(position.y) }]),
@@ -1684,6 +1691,16 @@ class Board {
   }
 
   /** Leaves an app out of the log of every app, or brings it back. */
+  /** The app's name in the log of every app: the user's own short one, else its name. */
+  logName(id: string): string {
+    return this.logAliases[id] ?? this.nameOf(id);
+  }
+  /** Gives an app a short name of the user's own in the log of every app; an empty one goes back to its name. */
+  aliasLog(id: string, alias: string): void {
+    const { [id]: _was, ...others } = this.logAliases;
+    const name = alias.trim().slice(0, 24);
+    this.logAliases = name && name !== this.nameOf(id) ? { ...others, [id]: name } : others;
+  }
   showLog(id: string, show: boolean): void {
     const { [id]: _was, ...others } = this.hiddenLogs;
     this.hiddenLogs = show ? others : { ...others, [id]: true };

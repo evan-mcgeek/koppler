@@ -261,6 +261,22 @@ export function sanitizeLayout(input: unknown): Loose | null {
   const hiddenQueues = chosen(input['hiddenQueues'], true);
   const hiddenOutside = chosen(input['hiddenOutside'], true);
   const hiddenLogs = chosen(input['hiddenLogs'], true);
+  const logAliases = Object.fromEntries(
+    Object.entries(isMap(input['logAliases']) ? input['logAliases'] : {})
+      .filter((entry): entry is [string, string] => isId(entry[0]) && typeof entry[1] === 'string')
+      .map(
+        ([id, alias]) =>
+          [
+            id,
+            alias
+              .replace(/[\u0000-\u001f\u007f]/g, '')
+              .trim()
+              .slice(0, 24),
+          ] as const,
+      )
+      .filter(([, alias]) => alias)
+      .slice(0, 200),
+  );
   const { keptLive, tidy, preset } = input;
   const pan = fieldsOf(input['pan']);
   return {
@@ -273,6 +289,7 @@ export function sanitizeLayout(input: unknown): Loose | null {
     ...(Object.keys(hiddenQueues).length && { hiddenQueues }),
     ...(Object.keys(hiddenOutside).length && { hiddenOutside }),
     ...(Object.keys(hiddenLogs).length && { hiddenLogs }),
+    ...(Object.keys(logAliases).length && { logAliases }),
     ...(ids(input['outside']).length && { outside: ids(input['outside']) }),
     ...(TIDY.includes(tidy as string) && { tidy }),
     ...(input['scratch'] === true && { scratch: true }),

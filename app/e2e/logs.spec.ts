@@ -130,20 +130,51 @@ test('All apps shows every app on the board in one stream by time, and an app le
   await expect(rows).toHaveText([/Web.*order form sent/, /WARN.*Orders API.*order created slowly/, /Web.*order shown/]);
   await page.screenshot({ path: 'test-results/next-logs-all.png' });
 
-  await pane.getByRole('combobox', { name: 'Names' }).selectOption('change');
-  await expect(pane.locator('.row .n')).toHaveCount(3);
-  await pane.getByRole('button', { name: 'Orders API', exact: true }).click();
+  // Times to the millisecond.
+  await expect(rows.first().locator('.t')).toHaveText(
+    new RegExp(`\\d\\d:\\d\\d:\\d\\d\\.${String(t % 1000).padStart(3, '0')}$`),
+  );
+
+  await pane.getByRole('radio', { name: 'App changes' }).check();
+  await expect(pane.locator('.switch .n')).toHaveCount(3);
+  const apps = pane.getByRole('group', { name: 'Apps in this log' });
+  await pane.locator('.switch .n', { hasText: 'Orders API' }).click();
   await expect(rows).toHaveCount(2);
-  await expect(pane.locator('.row .n')).toHaveCount(1);
-  await expect(pane.getByText('1 left out')).toBeVisible();
+  await expect(pane.locator('.switch .n')).toHaveCount(1);
+  await expect(apps.getByRole('button', { name: 'Orders API', exact: true })).toHaveAttribute('aria-pressed', 'false');
+
+  await apps.getByRole('button', { name: 'Rename Web Shop in this log' }).click();
+  await apps.getByRole('textbox', { name: 'Name for Web Shop in this log' }).fill('web');
+  await apps.getByRole('textbox').press('Enter');
+  await expect(pane.locator('.switch .n')).toHaveText(['web']);
 
   await page.reload();
   await (await actions(page, 'orders')).getByRole('button', { name: 'Show log' }).click();
   await pane.getByRole('tab', { name: 'All apps' }).click();
   await expect(rows).toHaveCount(2);
-  await expect(pane.getByRole('combobox', { name: 'Names' })).toHaveValue('change');
-  await pane.getByText('1 left out').click();
-  await pane.locator('.menu').getByRole('button', { name: 'Orders API' }).click();
+  await expect(pane.locator('.switch .n')).toHaveText(['web']);
+  await expect(pane.getByRole('radio', { name: 'App changes' })).toBeChecked();
+  await apps.getByRole('button', { name: 'Orders API', exact: true }).click();
   await expect(rows).toHaveCount(3);
-  await expect(pane.getByText('1 left out')).toHaveCount(0);
+  await page.screenshot({ path: 'test-results/next-logs-all.png' });
+});
+
+test('the All apps log opens from the top bar, and closes from there too', async ({ page }) => {
+  const button = page.getByRole('button', { name: 'Logs', exact: true });
+  await button.click();
+  const pane = page.getByRole('region', { name: 'App log' });
+  await expect(pane.getByRole('tab', { name: 'All apps' })).toHaveAttribute('aria-selected', 'true');
+  await expect(button).toHaveAttribute('aria-pressed', 'true');
+  await button.click();
+  await expect(pane).toHaveCount(0);
+});
+
+test('a hint shows soon after pointing at a button, and goes when the pointer leaves', async ({ page }) => {
+  const button = page.getByRole('button', { name: 'Logs', exact: true });
+  await button.hover();
+  const tip = page.getByRole('tooltip');
+  await expect(tip).toHaveText('The log of every app on the board, in one stream', { timeout: 800 });
+  await page.mouse.move(5, 500);
+  await expect(tip).toBeHidden();
+  await expect(button).toHaveAttribute('title', 'The log of every app on the board, in one stream');
 });

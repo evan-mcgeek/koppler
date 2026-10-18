@@ -117,11 +117,13 @@ function allLogs(args: string[]): void {
   if (asked !== undefined && !['run', '1h', 'all'].includes(asked)) fail('--since is run, 1h or all');
   const since = asked === '1h' ? 'hour' : asked === 'all' ? 'all' : 'run';
   const lines = Number(flagValue(args, '--lines')) || undefined;
-  const names = readStack()?.apps ?? {};
-  const width = Math.max(...apps.map(app => (names[app]?.name ?? app).length));
+  const stack = readStack()?.apps ?? {};
+  const aliases = (state['logAliases'] ?? {}) as Record<string, string>;
+  const nameOf = (app: string) => aliases[app] ?? stack[app]?.name ?? app;
+  const width = Math.max(...apps.map(app => nameOf(app).length));
   const time = (at: number) => new Date(at).toTimeString().slice(0, 8) + `.${String(at % 1000).padStart(3, '0')}`;
   const shown = (entry: Entry) =>
-    `${entry.approx ? '~' : ' '}${time(entry.at)} ${(names[entry.app]?.name ?? entry.app).padEnd(width)}  ${entry.line}`;
+    `${entry.approx ? '~' : ' '}${time(entry.at)} ${nameOf(entry.app).padEnd(width)}  ${entry.line}`;
   const key = (entry: Entry) => `${entry.app}\u0000${String(entry.at)}\u0000${entry.line}`;
   const first = sharedLog(apps, { since, ...(lines && { lines }) });
   for (const entry of first) console.log(shown(entry));

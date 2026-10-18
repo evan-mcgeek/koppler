@@ -1,10 +1,8 @@
 <script lang="ts">
   import X from '@lucide/svelte/icons/x';
-  import Database from '@lucide/svelte/icons/database';
   import RotateCw from '@lucide/svelte/icons/rotate-cw';
   import type { NodeProps } from '@xyflow/svelte';
   import InfraCard, { type CardAction } from './InfraCard.svelte';
-  import { openTerminal } from './commands.ts';
   import { dialogs } from './dialogs.svelte.ts';
   import { board, type TunnelNode } from './board.svelte.ts';
   import { live } from './live.svelte.ts';
@@ -30,16 +28,6 @@
             run: () => void restart(),
           },
         ]),
-    ...(data.what.startsWith('Database')
-      ? [
-          {
-            label: `Query the ${data.what}`,
-            title: 'Open psql on it in a Terminal window, with the stored connection',
-            icon: Database,
-            run: () => void openTerminal(data.apps[0] ?? '', true),
-          },
-        ]
-      : []),
     {
       label: `Settings for the ${data.what} tunnel`,
       title: 'Settings: the host, its port and how it is opened',
