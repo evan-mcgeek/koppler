@@ -53,16 +53,20 @@ class Wiring {
     const a = sidePoint(box, fromSide);
     const points: Point[] = [];
     const flow = (ev: PointerEvent) => board.toFlow({ x: ev.clientX, y: ev.clientY });
-    // Let go on a port, the cable goes into that port; anywhere else on the card, into the side facing where it comes from.
+    // On a port, the cable goes into that port, its ring reaching past the card's edge too; anywhere else on the card,
+    // into the side facing where it comes from.
+    const portAt = (box: Box, pointer: Point) =>
+      (Object.keys(SIDES) as Side[]).find(
+        side => Math.hypot(sidePoint(box, side).x - pointer.x, sidePoint(box, side).y - pointer.y) <= 16 / board.zoom(),
+      );
     const target = (ev: PointerEvent) => {
-      const id = cardAt(ev.clientX, ev.clientY);
+      const pointer = flow(ev);
+      const id =
+        cardAt(ev.clientX, ev.clientY) ??
+        [...board.boxes].find(([key, box]) => key !== from && portAt(box, pointer))?.[0];
       const at = id && id !== from ? board.boxes.get(id) : undefined;
       if (!id || !at) return undefined;
-      const pointer = flow(ev);
-      const onPort = (Object.keys(SIDES) as Side[]).find(
-        side => Math.hypot(sidePoint(at, side).x - pointer.x, sidePoint(at, side).y - pointer.y) <= 16 / board.zoom(),
-      );
-      return { id, side: onPort ?? this.nearestSide(at, points.at(-1) ?? a), at };
+      return { id, side: portAt(at, pointer) ?? this.nearestSide(at, points.at(-1) ?? a), at };
     };
     const app = (id: string) => board.app(id);
     const calls = (caller: string, callee: string) => !!app(caller)?.calls.includes(callee);
@@ -132,7 +136,7 @@ class Wiring {
           },
           { capture: true, once: true },
         );
-      if (cardAt(ev.clientX, ev.clientY)) {
+      if (cardAt(ev.clientX, ev.clientY) || target(ev)) {
         finish(ev);
         return;
       }
@@ -154,7 +158,7 @@ class Wiring {
       ev => {
         const at = flow(ev);
         const far = Math.hypot(at.x - a.x, at.y - a.y) > 24 / board.zoom();
-        if (cardAt(ev.clientX, ev.clientY) || !far) {
+        if (cardAt(ev.clientX, ev.clientY) || target(ev) || !far) {
           finish(ev);
           return;
         }

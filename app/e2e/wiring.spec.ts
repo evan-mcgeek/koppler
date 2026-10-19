@@ -44,3 +44,26 @@ test('a cable let go on a port goes into that port', async ({ page }) => {
   expect(Math.abs(at.y)).toBeLessThan(4);
   expect(Math.abs(at.x - at.orders.width / 2)).toBeLessThan(4);
 });
+
+test('a cable on the pointer, over a port, offers that card and ends there on a click', async ({ page }) => {
+  const port = await card(page, 'web')
+    .getByRole('button', { name: 'Draw a cable from the right of Web Shop' })
+    .boundingBox();
+  const target = await card(page, 'orders')
+    .getByRole('button', { name: 'Draw a cable from the left of Orders API' })
+    .boundingBox();
+  if (!port || !target) throw new Error('not on the page');
+  await page.mouse.move(port.x + port.width / 2, port.y + port.height / 2);
+  await page.mouse.down();
+  // Let go on the empty board: the cable stays on the pointer, with a point there.
+  await page.mouse.move(port.x + 160, port.y + 120, { steps: 8 });
+  await page.mouse.up();
+  // The port's outer half, off the card itself.
+  await page.mouse.move(target.x + 2, target.y + target.height / 2, { steps: 8 });
+  await expect(card(page, 'orders').locator('.drop-ok')).toHaveCount(1);
+  await page.screenshot({ path: 'test-results/wiring-over-port.png' });
+  await page.mouse.click(target.x + 2, target.y + target.height / 2);
+  const socket = await page.locator('.ends .socket[data-cable="web>orders"]').boundingBox();
+  if (!socket) throw new Error('no cable');
+  expect(Math.abs(socket.x + socket.width / 2 - (target.x + target.width / 2))).toBeLessThan(4);
+});

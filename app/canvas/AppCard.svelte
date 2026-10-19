@@ -804,6 +804,10 @@
   .port:hover {
     background: var(--local);
   }
+  /* A cable being drawn ends on a port as on the card: it is not one to start from. */
+  .card.wiring .port {
+    cursor: inherit;
+  }
   /* On the card's outer edge, where its cables end: one pixel out from where the border's inside puts them. */
   .port.top {
     left: 50%;

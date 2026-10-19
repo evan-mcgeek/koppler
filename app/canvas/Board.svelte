@@ -749,6 +749,7 @@
       <svg
         class="ends"
         class:reordering={!!wiring.grabbed}
+        class:drawing={!!wiring.draft}
         class:still={board.live}
         role="group"
         aria-label="Cable ends"
@@ -1159,6 +1160,10 @@
   .reordering,
   .reordering * {
     cursor: grabbing;
+  }
+  /* While a cable is drawn, the ends of the others are part of their card. */
+  .drawing :is(.plug, .socket) {
+    cursor: inherit;
   }
   /* Where a cable leaves: a small ring. Where it plugs in: a larger ring whose hole holds the last connection test. */
   .plug {
