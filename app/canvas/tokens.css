@@ -1,10 +1,4 @@
-/*
- * Patch bay: graphite hardware with its labels printed on the panel. Dark only. Colour is a signal: `local` for a
- * local cable and the one filled button, `deployed` for what still calls the deployed environment, `live` for what
- * runs, `warn` when something needs you, and `prod` for PROD and failures. A scheme sets them; the local and deployed
- * colours can also be picked by hand (Appearance), while `live`, `warn` and `prod` follow the scheme only. Five schemes
- * are dark and three are light.
- */
+/* Patch bay's colours are signals (local, deployed, live, warn, prod), set by one of eight schemes, five dark, three light. */
 :root {
   --desk: #0d0d0d;
   --panel: #161616;
@@ -29,7 +23,6 @@
   --dot: var(--line);
   --cable: var(--local);
   --cable-ink: var(--local);
-  --prod-ink: var(--prod-strong);
   --ok: var(--live);
   --bad: var(--prod);
   --msg: var(--deployed);

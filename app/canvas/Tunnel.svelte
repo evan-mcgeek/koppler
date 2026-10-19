@@ -1,6 +1,6 @@
 <script lang="ts">
   import X from '@lucide/svelte/icons/x';
-  import RotateCw from '@lucide/svelte/icons/rotate-cw';
+  import RefreshCw from '@lucide/svelte/icons/refresh-cw';
   import type { NodeProps } from '@xyflow/svelte';
   import InfraCard, { type CardAction } from './InfraCard.svelte';
   import { dialogs } from './dialogs.svelte.ts';
@@ -18,16 +18,6 @@
     else toasts.show(`The ${data.what} tunnel started again.`);
   };
   const actions = $derived<CardAction[]>([
-    ...(on === undefined
-      ? []
-      : [
-          {
-            label: `Restart the ${data.what} tunnel`,
-            title: 'Close the tunnel and open it again, for when calls through it hang or fail',
-            icon: RotateCw,
-            run: () => void restart(),
-          },
-        ]),
     {
       label: `Settings for the ${data.what} tunnel`,
       title: 'Settings: the host, its port and how it is opened',
@@ -58,6 +48,15 @@
   title={[data.host, ...data.about].join('\n')}
   {selected}
   {actions}
+  act={on === undefined
+    ? undefined
+    : {
+        label: `Restart the ${data.what} tunnel`,
+        word: 'Reconnect',
+        title: 'Close the tunnel and open it again, for when calls through it hang or fail',
+        icon: RefreshCw,
+        run: () => void restart(),
+      }}
 >
   <span class="label">Local port</span>
   <span class="well" class:moved={data.moved}>{data.local}</span>

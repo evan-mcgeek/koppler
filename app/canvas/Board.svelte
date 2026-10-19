@@ -318,8 +318,10 @@
     await frame();
     await fit();
   };
-  // Fitted in full when the whole board fits that close; else zoomed out, where the cards are short and closed up.
+  // Fitted in full when the whole board fits that close; else zoomed out, where the cards are short.
   // The view is worked out here and set once: a fit the flow queues runs again each time the cards change form.
+  const MAX_FRAMES = 40;
+  const STEADY_FRAMES = 3;
   const fit = async (duration = FIT.duration) => {
     const viewFor = (boxes: Box[], maxZoom: number) => {
       const x = Math.min(...boxes.map(box => box.x));
@@ -337,12 +339,12 @@
       ...board.infra.map(card => ({ ...card.position, ...(board.infraBoxes.get(card.id) ?? CARD) })),
     ];
     const drawn = () => [...board.boxes.values(), ...board.infraBoxes.values()];
-    // Close up the cards turn full a few frames later: the fit waits until their sizes have held for a few frames.
-    const measured = async () => {
+    // Zoomed in, the cards turn full a few frames later: wait until their sizes hold.
+    const untilSizesSettle = async () => {
       const sizes = () => JSON.stringify([...board.boxes.values(), ...board.infraBoxes.values()]);
       let last = '';
       let held = 0;
-      for (let wait = 0; wait < 40 && held < 3; wait++) {
+      for (let wait = 0; wait < MAX_FRAMES && held < STEADY_FRAMES; wait++) {
         await frame();
         const now = sizes();
         held = now === last && !board.brief ? held + 1 : 0;
@@ -354,7 +356,7 @@
       const close = viewFor(inFull(), FIT.maxZoom);
       if (close.zoom < FAR_ZOOM) break;
       await flow.setViewport(close, { duration: tries ? duration : 0 });
-      await measured();
+      await untilSizesSettle();
       // Measured in full, the cards under a grown card have moved down with it: fitted to where all are drawn now.
       const now = viewFor(drawn(), FIT.maxZoom);
       if (now.zoom >= FAR_ZOOM) {
@@ -858,10 +860,10 @@
     font-size: 12px;
   }
   /* Over the toolbar, with the other ways to move the view. */
-  /* The toolbar sits in the middle, clear of the overview of the board on its right, and wraps when the board is
-     narrow. */
+  /* Centred, clear of the overview on either side. */
   .area :global(.svelte-flow__panel.bottom.center) {
-    max-width: calc(100% - 460px);
+    --overview-room: 230px;
+    max-width: calc(100% - 2 * var(--overview-room));
   }
   .area :global(.svelte-flow__minimap) {
     margin: 0 15px 15px 0;

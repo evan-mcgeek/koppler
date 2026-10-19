@@ -4,7 +4,8 @@ Koppler's look, Patch bay, was designed in [Claude Design](https://claude.ai/des
 This folder keeps what came out of it, so the design travels with the code.
 
 - `images/`: each design file rendered, to read on GitHub.
-- `sources/`: the design files themselves (`.dc.html`). They open in Claude Design; on their own they do not render, because they load Claude Design's runtime (`support.js`), which is not ours to publish.
+- `sources/`: the design files themselves (`.dc.html`), which open in Claude Design.
+  On their own they do not render: they load Claude Design's runtime (`support.js`), which is not ours to publish.
 - `briefs/`: what was asked of Claude Design, in order.
 
 | Design | What it settles |

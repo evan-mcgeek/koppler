@@ -10,9 +10,7 @@
 </script>
 
 <script lang="ts">
-  // The card of everything on the board that is not an app: a tunnel, a queue, an outside system. The same frame as
-  // an app card: its state, name and kind tag on top with its buttons, what is particular to it below, and a status
-  // line at the foot.
+  // The card of a tunnel, queue or outside system, framed like an app card: header, body, and a status line with one action.
   import Cog from './Cog.svelte';
   import Icon from './Icon.svelte';
   import { board } from './board.svelte.ts';
@@ -26,6 +24,7 @@
     dotTitle = '',
     hasDot = false,
     status = '',
+    act,
     title = '',
     selected = false,
     actions,
@@ -43,6 +42,8 @@
     dotTitle?: string;
     /** Its state in words, at its foot. */
     status?: string;
+    /** The one action at its foot, as a word. */
+    act?: (CardAction & { word: string }) | undefined;
     title?: string;
     selected?: boolean;
     actions: CardAction[];
@@ -76,7 +77,18 @@
     </span>
   </span>
   {#if children}<div class="body">{@render children()}</div>{/if}
-  {#if status}<p class="foot">{status}</p>{/if}
+  {#if status}<p class="foot">
+      <span>{status}</span>
+      {#if act}<button
+          class="link nodrag"
+          type="button"
+          aria-label={act.label}
+          title={act.title}
+          onclick={() => {
+            act.run();
+          }}>{act.word}</button
+        >{/if}
+    </p>{/if}
 </div>
 
 <style>
@@ -150,6 +162,9 @@
     overflow-wrap: anywhere;
   }
   .foot {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
     margin: 0;
     padding: 8px 12px;
     border-top: 1px solid var(--line);

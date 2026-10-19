@@ -1,6 +1,5 @@
 /* global document */
-// The appearance chosen in Settings, set before the page draws: its scheme, and the local and deployed colours picked by
-// hand. A file of its own: the page allows no inline script. appearance.svelte.ts checks the same values again.
+// Applies the saved appearance before the page draws, as appearance.svelte.ts does after (no inline script allowed).
 try {
   const kept = JSON.parse(localStorage.getItem('koppler-appearance') || '{}');
   const root = document.documentElement;

@@ -209,6 +209,18 @@ test('a pinch over a panel zooms neither the board nor the page', async ({ page 
   await expect(zoom).toHaveText(before);
 });
 
+test('Ctrl held with the wheel over a panel still zooms the page, as the browser does', async ({ page }) => {
+  await page.keyboard.down('Control');
+  const kept = await page
+    .locator('aside')
+    .first()
+    .evaluate(el =>
+      el.dispatchEvent(new WheelEvent('wheel', { deltaY: -40, ctrlKey: true, bubbles: true, cancelable: true })),
+    );
+  await page.keyboard.up('Control');
+  expect(kept, 'the browser zooms the page').toBe(true);
+});
+
 test('the Select tool picks the cards in a dragged area, and the Hand tool moves the board', async ({ page }) => {
   await expect(page.getByRole('radio', { name: /^Select/ })).toBeChecked();
   const web = await middle(card(page, 'web'));

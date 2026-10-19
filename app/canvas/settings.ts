@@ -177,6 +177,7 @@ export interface Tab {
 }
 /** An app's settings: what it is first; then how it runs here, where it is deployed, and the rest. */
 export const APP_HEAD = ['name', 'kind', 'slug'];
+const ENVS_ABOUT = 'What it uses differently per environment';
 export const OTHER_ABOUT = 'Fields with no tab of their own';
 /** The fields for how one kind of app starts; an app is shown its own kind's, the others are a click away. */
 export const BY_KIND: Record<string, string[]> = {
@@ -218,13 +219,13 @@ export const APP_TABS: Tab[] = [
   },
   { name: 'Needs first', about: 'What has to be ready before it starts', keys: ['prereqs'] },
   { name: 'Secrets', about: 'The secrets it needs, and how to get each', keys: ['secrets'] },
-  { name: 'Environments', about: 'What it uses differently per environment', keys: ['envs'], view: 'envs' },
+  { name: 'Environments', about: ENVS_ABOUT, keys: ['envs'], view: 'envs' },
 ];
 /** An outside system never runs here: only where it is, what it calls, and per environment. */
 export const OUTSIDE_TABS: Tab[] = [
   { name: 'Deployed', about: 'Where it is and what it is', keys: ['outside', 'deployedUrl'] },
   { name: 'Calls', about: 'What it calls', keys: ['consumes'] },
-  { name: 'Environments', about: 'What it uses differently per environment', keys: ['envs'], view: 'envs' },
+  { name: 'Environments', about: ENVS_ABOUT, keys: ['envs'], view: 'envs' },
 ];
 export const STACK_HEAD = ['name'];
 export const STACK_TABS: Tab[] = [

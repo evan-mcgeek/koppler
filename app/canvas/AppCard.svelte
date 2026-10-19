@@ -7,7 +7,6 @@
   import RotateCw from '@lucide/svelte/icons/rotate-cw';
   import Settings from '@lucide/svelte/icons/settings';
   import Square from '@lucide/svelte/icons/square';
-  import X from '@lucide/svelte/icons/x';
   import GripVertical from '@lucide/svelte/icons/grip-vertical';
   import Command from './Command.svelte';
   import CardFields from './CardFields.svelte';
@@ -209,7 +208,7 @@
         board.remove(id);
       }}
     >
-      <Icon of={X} size={14} />
+      Remove
     </button>
   </span>
 </NodeToolbar>

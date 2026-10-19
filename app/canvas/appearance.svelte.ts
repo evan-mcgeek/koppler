@@ -1,5 +1,4 @@
-// Appearance, remembered in this browser: a scheme, and the local and deployed colours picked by hand over it. Warning
-// and PROD colours are not among the picks, so a custom colour can never be mistaken for either.
+// The scheme and hand-picked local and deployed colours, kept in this browser; warn and PROD are never picks.
 interface SchemeOf {
   name: string;
   note: string;

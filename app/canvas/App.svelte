@@ -271,20 +271,25 @@
       // Not remembered where the browser keeps nothing.
     }
   };
-  // From the folded rail: its board button lands on the board picker.
-  // A pinch zooms the board only. One the board did not take (over a panel, a card's toolbar, the overview) would
-  // zoom the whole page: it is dropped.
+  // A trackpad pinch the board did not take would zoom the page; Ctrl held with the wheel still zooms it.
   $effect(() => {
-    const wheel = (ev: WheelEvent) => {
-      if (ev.ctrlKey) ev.preventDefault();
+    let ctrl = false;
+    const key = (ev: KeyboardEvent) => {
+      if (ev.key === 'Control') ctrl = ev.type === 'keydown';
     };
-    // Safari also sends its own pinch: dropped too, the board zooms by the wheel it sends with it.
+    const wheel = (ev: WheelEvent) => {
+      if (ev.ctrlKey && !ctrl) ev.preventDefault();
+    };
     const gesture = (ev: Event) => {
       ev.preventDefault();
     };
+    window.addEventListener('keydown', key);
+    window.addEventListener('keyup', key);
     window.addEventListener('wheel', wheel, { passive: false });
     window.addEventListener('gesturestart', gesture);
     return () => {
+      window.removeEventListener('keydown', key);
+      window.removeEventListener('keyup', key);
       window.removeEventListener('wheel', wheel);
       window.removeEventListener('gesturestart', gesture);
     };
