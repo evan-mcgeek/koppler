@@ -1,5 +1,5 @@
 // Databases on the board: a card for each, hung from its tunnel, switched between the deployed one and the user's own.
-import type { Page } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
 import { at, card, expect, saved, sent, STACK, test } from './canvas.ts';
 
 const database = (page: Page, name: string) => page.locator('.svelte-flow__node-database').filter({ hasText: name });
@@ -171,4 +171,77 @@ test('the cards read on a light scheme', async ({ page }) => {
   await page.keyboard.press('Escape');
   await expect(database(page, 'Orders')).toBeVisible();
   await page.screenshot({ path: 'test-results/databases-paper.png' });
+});
+
+/** Switches a database to Local, giving its address the first time. */
+const goLocal = async (page: Page, name: string, port: string) => {
+  await database(page, name).getByText('Local', { exact: true }).click();
+  const form = page.getByRole('form', { name: `Where your local ${name} runs` });
+  await form.getByLabel('Port').fill(port);
+  await form.getByRole('button', { name: 'Use local' }).click();
+  await expect(form).toBeHidden();
+};
+
+test("each database's line leaves the tunnel card from its own row", async ({ page }) => {
+  const plugs = page.locator('.links .flow.db.row .plug');
+  await expect(plugs).toHaveCount(2);
+  const rows = tunnel(page).getByRole('listitem');
+  for (const [at, row] of [0, 1].entries()) {
+    const box = await rows.nth(row).boundingBox();
+    const plug = await plugs.nth(at).boundingBox();
+    if (!box || !plug) throw new Error('not drawn');
+    expect(Math.abs(plug.y + plug.height / 2 - (box.y + box.height / 2))).toBeLessThan(2);
+  }
+});
+
+/** Right-clicks the middle of a line on the board, as a person would. */
+const rightClick = async (page: Page, line: Locator) => {
+  const at = await line.evaluate(path => {
+    const svg = path as SVGPathElement;
+    const mid = svg.getPointAtLength(svg.getTotalLength() / 2);
+    const screen = new DOMPoint(mid.x, mid.y).matrixTransform(svg.getScreenCTM() ?? undefined);
+    return { x: screen.x, y: screen.y };
+  });
+  await page.mouse.click(at.x, at.y, { button: 'right' });
+};
+
+test('a right click on a line to the tunnel hides the tunnel for that app, and on its straight line shows it again', async ({
+  page,
+}) => {
+  await rightClick(page, page.locator('.links path.hit').first());
+  const menu = page.getByRole('menu', { name: 'Line' });
+  await expect(menu.getByRole('menuitem')).toHaveText(/Hide tunnel for (Orders|Payments) API/);
+  await menu.getByRole('menuitem').click();
+  await expect(menu).toBeHidden();
+  await expect(page.locator('.links .flow.db .via')).toHaveCount(1);
+  await rightClick(page, page.locator('.links .flow.db path.hit'));
+  await expect(menu.getByRole('menuitem')).toHaveText(/Show tunnel for/);
+  await page.screenshot({ path: 'test-results/databases-menu.png' });
+  await page.keyboard.press('Escape');
+  await expect(menu).toBeHidden();
+});
+
+test('with every database behind it local, the tunnel card stays and says nothing needs it', async ({ page }) => {
+  await goLocal(page, 'Orders', '5433');
+  await goLocal(page, 'Payments', '5434');
+  await expect(tunnel(page)).toContainText('Closed · nothing needs it');
+  await expect(tunnel(page).getByRole('listitem')).toHaveText([/Local, skips the tunnel/, /Local, skips the tunnel/]);
+  await expect(page.locator('.links .link')).toHaveCount(0);
+});
+
+test("the app card says the line it will change, and the database's settings show this Mac's address", async ({
+  page,
+}) => {
+  await goLocal(page, 'Payments', '5433');
+  await expect(card(page, 'payments')).toContainText('Will change 1 line');
+  await database(page, 'Payments').getByRole('button', { name: 'Settings for Payments' }).click();
+  const here = page.getByRole('region', { name: 'Local, this Mac' });
+  await expect(here).toContainText('localhost:5433');
+  await here.getByRole('button', { name: 'Change' }).click();
+  await here.getByLabel('Port').fill('5440');
+  await here.getByRole('button', { name: 'Keep' }).click();
+  await expect(here).toContainText('localhost:5440');
+  await page.screenshot({ path: 'test-results/databases-settings-local.png' });
+  await here.getByRole('button', { name: 'Forget' }).click();
+  await expect(here).toContainText('Not set');
 });

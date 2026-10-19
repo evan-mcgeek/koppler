@@ -497,6 +497,10 @@ class Board {
   useOf(app: string, database: string) {
     return this.#resolved?.apps[app]?.uses?.[database];
   }
+  /** The host of the tunnel a database is reached through on the board's environment. */
+  tunnelOf(database: string): string | undefined {
+    return this.#reach(database)?.tunnel;
+  }
   databaseName(id: string): string {
     return this.#resolved?.databases?.[id]?.name ?? id;
   }
@@ -535,8 +539,51 @@ class Board {
     const needs = (this.env !== this.envs[0] ? raw?.envs?.[this.env]?.prereqs : undefined) ?? raw?.prereqs ?? [];
     return needs.some(need => need.tunnel === host) || own.some(one => this.tunnelShown(app, one));
   }
+  /** Shows or hides the tunnel card on an app's cables to every database of it behind that tunnel. */
+  showTunnelFor(app: string, host: string, show: boolean): void {
+    const node = this.cards.find(one => one.id === app);
+    const behind = this.databasesOf(app).filter(one => !this.databases[one] && this.#reach(one)?.tunnel === host);
+    if (!node || !behind.length) return;
+    this.set(app, {
+      shownTunnels: { ...node.data.shownTunnels, ...Object.fromEntries(behind.map(one => [one, show])) },
+    });
+  }
+  /**
+   * A tunnel whose databases are all on this Mac: nothing opens it, and its card stays for the apps that share it, so
+   * the board says why.
+   */
+  #closed = $derived.by((): Tunnel[] => {
+    const hosts: Record<string, { port: number; apps: string[]; local: boolean }> = {};
+    for (const { id, apps } of this.boardDatabases) {
+      const reach = this.#reach(id);
+      if (!reach?.tunnel || !reach.port) continue;
+      const one = (hosts[reach.tunnel] ??= { port: reach.port, apps: [], local: true });
+      one.apps = [...new Set([...one.apps, ...apps])];
+      one.local &&= !!this.databases[id];
+    }
+    return Object.entries(hosts).flatMap(([host, { port, apps, local }]) =>
+      local && apps.length >= 2 && !this.plan.some(tunnel => tunnel.host === host)
+        ? [
+            {
+              host,
+              port,
+              original: port,
+              bind: 'localhost',
+              apps: [...apps],
+              envs: {},
+              what: tunnelKind({ tunnel: host }),
+            },
+          ]
+        : [],
+    );
+  });
   /** The tunnel cards on the board: one only for databases is drawn while an app's cable goes through it. */
-  shownPlan = $derived(this.plan.filter(tunnel => tunnel.apps.some(app => this.#drawsTunnel(app, tunnel.host))));
+  shownPlan = $derived([
+    ...this.plan.filter(tunnel => tunnel.apps.some(app => this.#drawsTunnel(app, tunnel.host))),
+    ...this.#closed,
+  ]);
+  /** Where each database's row sits down its tunnel card, by card and database, as last drawn. */
+  rowY = $state<Record<string, Record<string, number>>>({});
   setDatabase(id: string, local: boolean): void {
     const { [id]: _was, ...others } = this.databases;
     this.databases = local ? { ...others, [id]: 'local' } : others;

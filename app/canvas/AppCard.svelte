@@ -51,6 +51,10 @@
   const queues = $derived(board.queuesOf(id));
   const noQueues = $derived(queues.length > 0 && !data.showQueues);
   const calls = $derived(board.deployedCalls(id));
+  /** The lines Koppler changes for its local databases: kept in view while they are changed. */
+  const changedLines = $derived(
+    board.databasesOf(id).filter(database => board.databases[database] && board.useOf(id, database)?.change).length,
+  );
   /** "Acme Web Portal" reads as "Web Portal" on an Acme card. */
   const short = (name: string) => {
     const [first, ...rest] = name.split(' ');
@@ -264,6 +268,11 @@
   {:else}
     <CardFields {id} />
   {/if}
+  {#if changedLines}<p class="changed" data-on={!!up}>
+      {up
+        ? `${String(changedLines)} ${changedLines === 1 ? 'line' : 'lines'} changed · undone on Stop`
+        : `Will change ${String(changedLines)} ${changedLines === 1 ? 'line' : 'lines'}`}
+    </p>{/if}
   {#if where}<p class="where nodrag" data-on={up ?? 'other'}>{where}</p>
   {:else if stateSaid}<p class="where nodrag" data-state={now?.state}>{stateSaid}</p>{/if}
   {#if steps.length}
@@ -488,6 +497,15 @@
     [data-state='secret-missing']
   ) {
     background: var(--bad);
+  }
+  .changed {
+    margin: 0;
+    padding: 0 14px 10px 16px;
+    color: var(--muted);
+    font-size: 12px;
+  }
+  .changed[data-on='true'] {
+    color: var(--warn);
   }
   .where {
     contain: inline-size;

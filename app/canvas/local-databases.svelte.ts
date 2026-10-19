@@ -33,6 +33,14 @@ class LocalDatabases {
     this.addresses = { ...this.addresses, [id]: at };
     return null;
   }
+  /** Forgets the address; the reason when it could not. */
+  async forget(id: string): Promise<string | null> {
+    const said = await post<{ ok: true }>('local-database', { id, clear: true });
+    if ('error' in said) return said.error;
+    const { [id]: _was, ...rest } = this.addresses;
+    this.addresses = rest;
+    return null;
+  }
 }
 export const localDatabases = new LocalDatabases();
 

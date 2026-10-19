@@ -7,6 +7,7 @@
   // them. A lock keeps a field as it is, for the user and the agent.
   import { KINDS } from '../src/core/kinds.ts';
   import { DATABASE_KINDS } from '../src/core/databases.ts';
+  import LocalAddress from './LocalAddress.svelte';
   import { SECRET_TYPES } from '../src/core/secret-types.ts';
   import { getAt, parsePath, setAt } from '../src/core/stack-path.ts';
   import EnvOverrides from './EnvOverrides.svelte';
@@ -322,6 +323,7 @@
             <span class="title">{shown.name}</span>{#if shown.about}<span class="about">{shown.about}</span>{/if}
           </div>
         {/if}
+        {#if /^databases\.[a-z0-9-]+$/.test(at)}<LocalAddress database={at.slice('databases.'.length)} />{/if}
         {#if shown?.view === 'envs' && app && value}
           <EnvOverrides path={at} app={value} schema={shape} envs={board.envs} {ctx} />
         {:else if shown?.view === 'apps'}

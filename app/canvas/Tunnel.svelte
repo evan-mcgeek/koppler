@@ -27,6 +27,19 @@
         : 'Open'
       : `Open for ${through.map(row => row.name).join(' and ')}`;
   });
+  // Each row's middle, down the card, for its line to leave from: measured as drawn, unscaled by the zoom.
+  let list = $state<HTMLUListElement>();
+  $effect(() => {
+    const rows = [...(list?.querySelectorAll<HTMLLIElement>('li[data-database]') ?? [])];
+    const card = list?.closest<HTMLElement>('.infra');
+    if (!card || !data.rows.length) return;
+    board.rowY[id] = Object.fromEntries(
+      rows.map((row): [string, number] => [
+        row.dataset['database'] ?? '',
+        row.offsetTop - card.offsetTop + row.offsetHeight / 2,
+      ]),
+    );
+  });
   const USE = { deployed: 'Deployed', local: 'Local, skips the tunnel', hidden: 'Cable hidden' } as const;
   const restart = async () => {
     const done = await post<{ ok: true }>('restart-tunnel', { port: Number(port) });
@@ -79,9 +92,11 @@
   <span class="label">Goes to</span>
   <span class="host">{data.host}</span>
   {#if data.rows.length}
-    <ul class="rows" aria-label="Databases behind it">
+    <ul class="rows" aria-label="Databases behind it" bind:this={list}>
       {#each data.rows as row (row.database)}
-        <li data-use={row.use}><span>{row.name}</span><span class="use">{USE[row.use]}</span></li>
+        <li data-use={row.use} data-database={row.database}>
+          <span>{row.name}</span><span class="use">{USE[row.use]}</span>
+        </li>
       {/each}
     </ul>
   {/if}

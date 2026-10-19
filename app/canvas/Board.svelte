@@ -12,7 +12,7 @@
     useViewport,
     ViewportPortal,
   } from '@xyflow/svelte';
-  import type { Side } from '../src/core/arrange.ts';
+  import type { Point, Side } from '../src/core/arrange.ts';
   import { cablePath, sidePoint, SIDES, throughPath, type Box } from '../src/core/cables.ts';
   import { untrack } from 'svelte';
   import Hand from '@lucide/svelte/icons/hand';
@@ -217,11 +217,26 @@
       if (!app || !card) return [];
       const payload = { app: from, host: tunnel.bind, port: tunnel.port, original: tunnel.original };
       return [
-        { key: `${from}>${to}`, from, to, what: tunnel.what, payload, ...linkPath(app, card), idle: !live.up(from) },
+        {
+          key: `${from}>${to}`,
+          from,
+          to,
+          host: tunnel.host,
+          what: tunnel.what,
+          payload,
+          ...linkPath(app, card),
+          idle: !live.up(from),
+        },
       ];
     }),
   );
   const name = board.nameOf;
+  /** The menu a right click on a line to a tunnel or a database opens: show or hide the tunnel for that app. */
+  let lineMenu = $state<{ x: number; y: number; app: string; host: string; show: boolean } | null>(null);
+  const openLineMenu = (ev: MouseEvent, app: string, host: string, show: boolean) => {
+    ev.preventDefault();
+    lineMenu = { x: ev.clientX, y: ev.clientY, app, host, show };
+  };
   /** What a light says when the pointer rests on it. */
   const about = (probe: Probe | undefined, what: string) =>
     probe?.state === 'busy'
@@ -257,13 +272,52 @@
       const taken = (key: string, side: Side) =>
         board.boxes.has(key) && !!board.ledBy(key).length && board.infraSide(key) === side;
       if (!own && (taken(from, sides[0]) || taken(to, sides[1]))) sides = level;
-      const [start, end] = [sidePoint(a, sides[0]), sidePoint(b, sides[1])];
+      // A database's line leaves its tunnel card from the database's own row, on the side facing it.
+      const row = database ? board.rowY[from]?.[database] : undefined;
+      if (row !== undefined)
+        sides = [
+          dx > 0 ? 'right' : 'left',
+          b.x > a.x + a.w ? 'left' : b.x + b.w < a.x ? 'right' : dy > 0 ? 'top' : 'bottom',
+        ];
+      let [start, end] = [
+        row === undefined ? sidePoint(a, sides[0]) : { x: sides[0] === 'right' ? a.x + a.w : a.x, y: a.y + row },
+        sidePoint(b, sides[1]),
+      ];
+      // A straight line from an app to its database never runs behind another card: it goes round them, on the side
+      // the database leans to.
+      const others = [...board.boxes, ...board.infraBoxes].filter(([key]) => key !== from && key !== to);
+      const under = (p: Point, q: Point) =>
+        others.filter(([, box]) =>
+          [0.2, 0.35, 0.5, 0.65, 0.8].some(t => {
+            const x = p.x + (q.x - p.x) * t;
+            const y = p.y + (q.y - p.y) * t;
+            return x > box.x && x < box.x + box.w && y > box.y && y < box.y + box.h;
+          }),
+        );
+      const blocking = database && row === undefined && board.boxes.has(from) ? under(start, end) : [];
+      let detour: Point | undefined;
+      if (blocking.length) {
+        const side: Side = b.x + b.w / 2 <= a.x + a.w / 2 ? 'left' : 'right';
+        sides = [side, side];
+        [start, end] = [sidePoint(a, side), sidePoint(b, side)];
+        const edges = [a, b, ...blocking.map(([, box]) => box)];
+        detour = {
+          x:
+            side === 'left'
+              ? Math.min(...edges.map(box => box.x)) - 40
+              : Math.max(...edges.map(box => box.x + box.w)) + 40,
+          y: (start.y + end.y) / 2,
+        };
+      }
       return [
         {
           key: `${from}>${to}`,
           from,
           to,
-          d: cablePath(start, sides[0], end, sides[1]),
+          // A line straight from an app to a deployed database: its tunnel can be shown again from it.
+          tunnel:
+            database && !board.databases[database] && board.boxes.has(from) ? board.tunnelOf(database) : undefined,
+          d: detour ? throughPath(start, sides[0], end, sides[1], [detour]) : cablePath(start, sides[0], end, sides[1]),
           start,
           end,
           kind: queue
@@ -273,12 +327,19 @@
             : database
               ? board.databases[database]
                 ? 'db local'
-                : 'db'
+                : row === undefined
+                  ? 'db'
+                  : 'db row'
               : 'ext',
           via,
           // Beside the link, not on it: right of one running up or down, over one running across.
-          label:
-            SIDES[sides[0]][0] === 0
+          label: detour
+            ? {
+                x: detour.x + (sides[0] === 'left' ? -8 : 8),
+                y: detour.y,
+                anchor: sides[0] === 'left' ? 'end' : 'start',
+              }
+            : SIDES[sides[0]][0] === 0
               ? { x: (start.x + end.x) / 2 + 8, y: (start.y + end.y) / 2, anchor: 'start' }
               : { x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 - 9, anchor: 'middle' },
         },
@@ -419,6 +480,7 @@
 
 <svelte:window
   onkeydown={(ev: KeyboardEvent) => {
+    if (ev.key === 'Escape') lineMenu = null;
     hold(ev);
     space(ev);
     shortcut(ev);
@@ -427,9 +489,15 @@
     hold(ev);
     space(ev);
   }}
-  onblur={() => (spaceHeld = false)}
+  onblur={() => {
+    spaceHeld = false;
+    lineMenu = null;
+  }}
   onpointermovecapture={release}
-  onpointerdowncapture={(ev: PointerEvent) => (pressed = { x: ev.clientX, y: ev.clientY })}
+  onpointerdowncapture={(ev: PointerEvent) => {
+    pressed = { x: ev.clientX, y: ev.clientY };
+    if (!(ev.target as Element).closest('.line-menu')) lineMenu = null;
+  }}
   onpointerupcapture={() => (pressed = null)}
 />
 
@@ -636,6 +704,15 @@
             class:snapped={board.snapped.includes(`${link.from}>${link.to}`)}
             d={link.d}
           />
+          <path
+            class="hit"
+            role="presentation"
+            d={link.d}
+            oncontextmenu={ev => {
+              if (board.databasesOf(link.from).some(one => board.tunnelOf(one) === link.host))
+                openLineMenu(ev, link.from, link.host, false);
+            }}
+          />
         {/each}
         {#each flows as flow (flow.key)}
           <g
@@ -646,6 +723,17 @@
           >
             <path class="under" d={flow.d} />
             <path class="wire" d={flow.d} />
+            {#if flow.tunnel}
+              {@const host = flow.tunnel}
+              <path
+                class="hit"
+                role="presentation"
+                d={flow.d}
+                oncontextmenu={ev => {
+                  openLineMenu(ev, flow.from, host, true);
+                }}
+              />
+            {/if}
             <circle class="socket" cx={flow.end.x} cy={flow.end.y} r="5" />
             <circle class="plug" cx={flow.start.x} cy={flow.start.y} r="5" />
             {#if flow.via}<text class="via" x={flow.label.x} y={flow.label.y} text-anchor={flow.label.anchor}
@@ -795,9 +883,51 @@
       {/if}
     </div>
   {/if}
+  {#if lineMenu}
+    {@const menu = lineMenu}
+    <div class="line-menu" role="menu" aria-label="Line" style:left="{menu.x}px" style:top="{menu.y}px">
+      <button
+        type="button"
+        role="menuitem"
+        onclick={() => {
+          board.showTunnelFor(menu.app, menu.host, menu.show);
+          lineMenu = null;
+        }}>{menu.show ? 'Show' : 'Hide'} tunnel for {name(menu.app)}</button
+      >
+    </div>
+  {/if}
 </div>
 
 <style>
+  .links .hit {
+    fill: none;
+    stroke: transparent;
+    stroke-width: 12;
+    pointer-events: stroke;
+  }
+  .line-menu {
+    position: fixed;
+    z-index: 2000;
+    display: grid;
+    min-width: 200px;
+    padding: 4px;
+    border: 1px solid var(--line-strong);
+    background: var(--surface);
+    box-shadow: var(--lift);
+  }
+  .line-menu button {
+    padding: 8px 10px;
+    border: 0;
+    background: none;
+    color: var(--ink);
+    font: 13px var(--sans);
+    text-align: left;
+    cursor: pointer;
+  }
+  .line-menu button:hover,
+  .line-menu button:focus-visible {
+    background: color-mix(in oklab, var(--ink) 9%, transparent);
+  }
   .area {
     position: absolute;
     inset: 0;
@@ -960,6 +1090,13 @@
   }
   .flow.db .plug {
     display: none;
+  }
+  /* The out-socket on a tunnel card's row: a ring on its edge. */
+  .flow.db.row .plug {
+    display: initial;
+    fill: var(--desk);
+    stroke: var(--deployed);
+    stroke-width: 2;
   }
   .flow.db.lit .wire {
     stroke-width: 3;
