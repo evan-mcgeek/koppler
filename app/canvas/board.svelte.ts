@@ -2,6 +2,7 @@
 // waypoints, sliding an end along its side). The geometry is core/cables and core/arrange, unchanged.
 import type { Edge, Node } from '@xyflow/svelte';
 import { resolveExpressions } from '../src/core/expressions.ts';
+import { withDatabases } from '../src/core/databases.ts';
 import { arrange, sidesFor, type Point, type Side } from '../src/core/arrange.ts';
 import { endOffsets, orderSlots, sidePoint, SIDES, type Box, type Cable } from '../src/core/cables.ts';
 import { of as kindOf } from '../src/core/kinds.ts';
@@ -1549,7 +1550,7 @@ class Board {
   }
   open({ stack: raw, clones, roots, saved }: Loaded): void {
     // The board works with the facts; Settings edits the stack as written.
-    const stack = resolveExpressions(raw);
+    const stack = withDatabases(resolveExpressions(raw));
     this.#registry = stack;
     this.#guarded = stack.envs.filter(env => isProtected(stack, env));
     this.stack = stack.name ?? '';

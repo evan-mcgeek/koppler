@@ -115,6 +115,44 @@ const LocalChange = z
   .looseObject({ file: z.string().min(1), find: z.string().min(1), replace: z.string() }, { error: LOCAL_CHANGE })
   .refine(change => insideClone(change.file), LOCAL_CHANGE);
 
+/** Where a database or cache is reached on one environment: the tunnel to it, and the name the apps' own settings dial. */
+const DatabaseReach = {
+  tunnel: host.optional().describe('The host the tunnel reaches'),
+  port: z
+    .number({ error: PORT })
+    .int(PORT)
+    .min(1, PORT)
+    .max(65535, PORT)
+    .optional()
+    .describe('The local port it opens'),
+  cmd: z.string().optional().describe('How the team opens the tunnel by hand'),
+  hosts: host.optional().describe("The name the apps' own connection settings dial, pointed at the tunnel"),
+};
+/** A database or cache the stack's apps use, named once and reached the same way by each. */
+const Database = z.looseObject(
+  {
+    name: z.string().optional().describe('Its name on the board, from the code'),
+    kind: z.string().optional().describe('postgres, mysql, valkey and so on'),
+    ...DatabaseReach,
+    envs: z
+      .record(z.string(), z.looseObject(DatabaseReach, { error: 'an object' }), {
+        error: 'an object keyed by environment',
+      })
+      .optional()
+      .describe('Where it is reached on another environment'),
+    note: z.string().optional().describe('Anything else worth knowing, in words'),
+  },
+  { error: 'an object' },
+);
+/** How an app finds a database it uses. */
+const Use = z.looseObject(
+  {
+    setting: setting.optional().describe('The setting its connection comes from, set to a local database when Local'),
+    note: z.string().optional().describe('Anything else worth knowing, in words'),
+  },
+  { error: 'an object ({} when nothing is known yet)' },
+);
+
 /** What differs for an app on an environment other than the stack's first. */
 const EnvOverlay = z.looseObject(
   {
@@ -258,6 +296,10 @@ const App = z.looseObject(
       .record(z.string(), Call, { error: 'an object' })
       .optional()
       .describe('The apps it calls, and how it finds each'),
+    uses: z
+      .record(z.string(), Use, { error: 'an object keyed by database id' })
+      .optional()
+      .describe('The databases and caches it uses, by id under databases'),
     publishes: z.record(z.string(), z.unknown(), { error: 'an object' }).optional().describe('The queues it sends to'),
     reads: z.record(z.string(), z.unknown(), { error: 'an object' }).optional().describe('The queues it reads from'),
     envs: z
@@ -407,6 +449,7 @@ export const StackSchema = z.looseObject(
     apps: z.record(z.string(), App, { error: 'an object keyed by app id' }),
     kinds: z.record(z.string(), Kind, { error: 'an object keyed by kind id' }).optional(),
     queues: z.record(z.string(), Queue, { error: 'an object keyed by queue id' }).optional(),
+    databases: z.record(z.string(), Database, { error: 'an object keyed by database id' }).optional(),
     checks: z.array(Check, { error: CHECKS }).max(50, CHECKS).optional(),
     signIns: z.record(z.string(), SignIn, { error: 'an object keyed by sign-in name' }).optional(),
     presets: z.array(Preset, { error: 'a list' }).optional(),
@@ -421,6 +464,7 @@ export const StackSchema = z.looseObject(
 export type Stack = z.infer<typeof StackSchema>;
 export type App = z.infer<typeof App>;
 export type Prereq = z.infer<typeof Prereq>;
+export type Database = z.infer<typeof Database>;
 export type Secret = z.infer<typeof Secret>;
 export type Call = z.infer<typeof Call>;
 
@@ -543,8 +587,15 @@ function crossProblems(stack: Loose): string[] {
       if (to === id) problems.push(`queues.${id}.feeds.${to}: a queue cannot feed itself`);
       else if (!has(stack['queues'], to)) problems.push(`queues.${id}.feeds.${to}: no such queue under "queues"`);
   }
+  for (const [id, database] of entries(stack['databases'])) {
+    if (!ID.test(id)) problems.push(`databases.${id}: id must be lowercase letters, digits and dashes`);
+    for (const [env] of entries(isObject(database) ? database['envs'] : undefined))
+      if (!envs.includes(env)) problems.push(`databases.${id}.envs.${env}: must be one of envs`);
+  }
   for (const [id, app] of entries(stack['apps'])) {
     if (!ID.test(id)) problems.push(`apps.${id}: id must be lowercase letters, digits and dashes`);
+    for (const [used] of entries(isObject(app) ? app['uses'] : undefined))
+      if (!has(stack['databases'], used)) problems.push(`apps.${id}.uses.${used}: no such database under "databases"`);
     if (isObject(app)) problems.push(...appProblems(id, app, stack, envs));
   }
   for (const [index, preset] of list(stack['presets']).entries())
