@@ -145,6 +145,8 @@ export const test = base.extend<{
       KOPPLER_LOGS: path.join(dir, 'state', 'logs'),
       KOPPLER_CONFIG_DIR: path.join(dir, 'config'),
       KOPPLER_PORT: String(port),
+      // A run reads each app's first seconds of log: one second here.
+      KOPPLER_EARLY_LOG: '1',
       // Never the profiles of whoever runs the tests.
       AWS_CONFIG_FILE: path.join(dir, 'aws-config'),
     };

@@ -27,6 +27,7 @@ Each app is a card with:
 - **Note:** an instruction for the agent about this app, such as a feature flag or a test account (needs the [agent add-on](../README.md#the-agent-add-on)).
 - **Local libraries:** when another of your clones publishes a package the app depends on, the app can use your local copy instead.
 - **Status, steps and log** once it runs.
+  After a run starts an app, Koppler reads its log for its first 30 seconds: the **First 30 s** step says it found no errors, or shows the lines that tell of one and hands them to the agent.
 
 Apps you have not cloned yet show greyed out, with the command to clone them.
 

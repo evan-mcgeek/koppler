@@ -35,6 +35,7 @@ import { appOn } from '../core/stack.ts';
 import { databasesOf, localValue } from '../core/databases.ts';
 import { localAddresses } from './local-databases.ts';
 import { opens } from '../server/cable-test.ts';
+import { earlyLogSeconds, readEarlyLogs } from './early-log.ts';
 import os from 'node:os';
 
 type StepState = 'todo' | 'user' | 'done' | 'failed';
@@ -526,6 +527,28 @@ async function startQueues(up: Up, chosen: Record<string, string>): Promise<void
  * Apps the others call start first, so a caller finds its callee answering, and an app's `after` (a migration that
  * runs to completion) before it; a loop just starts in board order.
  */
+const FIRST = `First ${String(earlyLogSeconds())} s`;
+/** The first seconds of each app the run started: its log read for errors, a failure left for the agent with its lines. */
+async function readFirstSeconds(up: Up, ids: string[]): Promise<void> {
+  if (!ids.length) return;
+  const seconds = String(earlyLogSeconds());
+  console.log(`Reading the first ${seconds} s of ${ids.map(id => nameOf(up.stack, id)).join(', ')}…`);
+  for (const [id, { stopped, lines }] of Object.entries(await readEarlyLogs(ids))) {
+    const name = nameOf(up.stack, id);
+    if (!stopped && !lines.length) {
+      up.step(id, FIRST, 'done', `No errors in its first ${seconds} s.`);
+      continue;
+    }
+    const said = stopped
+      ? `It stopped within ${seconds} s of starting.`
+      : `Its log shows problems in its first ${seconds} s.`;
+    up.step(id, FIRST, 'failed', [said, ...lines].join('\n'));
+    up.left.push(
+      `${name}: ${said} Read its log (koppler logs ${id})${lines.length ? `:\n${lines.map(line => `      ${line}`).join('\n')}` : '.'}`,
+    );
+  }
+}
+
 async function startApps(up: Up): Promise<void> {
   const { ids, env, edges, node, step } = up;
   const order: string[] = [];
@@ -539,6 +562,8 @@ async function startApps(up: Up): Promise<void> {
   };
   ids.forEach(visit);
   const yours: string[] = [];
+  // The apps this run starts itself, whose first seconds are read for problems once all have started.
+  const started: string[] = [];
   // An app whose start failed, and why; the apps that need it are not started, unless a call says to start anyway.
   const down = new Map<string, string>();
   const needs = (id: string) => [
@@ -587,6 +612,10 @@ async function startApps(up: Up): Promise<void> {
         continue;
       }
       step(id, 'Start', 'done', up.stack.apps[id]?.once ? 'Finished.' : 'Running.');
+      if (runIn !== 'mock' && !up.stack.apps[id]?.once) {
+        started.push(id);
+        step(id, FIRST, 'todo', 'Reading its log for problems.');
+      }
     }
   }
   if (yours.length) console.log(`Start ${yours.join(', ')} in your IDE.`);
@@ -603,6 +632,7 @@ async function startApps(up: Up): Promise<void> {
       });
     else if (!wants && watcher) console.log(await stopOne(watcher));
   }
+  await readFirstSeconds(up, started);
   if (down.size)
     throw new Failure(
       `Not everything started:\n${[...down].map(([id, why]) => `  ${nameOf(up.stack, id)}: ${why.split('\n')[0] ?? ''}`).join('\n')}`,
