@@ -71,3 +71,25 @@ test('with no agent the bar says so and shows how to connect one; a connected ag
   await expect(steps).toBeVisible();
   await page.screenshot({ path: 'test-results/next-agent-quiet.png' });
 });
+
+test('the Agent panel shows what the agent works on and for how long, as its button does', async ({ page }) => {
+  const ago = (minutes: number) => new Date(Date.now() - minutes * 60000).toISOString();
+  let status: object = {
+    apps: {},
+    agent: { state: 'busy', busy: ago(3) },
+    runs: [{ id: 'r1', kind: 'run', env: 'qa', state: 'applying' }],
+  };
+  await page.route('**/data/status.json', route => route.fulfill({ json: status }));
+  const chip = page.locator('header .agent');
+  await expect(chip).toHaveText('Agent working, 3 min');
+  await chip.click();
+  const panel = page.getByRole('dialog', { name: 'Messages from the agent' });
+  await expect(panel.getByRole('status')).toContainText('Working on the run on QA, 3 min');
+  await page.screenshot({ path: 'test-results/agent-panel-working.png' });
+  // Done, or quiet for long: the panel no longer says it works.
+  status = { apps: {}, agent: { state: 'listening' } };
+  await expect(panel.getByRole('status')).toHaveCount(0);
+  status = { apps: {}, agent: { state: 'busy', busy: ago(14) } };
+  await expect(chip).toHaveText('Agent quiet, 14 min');
+  await expect(panel.getByRole('status')).toHaveCount(0);
+});
