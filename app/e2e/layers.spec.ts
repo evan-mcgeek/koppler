@@ -34,7 +34,10 @@ test('a group picked by dragging an area shows no box around it', async ({ page 
   await page.mouse.up();
   await expect(page.locator('.svelte-flow__node-app.selected')).not.toHaveCount(0);
   await expect(page.locator('.svelte-flow__selection')).toBeHidden();
-  // The cards under where the box was still take a click.
+  // The cards under where the box was still take a click: with the group let go, one picks that card, with its bar.
+  await page.locator('.svelte-flow__pane').click({ position: { x: 20, y: 700 } });
+  await page.locator('.svelte-flow__node[data-id="payments"] header').click({ position: { x: 30, y: 12 } });
+  await expect(page.locator('.svelte-flow__node-app.selected')).toHaveCount(1);
   await (await actions(page, 'payments')).getByRole('button', { name: 'Run Payments API alone' }).click();
   await expect(page.getByRole('dialog').filter({ hasText: 'Run on QA' })).toBeVisible();
 });
