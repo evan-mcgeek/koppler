@@ -68,6 +68,7 @@ type Stack = {
   protected?: string[];
   apps: Record<string, Record<string, unknown>>;
   queues?: Record<string, Record<string, unknown>>;
+  databases?: Record<string, Record<string, unknown>>;
   presets?: unknown[];
 };
 type Canvas = { url: string; dir: string; temp: string };
