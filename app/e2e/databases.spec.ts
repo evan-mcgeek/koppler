@@ -123,3 +123,52 @@ test("a database's gear opens its settings, kept under databases in the stack", 
   await expect(panel.getByRole('textbox').first()).toBeVisible();
   await page.screenshot({ path: 'test-results/databases-settings.png' });
 });
+
+test.describe('on PROD', () => {
+  test.use({
+    stack: {
+      ...stack,
+      protected: ['prod'],
+      databases: {
+        'orders-db': {
+          ...stack.databases['orders-db'],
+          envs: { prod: { tunnel: 'aurora.prod.acme.example', port: 5432 } },
+        },
+        'payments-db': stack.databases['payments-db'],
+      },
+    },
+    board: {
+      env: 'prod',
+      mode: 'auto',
+      zoom: 0.8,
+      pan: { x: 60, y: 40 },
+      nodes: { orders: at(0, 0) },
+      edges: [],
+      databases: { 'orders-db': 'local' },
+    },
+  });
+
+  test('a deployed PROD database is marked, and switching to it asks first', async ({ page }) => {
+    const orders = database(page, 'Orders');
+    await expect(orders).toContainText('On this Mac');
+    await orders.getByText('Deployed', { exact: true }).click();
+    const guard = page.getByRole('alertdialog', { name: 'Use the PROD Orders database?' });
+    await expect(guard).toContainText('Orders API will read and write real customer data.');
+    await expect(orders.getByRole('radio', { name: 'Local' })).toBeChecked();
+    await guard.getByRole('button', { name: 'Keep Local' }).click();
+    await expect(orders).toContainText('On this Mac');
+    await orders.getByText('Deployed', { exact: true }).click();
+    await guard.getByRole('button', { name: 'Use PROD database' }).click();
+    await expect(orders).toContainText('PROD DATABASE');
+    await expect(orders).toContainText('Asks before each run');
+    await page.screenshot({ path: 'test-results/databases-prod.png' });
+  });
+});
+
+test('the cards read on a light scheme', async ({ page }) => {
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await page.getByRole('radio', { name: /^Paper/ }).click();
+  await page.keyboard.press('Escape');
+  await expect(database(page, 'Orders')).toBeVisible();
+  await page.screenshot({ path: 'test-results/databases-paper.png' });
+});
