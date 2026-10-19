@@ -17,7 +17,7 @@ An answer from the canvas arrives as a `koppler-reply` prompt (`data.message`, `
 
 ## Connect and disconnect
 
-When invoked with `connect` (or the user asks to connect this session to Koppler):
+When invoked with `connect`, when the user asks to connect this session to Koppler, or when a `koppler` command you ran prints a line starting `CONNECT:` (it does after starting the canvas, `koppler init`, `koppler board new` or `open`, and switching stacks, while this session is not the one listening), connect right away:
 1. Make sure the canvas runs: `koppler status`; if `canvas` is not running, `koppler canvas`.
 2. Start listening for the canvas's requests in this session (runs with a note, checklists, fixes, and what a run left over): `koppler listen take` with run_in_background and `timeout: 7200000`. `take` moves the connection here from any other session, which stops getting them. Its first line names this session (`connected as session <id>`); remember the id.
 3. Run `koppler plan` and `koppler history`, then tell the user in a few lines: the canvas address (`<state>/canvas-url`), that this session now gets their runs, and any run already waiting (handle it as usual, starting with `koppler plan`).

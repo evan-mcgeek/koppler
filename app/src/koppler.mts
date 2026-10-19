@@ -20,7 +20,7 @@ import { down } from './engine/down.ts';
 import { investigate } from './engine/investigate.ts';
 import { discardChanges, linkStack, linkedStatus, proposeChanges, updateStack } from './engine/linked.ts';
 import { boardCommand } from './engine/boards.ts';
-import { listen } from './engine/listen.ts';
+import { askToConnect, listen } from './engine/listen.ts';
 import { lockedPaths, setLock } from './engine/locks.ts';
 import { sayCommand } from './engine/messages.ts';
 import { alive, readRecord, sh } from './engine/processes.ts';
@@ -874,8 +874,17 @@ async function main([name, ...args]: string[]): Promise<void> {
     );
   }
   if (own.includes('--help') || own.includes('-h')) help(command);
-  else await command.run(args);
+  else {
+    await command.run(args);
+    if (setsUpCanvas(name, args)) askToConnect();
+  }
 }
+/** A command that starts the canvas or gives it another stack or board: an agent that ran it is asked to connect. */
+const setsUpCanvas = (name: string, args: string[]) =>
+  (name === 'canvas' && args[0] !== 'stop') ||
+  name === 'init' ||
+  (name === 'use' && !!positional(args).length && !args.includes('--boards')) ||
+  (name === 'board' && ['new', 'open'].includes(args[0] ?? ''));
 
 if (process.argv[1] && fs.realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)) {
   // A failure says what went wrong in one line; KOPPLER_DEBUG=1 adds where, for a bug report.

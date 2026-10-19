@@ -70,6 +70,29 @@ export function finishTaken(): boolean {
   }
 }
 
+/**
+ * Run inside an agent session, a command that sets up the canvas (starting it, a new stack or board, switching stacks)
+ * ends by telling that session to connect, unless it already is: only the session itself can listen, in the background,
+ * for the canvas's requests to reach it.
+ */
+export function askToConnect(): void {
+  const session = process.env['CLAUDE_CODE_SESSION_ID'];
+  if (!session) return;
+  let current: Listener | null = null;
+  try {
+    current = JSON.parse(fs.readFileSync(path.join(tempDir(), 'listener.json'), 'utf8')) as Listener | null;
+  } catch {
+    // Nobody connected yet.
+  }
+  const connected = !current?.disconnected && (!!listenerPid(current) || !!current?.busy);
+  if (connected && current?.agentSession === session) return;
+  console.log(
+    connected
+      ? "CONNECT: another agent session gets the canvas's requests. To have them here, run `koppler listen take` in the background in this session."
+      : "CONNECT: no agent session gets the canvas's requests yet. Run `koppler listen take` in the background in this session, now, so they reach you.",
+  );
+}
+
 export async function listen(argv: string[]): Promise<void> {
   const temp = tempDir();
   const inbox = path.join(temp, 'prompts.jsonl');
