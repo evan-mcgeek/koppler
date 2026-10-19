@@ -29,6 +29,7 @@
   import AppCard from './AppCard.svelte';
   import Cable from './Cable.svelte';
   import Outside from './Outside.svelte';
+  import Database from './Database.svelte';
   import Queue from './Queue.svelte';
   import Tunnel from './Tunnel.svelte';
   import { board, CARD_PANEL, FAR_ZOOM, type CardNode, type InfraNode } from './board.svelte.ts';
@@ -241,7 +242,7 @@
   ]);
   /** A message link or a call to an outside system, between the sides of its two cards that face each other. */
   const flows = $derived(
-    board.flows.flatMap(({ from, to, queue, via }) => {
+    board.flows.flatMap(({ from, to, queue, database, via }) => {
       const box = (key: string) => board.boxes.get(key) ?? board.infraBoxes.get(key);
       const [a, b] = [box(from), box(to)];
       if (!a || !b) return [];
@@ -265,7 +266,15 @@
           d: cablePath(start, sides[0], end, sides[1]),
           start,
           end,
-          kind: queue ? (board.queues[queue] === 'local' ? 'msg local' : 'msg') : 'ext',
+          kind: queue
+            ? board.queues[queue] === 'local'
+              ? 'msg local'
+              : 'msg'
+            : database
+              ? board.databases[database]
+                ? 'db local'
+                : 'db'
+              : 'ext',
           via,
           // Beside the link, not on it: right of one running up or down, over one running across.
           label:
@@ -455,7 +464,7 @@
       }
     }
     bind:edges={board.edges}
-    nodeTypes={{ app: AppCard, tunnel: Tunnel, queue: Queue, outside: Outside }}
+    nodeTypes={{ app: AppCard, tunnel: Tunnel, queue: Queue, outside: Outside, database: Database }}
     edgeTypes={{ cable: Cable }}
     connectionMode={ConnectionMode.Loose}
     deleteKey={board.live ? null : ['Backspace', 'Delete']}
@@ -929,6 +938,31 @@
     fill: var(--msg);
     stroke: var(--surface);
     stroke-width: 2;
+  }
+  /* A line to a deployed database is dotted in the deployed colour; to one on this Mac, solid in the local colour. */
+  .flow.db :is(.wire, .socket) {
+    stroke: var(--deployed);
+  }
+  .flow.db .socket {
+    fill: var(--deployed);
+  }
+  .flow.db .wire {
+    stroke-dasharray: 2 4;
+  }
+  .flow.db.local :is(.wire, .socket) {
+    stroke: var(--local);
+  }
+  .flow.db.local .socket {
+    fill: var(--local);
+  }
+  .flow.db.local .wire {
+    stroke-dasharray: none;
+  }
+  .flow.db .plug {
+    display: none;
+  }
+  .flow.db.lit .wire {
+    stroke-width: 3;
   }
   .flow.ext :is(.wire, .socket) {
     stroke: var(--socket-rim);

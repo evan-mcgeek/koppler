@@ -126,16 +126,23 @@
       else waiting = setTimeout(keep, 2000);
     });
   };
-  // The tunnel and queue cards follow what is on the board: its apps, which of them run without tunnels or are off
-  // their queues, and the environment.
+  // The tunnel, database and queue cards follow what is on the board: its apps, which of them run without tunnels or
+  // are off their queues, which databases are local, and the environment.
   const needs = $derived(
     JSON.stringify([
       board.env,
       board.queues,
+      board.databases,
       board.hiddenQueues,
       board.hiddenOutside,
       board.pinned,
-      board.cards.map(node => [node.id, node.data.hideTunnels, node.data.showQueues]),
+      board.cards.map(node => [
+        node.id,
+        node.data.run,
+        node.data.hideTunnels,
+        node.data.showQueues,
+        node.data.shownTunnels,
+      ]),
     ]),
   );
   $effect(() => {

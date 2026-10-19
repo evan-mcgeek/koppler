@@ -105,7 +105,19 @@ class Runs {
       : Object.fromEntries(
           board.infra.flatMap(card => (card.type === 'queue' && card.data.local ? [[card.data.queue, 'local']] : [])),
         );
-    return { env: board.env, mode: 'auto', nodes, edges, deployed, ...(Object.keys(queues).length && { queues }) };
+    // A restart keeps the databases as they run; a run takes the board's.
+    const databases = restart
+      ? Object.fromEntries(Object.entries(was?.databases ?? {}).filter(([, where]) => where === 'local'))
+      : board.databases;
+    return {
+      env: board.env,
+      mode: 'auto',
+      nodes,
+      edges,
+      deployed,
+      ...(Object.keys(queues).length && { queues }),
+      ...(Object.keys(databases).length && { databases }),
+    };
   }
 
   #plan(desired: Parameters<typeof plan>[1]): Plan {
@@ -117,6 +129,7 @@ class Runs {
       strays: (running ?? []).filter(id => board.apps.some(app => app.id === id) && !status?.live?.nodes?.[id]),
       startedOn: id => status?.runningEnvs?.[id],
       queuesOf: id => board.queuesOf(id),
+      databasesOf: id => board.databasesOf(id),
       current: id => board.app(id)?.current,
     });
   }
@@ -138,6 +151,9 @@ class Runs {
       `MODE ${graph.mode === 'manual' ? 'manual: give me a checklist, change nothing' : 'auto: apply the changes and start everything'}`,
       ...(graph.note ? [`NOTE ${graph.note}`] : []),
       ...Object.keys(graph.queues ?? {}).map(queue => `QUEUE ${board.queueName(queue)}: local, in the AWS emulator`),
+      ...Object.keys(graph.databases ?? {}).map(
+        database => `DATABASE ${board.databaseName(database)}: local, the user's own on this Mac`,
+      ),
       ...graph.nodes.flatMap(node => {
         const platform = board.apps
           .find(app => app.id === node.id)

@@ -10,7 +10,7 @@
 </script>
 
 <script lang="ts">
-  // The card of a tunnel, queue or outside system, framed like an app card: header, body, and a status line with one action.
+  // The card of a tunnel, database, queue or outside system, framed like an app card: header, body, and a status line with one action.
   import Cog from './Cog.svelte';
   import Icon from './Icon.svelte';
   import { board } from './board.svelte.ts';
@@ -29,10 +29,13 @@
     selected = false,
     actions,
     flag,
+    band,
+    foot,
+    variant = '',
     children,
   }: {
     id: string;
-    kind: 'tunnel' | 'queue' | 'outside';
+    kind: 'tunnel' | 'queue' | 'outside' | 'database';
     name: string;
     /** What it is, as a code: Tunnel, SQS, Outside. */
     tag: string;
@@ -49,11 +52,18 @@
     actions: CardAction[];
     /** Something to notice, shown beside the name. */
     flag?: Snippet;
+    /** A band above the header, such as PROD's. */
+    band?: Snippet;
+    /** The foot in place of the status line. */
+    foot?: Snippet;
+    /** More classes for the frame: local, prod. */
+    variant?: string;
     children?: Snippet;
   } = $props();
 </script>
 
-<div class="infra {kind}" class:selected class:dimmed={board.dimmed(id)} {title}>
+<div class="infra {kind} {variant}" class:selected class:dimmed={board.dimmed(id)} {title}>
+  {@render band?.()}
   <span class="head">
     {#if hasDot}<span class="led" data-state={dot ? 'running' : dot === false ? 'failed' : undefined} title={dotTitle}
       ></span>{/if}
@@ -77,7 +87,8 @@
     </span>
   </span>
   {#if children}<div class="body">{@render children()}</div>{/if}
-  {#if status}<p class="foot">
+  {#if foot}<div class="foot stack">{@render foot()}</div>
+  {:else if status}<p class="foot">
       <span>{status}</span>
       {#if act}<button
           class="link nodrag"
@@ -108,6 +119,21 @@
   .infra.outside {
     border: 1px dashed var(--deployed);
     background: var(--desk);
+  }
+  /* Deployed data has a dashed edge in the deployed colour; one on this Mac a solid one. PROD's is red. */
+  .infra.tunnel,
+  .infra.database {
+    border: 1px dashed var(--deployed);
+  }
+  .infra.database {
+    width: 270px;
+    min-width: 0;
+  }
+  .infra.database.local {
+    border: 1px solid var(--line-strong);
+  }
+  .infra.database.prod {
+    border: 2px solid var(--prod);
   }
   .infra.selected,
   :global(.svelte-flow__node:focus-visible) .infra {
@@ -168,5 +194,9 @@
     margin: 0;
     padding: 8px 12px;
     border-top: 1px solid var(--line);
+  }
+  .foot.stack {
+    display: grid;
+    gap: 3px;
   }
 </style>

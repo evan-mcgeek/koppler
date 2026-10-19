@@ -198,6 +198,12 @@ export function sanitizeLayout(input: unknown): Loose | null {
       .filter(name => typeof name === 'string' && name)
       .slice(0, 50)
       .map(name => text(name, 214));
+    // Whether its cable to each database goes through the tunnel card, as the user chose.
+    const shownTunnels = Object.fromEntries(
+      Object.entries(isMap(node['shownTunnels']) ? node['shownTunnels'] : {})
+        .filter(([id, shown]) => isId(id) && typeof shown === 'boolean')
+        .slice(0, 50),
+    );
     nodes[key] = {
       x: num(node['x']),
       y: num(node['y']),
@@ -210,6 +216,7 @@ export function sanitizeLayout(input: unknown): Loose | null {
       ...(node['watch'] === true && { watch: true }),
       ...(['set-aside', 'take-along'].includes(changes as string) && { changes }),
       ...(libraries.length > 0 && { libraries }),
+      ...(Object.keys(shownTunnels).length > 0 && { shownTunnels }),
       ...(typeof node['full'] === 'number' && node['full'] > 0 && { full: Math.min(Math.round(node['full']), 5000) }),
     };
   }
@@ -258,6 +265,7 @@ export function sanitizeLayout(input: unknown): Loose | null {
         .slice(0, 200),
     );
   const queues = chosen(input['queues'], 'local');
+  const databases = chosen(input['databases'], 'local');
   const hiddenQueues = chosen(input['hiddenQueues'], true);
   const hiddenOutside = chosen(input['hiddenOutside'], true);
   const hiddenLogs = chosen(input['hiddenLogs'], true);
@@ -286,6 +294,7 @@ export function sanitizeLayout(input: unknown): Loose | null {
     ...(typeof keptLive === 'string' && RUN_ID.test(keptLive) && { keptLive }),
     ...(Object.keys(infra).length && { infra }),
     ...(Object.keys(queues).length && { queues }),
+    ...(Object.keys(databases).length && { databases }),
     ...(Object.keys(hiddenQueues).length && { hiddenQueues }),
     ...(Object.keys(hiddenOutside).length && { hiddenOutside }),
     ...(Object.keys(hiddenLogs).length && { hiddenLogs }),

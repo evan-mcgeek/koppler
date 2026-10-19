@@ -2,7 +2,7 @@
 // waypoints, sliding an end along its side). The geometry is core/cables and core/arrange, unchanged.
 import type { Edge, Node } from '@xyflow/svelte';
 import { resolveExpressions } from '../src/core/expressions.ts';
-import { withDatabases } from '../src/core/databases.ts';
+import { databasesOf, withDatabases } from '../src/core/databases.ts';
 import { arrange, sidesFor, type Point, type Side } from '../src/core/arrange.ts';
 import { endOffsets, orderSlots, sidePoint, SIDES, type Box, type Cable } from '../src/core/cables.ts';
 import { of as kindOf } from '../src/core/kinds.ts';
@@ -56,6 +56,8 @@ export interface CardData extends Record<string, unknown> {
   changes?: Changes;
   /** The libraries it runs with the local copy of, by name. */
   libraries?: string[];
+  /** Whether its cable to a database goes through the tunnel card, where the user chose; else the board's default. */
+  shownTunnels?: Record<string, boolean>;
 }
 export type Changes = 'set-aside' | 'take-along';
 /** Below this zoom a card is drawn in its short form. */
@@ -97,10 +99,31 @@ export interface TunnelData extends Record<string, unknown> {
   /** What is worth knowing about it, one line each. */
   about: string[];
   apps: string[];
-  /** Where its facts are kept in the stack: the need on its first app. */
+  /** Where its facts are kept in the stack: the need on its first app, or the database behind it. */
   settings: string;
+  /** The databases behind it, one row each. */
+  rows: TunnelRow[];
 }
 export type TunnelNode = Node<TunnelData, 'tunnel'>;
+/** How a database behind a tunnel uses it: through it, on this Mac instead, or through it with its cable hidden. */
+export interface TunnelRow {
+  database: string;
+  name: string;
+  use: 'deployed' | 'local' | 'hidden';
+}
+/** A database or cache the board's apps use: the deployed one through its tunnel, or one on this Mac. */
+export interface DatabaseData extends Record<string, unknown> {
+  database: string;
+  name: string;
+  /** Its kind, as the card shows it: POSTGRES, VALKEY. */
+  kind: string;
+  local: boolean;
+  /** The tunnel it is reached through when deployed, and the address that tunnel listens on; empty with none. */
+  tunnel: string;
+  through: string;
+  apps: string[];
+}
+export type DatabaseNode = Node<DatabaseData, 'database'>;
 /** A queue between apps: a card with a switch between the deployed queue and a local copy. */
 export interface QueueData extends Record<string, unknown> {
   queue: string;
@@ -126,13 +149,15 @@ export interface OutsideData extends Record<string, unknown> {
 }
 export type OutsideNode = Node<OutsideData, 'outside'>;
 /** Every card that is not an app. */
-export type InfraNode = TunnelNode | QueueNode | OutsideNode;
+export type InfraNode = TunnelNode | QueueNode | OutsideNode | DatabaseNode;
 /** A line between cards that is not a cable: a message to or from a queue, or a call to an outside system. */
 export interface Flow {
   from: string;
   to: string;
   /** The queue a message link belongs to. */
   queue?: string;
+  /** The database a line leads to. */
+  database?: string;
   /** How the messages go, shown on the link: a pipe, a rule, a subscription, or a pipe or rule to a Lambda. */
   via?: string;
 }
@@ -225,6 +250,8 @@ class Board {
   infra = $state.raw<InfraNode[]>([]);
   /** The queues run locally instead of the deployed ones, and the queues taken off the board. */
   queues = $state.raw<Record<string, 'local'>>({});
+  /** The databases switched to the user's own on this Mac. */
+  databases = $state.raw<Record<string, 'local'>>({});
   hiddenQueues = $state.raw<Record<string, true>>({});
   /** Outside systems taken off the board, though an app on it calls them or reads their queue. */
   hiddenOutside = $state.raw<Record<string, true>>({});
@@ -296,7 +323,10 @@ class Board {
       ),
     ),
   );
-  #registry = $state.raw<Registry | undefined>();
+  /** The stack as written, with its expressions resolved; the board reads it with each database folded into its apps. */
+  #resolved = $state.raw<Registry | undefined>();
+  // A database on this Mac brings no tunnel or hosts entry.
+  #registry = $derived(this.#resolved && withDatabases(this.#resolved, new Set(Object.keys(this.databases))));
   /** The apps whose new tunnel cards still wait for their real place. */
   unplaced = $state.raw<string[]>([]);
   /** Upstream queue cards placed by guess, put above what they feed once the cards have their sizes. */
@@ -319,6 +349,8 @@ class Board {
   }
   /** The stack path of an app's need for a tunnel to a host, on the board's environment. */
   tunnelPath(id: string, host: string): string {
+    const [database] = this.#behind(host);
+    if (database) return `databases.${database}${this.env !== this.envs[0] ? `.envs.${this.env}` : ''}`;
     const app = this.#registry?.apps[id];
     const own = this.env !== this.envs[0] ? app?.envs?.[this.env]?.prereqs : undefined;
     const at = (own ?? app?.prereqs ?? []).findIndex(need => need.tunnel === host);
@@ -346,7 +378,8 @@ class Board {
   /** The tunnel cards an app leads: those it is the first app on the board to use. They stay beside it. */
   ledBy(id: string): string[] {
     return [
-      ...this.plan.filter(tunnel => tunnel.apps[0] === id).map(tunnelKey),
+      ...this.shownPlan.filter(tunnel => tunnel.apps[0] === id).map(tunnelKey),
+      ...this.boardDatabases.filter(one => one.apps[0] === id).map(one => `database:${one.id}`),
       ...this.boardQueues.filter(queue => this.#leadOf(queue) === id).map(queue => `queue:${queue.id}`),
     ];
   }
@@ -402,7 +435,10 @@ class Board {
         .filter(app => this.#onBoard.has(app) || (this.#outside(app) && !this.hiddenOutside[app]))
         .every(app => app === id);
     return this.ledBy(id).filter(
-      key => key.startsWith('tunnel:') || this.boardQueues.some(one => `queue:${one.id}` === key && alone(one)),
+      key =>
+        key.startsWith('tunnel:') ||
+        this.boardQueues.some(one => `queue:${one.id}` === key && alone(one)) ||
+        this.boardDatabases.some(one => `database:${one.id}` === key && one.apps.length === 1),
     );
   }
   #leadOf(queue: { pubs: string[]; reads: string[] }): string | undefined {
@@ -448,6 +484,84 @@ class Board {
     if (this.#mock(id)) return [];
     return queuesOf(this.#registry, id).filter(queue => this.#registry?.queues?.[queue]);
   }
+  /** An app's databases that the stack describes. */
+  databasesOf(id: string): string[] {
+    return this.#mock(id) || !this.#resolved ? [] : databasesOf(this.#resolved, id);
+  }
+  /** Where a database is reached on the board's environment: its tunnel and port. */
+  #reach(database: string) {
+    const one = this.#resolved?.databases?.[database];
+    return this.env === this.envs[0] ? one : one?.envs?.[this.env];
+  }
+  /** How an app reaches a database: the setting Koppler points, or the code change it makes for a local run. */
+  useOf(app: string, database: string) {
+    return this.#resolved?.apps[app]?.uses?.[database];
+  }
+  databaseName(id: string): string {
+    return this.#resolved?.databases?.[id]?.name ?? id;
+  }
+  /** The databases behind a tunnel, deployed or not, that apps on the board use. */
+  #behind(host: string): string[] {
+    return this.boardDatabases.filter(one => this.#reach(one.id)?.tunnel === host).map(one => one.id);
+  }
+  /** The databases the board's apps use, with the apps on the board that use each. */
+  boardDatabases = $derived.by(() =>
+    Object.keys(this.#resolved?.databases ?? {}).flatMap(id => {
+      const apps = this.cards.filter(node => this.databasesOf(node.id).includes(id)).map(node => node.id);
+      return apps.length ? [{ id, apps }] : [];
+    }),
+  );
+  /**
+   * Whether an app's cable to a deployed database goes through the tunnel card: as the user chose, else when two or
+   * more apps on the board share the tunnel.
+   */
+  tunnelShown(app: string, database: string): boolean {
+    const host = this.#reach(database)?.tunnel;
+    if (!host || this.databases[database]) return false;
+    const chosen = this.cards.find(node => node.id === app)?.data.shownTunnels?.[database];
+    if (chosen !== undefined) return chosen;
+    const sharing = this.cards.filter(node => this.databasesOf(node.id).some(one => this.#reach(one)?.tunnel === host));
+    return sharing.length >= 2;
+  }
+  showTunnel(app: string, database: string, show: boolean): void {
+    const node = this.cards.find(one => one.id === app);
+    if (!node) return;
+    this.set(app, { shownTunnels: { ...node.data.shownTunnels, [database]: show } });
+  }
+  /** Whether an app's line to a tunnel card is drawn: it needs the tunnel itself, or one of its databases goes through it. */
+  #drawsTunnel(app: string, host: string): boolean {
+    const own = this.databasesOf(app).filter(one => this.#reach(one)?.tunnel === host);
+    const raw = this.#resolved?.apps[app];
+    const needs = (this.env !== this.envs[0] ? raw?.envs?.[this.env]?.prereqs : undefined) ?? raw?.prereqs ?? [];
+    return needs.some(need => need.tunnel === host) || own.some(one => this.tunnelShown(app, one));
+  }
+  /** The tunnel cards on the board: one only for databases is drawn while an app's cable goes through it. */
+  shownPlan = $derived(this.plan.filter(tunnel => tunnel.apps.some(app => this.#drawsTunnel(app, tunnel.host))));
+  setDatabase(id: string, local: boolean): void {
+    const { [id]: _was, ...others } = this.databases;
+    this.databases = local ? { ...others, [id]: 'local' } : others;
+    this.syncInfra();
+  }
+  /** The lines to and from database cards: from its tunnel, or straight from each app when local or the tunnel is hidden. */
+  #databaseFlows(): Flow[] {
+    return this.boardDatabases.flatMap(({ id, apps }) => {
+      const host = this.#reach(id)?.tunnel;
+      const tunnel = host && this.shownPlan.find(one => one.host === host);
+      const to = `database:${id}`;
+      const through = apps.filter(app => this.tunnelShown(app, id));
+      return [
+        ...(tunnel && through.length ? [{ from: tunnelKey(tunnel), to, database: id }] : []),
+        ...apps
+          .filter(app => !through.includes(app))
+          .map(app => ({
+            from: app,
+            to,
+            database: id,
+            ...(!this.databases[id] && tunnel && { via: `Through tunnel · ${tunnel.bind}:${String(tunnel.port)}` }),
+          })),
+      ];
+    });
+  }
   /** The message links and the calls to outside systems, between the cards they join. */
   flows = $derived.by((): Flow[] => {
     const card = (app: string) => (this.#outside(app) ? `outside:${app}` : app);
@@ -467,6 +581,7 @@ class Board {
           .filter(app => this.#outside(app))
           .map(app => ({ from: id, to: `outside:${app}` })),
       ),
+      ...this.#databaseFlows(),
       // An outside system that calls the apps on the board: a webhook, say.
       ...Object.entries(this.#registry?.apps ?? {}).flatMap(([id, app]) =>
         this.#outside(id)
@@ -507,7 +622,13 @@ class Board {
     this.hiddenQueues = Object.fromEntries(show ? kept : [...kept, ...ids.map(id => [id, true] as const)]);
   }
   /** Which apps each tunnel card is linked to. */
-  links = $derived(this.plan.flatMap(tunnel => tunnel.apps.map(app => ({ from: app, to: tunnelKey(tunnel), tunnel }))));
+  links = $derived(
+    this.shownPlan.flatMap(tunnel =>
+      tunnel.apps
+        .filter(app => this.#drawsTunnel(app, tunnel.host))
+        .map(app => ({ from: app, to: tunnelKey(tunnel), tunnel })),
+    ),
+  );
   /**
    * One app card picked: it, the cards its cables and links join, and its own tunnel, queue and outside cards stay
    * bright; the rest of the board is dimmed. Null with nothing or several picked.
@@ -671,7 +792,7 @@ class Board {
   syncInfra(at: Record<string, Point | undefined> = {}): void {
     const before = new Map(this.infra.map(card => [card.id, card]));
     const fresh: string[] = [];
-    const tunnels = this.plan.map((tunnel): TunnelNode => {
+    const tunnels = this.shownPlan.map((tunnel): TunnelNode => {
       const id = tunnelKey(tunnel);
       const kept = before.get(id);
       if (!kept && !at[id]) fresh.push(tunnel.apps[0] ?? '');
@@ -699,6 +820,43 @@ class Board {
           ].filter(Boolean),
           apps: tunnel.apps,
           settings: this.tunnelPath(tunnel.apps[0] ?? '', tunnel.host),
+          rows: this.#behind(tunnel.host).map(database => ({
+            database,
+            name: this.databaseName(database),
+            use: this.databases[database]
+              ? 'local'
+              : this.boardDatabases.find(one => one.id === database)?.apps.some(app => this.tunnelShown(app, database))
+                ? 'deployed'
+                : 'hidden',
+          })),
+        },
+      };
+    });
+    const databases = this.boardDatabases.map(({ id: database, apps }): DatabaseNode => {
+      const id = `database:${database}`;
+      const kept = before.get(id);
+      if (!kept && !at[id]) fresh.push(apps[0] ?? '');
+      const host = this.#reach(database)?.tunnel;
+      const tunnel = host ? this.plan.find(one => one.host === host) : undefined;
+      const kind = this.#resolved?.databases?.[database]?.kind ?? '';
+      return {
+        ...(kept as DatabaseNode | undefined),
+        id,
+        type: 'database',
+        deletable: false,
+        position: kept?.position ?? at[id] ?? { x: 0, y: 0 },
+        data: {
+          database,
+          name: this.databaseName(database),
+          kind: kind.toUpperCase(),
+          local: !!this.databases[database],
+          tunnel: tunnel ? `the ${tunnelKind({ tunnel: tunnel.host })} tunnel` : '',
+          through: tunnel
+            ? `${tunnel.bind}:${String(tunnel.port)}`
+            : host
+              ? `localhost:${String(this.#reach(database)?.port ?? '')}`
+              : '',
+          apps,
         },
       };
     });
@@ -773,7 +931,7 @@ class Board {
         },
       };
     });
-    let cards: InfraNode[] = [...tunnels, ...queues, ...outside];
+    let cards: InfraNode[] = [...tunnels, ...databases, ...queues, ...outside];
     for (const lead of fresh) cards = this.#beside(lead, cards);
     // What feeds a queue goes above it, the nearest first, so a chain stacks up from the queue an app reads.
     cards = this.#stackAbove(upstream, cards);
@@ -1151,6 +1309,7 @@ class Board {
       nodes: this.nodes.map(({ id, type, position, data }) => ({ id, type, position, data })),
       infra: this.infra.map(({ id, position }) => ({ id, position })),
       queues: this.queues,
+      databases: this.databases,
       hiddenQueues: this.hiddenQueues,
       hiddenOutside: this.hiddenOutside,
       pinned: this.pinned,
@@ -1160,12 +1319,13 @@ class Board {
 
   /** Puts back a board held as text: its cards, cables and the cards beside them. */
   setContent(back: string): void {
-    const { name, nodes, edges, infra, queues, hiddenQueues, hiddenOutside, pinned } = JSON.parse(back) as {
+    const { name, nodes, edges, infra, queues, databases, hiddenQueues, hiddenOutside, pinned } = JSON.parse(back) as {
       name: string | null;
       nodes: CardNode[];
       edges: CableEdge[];
       infra: { id: string; position: Point }[];
       queues: Record<string, 'local'>;
+      databases?: Record<string, 'local'>;
       hiddenQueues: Record<string, true>;
       hiddenOutside: Record<string, true>;
       pinned: string[];
@@ -1175,6 +1335,7 @@ class Board {
     this.nodes = nodes;
     this.edges = edges;
     this.queues = queues;
+    this.databases = databases ?? {};
     this.hiddenQueues = hiddenQueues;
     this.hiddenOutside = hiddenOutside;
     this.syncInfra(Object.fromEntries(infra.map(({ id, position }) => [id, position])));
@@ -1380,7 +1541,7 @@ class Board {
   keptForTeam(at: number, preset: StoredPreset): void {
     const presets = [...((this.#registry?.presets ?? []) as StoredPreset[])];
     presets[at] = preset;
-    if (this.#registry) this.#registry = { ...this.#registry, presets: presets as Registry['presets'] };
+    if (this.#resolved) this.#resolved = { ...this.#resolved, presets: presets as Registry['presets'] };
   }
   asShared(preset: StoredPreset): string {
     const { name, nodes, edges } = preset;
@@ -1408,6 +1569,7 @@ class Board {
     this.nodes = [];
     this.edges = [];
     this.queues = {};
+    this.databases = {};
     this.hiddenQueues = {};
     this.hiddenOutside = {};
     this.hiddenLogs = {};
@@ -1448,6 +1610,7 @@ class Board {
     ].slice(0, 20);
     this.name = preset.name;
     this.queues = {};
+    this.databases = {};
     this.hiddenQueues = {};
     this.hiddenOutside = {};
     this.hiddenLogs = {};
@@ -1532,6 +1695,7 @@ class Board {
         ...(Array.isArray(chosen.libraries) && {
           libraries: chosen.libraries.filter(name => typeof name === 'string'),
         }),
+        ...(chosen.shownTunnels && { shownTunnels: chosen.shownTunnels }),
         branch: chosen.branch ?? '',
         run: run ?? 'cli',
         ...(platform && { platform }),
@@ -1551,7 +1715,7 @@ class Board {
   open({ stack: raw, clones, roots, saved }: Loaded): void {
     // The board works with the facts; Settings edits the stack as written.
     const stack = withDatabases(resolveExpressions(raw));
-    this.#registry = stack;
+    this.#resolved = resolveExpressions(raw);
     this.#guarded = stack.envs.filter(env => isProtected(stack, env));
     this.stack = stack.name ?? '';
     this.dir = (stack.source ?? '').replace(/\/stack\.json$/, '');
@@ -1608,6 +1772,7 @@ class Board {
     this.recent = (Array.isArray(saved?.['recent']) ? saved['recent'] : []) as Opened[];
     this.infra = [];
     this.queues = (saved?.['queues'] ?? {}) as Record<string, 'local'>;
+    this.databases = (saved?.['databases'] ?? {}) as Record<string, 'local'>;
     this.hiddenQueues = (saved?.['hiddenQueues'] ?? {}) as Record<string, true>;
     this.hiddenOutside = (saved?.['hiddenOutside'] ?? {}) as Record<string, true>;
     this.hiddenLogs = (saved?.['hiddenLogs'] ?? {}) as Record<string, true>;
@@ -1641,6 +1806,7 @@ class Board {
       this.dismissed,
       this.fullHeights,
       this.queues,
+      this.databases,
       this.hiddenQueues,
       this.hiddenOutside,
       this.hiddenLogs,
@@ -1676,7 +1842,7 @@ class Board {
           ({
             id,
             position,
-            data: { branch, run, platform, note, hideTunnels, showQueues, watch, changes, libraries },
+            data: { branch, run, platform, note, hideTunnels, showQueues, watch, changes, libraries, shownTunnels },
           }) => [
             id,
             {
@@ -1692,6 +1858,7 @@ class Board {
               watch: watch ? true : undefined,
               changes,
               libraries: libraries?.length ? libraries : undefined,
+              shownTunnels: shownTunnels && Object.keys(shownTunnels).length ? shownTunnels : undefined,
               full: this.fullHeights[id],
             },
           ],
@@ -1699,6 +1866,7 @@ class Board {
       ),
       edges: this.edges.map(({ source, target, data }) => ({ from: source, to: target, ...data })),
       queues: this.queues,
+      databases: Object.keys(this.databases).length ? this.databases : undefined,
       hiddenQueues: this.hiddenQueues,
       hiddenOutside: Object.keys(this.hiddenOutside).length ? this.hiddenOutside : undefined,
       hiddenLogs: Object.keys(this.hiddenLogs).length ? this.hiddenLogs : undefined,
