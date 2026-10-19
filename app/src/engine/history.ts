@@ -20,6 +20,7 @@ export interface RunRecord {
   nodes: Record<string, kp.BoardNode>;
   edges: kp.Edge[];
   queues?: Record<string, 'local'>;
+  databases?: Record<string, 'local'>;
   /** The plan the user confirmed. */
   plan: Steps;
 }
@@ -51,6 +52,7 @@ export interface LiveBoard {
   nodes: Record<string, kp.BoardNode>;
   edges: kp.Edge[];
   queues?: Record<string, 'local'>;
+  databases?: Record<string, 'local'>;
 }
 /** A prompt from the canvas, as it sits in the queue. */
 export interface Prompt {
@@ -118,6 +120,12 @@ export function runRecord(prompt: Prompt | null | undefined): RunRecord | null {
     ([queue, where]) => ID.test(queue) && where === 'local',
   );
   const queues = Object.fromEntries(local.slice(0, 50)) as Record<string, 'local'>;
+  // Databases the board switched to the one on this Mac; the rest stay deployed.
+  const databases = Object.fromEntries(
+    Object.entries((data['databases'] ?? {}) as Loose)
+      .filter(([database, where]) => ID.test(database) && where === 'local')
+      .slice(0, 50),
+  ) as Record<string, 'local'>;
   const plan = (data['plan'] ?? {}) as Loose;
   return {
     id,
@@ -129,6 +137,7 @@ export function runRecord(prompt: Prompt | null | undefined): RunRecord | null {
     nodes,
     edges: board.edges.filter(edge => nodes[edge.from] && nodes[edge.to]),
     ...(Object.keys(queues).length && { queues }),
+    ...(Object.keys(databases).length && { databases }),
     plan: {
       starts: steps(plan['starts']),
       restarts: steps(plan['restarts']),

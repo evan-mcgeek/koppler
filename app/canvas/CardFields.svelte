@@ -22,6 +22,8 @@
   const queues = $derived(board.queuesOf(id));
   const hiddenQueues = $derived(queues.filter(queue => board.hiddenQueues[queue]));
   const noQueues = $derived(queues.length > 0 && !data?.showQueues);
+  const databases = $derived(board.databasesOf(id));
+  let showing = $state<string | null>(null);
   const local = $derived(board.localLibraries(id));
   const useLocal = (name: string, on: boolean) => {
     board.set(id, { libraries: on ? [...local, name] : local.filter(one => one !== name) });
@@ -198,6 +200,51 @@
         {/if}
       </div>
     {/if}
+    {#if databases.length}
+      <div class="field databases">
+        {databases.length > 1 ? 'Databases' : 'Database'}
+        {#each databases as database (database)}
+          {@const isLocal = !!board.databases[database]}
+          {@const change = isLocal ? board.useOf(id, database)?.change : undefined}
+          <span class="database">
+            <span class="db-name">{board.databaseName(database)}{isLocal ? ' · Local' : ''}</span>
+            {#if change}
+              <button
+                class="link"
+                type="button"
+                aria-expanded={showing === database}
+                onclick={() => (showing = showing === database ? null : database)}
+                >{showing === database ? 'Hide change' : 'Show change'}</button
+              >
+            {:else if !isLocal}
+              <label
+                class="toggle"
+                title="Off draws its cable straight to the database; the tunnel keeps working, only the drawing changes."
+              >
+                <input
+                  type="checkbox"
+                  role="switch"
+                  aria-label="Show the tunnel to {board.databaseName(database)}"
+                  checked={board.tunnelShown(id, database)}
+                  onchange={ev => {
+                    board.showTunnel(id, database, ev.currentTarget.checked);
+                  }}
+                /><span class="track" aria-hidden="true"></span>Show tunnel
+              </label>
+            {/if}
+          </span>
+          {#if change && showing === database}
+            <div class="change">
+              <b>Koppler changes one line for the run</b>
+              <span class="file">{change.file}</span>
+              <code class="out">− {change.find}</code>
+              <code class="in">+ {change.replace}</code>
+              <span>Undone on Stop.</span>
+            </div>
+          {/if}
+        {/each}
+      </div>
+    {/if}
     {#if app?.libraries.length && !mock}
       <div class="field">
         Libraries
@@ -289,6 +336,40 @@
   }
   .field > :global(*) {
     font: 400 12px var(--sans);
+  }
+  .database {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .db-name {
+    color: var(--ink);
+    font-size: 13px;
+  }
+  .change {
+    display: grid;
+    gap: 4px;
+    padding: 8px 10px;
+    border: 1px solid var(--line);
+    background: var(--desk);
+  }
+  .change b {
+    color: var(--ink);
+    font-weight: 600;
+  }
+  .change .file {
+    font: 11px var(--mono);
+  }
+  .change code {
+    overflow-wrap: anywhere;
+    font: 11px var(--mono);
+  }
+  .change .out {
+    color: var(--prod);
+  }
+  .change .in {
+    color: var(--ok);
   }
   .combo {
     position: relative;

@@ -4,15 +4,16 @@
 //        koppler sync [--stack <dir>] [--rescan]                        before each run
 import fs from 'node:fs';
 import path from 'node:path';
-import { readJson, writeJson } from '../json-files.ts';
+import { writeJson } from '../json-files.ts';
 import { of as kindOf } from '../core/kinds.ts';
 import { validateStack } from '../core/stack.ts';
 import { writeData, type Clone } from '../data.ts';
 import { tempDir } from '../paths.ts';
 import { checkStack as checkLoadedStack } from './checks.ts';
+import { readStackFile } from './stack-file.ts';
 import { librariesFor, packageOf, type Library } from './libraries.ts';
 import { grepClone, hostOwners, hostsByApp, lines, missingCalls } from './calls.ts';
-import { CONFIG, expand, fail, type Index, loadConfig, readIndex, type Save, type StackFile, tilde } from './config.ts';
+import { CONFIG, expand, fail, type Index, loadConfig, readIndex, type Save, tilde } from './config.ts';
 import {
   branchesOf,
   candidateRepos,
@@ -49,7 +50,9 @@ function parseFlags(args: string[]): Flags {
 /** Copies the stack and resolves each app to a clone from the index; branch and changes are read fresh every time. */
 function syncStack(stackDir: string, index: Index): void {
   const source = path.join(stackDir, 'stack.json');
-  const stack = (readJson(source) as StackFile | null) ?? fail(`cannot read ${source}`);
+  const read = readStackFile(source);
+  if (read.error !== undefined) fail(read.error);
+  const stack = read.stack ?? fail(`cannot read ${source}`);
   const errors = validateStack(stack);
   if (errors.length) fail(`${source} is invalid:\n  ${errors.join('\n  ')}`);
   fs.mkdirSync(tempDir(), { recursive: true });

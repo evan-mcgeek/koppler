@@ -2,12 +2,17 @@
 // found, and the board. Each is one JSON file in the run folder.
 import fs from 'node:fs';
 import path from 'node:path';
+import { withDatabases } from './core/databases.ts';
 import { resolveExpressions } from './core/expressions.ts';
+import { migrateStack } from './core/migrations/stack/index.ts';
+import { fail } from './failure.ts';
+import { upgradeBoardFile, upgradeStack, type Upgrade } from './core/migrations/files.ts';
+import { readUpgraded } from './upgraded.ts';
 import type { Stack } from './core/stack.ts';
 import { readJson, writeJson } from './json-files.ts';
 import { tempDir } from './paths.ts';
 
-export type DataName = 'registry' | 'local' | 'repos' | 'state' | 'board-edits' | 'board-proposals';
+export type DataName = 'registry' | 'local' | 'repos' | 'state' | 'board-edits' | 'board-proposals' | 'local-databases';
 export type Data = Record<string, unknown>;
 
 // Read at each call: the tests, and a stack switch, change where the run folder is while the process lives.
@@ -30,9 +35,13 @@ function readOldForm(name: DataName): unknown {
 
 /** One of the run files, or null when it is not there yet (before `koppler init`) or unreadable. */
 export function readData(name: DataName): Data | null {
-  const value = readJson(dataFile(name)) ?? readOldForm(name);
+  // The stack's copy and the board file are brought up to this Koppler's format as they are read.
+  const upgrade = UPGRADES[name];
+  const upgraded = upgrade ? readUpgraded(dataFile(name), upgrade) : undefined;
+  const value = upgraded?.value ?? readJson(dataFile(name)) ?? readOldForm(name);
   return isData(value) ? value : null;
 }
+const UPGRADES: Partial<Record<DataName, Upgrade>> = { registry: upgradeStack, state: upgradeBoardFile };
 
 /** The stack in use, as the last sync copied it: the stack file, where it came from, and calls found in the code. */
 export type Registry = Stack & {
@@ -51,8 +60,17 @@ export interface Clone {
   /** Clones of libraries the app depends on, which it can use in place of the published ones. */
   libraries?: { name: string; path: string; ecosystem: 'dart' | 'npm' }[];
 }
-/** The stack in use, its expressions filled in. It passed the stack check when it was copied here, so it is read as one. */
-export const readStack = () => resolveExpressions(readData('registry')) as Registry | null;
+/**
+ * The stack in use as this Koppler reads it: brought up to its format, its expressions filled in, and its databases
+ * folded into its apps' needs (those in `local` run on this Mac and bring none). The file itself is left as written.
+ */
+export const readStack = (local?: ReadonlySet<string>): Registry | null => {
+  const raw = readData('registry');
+  if (!raw) return null;
+  const migrated = migrateStack(raw);
+  if (migrated.error !== undefined) fail(`The stack: ${migrated.error}`);
+  return withDatabases(resolveExpressions(migrated.value) as Registry, local);
+};
 /** The clones the last sync found, by app. */
 export const readClones = () => (readData('local')?.['apps'] ?? {}) as Record<string, Clone | null | undefined>;
 

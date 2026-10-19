@@ -12,7 +12,7 @@ Everything you leave unplugged keeps calling the deployed environment you chose.
 Koppler is for local development.
 It helps most when you work on one app (a mobile app, a front end, one API) and need a few of its neighbours running next to it.
 
-<img alt="One feature, Checkout, worked on across four apps: the mobile app and web shop cabled to a local Orders API, which calls a local Payments API; each runs its feature/checkout branch, Orders API has a database tunnel and a local SQS queue, two apps carry a note for the agent, and everything runs" src="docs/images/board.png">
+<img alt="One feature, Checkout, worked on across four apps: the mobile app and web shop cabled to a local Orders API, which calls a local Payments API; each runs its feature/checkout branch, Orders API has its deployed QA database and a local SQS queue, two apps carry a note for the agent, and everything runs" src="docs/images/board.png">
 
 ## How it works
 

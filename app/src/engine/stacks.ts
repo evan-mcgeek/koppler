@@ -35,6 +35,7 @@ export interface KnownStack {
 // The board in both its forms: one saved before boards were JSON moves along until it is saved again.
 const PER_STACK = [
   'state.json',
+  'local-databases.json',
   'state.js',
   'history.jsonl',
   'live.json',

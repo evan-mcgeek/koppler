@@ -30,6 +30,8 @@ export interface Board {
   edges: Edge[];
   /** Queues switched to a local copy; the others stay deployed. */
   queues: Record<string, 'local'>;
+  /** Databases switched to the one on this Mac; the others stay deployed. */
+  databases: Record<string, 'local'>;
 }
 
 /** A board as it arrives: from the page (nodes as a list), a saved run (nodes by id), or nothing at all. */
@@ -50,6 +52,7 @@ export interface BoardInput {
   nodes?: Record<string, NodeInput | null> | (NodeInput & { id: string })[];
   edges?: (Edge | null)[];
   queues?: Record<string, unknown>;
+  databases?: Record<string, unknown>;
 }
 
 export interface Step {
@@ -79,6 +82,8 @@ export interface PlanOptions {
   startedOn?: (id: string) => string | undefined;
   /** The queues an app publishes to or reads. */
   queuesOf?: (id: string) => string[];
+  /** The databases an app uses. */
+  databasesOf?: (id: string) => string[];
   /** The branch an app's clone is on, for an app that runs on whatever that is. */
   current?: (id: string) => string | undefined;
 }
@@ -108,10 +113,11 @@ export function board(input: BoardInput | null | undefined): Board {
   const edges = (Array.isArray(input?.edges) ? input.edges : [])
     .filter((e): e is Edge => !!e && Object.hasOwn(nodes, e.from) && Object.hasOwn(nodes, e.to))
     .map(e => ({ from: e.from, to: e.to }));
-  const queues = Object.fromEntries(
-    Object.entries(input?.queues ?? {}).flatMap(([id, where]) => (where === 'local' ? [[id, 'local' as const]] : [])),
-  );
-  return { env: input?.env ?? null, nodes, edges, queues };
+  const local = (choices: Record<string, unknown> | undefined) =>
+    Object.fromEntries(
+      Object.entries(choices ?? {}).flatMap(([id, where]) => (where === 'local' ? [[id, 'local' as const]] : [])),
+    );
+  return { env: input?.env ?? null, nodes, edges, queues: local(input?.queues), databases: local(input?.databases) };
 }
 
 const callees = (b: Board, id: string) =>
@@ -160,6 +166,10 @@ function reasonsToRestart(
   for (const q of o.queuesOf?.(id) ?? [])
     if (onLocal(live, now, q) !== onLocal(want, next, q))
       why.push(`it moves to the ${onLocal(want, next, q) ? 'local' : 'deployed'} ${q} queue`);
+  // An app whose database moves between this Mac and the deployed one starts again with the other's address.
+  for (const d of o.databasesOf?.(id) ?? [])
+    if (Object.hasOwn(live.databases, d) !== Object.hasOwn(want.databases, d))
+      why.push(`it moves to the ${Object.hasOwn(want.databases, d) ? 'local' : 'deployed'} ${d} database`);
   return why;
 }
 

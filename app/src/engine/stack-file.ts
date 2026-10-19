@@ -1,4 +1,6 @@
 // Changes to the stack file in use: adding and removing apps and outside systems, and setting any field.
+import { upgradeStack } from '../core/migrations/files.ts';
+import { readUpgraded } from '../upgraded.ts';
 import path from 'node:path';
 import { readJson, writeJson } from '../json-files.ts';
 import { kindsFor } from '../core/kinds.ts';
@@ -15,8 +17,21 @@ const NO_STACK = 'No stack is set up yet: koppler init';
 function stackInUse(config: Config): { source: string; stack: StackFile; error?: undefined } | { error: string } {
   if (!config.stack) return { error: NO_STACK };
   const source = path.join(config.stack, 'stack.json');
-  const stack = readJson(source) as StackFile | null;
-  return stack ? { source, stack } : { error: `cannot read ${source}` };
+  const read = readStackFile(source);
+  if (read.error !== undefined) return read;
+  return read.stack ? { source, stack: read.stack } : { error: `cannot read ${source}` };
+}
+
+/**
+ * A stack file in this Koppler's format: brought up to it as it is read, and written back with its version, unless
+ * that would give it a problem it did not have.
+ */
+export function readStackFile(source: string): { stack: StackFile | null; error?: undefined } | { error: string } {
+  const read = readUpgraded(source, upgradeStack, (before, after) => {
+    const had = new Set(validateStack(before));
+    return validateStack(after).every(problem => had.has(problem));
+  });
+  return read.error === undefined ? { stack: read.value as StackFile | null } : { error: `${source}: ${read.error}` };
 }
 
 const NOT_SET_UP =

@@ -3,6 +3,7 @@
 // Usage: koppler plan [--json]                      what the newest unapplied Send will do, checked against what is running
 //        koppler history done [<id>] [--failed <why>]    the agent finished (or gave up on) a run
 //        koppler history                            recent runs and how they ended
+import { databasesOf } from '../core/databases.ts';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fail } from '../failure.ts';
@@ -69,6 +70,7 @@ export function planFor(board: kp.BoardInput): kp.Plan {
     strays: strays(liveBoard, names, Object.keys(stack?.apps ?? {})),
     startedOn: id => envs[id],
     queuesOf: id => kp.queuesOf(stack, id),
+    databasesOf: id => (stack ? databasesOf(stack, id) : []),
     current: id => readClones()[id]?.branch ?? undefined,
   });
 }
@@ -208,6 +210,7 @@ export async function appliedCommand(args: string[]): Promise<void> {
     nodes,
     edges,
     ...(run.queues && { queues: run.queues }),
+    ...(run.databases && { databases: run.databases }),
   };
   writeJson(liveFile(), now);
   if (run.kind === 'stop' && !failed) await gatherSession(run);

@@ -7,6 +7,7 @@ import { post, save, send } from './data.ts';
 import { live } from './live.svelte.ts';
 import { dialogs } from './dialogs.svelte.ts';
 import { toasts } from './toast.svelte.ts';
+import { addressText, localDatabases as local } from './local-databases.svelte.ts';
 
 /** One line of a review: an app or a tunnel, with what is worth knowing under it. */
 export interface ReviewItem {
@@ -105,7 +106,19 @@ class Runs {
       : Object.fromEntries(
           board.infra.flatMap(card => (card.type === 'queue' && card.data.local ? [[card.data.queue, 'local']] : [])),
         );
-    return { env: board.env, mode: 'auto', nodes, edges, deployed, ...(Object.keys(queues).length && { queues }) };
+    // A restart keeps the databases as they run; a run takes the board's.
+    const databases = restart
+      ? Object.fromEntries(Object.entries(was?.databases ?? {}).filter(([, where]) => where === 'local'))
+      : board.databases;
+    return {
+      env: board.env,
+      mode: 'auto',
+      nodes,
+      edges,
+      deployed,
+      ...(Object.keys(queues).length && { queues }),
+      ...(Object.keys(databases).length && { databases }),
+    };
   }
 
   #plan(desired: Parameters<typeof plan>[1]): Plan {
@@ -117,6 +130,7 @@ class Runs {
       strays: (running ?? []).filter(id => board.apps.some(app => app.id === id) && !status?.live?.nodes?.[id]),
       startedOn: id => status?.runningEnvs?.[id],
       queuesOf: id => board.queuesOf(id),
+      databasesOf: id => board.databasesOf(id),
       current: id => board.app(id)?.current,
     });
   }
@@ -138,6 +152,9 @@ class Runs {
       `MODE ${graph.mode === 'manual' ? 'manual: give me a checklist, change nothing' : 'auto: apply the changes and start everything'}`,
       ...(graph.note ? [`NOTE ${graph.note}`] : []),
       ...Object.keys(graph.queues ?? {}).map(queue => `QUEUE ${board.queueName(queue)}: local, in the AWS emulator`),
+      ...Object.keys(graph.databases ?? {}).map(
+        database => `DATABASE ${board.databaseName(database)}: local, the user's own on this Mac`,
+      ),
       ...graph.nodes.flatMap(node => {
         const platform = board.apps
           .find(app => app.id === node.id)
@@ -272,8 +289,53 @@ class Runs {
         ...(board.localLibraries(id).length
           ? [{ text: `Uses your local ${board.localLibraries(id).join(', ')}` }]
           : []),
+        ...board
+          .databasesOf(id)
+          .filter(database => board.databases[database] && board.useOf(id, database)?.change)
+          .map(database => ({
+            text: `1 line changed for this run, undone on Stop: ${board.databaseName(database)} on this Mac`,
+            title: board.useOf(id, database)?.change?.file ?? '',
+          })),
       ];
     };
+    // Databases by where the data lives: the deployed ones with the tunnel they go through, then those on this Mac.
+    const databases = board.infra.flatMap(card => (card.type === 'database' ? [card.data] : []));
+    const users = (apps: string[]) => `used by ${apps.map(name).join(', ')}`;
+    const deployedDatabases = databases
+      .filter(one => !one.local)
+      .map(one => ({
+        name: one.name,
+        notes: [
+          { text: one.tunnel ? `Through ${one.tunnel} · ${users(one.apps)}` : users(one.apps) },
+          { text: one.kind, kind: 'host' as const },
+        ],
+      }));
+    const localDatabases = databases
+      .filter(one => one.local)
+      .map(one => {
+        const at = local.addresses[one.database];
+        return {
+          name: one.name,
+          notes: [
+            ...(at
+              ? [{ text: addressText(at), kind: 'host' as const }]
+              : [{ text: 'No address yet', kind: 'flag' as const }]),
+            { text: users(one.apps) },
+          ],
+        };
+      });
+    const databaseGroups: Review['groups'] = [
+      ...(deployedDatabases.length
+        ? [
+            {
+              verb: board.protected ? 'stops' : 'deployed',
+              label: `Deployed ${env} databases`,
+              items: deployedDatabases,
+            },
+          ]
+        : []),
+      ...(localDatabases.length ? [{ verb: 'local', label: 'On this Mac', items: localDatabases }] : []),
+    ];
     const called: Record<string, string[]> = {};
     for (const { from, to } of graph.deployed) called[to] = [...(called[to] ?? []), from];
     const agent = live.status?.agent?.state ?? 'none';
@@ -326,6 +388,8 @@ class Runs {
           : []),
       ],
       groups: [
+        // On PROD, the real data comes before anything else.
+        ...(board.protected ? databaseGroups.slice(0, deployedDatabases.length ? 1 : 0) : []),
         ...this.#groups(steps, notes),
         ...(Object.keys(called).length
           ? [
@@ -358,7 +422,7 @@ class Runs {
           ? [
               {
                 verb: 'calls',
-                label: 'Opens tunnels',
+                label: 'Opens first',
                 items: tunnels.map(tunnel => {
                   const off = tunnel.apps.filter(app => borrowed.includes(app));
                   const open = live.status?.ports?.[String(tunnel.port)] ? ' (already open)' : '';
@@ -376,6 +440,7 @@ class Runs {
               },
             ]
           : []),
+        ...(board.protected && deployedDatabases.length ? databaseGroups.slice(1) : databaseGroups),
         ...(skipped.length
           ? [
               {

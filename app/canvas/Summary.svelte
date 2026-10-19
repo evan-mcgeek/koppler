@@ -30,7 +30,10 @@
         })),
     ),
   );
-  const notes = $derived([...ports, ...unwired].filter(note => !board.dismissed.includes(note.key)));
+  const tooNew = $derived<Note[]>(
+    board.formatError ? [{ key: `format:${board.formatError}`, text: `${board.formatError}.` }] : [],
+  );
+  const notes = $derived([...tooNew, ...ports, ...unwired].filter(note => !board.dismissed.includes(note.key)));
 </script>
 
 {#if notes.length && !board.live}

@@ -29,7 +29,7 @@ const CONTENT_TYPES: Record<string, string> = {
   svg: 'image/svg+xml',
   jsonl: 'text/plain; charset=utf-8',
 };
-const DATA_FILE = /^data\/(registry|local|repos|state)\.json$/;
+const DATA_FILE = /^data\/(registry|local|repos|state|local-databases)\.json$/;
 /** The files the page names: what its build put beside it. */
 const assetFile = (what: string) => (/^assets\/[\w-][\w.-]*$/.test(what) ? `page/${what}` : undefined);
 

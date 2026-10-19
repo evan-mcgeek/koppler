@@ -117,8 +117,8 @@ const NAMES: Record<string, string> = {
   env: 'Setting',
   sso: 'AWS profile',
   signIn: 'Sign-in',
-  hosts: 'Host name',
-  tunnel: 'Host',
+  hosts: 'Hosts entry',
+  tunnel: 'Tunnel to',
   connectsAs: 'Dials it as',
   cmd: 'Command',
   what: 'What it is',
@@ -214,8 +214,8 @@ export const APP_TABS: Tab[] = [
   { name: 'Deployed', about: 'Where it runs in the deployed environments', keys: ['deployedUrl', 'cors', 'outside'] },
   {
     name: 'Calls',
-    about: 'What it calls, and the queues it sends to and reads',
-    keys: ['consumes', 'publishes', 'reads'],
+    about: 'What it calls, the queues it sends to and reads, and the databases it uses',
+    keys: ['consumes', 'publishes', 'reads', 'uses'],
   },
   { name: 'Needs first', about: 'What has to be ready before it starts', keys: ['prereqs'] },
   { name: 'Secrets', about: 'The secrets it needs, and how to get each', keys: ['secrets'] },
@@ -235,6 +235,11 @@ export const STACK_TABS: Tab[] = [
     keys: ['envs', 'protected', 'envAliases'],
   },
   { name: 'Apps', about: 'Every app in the stack', keys: ['apps'], view: 'apps' },
+  {
+    name: 'Databases',
+    about: 'Named from the code. Renaming here does not change the code.',
+    keys: ['databases'],
+  },
   { name: 'Queues', about: 'The queues and topics between apps', keys: ['queues'] },
   { name: 'Sign-ins', about: 'Sign-ins the needs of its apps can use', keys: ['signIns'] },
   { name: 'Checks', about: 'What is checked on this Mac', keys: ['checks'] },
@@ -504,7 +509,7 @@ export function controlOf(path: string, schema: Schema, value: unknown, choice: 
   if (path === 'protected') return 'envs';
   if (/(?:^|\.)(publishes|reads)$/.test(path)) return 'queues';
   if (/^apps\.[a-z0-9-]+\.after$/.test(path)) return 'apps';
-  if (choice) return /(?:^|\.)kind$/.test(path) ? 'kind' : 'pick';
+  if (choice) return /(?:^|\.)kind$/.test(path) && !path.startsWith('databases.') ? 'kind' : 'pick';
   if (/(?:^|\.)(url|deployedUrl|deployed)$/.test(path)) return 'address';
   const strings = (one: Schema) => types(one).includes('array') && types(one.items ?? {}).includes('string');
   if (strings(schema) || (Array.isArray(value) && schema.anyOf?.some(strings))) return 'chips';

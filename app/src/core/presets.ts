@@ -1,7 +1,9 @@
 // Presets (saved boards): bringing one saved in an older format up to date, and checking it against the stack before
 // it opens.
+import { BOARD_FORMAT, migrateBoard } from './migrations/board/index.ts';
 import type { Edge } from './plan.ts';
 
+/** The numbered preset format Koppler 0.1.0 and older read; a board's format is now its `koppler` version. */
 export const VERSION = 1;
 
 type Loose = Record<string, unknown>;
@@ -15,39 +17,32 @@ export interface StoredPreset extends Loose {
   nodes: Record<string, Loose>;
   edges: unknown[];
 }
-/** One step per format version: MIGRATIONS[n] turns a version n preset into version n + 1. */
-export const MIGRATIONS: Record<number, (preset: StoredPreset) => StoredPreset> = {
-  // Version 0 had no version field; cables and how an app runs could be left out.
-  0: preset => ({
-    ...preset,
-    nodes: Object.fromEntries(Object.entries(preset.nodes).map(([id, node]) => [id, { run: 'cli', ...node }])),
-  }),
-};
-
 export type Migrated =
-  | { preset: StoredPreset; migratedFrom: number | null; error?: undefined }
+  | { preset: StoredPreset; migratedFrom: string | null; error?: undefined }
   | { error: string; preset?: undefined; migratedFrom?: undefined };
 
-/** The preset in the current format, or the reason it cannot be read. */
+/** A preset as stored, brought up to this Koppler's board format; the reason when it cannot be read. */
 export function migrate(input: unknown): Migrated {
   if (!isObject(input)) return { error: 'It is not a preset.' };
   const { name, nodes, edges, version } = input;
   if (typeof name !== 'string' || !name.trim()) return { error: 'It has no name.' };
   if (!isObject(nodes) || Object.keys(nodes).length === 0) return { error: 'It has no apps.' };
-  const from = typeof version === 'number' && Number.isInteger(version) && version >= 0 ? version : 0;
-  if (from > VERSION) {
-    const formats = `preset format ${String(from)}, this one reads up to ${String(VERSION)}`;
-    return { error: `It was saved by a newer Koppler (${formats}). Update Koppler.` };
-  }
+  if (typeof version === 'number' && version > VERSION)
+    return { error: `It was saved by a newer Koppler (preset format ${String(version)}). Update Koppler.` };
   // Whatever wrote it: every app is an object and the cables are a list.
-  let preset: StoredPreset = {
+  const preset: StoredPreset = {
     ...input,
     name,
     nodes: Object.fromEntries(Object.entries(nodes).map(([id, node]) => [id, isObject(node) ? node : {}])),
     edges: Array.isArray(edges) ? edges : [],
   };
-  for (let v = from; v < VERSION; v++) preset = { ...(MIGRATIONS[v]?.(preset) ?? preset), version: v + 1 };
-  return { preset, migratedFrom: from < VERSION ? from : null };
+  const done = migrateBoard(preset);
+  if (done.error !== undefined) return { error: `It was saved by a newer Koppler: ${done.error}.` };
+  // The numbered format Koppler 0.1.0 and older read is still written, so they keep opening it.
+  return {
+    preset: { ...(done.value as StoredPreset), version: VERSION },
+    migratedFrom: done.applied.length ? done.from : null,
+  };
 }
 
 /** What a preset is checked against: this stack's apps, the clones on this machine and their branches. */
@@ -76,6 +71,8 @@ export interface OpenedNode {
 export interface OpenedPreset {
   name: string;
   version: number;
+  /** The Koppler board format it is in. */
+  koppler: string;
   nodes: Record<string, OpenedNode>;
   edges: Edge[];
   source?: unknown;
@@ -126,7 +123,7 @@ export function check(input: unknown, stack: StackFacts): Checked {
   const preset = migrated.preset;
   const notes: string[] = [];
   const name = (id: string) => stack.name?.(id) ?? id;
-  if (!isObject(input) || !Number.isInteger(input['version']))
+  if (!isObject(input) || (!Number.isInteger(input['version']) && input['koppler'] === undefined))
     notes.push('it had no version, read as the oldest format');
 
   const all = Object.keys(preset.nodes);
@@ -157,9 +154,15 @@ export function check(input: unknown, stack: StackFacts): Checked {
   }
   if (dropped > 0) notes.push(`${String(dropped)} ${dropped === 1 ? 'cable' : 'cables'} left out with their apps`);
   // A preset without a version already has its note above.
-  if (migrated.migratedFrom !== null && migrated.migratedFrom > 0)
-    notes.push(`updated from preset format ${String(migrated.migratedFrom)}`);
-  const opened: OpenedPreset = { name: preset.name.trim().slice(0, 80), version: VERSION, nodes, edges };
+  if (migrated.migratedFrom !== null && migrated.migratedFrom !== '0.0.0')
+    notes.push(`updated from the Koppler ${migrated.migratedFrom} format`);
+  const opened: OpenedPreset = {
+    name: preset.name.trim().slice(0, 80),
+    version: VERSION,
+    koppler: BOARD_FORMAT.version,
+    nodes,
+    edges,
+  };
   if (preset['source']) opened.source = preset['source'];
   return { preset: opened, notes };
 }

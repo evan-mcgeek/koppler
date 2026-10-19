@@ -7,9 +7,8 @@ import path from 'node:path';
 import { migrate, type StoredPreset } from '../core/presets.ts';
 import { validateStack } from '../core/stack.ts';
 import { fileUrl, proposeFile, readFile, gh, type GithubFile } from '../github.ts';
-import { readJson } from '../json-files.ts';
 import { sourceOf } from './linked.ts';
-import { saveStack } from './stack-file.ts';
+import { readStackFile, saveStack } from './stack-file.ts';
 
 type Failed = { error: string };
 /** Where a pull request for the stack would go, or why there is none. */
@@ -123,7 +122,9 @@ export async function shareBoard(dir: string, preset: StoredPreset): Promise<Sha
 /** A stack that is not on GitHub: the board joins its file here, for the user to commit. */
 function keepHere(dir: string, board: StoredPreset): Shared | Failed {
   const source = path.join(dir, 'stack.json');
-  const before = readJson(source) as Record<string, unknown> | null;
+  const read = readStackFile(source);
+  if (read.error !== undefined) return read;
+  const before = read.stack as Record<string, unknown> | null;
   if (!before) return { error: `cannot read ${source}` };
   const next = withBoard(before, board);
   const problems = validateStack(next);
