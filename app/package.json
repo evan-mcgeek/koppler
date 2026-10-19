@@ -36,7 +36,7 @@
     "skills"
   ],
   "scripts": {
-    "test": "npm run build && vitest run && node --test --test-concurrency=1 test/*.test.mjs",
+    "test": "npm run build && vitest run && KOPPLER_EARLY_LOG=1 node --test --test-concurrency=1 test/*.test.mjs",
     "test:canvas": "npm run build && playwright test",
     "start": "node scripts/koppler-dev.mjs canvas",
     "play": "npm run build && node scripts/play.mjs",

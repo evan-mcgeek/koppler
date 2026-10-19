@@ -43,6 +43,9 @@ jobs:
         run: npx vitest run
       - name: End-to-end tests
         run: node --test --test-concurrency=1 test/*.test.mjs
+        # A run reads each app's first seconds of log: one second in the tests.
+        env:
+          KOPPLER_EARLY_LOG: '1'
       - run: npx playwright install --with-deps chromium
       - name: Canvas in a browser
         run: npx playwright test
