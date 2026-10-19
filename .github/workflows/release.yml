@@ -1,7 +1,7 @@
 name: Release
 
 # A version tag (v0.0.2, made by `npm version` in app/) publishes that version to npm as `latest`, with provenance,
-# and makes its GitHub Release. npm trusts this workflow (trusted publishing); until it is set up for the package, an
+# and to GitHub Packages as @evan-mcgeek/koppler, and makes its GitHub Release linking both. npm trusts this workflow (trusted publishing); until it is set up for the package, an
 # NPM_TOKEN secret (a granular token) is used instead.
 on:
   push:
@@ -24,6 +24,7 @@ jobs:
     permissions:
       contents: write
       id-token: write
+      packages: write
     defaults:
       run:
         working-directory: app
@@ -48,7 +49,21 @@ jobs:
         run: npm publish --provenance --access public --tag latest
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      # GitHub Packages takes only scoped names: the same package, published under the repo owner's scope.
+      - name: Publish to GitHub Packages
+        run: |
+          npm config set //npm.pkg.github.com/:_authToken "$NODE_AUTH_TOKEN"
+          npm pkg set name=@evan-mcgeek/koppler
+          npm publish --registry https://npm.pkg.github.com
+        env:
+          NODE_AUTH_TOKEN: ${{ github.token }}
       - name: GitHub Release
-        run: gh release create "$GITHUB_REF_NAME" --verify-tag --generate-notes --title "Koppler ${GITHUB_REF_NAME#v}"
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          notes="Install with \`npm i -g koppler@$version\`.
+
+          - npm: https://www.npmjs.com/package/koppler/v/$version
+          - GitHub Packages: https://github.com/${GITHUB_REPOSITORY}/pkgs/npm/koppler"
+          gh release create "$GITHUB_REF_NAME" --verify-tag --generate-notes --title "Koppler $version" --notes "$notes"
         env:
           GH_TOKEN: ${{ github.token }}
