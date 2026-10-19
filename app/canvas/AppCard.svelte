@@ -33,7 +33,9 @@
   const hide = () => {
     leaving = setTimeout(() => (hovered = false), 250);
   };
-  const bar = $derived(hovered || selected);
+  // The bar acts on one app: with several picked, none shows.
+  const several = $derived(board.nodes.filter(node => node.selected).length > 1);
+  const bar = $derived((hovered || selected) && !several);
   const SIDES: Side[] = ['top', 'right', 'bottom', 'left'];
   const viewport = useViewport();
   const far = $derived(viewport.current.zoom < FAR_ZOOM);
