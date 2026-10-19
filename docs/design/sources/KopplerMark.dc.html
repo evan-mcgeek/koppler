@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<svg viewBox="0 0 64 64" width="{{ size }}" height="{{ size }}" role="img" aria-label="Koppler" style="display:block;flex:none">
+<rect x="10" y="8" width="10" height="48" rx="5" fill="{{ socket }}"></rect>
+<path d="M20 32 C 34 32, 34 14, 47 14 M20 32 C 34 32, 34 50, 47 50" fill="none" stroke="{{ cable }}" stroke-width="{{ sw }}" stroke-linecap="round"></path>
+<circle cx="49" cy="14" r="7.5" fill="{{ socket }}"></circle>
+<circle cx="49" cy="50" r="7.5" fill="{{ socket }}"></circle>
+<circle cx="49" cy="14" r="2.5" fill="{{ hole }}"></circle>
+<circle cx="49" cy="50" r="2.5" fill="{{ hole }}"></circle>
+</svg>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:120,&quot;height&quot;:120},&quot;size&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:64,&quot;tsType&quot;:&quot;number&quot;},&quot;dark&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;},&quot;cable&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;string&quot;},&quot;ink&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;string&quot;},&quot;hole&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;string&quot;}}">
+class Component extends DCLogic {
+  renderVals() {
+    const dark = this.props.dark ?? true;
+    const size = this.props.size ?? 64;
+    return {
+      size,
+      cable: this.props.cable ?? (dark ? '#FFFFFF' : '#141414'),
+      socket: this.props.ink ?? (dark ? '#E8E8E8' : '#141414'),
+      hole: this.props.hole ?? (dark ? '#0D0D0D' : '#F4F4F2'),
+      sw: size <= 20 ? 8 : 6
+    };
+  }
+}
+</script>
+</body>
+</html>

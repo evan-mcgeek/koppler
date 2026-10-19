@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400..700&family=Martian+Mono:wdth,wght@75..112.5,400..700&display=swap">
+<style>
+html,body{margin:0;background:#050505;color:#E8E8E8;-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:underline;text-underline-offset:3px}
+a:hover{opacity:0.75}
+.dv-turn{padding:48px 56px 40px;border-bottom:1px solid #2B2B2B}
+.dv-thd{display:flex;align-items:baseline;gap:10px;margin:0 0 8px}
+.dv-tid{font:600 10px 'Martian Mono',monospace;padding:3px 7px;background:#E8E8E8;color:#0D0D0D;text-decoration:none}
+.dv-tname{font:600 15px 'Instrument Sans',sans-serif}
+.dv-brief{max-width:880px;margin:0 0 28px;color:#A3A3A3;font:14px/1.55 'Instrument Sans',sans-serif}
+.dv-opts{display:flex;flex-wrap:wrap;gap:36px;align-items:flex-start}
+.dv-opt{flex:none;display:flex;flex-direction:column;gap:10px}
+.dv-oid{font:600 10.5px 'Martian Mono',monospace;padding:3px 7px;background:#2B2B2B;color:#E8E8E8;text-decoration:none}
+.dv-olabel{display:flex;align-items:baseline;gap:8px;color:#A3A3A3;font:12px 'Instrument Sans',sans-serif}
+.dv-opt:target .dv-oid{background:#FFFFFF;color:#0D0D0D}
+.dv-next{margin:28px 0 0;color:#A3A3A3;font:13px/1.5 'Instrument Sans',sans-serif}
+
+.pb{--desk:#0D0D0D;--panel:#161616;--line:#2B2B2B;--line2:#404040;--ink:#E8E8E8;--mute:#A3A3A3;--local:#FFFFFF;--deployed:#9A9A9A;--warn:#FFC940;--prod:#FF3B30;background:var(--panel);border-left:1px solid var(--line2);color:var(--ink);font:14px/1.4 'Instrument Sans',sans-serif;display:flex;flex-direction:column}
+.mono{font-family:'Martian Mono',monospace}
+.caps{font:500 10px 'Martian Mono',monospace;letter-spacing:0.08em;text-transform:uppercase;color:var(--mute)}
+.mute{color:var(--mute)}
+.hair{border-bottom:1px solid var(--line)}
+.well{background:var(--desk);border:1px solid var(--line);padding:7px 10px;font:12px 'Martian Mono',monospace;min-width:0}
+.well.empty{color:#6B6B6B;font-family:'Instrument Sans',sans-serif;font-size:13px}
+.well.changed{border-color:var(--ink)}
+.lock{font:500 9px 'Martian Mono',monospace;letter-spacing:0.08em;padding:3px 5px;border:1px solid var(--line2);color:var(--mute);white-space:nowrap}
+.lock.on{background:var(--ink);border-color:var(--ink);color:var(--desk)}
+.btn{font:600 12px 'Martian Mono',monospace;padding:8px 14px;border:1px solid var(--line2);background:none;color:var(--ink);white-space:nowrap}
+.btn.go{background:var(--local);border-color:var(--local);color:var(--desk)}
+.btn.ask{border-style:dashed}
+.strip{display:flex;flex-wrap:wrap;padding:1px 0 0 1px}
+.tb{margin:-1px 0 0 -1px;border:1px solid var(--line2);background:var(--panel);font:500 10px 'Martian Mono',monospace;letter-spacing:0.08em;text-transform:uppercase;padding:8px 10px;color:var(--mute);white-space:nowrap}
+.tb.on{background:var(--line2);color:var(--ink)}
+.fold{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--line)}
+.chev{width:0;height:0;border-left:5px solid var(--mute);border-top:4px solid transparent;border-bottom:4px solid transparent}
+.box{width:12px;height:12px;border:1px solid var(--line2);flex:none;margin-right:7px}
+.box.on{background:var(--ink);border-color:var(--ink)}
+.led{width:7px;height:7px;background:var(--local);flex:none}
+.tag{font:500 10px 'Martian Mono',monospace;padding:2px 5px;border:1px solid var(--line2);color:var(--mute)}
+.idx{display:flex;flex-direction:column}
+.ch{display:flex;align-items:center;gap:8px;white-space:nowrap;padding:10px 14px;border-bottom:1px solid var(--line);font:500 10px 'Martian Mono',monospace;letter-spacing:0.08em;text-transform:uppercase;color:var(--mute)}
+.ch.on{background:var(--desk);color:var(--ink);box-shadow:inset 2px 0 0 var(--local)}
+.chn{font-weight:500;color:#6B6B6B}
+.mk{margin-left:auto;font-style:normal;color:var(--ink)}
+.mk.warn{color:var(--warn)}
+.row{display:grid;grid-template-columns:132px minmax(0,1fr) auto;align-items:start;gap:12px;padding:10px 20px;border-bottom:1px solid var(--line)}
+.row .caps{padding-top:7px}
+.jumps{display:flex;flex-wrap:wrap;padding:10px 20px;row-gap:6px}
+.jp{white-space:nowrap;margin-right:16px}
+.jp.on{color:var(--ink)}
+.sec{padding:14px 20px 8px;border-bottom:1px solid var(--line);display:flex;align-items:baseline;gap:10px}
+</style>
+</helmet>
+
+<section class="dv-turn" id="t1" data-screen-label="Settings side panel">
+<div class="dv-thd"><a class="dv-tid" href="#t1">1</a><span class="dv-tname">Settings side panel, in Patch bay</span></div>
+<p class="dv-brief">The panel that slides in from the right when you open an app's settings: Orders API, on its Runs here tab, with one unsaved change (URL) and one locked field (Slug). Every field is one the canvas has today. Square corners, hairlines, mono capitals for labels, words instead of icons; white is the only filled button.</p>
+<div class="dv-opts">
+
+<div class="dv-opt" id="1a">
+<div class="dv-olabel"><a class="dv-oid" href="#1a">1a</a>By the book: today's panel, printed on the panel</div>
+<div class="pb" style="width:560px;height:940px">
+<div class="fx ac gap12 hair" style="padding:16px 20px">
+<span class="led"></span><span style="font:600 18px 'Instrument Sans',sans-serif;flex:1">Orders API</span>
+<span class="btn ask">Ask the agent to fill in</span><span class="btn" style="padding:8px 10px">×</span>
+</div>
+<div style="padding:14px 20px;display:grid;grid-template-columns:96px minmax(0,1fr) auto;gap:10px 12px;align-items:center" class="hair">
+<sc-for list="{{ identity }}" as="f" hint-placeholder-count="3">
+<span class="caps">{{ f.label }}</span><span class="{{ f.well }}">{{ f.value }}</span><span class="{{ f.lock }}">{{ f.lockWord }}</span>
+</sc-for>
+</div>
+<div style="padding:14px 20px 0"><div class="strip"><sc-for list="{{ tabs }}" as="t" hint-placeholder-count="7"><span class="{{ t.cls }}">{{ t.name }}</span></sc-for></div></div>
+<div style="flex:1;overflow:hidden;padding:16px 20px;display:grid;grid-template-columns:96px minmax(0,1fr) auto;gap:12px;align-content:start;align-items:start">
+<sc-for list="{{ runs }}" as="f" hint-placeholder-count="5">
+<span class="caps" style="padding-top:8px">{{ f.label }}</span>
+<div class="fx col gap6"><span class="{{ f.well }}">{{ f.value }}</span><sc-if value="{{ f.hint }}" hint-placeholder-val="{{ true }}"><span class="mute" style="font-size:12px">{{ f.hint }}</span></sc-if></div>
+<span class="lock" style="margin-top:5px">Lock</span>
+</sc-for>
+<span class="caps" style="padding-top:2px">Starts after</span>
+<div class="fx gap12" style="flex-wrap:wrap"><sc-for list="{{ after }}" as="a" hint-placeholder-count="4"><span class="fx ac gap6" style="font-size:13px"><span class="{{ a.box }}"></span>{{ a.name }}</span></sc-for></div>
+<span class="lock">Lock</span>
+<div style="grid-column:1/4" class="fx col gap6"><sc-for list="{{ folds }}" as="f" hint-placeholder-count="4"><div class="fold"><span class="chev"></span><span style="flex:1;font-weight:600">{{ f }}</span><span class="caps">Not set</span></div></sc-for></div>
+</div>
+<div class="fx ac gap8" style="padding:14px 20px;border-top:1px solid var(--line)">
+<span class="caps" style="flex:1;color:var(--ink)">1 change · URL</span><span class="btn">Discard</span><span class="btn go">Save</span>
+</div>
+</div>
+</div>
+
+<div class="dv-opt" id="1b">
+<div class="dv-olabel"><a class="dv-oid" href="#1b">1b</a>Channel index: the tabs as numbered channels down the side, like a patch bay</div>
+<div class="pb" style="width:640px;height:940px">
+<div class="fx ac gap12 hair" style="padding:16px 20px">
+<span class="led"></span>
+<div class="fx col" style="flex:1"><span style="font:600 18px 'Instrument Sans',sans-serif">Orders API</span><span class="caps">.NET · acme/orders-api</span></div>
+<span class="btn ask">Ask the agent</span><span class="btn" style="padding:8px 10px">×</span>
+</div>
+<div style="flex:1;display:grid;grid-template-columns:196px minmax(0,1fr);min-height:0">
+<div class="idx" style="border-right:1px solid var(--line)">
+<sc-for list="{{ channels }}" as="c" hint-placeholder-count="8"><span class="{{ c.cls }}"><span class="chn">{{ c.n }}</span>{{ c.name }}<i class="{{ c.markCls }}">{{ c.mark }}</i></span></sc-for>
+</div>
+<div class="fx col" style="min-width:0">
+<div class="sec"><span class="caps" style="color:var(--ink)">02 · Runs here</span><span class="mute" style="font-size:12px">How Koppler starts it on this Mac</span></div>
+<sc-for list="{{ runs }}" as="f" hint-placeholder-count="5">
+<div class="fx col gap6" style="padding:12px 20px;border-bottom:1px solid var(--line)">
+<div class="fx ac jb"><span class="caps">{{ f.label }}</span><span class="lock">Lock</span></div>
+<span class="{{ f.well }}">{{ f.value }}</span>
+<sc-if value="{{ f.hint }}" hint-placeholder-val="{{ true }}"><span class="mute" style="font-size:12px">{{ f.hint }}</span></sc-if>
+</div>
+</sc-for>
+<div class="fx col gap8" style="padding:12px 20px;border-bottom:1px solid var(--line)">
+<div class="fx ac jb"><span class="caps">Starts after</span><span class="lock">Lock</span></div>
+<div class="fx gap12" style="flex-wrap:wrap"><sc-for list="{{ after }}" as="a" hint-placeholder-count="4"><span class="fx ac gap6" style="font-size:13px"><span class="{{ a.box }}"></span>{{ a.name }}</span></sc-for></div>
+</div>
+</div>
+</div>
+<div class="fx ac gap8" style="padding:14px 20px;border-top:1px solid var(--line)">
+<span class="caps" style="flex:1;color:var(--ink)">1 change · URL</span><span class="btn">Discard</span><span class="btn go">Save</span>
+</div>
+</div>
+</div>
+
+<div class="dv-opt" id="1c">
+<div class="dv-olabel"><a class="dv-oid" href="#1c">1c</a>Spec sheet: one hairline table, sections instead of tabs, every value in its cell</div>
+<div class="pb" style="width:560px;height:940px">
+<div class="fx ac gap12 hair" style="padding:16px 20px">
+<span style="font:600 16px 'Martian Mono',monospace;font-stretch:87.5%;flex:1">Orders API</span>
+<span class="tag">.NET</span><span class="btn" style="padding:8px 10px">×</span>
+</div>
+<div class="jumps hair">
+<sc-for list="{{ jumps }}" as="j" hint-placeholder-count="8"><span class="{{ j.cls }}">{{ j.name }}</span></sc-for>
+</div>
+<div style="flex:1;overflow:hidden">
+<div class="sec"><span class="caps" style="color:var(--ink)">Identity</span></div>
+<sc-for list="{{ identity }}" as="f" hint-placeholder-count="3">
+<div class="row"><span class="caps">{{ f.label }}</span><span class="{{ f.well }}">{{ f.value }}</span><span class="{{ f.lock }}" style="margin-top:4px">{{ f.lockWord }}</span></div>
+</sc-for>
+<div class="sec"><span class="caps" style="color:var(--ink)">Runs here</span><span class="mute" style="font-size:12px;flex:1">How Koppler starts it on this Mac</span><span class="btn ask" style="padding:4px 8px;font-size:10px">Ask the agent</span></div>
+<sc-for list="{{ runs }}" as="f" hint-placeholder-count="5">
+<div class="row"><span class="caps">{{ f.label }}</span><div class="fx col gap4"><span class="{{ f.well }}">{{ f.value }}</span><sc-if value="{{ f.hint }}" hint-placeholder-val="{{ true }}"><span class="mute" style="font-size:12px">{{ f.hint }}</span></sc-if></div><span class="lock" style="margin-top:4px">Lock</span></div>
+</sc-for>
+<sc-for list="{{ folds }}" as="f" hint-placeholder-count="4">
+<div class="row" style="align-items:center"><span class="caps">{{ f }}</span><span class="mute" style="font-size:13px">Not set · Add</span><span class="lock">Lock</span></div>
+</sc-for>
+</div>
+<div class="fx ac gap8" style="padding:14px 20px;border-top:1px solid var(--line)">
+<span class="caps" style="flex:1;color:var(--ink)">1 change · URL</span><span class="btn">Discard</span><span class="btn go">Save</span>
+</div>
+</div>
+</div>
+
+</div>
+<p class="dv-next">Try next: "<a class="dv-oid" href="#1b">1b</a> with the identity fields of <a class="dv-oid" href="#1a">1a</a>" · "show the Needs first tab in <a class="dv-oid" href="#1c">1c</a>" · "the same panel for a queue and for the stack"</p>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{}'>
+class Component extends DCLogic {
+  renderVals() {
+    const tabNames = ['Runs here', 'Deployed', 'Calls', 'Needs first', 'Secrets', 'Environments', 'Other'];
+    const well = (value, empty, changed) => ({ value, well: 'well' + (empty ? ' empty' : '') + (changed ? ' changed' : '') });
+    return {
+      identity: [
+        { label: 'Name', ...well('Orders API'), lock: 'lock', lockWord: 'Lock' },
+        { label: 'Kind', ...well('.NET  ▾'), lock: 'lock', lockWord: 'Lock' },
+        { label: 'Slug', ...well('acme/orders-api'), lock: 'lock on', lockWord: 'Locked' },
+      ],
+      tabs: tabNames.map((name, i) => ({ name, cls: i === 0 ? 'tb on' : 'tb' })),
+      jumps: ['Identity', ...tabNames].map((name, i) => ({ name, cls: i === 1 ? 'caps jp on' : 'caps jp' })),
+      channels: [
+        { n: '01', name: 'Identity', mark: '' },
+        { n: '02', name: 'Runs here', mark: '1', on: true },
+        { n: '03', name: 'Deployed', mark: '' },
+        { n: '04', name: 'Calls', mark: '' },
+        { n: '05', name: 'Needs first', mark: '!' },
+        { n: '06', name: 'Secrets', mark: '' },
+        { n: '07', name: 'Environments', mark: '' },
+        { n: '08', name: 'Other', mark: '' },
+      ].map(c => ({ ...c, cls: c.on ? 'ch on' : 'ch', markCls: c.mark === '!' ? 'mk warn' : 'mk' })),
+      runs: [
+        { label: 'Start', ...well('The shell command that starts it, run in its repo', true) },
+        { label: 'URL', ...well('http://localhost:5002', false, true), hint: 'Answers on port 5002 of this Mac. Was 5001.' },
+        { label: 'Ready', ...well('GET /health  →  200') , hint: 'Started once this answers.' },
+        { label: 'Project', ...well('.NET: the project to run', true) },
+        { label: 'Base profile', ...well('.NET: the launch profile to start from', true) },
+      ],
+      after: [
+        { name: 'Mobile App', box: 'box' },
+        { name: 'Web Shop', box: 'box' },
+        { name: 'Payments API', box: 'box on' },
+        { name: 'Catalog API', box: 'box' },
+      ],
+      folds: ['Runs to completion', 'Commands on its card', 'Mock responses', 'Code changes for local runs'],
+    };
+  }
+}
+</script>
+</body>
+</html>
