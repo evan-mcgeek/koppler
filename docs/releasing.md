@@ -1,6 +1,6 @@
 # Releasing
 
-A version tag publishes Koppler to npm as `latest`, with provenance, and makes its GitHub Release.
+A version tag publishes Koppler to npm as `latest`, with provenance, and to GitHub Packages, and makes its GitHub Release.
 
 From `app/`, on `main`, with nothing uncommitted and nothing to pull:
 
@@ -15,7 +15,9 @@ The tag starts the Release workflow (`.github/workflows/release.yml`):
 
 1. It refuses a tag that is not the version in `app/package.json`.
 2. It publishes the package with `npm publish --provenance`, so npm shows the commit and the run that built it.
-3. It makes the GitHub Release, with notes from the pull requests merged since the last one.
+3. It publishes the same package to GitHub Packages as `@evan-mcgeek/koppler`, which lists it on the repository's page.
+   GitHub Packages takes only scoped names, so npm stays the place to install from: installing from GitHub Packages needs a GitHub sign-in even for a public package.
+4. It makes the GitHub Release: the install command and links to the version on npm and on GitHub Packages, then notes from the pull requests merged since the last one.
 
 ## How npm trusts the workflow
 
