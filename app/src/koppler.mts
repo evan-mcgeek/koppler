@@ -27,6 +27,7 @@ import { alive, readRecord, sh } from './engine/processes.ts';
 import { writeJson } from './json-files.ts';
 import { queryCommand } from './engine/query.ts';
 import { recipesCommand } from './engine/recipes.ts';
+import { dbCommand } from './engine/local-databases.ts';
 import { findCommand } from './engine/research.ts';
 import { run } from './engine/run.ts';
 import { appliedCommand, historyCommand, planCommand, runningNames, sessionCommand } from './engine/runs.ts';
@@ -419,6 +420,19 @@ const COMMANDS: Command[] = [
     about: 'list the stacks on this Mac (* is in use), switch to one, or list its boards',
     run: use,
     example: 'koppler use "Shop"',
+  },
+  {
+    name: 'db',
+    who: 'you',
+    args: '[local <database> <host:port[/database]> | local <database> --clear]',
+    about: "the stack's databases, and where each runs on this Mac when switched to Local",
+    run: dbCommand,
+    example: 'koppler db local orders-db localhost:5432/orders',
+    forms: [
+      ['', 'list the databases, the apps that use them and their local addresses'],
+      ['local <database> <host:port[/database]>', 'keep where it runs on this Mac (never in the stack)'],
+      ['local <database> --clear', 'forget its local address'],
+    ],
   },
   {
     name: 'link',

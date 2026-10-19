@@ -8,7 +8,7 @@ import type { Stack } from './core/stack.ts';
 import { readJson, writeJson } from './json-files.ts';
 import { tempDir } from './paths.ts';
 
-export type DataName = 'registry' | 'local' | 'repos' | 'state' | 'board-edits' | 'board-proposals';
+export type DataName = 'registry' | 'local' | 'repos' | 'state' | 'board-edits' | 'board-proposals' | 'local-databases';
 export type Data = Record<string, unknown>;
 
 // Read at each call: the tests, and a stack switch, change where the run folder is while the process lives.
@@ -53,9 +53,10 @@ export interface Clone {
   libraries?: { name: string; path: string; ecosystem: 'dart' | 'npm' }[];
 }
 /** The stack in use, its expressions filled in. It passed the stack check when it was copied here, so it is read as one. */
-export const readStack = (): Registry | null => {
+/** The stack in use, its databases folded into its apps' needs; those in `local` run on this Mac and bring none. */
+export const readStack = (local?: ReadonlySet<string>): Registry | null => {
   const stack = resolveExpressions(readData('registry')) as Registry | null;
-  return stack ? withDatabases(stack) : null;
+  return stack ? withDatabases(stack, local) : null;
 };
 /** The clones the last sync found, by app. */
 export const readClones = () => (readData('local')?.['apps'] ?? {}) as Record<string, Clone | null | undefined>;

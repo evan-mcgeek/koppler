@@ -12,7 +12,7 @@ import { of as kindOf } from '../core/kinds.ts';
 import type { BoardNode, Edge } from '../core/plan.ts';
 import { aliasReady, planSteps, planTunnels, type TunnelNeed } from '../core/ports.ts';
 import { signInOf, type SignIn } from '../core/sign-in.ts';
-import type { Prereq } from '../core/stack.ts';
+import type { App, Prereq } from '../core/stack.ts';
 import { readClones, readData, readStack, type Clone, type Registry } from '../data.ts';
 import { CODE, tempDir } from '../paths.ts';
 import { readActions, writeLogged, type Action } from './actions.ts';
@@ -32,6 +32,10 @@ import { appendRun, live, runRecord, runs, type Run } from './history.ts';
 import { wireInfo } from './wire.ts';
 import { writeJson } from '../json-files.ts';
 import { appOn } from '../core/stack.ts';
+import { databasesOf, localValue } from '../core/databases.ts';
+import { localAddresses } from './local-databases.ts';
+import { opens } from '../server/cable-test.ts';
+import os from 'node:os';
 
 type StepState = 'todo' | 'user' | 'done' | 'failed';
 interface ProgressStep {
@@ -77,6 +81,7 @@ export const tunnelsOf = (stack: Registry, id: string, env: string): TunnelNeed[
     tunnel && port ? [{ app: id, tunnel, port, env: setting, what, connectsAs }] : [],
   );
 const settingsFor = (up: Up, id: string) => (up.setEnv[id] ??= {});
+type LocalChange = NonNullable<App['localChanges']>[number] & { when?: { always: true } };
 
 interface Asked {
   env: string;
@@ -253,12 +258,59 @@ function linkLibraries(up: Up): void {
   }
 }
 
+/**
+ * Each app on a database switched to this Mac is pointed at the address kept here: through its setting, or the code
+ * change the stack names for it. Returns those changes, applied with the remembered ones.
+ */
+async function pointDatabases(up: Up, local: Record<string, 'local'>): Promise<Record<string, LocalChange[]>> {
+  const { stack, ids, left } = up;
+  const kept = localAddresses();
+  const changes: Record<string, LocalChange[]> = {};
+  const checked = new Map<string, Promise<boolean>>();
+  for (const id of ids.filter(one => !up.skip.has(one))) {
+    const app = stack.apps[id];
+    for (const db of databasesOf(stack, id).filter(one => local[one])) {
+      const database = stack.databases?.[db];
+      const use = app?.uses?.[db];
+      const name = database?.name ?? db;
+      const at = kept[db];
+      if (!at) {
+        left.push(
+          `${nameOf(stack, id)}: no address for the local ${name} database yet; set it with koppler db local ${db} <host:port/database>`,
+        );
+        up.step(id, 'Local database', 'failed', `No address for ${name} on this Mac`);
+        continue;
+      }
+      const value = localValue(database?.kind, app?.kind, at, os.userInfo().username);
+      if (use?.setting) settingsFor(up, id)[use.setting] = value;
+      if (use?.change)
+        (changes[id] ??= []).push({
+          ...use.change,
+          replace: use.change.replace.replaceAll('{local}', value),
+          when: { always: true },
+        });
+      if (!use?.setting && !use?.change)
+        left.push(
+          `${nameOf(stack, id)}: point it at the local ${name} database (${value}); the stack names no setting or code change for it`,
+        );
+      const where = `${at.host}:${String(at.port)}`;
+      if (!checked.has(where)) checked.set(where, opens(at.host, at.port));
+      if (await checked.get(where)) up.step(id, 'Local database', 'done', `${name} on ${where}`);
+      else {
+        left.push(`${nameOf(stack, id)}: nothing answers on ${where}; start your local ${name} database`);
+        up.step(id, 'Local database', 'failed', `Nothing on ${where}. Start your local ${name} database`);
+      }
+    }
+  }
+  return changes;
+}
+
 /** Remembered changes that match this board. */
-function applyRemembered(up: Up): void {
+function applyRemembered(up: Up, extra: Record<string, LocalChange[]> = {}): void {
   const { stack, ids, env, edges, left } = up;
   // A code change the stack remembers is the stack's own doing: applied only once the user allowed it.
   const allowed = approved(stack.source ?? '', stack);
-  const shared = ids.filter(id => stack.apps[id]?.localChanges?.length);
+  const shared = ids.filter(id => stack.apps[id]?.localChanges?.length || extra[id]?.length);
   if (!allowed && shared.length)
     left.push(
       `${shared.map(id => nameOf(stack, id)).join(', ')}: the stack's code changes were not applied; the user has to allow them first, in their own terminal: ${APPROVE}`,
@@ -266,8 +318,14 @@ function applyRemembered(up: Up): void {
   const withoutShared = Object.fromEntries(
     Object.entries(stack.apps).map(([id, app]) => [id, { ...app, localChanges: [] }]),
   );
+  const withExtra = Object.fromEntries(
+    Object.entries(stack.apps).map(([id, app]) => [
+      id,
+      { ...app, localChanges: [...(app.localChanges ?? []), ...(extra[id] ?? [])] },
+    ]),
+  );
   const applied = prepare({
-    registry: allowed ? stack : { ...stack, apps: withoutShared },
+    registry: { ...stack, apps: allowed ? withExtra : withoutShared },
     apps: ids.filter(id => !up.skip.has(id)),
     env,
     calls: Object.fromEntries(ids.map(id => [id, edges.filter(edge => edge.from === id).map(edge => edge.to)])),
@@ -552,10 +610,12 @@ async function startApps(up: Up): Promise<void> {
 }
 
 /** Carries a run out. Without a confirmed Send (`board`), only tunnels and apps start, and nothing is recorded. */
-async function carryOut(stack: Registry, args: string[]): Promise<void> {
+async function carryOut(deployed: Registry, args: string[]): Promise<void> {
   const runId = flagValue(args, '--run');
   const all = runs();
   const board = runId ? (all.find(one => one.id === runId) ?? fail(`no run ${runId} in the history`)) : null;
+  // A database on this Mac brings no tunnel or hosts entry.
+  const stack = board?.databases ? (readStack(new Set(Object.keys(board.databases))) ?? deployed) : deployed;
   keepRunLogs(board?.id);
   const env = board?.env ?? flagValue(args, '--env') ?? stack.envs[0] ?? '';
   const latest = board ?? all.findLast(one => one.kind === 'run' && one.env === env);
@@ -642,6 +702,7 @@ async function carryOut(stack: Registry, args: string[]): Promise<void> {
       nodes,
       edges,
       ...(board.queues && { queues: board.queues }),
+      ...(board.databases && { databases: board.databases }),
     });
   };
   try {
@@ -649,7 +710,7 @@ async function carryOut(stack: Registry, args: string[]): Promise<void> {
       await stopFirst(up, board);
       switchBranches(up);
       linkLibraries(up);
-      applyRemembered(up);
+      applyRemembered(up, board.databases ? await pointDatabases(up, board.databases) : {});
       wireCables(up);
     }
     await openTunnels(up);

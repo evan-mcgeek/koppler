@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { withDatabases } from './databases.ts';
+import { localValue, withDatabases } from './databases.ts';
 import { validateStack, type Stack } from './stack.ts';
 
 const stack: Stack = {
@@ -56,4 +56,19 @@ test('a use of a database the stack does not name is a problem; one it names is 
   expect(validateStack(stack).filter(problem => problem.includes('uses') || problem.startsWith('databases'))).toEqual(
     [],
   );
+});
+
+test('a database switched to this Mac brings no tunnel or hosts entry', () => {
+  const prereqs = withDatabases(stack, new Set(['orders-db'])).apps['orders']?.prereqs;
+  expect(prereqs?.map(need => need.tunnel ?? need.hosts ?? need.sso)).toEqual(['acme-dev', 'cache.qa.acme.example']);
+});
+
+test("a local database's address is written the way the app's kind reads it", () => {
+  const at = { host: 'localhost', port: 5433, database: 'orders_dev' };
+  expect(localValue('postgres', 'dotnet', at, 'ivan')).toBe(
+    'Host=localhost;Port=5433;Database=orders_dev;Username=ivan',
+  );
+  expect(localValue('mysql', 'dotnet', at, 'ivan')).toBe('Server=localhost;Port=5433;Database=orders_dev;User=ivan');
+  expect(localValue('postgres', 'node', at, 'ivan')).toBe('postgres://ivan@localhost:5433/orders_dev');
+  expect(localValue('valkey', 'dotnet', { host: 'localhost', port: 6379 }, 'ivan')).toBe('localhost:6379');
 });

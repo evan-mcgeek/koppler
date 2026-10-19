@@ -79,7 +79,7 @@ const answers: Probe['answers'] = url =>
       done(null);
     });
   });
-const opens: Probe['opens'] = (host, port) =>
+export const opens: Probe['opens'] = (host, port) =>
   new Promise(resolve => {
     const socket = net.connect({ host, port, timeout: 1500 });
     const done = (open: boolean) => {

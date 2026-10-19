@@ -30,7 +30,9 @@ import { newToken, pageToken, writePageUrl } from './token.ts';
 import type { StoredPreset } from '../core/presets.ts';
 import { createStack, currentStack, forgetStacks, useStack } from '../engine/stacks.ts';
 import { CODE, tempDir } from '../paths.ts';
-import { cableTest } from './cable-test.ts';
+import { cableTest, opens } from './cable-test.ts';
+import { addressProblem, keepAddress } from '../engine/local-databases.ts';
+import type { LocalAddress } from '../core/databases.ts';
 import { appendDebugLog, clearDebugLog } from './logs.ts';
 import { fetchPresets, sanitizeLayout } from './sanitize.ts';
 import { secretRequest } from './secrets.ts';
@@ -40,6 +42,15 @@ import { APP_ID } from '../ids.ts';
 
 type Loose = Record<string, unknown>;
 type Route = (body: Loose) => Answer | Promise<Answer>;
+
+/** A database of the stack and the local address the page sent for it, or why it is refused. */
+const localDatabase = (body: Loose): { id: string; at: LocalAddress } | { error: string } => {
+  const id = body['id'];
+  if (typeof id !== 'string' || !readStack()?.databases?.[id]) return { error: 'No such database in the stack.' };
+  const at = { host: body['host'], port: body['port'], ...(body['database'] !== '' && { database: body['database'] }) };
+  const problem = addressProblem(at as Partial<LocalAddress>);
+  return problem ? { error: `Needs ${problem}.` } : { id, at: at as LocalAddress };
+};
 
 // Never starts with a dash: an id is passed to `koppler` as an argument, and must not read as a flag.
 const isApp = (value: unknown): value is string => typeof value === 'string' && APP_ID.test(value);
@@ -154,6 +165,26 @@ export const ROUTES: Record<string, Route> = {
   },
   // One field of the stack, set or taken out, checked as the terminal's koppler stack set is.
   // A new address for the page: every address given out before stops working. The page moves to the new one.
+  // Where a database runs on this Mac: kept here only, never in the stack. `clear` forgets it.
+  '/local-database': body => {
+    if (body['clear'] === true) {
+      const id = body['id'];
+      if (typeof id !== 'string' || !readStack()?.databases?.[id])
+        return { status: 400, body: { error: 'No such database in the stack.' } };
+      keepAddress(id, null);
+      return { status: 200, body: { ok: true } };
+    }
+    const asked = localDatabase(body);
+    if ('error' in asked) return { status: 400, body: asked };
+    keepAddress(asked.id, asked.at);
+    return { status: 200, body: { ok: true } };
+  },
+  // Test connection: whether anything answers on that address, before it is kept.
+  '/local-database-test': async body => {
+    const asked = localDatabase(body);
+    if ('error' in asked) return { status: 400, body: asked };
+    return { status: 200, body: { open: await opens(asked.at.host, asked.at.port) } };
+  },
   '/new-address': body => {
     newToken();
     const port = typeof body['port'] === 'string' && /^\d{2,5}$/.test(body['port']) ? body['port'] : '';

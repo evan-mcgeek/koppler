@@ -148,6 +148,9 @@ const Database = z.looseObject(
 const Use = z.looseObject(
   {
     setting: setting.optional().describe('The setting its connection comes from, set to a local database when Local'),
+    change: LocalChange.optional().describe(
+      'A code change for a run on a local database, when the app reads no setting for it; {local} is its address',
+    ),
     note: z.string().optional().describe('Anything else worth knowing, in words'),
   },
   { error: 'an object ({} when nothing is known yet)' },

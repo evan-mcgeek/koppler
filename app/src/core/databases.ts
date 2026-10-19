@@ -39,9 +39,16 @@ const add = (own: Prereq[], more: Prereq[]): Prereq[] => [
   ),
 ];
 
-/** The stack with each app's databases folded into its needs, on every environment. Never written back. */
-export function withDatabases<S extends Stackish>(stack: S): S {
-  const databases = stack.databases ?? {};
+/** The databases an app uses, by id, that the stack names. */
+export const databasesOf = (stack: Pick<Stackish, 'apps' | 'databases'>, id: string): string[] =>
+  Object.keys(stack.apps[id]?.uses ?? {}).filter(key => !!stack.databases?.[key]);
+
+/**
+ * The stack with each app's databases folded into its needs, on every environment. One switched to this Mac (`local`)
+ * brings none: it has no tunnel. Never written back.
+ */
+export function withDatabases<S extends Stackish>(stack: S, local: ReadonlySet<string> = new Set()): S {
+  const databases = Object.fromEntries(Object.entries(stack.databases ?? {}).filter(([id]) => !local.has(id)));
   const first = stack.envs[0] ?? '';
   const apps = Object.fromEntries(
     Object.entries(stack.apps).map(([id, app]) => {
@@ -60,4 +67,35 @@ export function withDatabases<S extends Stackish>(stack: S): S {
     }),
   );
   return { ...stack, apps };
+}
+
+/** Where a database on this Mac runs, as the user gave it. */
+export interface LocalAddress {
+  host: string;
+  port: number;
+  /** The database's name on that server; none for a cache. */
+  database?: string;
+}
+
+const CACHES = ['valkey', 'redis'];
+
+/**
+ * The value an app's connection setting takes for a database on this Mac, in the form its kind expects: a .NET app's
+ * key=value connection string, else a URL; a cache is its host and port. The local server's user is the Mac's own,
+ * as Homebrew and Postgres.app set them up, with no password.
+ */
+export function localValue(
+  kind: string | undefined,
+  appKind: string | undefined,
+  at: LocalAddress,
+  user: string,
+): string {
+  const where = `${at.host}:${String(at.port)}`;
+  if (CACHES.includes(kind ?? '')) return where;
+  const name = at.database ?? '';
+  if (appKind === 'dotnet')
+    return kind === 'mysql'
+      ? `Server=${at.host};Port=${String(at.port)};Database=${name};User=${user}`
+      : `Host=${at.host};Port=${String(at.port)};Database=${name};Username=${user}`;
+  return `${kind === 'mysql' ? 'mysql' : 'postgres'}://${encodeURIComponent(user)}@${where}/${encodeURIComponent(name)}`;
 }
