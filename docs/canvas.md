@@ -17,7 +17,7 @@ A board file can also be opened, dropped on the page or linked from GitHub.
 
 ## Cards
 
-<img alt="One feature, Checkout, worked on across four apps: the mobile app and web shop cabled to a local Orders API, which calls a local Payments API; each runs its feature/checkout branch, Orders API has a database tunnel and a local SQS queue, two apps carry a note for the agent, and everything runs" src="images/board.png">
+<img alt="One feature, Checkout, worked on across four apps: the mobile app and web shop cabled to a local Orders API, which calls a local Payments API; each runs its feature/checkout branch, Orders API has its deployed QA database and a local SQS queue, two apps carry a note for the agent, and everything runs" src="images/board.png">
 
 Each app is a card with:
 
@@ -74,9 +74,16 @@ Every call without a cable goes to the deployed app of the chosen environment.
 Cables are always curves, so any board you see is one you could draw yourself.
 A cable leaves its caller from a hollow ring and plugs into the app it calls at a solid socket.
 
-## Tunnels, queues and outside systems
+## Databases, tunnels, queues and outside systems
 
 These appear next to the app that uses them, and show or hide with it.
+
+<img alt="Orders API and Payments API, their databases Orders and Payments behind one tunnel to the Aurora cluster: the tunnel card has a row for each database, open for both, and each database card is deployed on QA and reachable" src="images/databases.png">
+
+- **Databases** the stack names under `databases` each have a card, with a switch between **Deployed** (dashed: the environment's database, through its tunnel) and **Local** (solid: your own database on this Mac).
+  The first time a database goes Local, its card asks where it runs (host, port, database name), with **Test connection**; the address is kept on this Mac only, never in the stack, and can be changed from the card or the database's settings.
+  A run points each app at its local database through its setting, or the one line the stack says to change, undone on Stop. Deployed on PROD asks first.
+- The tunnel card has a row per database behind it, and the line to each database leaves from its row. **Show tunnel** on an app's card draws its line through the tunnel card, or straight to the database; by default the tunnel shows when two or more apps on the board share it. A right click on a line does the same.
 
 - **Tunnels** carry an app to a deployed database or service. Koppler opens one per host and port, shared by the apps that need it, and moves a clashing one to a free port. Each can be left out of a run, and one that runs can be restarted from its card when calls through it hang.
 - **Queues** (SQS, SNS, EventBridge, Kafka) show which apps publish and read. A switch on the card picks **Deployed** (local apps use the environment's queue) or **Local** (Koppler starts an SQS emulator or a Kafka broker in Docker and points every app on that queue at it). A queue can be hidden and shown again from its app.

@@ -15,9 +15,14 @@ const shot = async (page: Page, name: string, clip?: { x: number; y: number; wid
 
 const { web = {}, orders = {}, payments = {}, catalog = {} } = STACK.apps;
 type Apps = Record<string, Record<string, unknown>>;
-const stack: { queues: object; apps: Apps } & typeof STACK = {
+const stack: { queues: object; databases: object; apps: Apps } & typeof STACK = {
   ...STACK,
   queues: { 'order-events': { name: 'Order events', type: 'sqs', queue: 'order-events-qa' } },
+  // One tunnel to the Aurora cluster, with each API's database behind it.
+  databases: {
+    'orders-db': { name: 'Orders', kind: 'postgres', tunnel: 'aurora.qa.acme.example', port: 5432 },
+    'payments-db': { name: 'Payments', kind: 'postgres', tunnel: 'aurora.qa.acme.example', port: 5432 },
+  },
   apps: {
     mobile: {
       name: 'Mobile App',
@@ -26,7 +31,7 @@ const stack: { queues: object; apps: Apps } & typeof STACK = {
       consumes: { orders: { how: 'env', env: 'ORDERS_URL' } },
     },
     web,
-    orders: { ...orders, publishes: { 'order-events': {} } },
+    orders: { ...orders, prereqs: [], envs: {}, publishes: { 'order-events': {} }, uses: { 'orders-db': {} } },
     payments: {
       ...payments,
       reads: { 'order-events': {} },
@@ -51,8 +56,8 @@ const board = {
   nodes: {
     mobile: { ...at(0, 0), platform: 'ios' },
     web: at(0, 480),
-    orders: { ...at(560, 200), note: 'Seed two test orders after it starts' },
-    payments: { ...at(1160, 200), note: 'Use the sandbox merchant account, not the live one' },
+    orders: { ...at(560, 0), note: 'Seed two test orders after it starts' },
+    payments: { ...at(1160, 0), note: 'Use the sandbox merchant account, not the live one' },
   },
   queues: { 'order-events': 'local' },
   edges: [
@@ -170,5 +175,44 @@ test.describe('zoomed out', () => {
     await page.mouse.move(700, 850);
     await page.waitForTimeout(600);
     await shot(page, 'zoomed-out');
+  });
+});
+
+// Two APIs whose databases sit behind one tunnel to the Aurora cluster.
+test.describe('databases', () => {
+  const { apps } = stack;
+  const alone = (id: string, uses: string) => {
+    const { publishes: _p, reads: _r, consumes: _c, ...app } = apps[id] ?? {};
+    return { ...app, uses: { [uses]: {} } };
+  };
+  test.use({
+    stack: {
+      ...stack,
+      queues: {},
+      apps: { orders: alone('orders', 'orders-db'), payments: alone('payments', 'payments-db') },
+    },
+    board: {
+      env: 'qa',
+      mode: 'auto',
+      zoom: 0.62,
+      pan: { x: 80, y: 90 },
+      nodes: { orders: { ...at(0, 0), showQueues: false }, payments: { ...at(760, 0), showQueues: false } },
+      edges: [],
+    },
+  });
+  test('behind their tunnel', async ({ page }) => {
+    await running(page);
+    await healthy(page);
+    await page.reload();
+    await settle(page);
+    await expect(page.locator('.svelte-flow__node-database')).toHaveCount(2);
+    const boxes = (
+      await Promise.all((await page.locator('.svelte-flow__node').all()).map(one => one.boundingBox()))
+    ).flatMap(one => one ?? []);
+    const x = Math.min(...boxes.map(one => one.x)) - 32;
+    const y = Math.min(...boxes.map(one => one.y)) - 32;
+    const width = Math.max(...boxes.map(one => one.x + one.width)) + 32 - x;
+    const height = Math.max(...boxes.map(one => one.y + one.height)) + 32 - y;
+    await shot(page, 'databases', { x, y, width, height });
   });
 });
