@@ -115,3 +115,11 @@ test('the Run review groups databases by where the data lives, and the run carri
   await expect.poll(() => sent(canvas.temp).at(-1)?.data['databases']).toEqual({ 'payments-db': 'local' });
   expect(sent(canvas.temp).at(-1)?.text).toContain("DATABASE Payments: local, the user's own on this Mac");
 });
+
+test("a database's gear opens its settings, kept under databases in the stack", async ({ page }) => {
+  await database(page, 'Orders').getByRole('button', { name: 'Settings for Orders' }).click();
+  const panel = page.getByRole('dialog');
+  await expect(panel).toContainText('Orders');
+  await expect(panel.getByRole('textbox').first()).toBeVisible();
+  await page.screenshot({ path: 'test-results/databases-settings.png' });
+});

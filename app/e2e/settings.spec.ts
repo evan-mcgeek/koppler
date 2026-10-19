@@ -111,7 +111,7 @@ test('a need is a row that says what it is; a new one asks its type and shows on
   const tunnel = needs.locator('details.rowed').filter({ hasText: 'Database (Postgres), db.qa.acme.example:5432' });
   await expect(tunnel.locator('summary')).toContainText('Tunnel');
   await tunnel.locator('summary').click();
-  await expect(tunnel.getByLabel('Host', { exact: true })).toHaveValue('db.qa.acme.example');
+  await expect(tunnel.getByLabel('Tunnel to', { exact: true })).toHaveValue('db.qa.acme.example');
   await expect(tunnel.getByLabel('AWS profile')).toHaveCount(0);
 
   await needs.getByRole('button', { name: 'Add a need' }).click();
@@ -127,7 +127,7 @@ test('a need is a row that says what it is; a new one asks its type and shows on
   ]);
   await types.getByRole('button', { name: /AWS sign-in/ }).click();
   const fresh = needs.getByRole('group', { name: 'New in Needs first' });
-  await expect(fresh.getByLabel('Host', { exact: true })).toHaveCount(0);
+  await expect(fresh.getByLabel('Tunnel to', { exact: true })).toHaveCount(0);
   // The profiles of this Mac are offered by name.
   await fresh.getByLabel('AWS profile', { exact: true }).selectOption('acme-dev');
   await fresh.getByLabel('Account', { exact: true }).fill('123456789012');

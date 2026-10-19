@@ -13,14 +13,20 @@ interface AppLike {
   envs?: Record<string, { prereqs?: Prereq[] | undefined } | undefined> | undefined;
 }
 
-const KIND_LABELS: Record<string, string> = { postgres: 'Postgres', mysql: 'MySQL', valkey: 'Valkey', redis: 'Redis' };
+/** The kinds of database Koppler knows, by their words. */
+export const DATABASE_KINDS: Record<string, string> = {
+  postgres: 'Postgres',
+  mysql: 'MySQL',
+  valkey: 'Valkey',
+  redis: 'Redis',
+};
 
 /** The needs a database brings on one environment, or none when it is not reached there. */
 export function databaseNeeds(database: Database, env: string, first: string): Prereq[] {
   // Another environment's tunnel or name is never borrowed: each environment states its own.
   const reach = env === first ? database : database.envs?.[env];
   if (!reach) return [];
-  const kind = database.kind ? (KIND_LABELS[database.kind] ?? database.kind) : '';
+  const kind = database.kind ? (DATABASE_KINDS[database.kind] ?? database.kind) : '';
   const what = `${database.name ?? 'Database'}${kind ? ` (${kind})` : ''}`;
   return [
     ...(reach.tunnel && reach.port

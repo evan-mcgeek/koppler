@@ -6,6 +6,7 @@
   // schema has is there. Edits are a draft until Save, which checks the whole stack and writes it at once; Discard drops
   // them. A lock keeps a field as it is, for the user and the agent.
   import { KINDS } from '../src/core/kinds.ts';
+  import { DATABASE_KINDS } from '../src/core/databases.ts';
   import { SECRET_TYPES } from '../src/core/secret-types.ts';
   import { getAt, parsePath, setAt } from '../src/core/stack-path.ts';
   import EnvOverrides from './EnvOverrides.svelte';
@@ -164,6 +165,11 @@
             .map(([id, kind]) => ({ value: id, label: kind.label ?? id, kind: id })),
         ],
       };
+    if (/^databases\.[a-z0-9-]+\.kind$/.test(path))
+      return {
+        options: Object.entries(DATABASE_KINDS).map(([id, words]) => ({ value: id, label: words })),
+        other: true,
+      };
     if (key === 'sso') return typed(choices.awsProfiles);
     if (key === 'signIn') return typed(Object.keys(all.signIns ?? {}), false);
     if (key === 'how' && /consumes/.test(path)) return { options: HOWS };
@@ -207,6 +213,8 @@
       if (/(^|\.)consumes$/.test(path))
         return board.apps.map(one => one.id).filter(id => !path.startsWith(`apps.${id}.`));
       if (/(^|\.)(envs|sam\.envs)$/.test(path)) return board.envs;
+      if (/(^|\.)uses$/.test(path))
+        return Object.keys((getAt(draft, ['databases']) as Record<string, unknown> | undefined) ?? {});
       if (/(^|\.)(publishes|reads)$/.test(path))
         return Object.keys((getAt(draft, ['queues']) as Record<string, unknown> | undefined) ?? {});
       return null;
