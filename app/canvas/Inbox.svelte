@@ -20,6 +20,18 @@
   /** Only the newest message and questions still open can be acted on; the rest is history. */
   const past = (one: Message) =>
     !waits(one) && (list[0] !== one || one.answered?.via === 'dismissed' || one.answered?.via === 'replaced');
+  // What the agent is at, the same as the button that opens this panel says, with what it took.
+  const minutes = $derived.by(() => {
+    const took = Date.parse(live.status?.agent?.busy ?? '');
+    return Number.isNaN(took) || !live.status ? 0 : Math.floor((Date.now() - took) / 60000);
+  });
+  // Ten minutes on, the button calls it quiet: most likely it stopped, so this no longer says it works.
+  const busy = $derived(live.status?.agent?.state === 'busy' && minutes < 10);
+  const task = $derived.by(() => {
+    const run = live.status?.runs?.findLast(one => one.state === 'applying' || one.state === 'waiting');
+    if (!run) return 'your request';
+    return run.kind === 'stop' ? 'the Stop' : `the run on ${(run.env ?? '').toUpperCase()}`;
+  });
   // Opened by a question: its first choice is ready under the keys.
   $effect(() => {
     if (inbox.open)
@@ -49,6 +61,13 @@
       >
     </header>
     <div class="list">
+      {#if busy}
+        <p class="working" role="status">
+          <span class="dot" aria-hidden="true"></span>
+          <span>Working on {task}{minutes ? `, ${String(minutes)} min` : ''}</span>
+          <small>It takes the next request once this one is done.</small>
+        </p>
+      {/if}
       {#if inbox.waiting.length}
         <section class="waiting" aria-labelledby="waiting-title">
           <h3 id="waiting-title">Waiting for an agent ({inbox.waiting.length})</h3>
@@ -142,6 +161,38 @@
   .none {
     margin: 0;
     color: var(--muted);
+  }
+  .working {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: 2px 10px;
+    margin: 0;
+    padding: 10px 12px;
+    border: 1px solid var(--line);
+    font-weight: 600;
+  }
+  .working small {
+    grid-column: 2;
+    color: var(--muted);
+    font-weight: 400;
+    font-size: 12px;
+  }
+  .working .dot {
+    width: 6px;
+    height: 6px;
+    background: var(--live);
+    animation: working 1.4s ease-in-out infinite;
+  }
+  @keyframes working {
+    50% {
+      opacity: 0.35;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .working .dot {
+      animation: none;
+    }
   }
   .waiting {
     display: grid;
