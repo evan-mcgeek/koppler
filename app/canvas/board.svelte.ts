@@ -253,9 +253,11 @@ class Board {
   entering = false;
   /** Zoomed out or in Live the cards are short, each in the room its full form takes. */
   brief = $state(false);
+  /** An area is being dragged out to select cards: what it picks is not settled until it is let go. */
+  selecting = $state(false);
   /** Zoomed out in Edit with one app card picked: its choices show in the panel beside the board. */
   panelCard = $derived.by(() => {
-    if (!this.brief || this.live || this.present) return undefined;
+    if (!this.brief || this.live || this.present || this.selecting) return undefined;
     const picked = this.nodes.filter(node => node.selected);
     return picked.length === 1 ? picked[0] : undefined;
   });

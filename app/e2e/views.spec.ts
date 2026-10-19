@@ -89,12 +89,14 @@ test('Present shows the board alone, and Escape brings the page back', async ({ 
   await expect(bar).toBeVisible();
 });
 
-test('the toolbar sits at the bottom left and the overview of the board at the bottom right, on one line', async ({
+test('the toolbar sits at the bottom in the middle and the overview of the board at the bottom right, on one line', async ({
   page,
 }) => {
   const map = await page.getByRole('img', { name: 'Overview of the board' }).boundingBox();
   const tools = await page.getByRole('toolbar', { name: 'Board' }).boundingBox();
-  if (!map || !tools) throw new Error('not on the page');
+  const board = await page.locator('.svelte-flow').boundingBox();
+  if (!map || !tools || !board) throw new Error('not on the page');
+  expect(Math.abs(tools.x + tools.width / 2 - (board.x + board.width / 2))).toBeLessThan(2);
   expect(tools.x + tools.width).toBeLessThan(map.x);
   expect(Math.abs(map.y + map.height - (tools.y + tools.height))).toBeLessThan(2);
 });

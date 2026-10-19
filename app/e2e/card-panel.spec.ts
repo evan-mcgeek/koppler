@@ -126,3 +126,30 @@ test.describe('a card the panel does not cover', () => {
     expect(await x('web')).toBe(web);
   });
 });
+
+test('a dragged selection opens the panel only once let go, and only when it picked one card', async ({ page }) => {
+  const web = await card(page, 'web').boundingBox();
+  const orders = await card(page, 'orders').boundingBox();
+  if (!web || !orders) throw new Error('not on the page');
+  const panels = page.locator('aside[aria-labelledby="card-panel-title"]');
+  // Around Web Shop alone: while the area is still being dragged, nothing opens.
+  await page.mouse.move(web.x - 20, web.y - 20);
+  await page.mouse.down();
+  await page.mouse.move(web.x + web.width + 10, web.y + web.height + 10, { steps: 10 });
+  await expect(card(page, 'web')).toHaveClass(/selected/);
+  await page.waitForTimeout(300);
+  await expect(panels).toHaveCount(0);
+  await page.mouse.up();
+  await expect(page.getByRole('complementary', { name: 'Web Shop' })).toBeVisible();
+
+  // Around both cards: let go, still no panel.
+  await page.locator('.svelte-flow__pane').click({ position: { x: 10, y: 10 } });
+  await expect(panels).toHaveCount(0);
+  await page.mouse.move(web.x - 20, web.y - 20);
+  await page.mouse.down();
+  await page.mouse.move(orders.x + orders.width + 10, orders.y + orders.height + 10, { steps: 10 });
+  await page.mouse.up();
+  await expect(card(page, 'orders')).toHaveClass(/selected/);
+  await page.waitForTimeout(300);
+  await expect(panels).toHaveCount(0);
+});

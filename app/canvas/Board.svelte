@@ -465,6 +465,8 @@
     panOnScrollSpeed={1}
     panOnDrag={panning ? true : [1, 2]}
     selectionOnDrag={!panning}
+    onselectionstart={() => (board.selecting = true)}
+    onselectionend={() => (board.selecting = false)}
     selectionMode={SelectionMode.Partial}
     colorMode={isLight(appearance.now.scheme) ? 'light' : 'dark'}
     minZoom={0.2}
@@ -504,7 +506,7 @@
         </label>
       </div>
     </Panel>
-    <Panel position="bottom-left">
+    <Panel position="bottom-center">
       <div class="tools" role="toolbar" aria-label="Board">
         <div class="switch" role="radiogroup" aria-label="Dragging on the board">
           {#each TOOLS as [name, title, icon] (name)}
@@ -856,9 +858,10 @@
     font-size: 12px;
   }
   /* Over the toolbar, with the other ways to move the view. */
-  /* The toolbar keeps clear of the overview of the board, bottom right, and wraps when the board is narrow. */
-  .area :global(.svelte-flow__panel.bottom.left) {
-    max-width: calc(100% - 230px);
+  /* The toolbar sits in the middle, clear of the overview of the board on its right, and wraps when the board is
+     narrow. */
+  .area :global(.svelte-flow__panel.bottom.center) {
+    max-width: calc(100% - 460px);
   }
   .area :global(.svelte-flow__minimap) {
     margin: 0 15px 15px 0;
