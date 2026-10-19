@@ -148,3 +148,14 @@ test('the keyboard: Space presses the focused button, and shortcuts stay off und
   await page.keyboard.press('l');
   await expect(live).toBeChecked();
 });
+
+test('a narrow window drops the words from the top bar, and a wide one brings them back', async ({ page }) => {
+  const bar = page.locator('header').first();
+  const logs = bar.getByRole('button', { name: 'Logs' });
+  await expect(bar).not.toHaveClass(/compact/);
+  await page.setViewportSize({ width: 760, height: 800 });
+  await expect(bar).toHaveClass(/compact/);
+  await page.setViewportSize({ width: 1600, height: 800 });
+  await expect(bar).not.toHaveClass(/compact/);
+  await expect(logs).toBeVisible();
+});

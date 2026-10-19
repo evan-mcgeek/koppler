@@ -241,7 +241,15 @@
   };
   $effect(() => {
     if (!bar) return;
-    const watch = new ResizeObserver(fitBar);
+    // Fitted on the next frame, and only when its width changed: dropping the words changes its height, and a change
+    // of size made while the browser hands out sizes is what it reports as a ResizeObserver loop.
+    let width = 0;
+    const watch = new ResizeObserver(([entry]) => {
+      const now = Math.round(entry?.contentRect.width ?? 0);
+      if (now === width) return;
+      width = now;
+      requestAnimationFrame(fitBar);
+    });
     watch.observe(bar);
     return () => {
       watch.disconnect();

@@ -2,7 +2,7 @@
 // waypoints, sliding an end along its side). The geometry is core/cables and core/arrange, unchanged.
 import type { Edge, Node } from '@xyflow/svelte';
 import { resolveExpressions } from '../src/core/expressions.ts';
-import { arrange, sidesFor, squeeze, type Point, type Side } from '../src/core/arrange.ts';
+import { arrange, sidesFor, type Point, type Side } from '../src/core/arrange.ts';
 import { endOffsets, orderSlots, sidePoint, SIDES, type Box, type Cable } from '../src/core/cables.ts';
 import { of as kindOf } from '../src/core/kinds.ts';
 import { isProtected, LOCAL_QUEUE_TYPES, queuesOf } from '../src/core/plan.ts';
@@ -251,7 +251,7 @@ class Board {
   present = $state(false);
   /** Full screen is being changed from here: the browser's word about it is not the user leaving.  */
   entering = false;
-  /** Zoomed out or in Live the cards are short: the empty bands their full form needs are squeezed, on screen only. */
+  /** Zoomed out or in Live the cards are short, each in the room its full form takes. */
   brief = $state(false);
   /** Zoomed out in Edit with one app card picked: its choices show in the panel beside the board. */
   panelCard = $derived.by(() => {
@@ -259,7 +259,7 @@ class Board {
     const picked = this.nodes.filter(node => node.selected);
     return picked.length === 1 ? picked[0] : undefined;
   });
-  /** Each card's height in full, as last drawn so: short, the room it needs only then is closed up. */
+  /** Each card's height in full, as last drawn so: short, it is drawn in the middle of that room. */
   fullHeights = $state.raw<Record<string, number>>({});
   /**
    * How far down a short card is drawn inside the room its full form takes: centred on the full card's middle, so the
@@ -274,57 +274,13 @@ class Board {
       }),
     ),
   );
-  #squeeze(top: (id: string, at: Point) => number = (_, at) => at.y) {
-    const taken: [number, number][] = [];
-    const needed: [number, number][] = [];
-    for (const { id, position, measured } of [...this.nodes, ...this.infra]) {
-      const height = measured?.height;
-      if (!height) continue;
-      const y = top(id, position);
-      const inset = this.#insets.get(id) ?? 0;
-      taken.push([y + inset, y + inset + height]);
-      const full = this.fullHeights[id] ?? 0;
-      // The room only the full card needs, above and below the short one, is closed up.
-      if (inset) needed.push([y, y + inset]);
-      if (full > height) needed.push([y + inset + height, y + full]);
-    }
-    return squeeze(this.brief ? taken : [], this.brief ? needed : []);
-  }
-  #squeezed = squeeze([], []);
-  /**
-   * Every card's place and height when the zoomed-out board last moved by hand: while they stay so, what it closes up
-   * stays too, so a card let go never shifts the others. Zoomed in, or laid out anew (Arrange, undo, a card added,
-   * removed or resized), it is closed up again.
-   */
-  #held: string | null = null;
-  #shape = () =>
-    [...this.nodes, ...this.infra]
-      .map(
-        ({ id, position, measured }) =>
-          `${id} ${String(position.x)} ${String(position.y)} ${String(measured?.height ?? 0)}`,
-      )
-      .join('|');
-  /** While a card is dragged the board holds still around it, so it stays under the pointer. */
-  squeezed = $derived.by(() => {
-    const shape = this.#shape();
-    if ([...this.nodes, ...this.infra].some(card => card.dragging)) return this.#squeezed;
-    if (this.brief && this.#held === shape) return this.#squeezed;
-    this.#held = null;
-    this.#squeezed = this.#squeeze();
-    return this.#squeezed;
-  });
-  /** Where a card kept at this place is drawn, and back: short, in the middle of its full form's room. */
-  shown = (at: Point, id = ''): Point => ({ x: at.x, y: this.squeezed.show(at.y + (this.#insets.get(id) ?? 0)) });
-  stored = (at: Point, id = ''): Point => ({ x: at.x, y: this.squeezed.back(at.y) - (this.#insets.get(id) ?? 0) });
-  /** Where a card let go at this place is kept: counting the room it now takes there, it stays drawn where it was let go. */
+  /** Where a card kept at this place is drawn, and back: short, in the middle of its full form's room, so nothing on
+   *  the board moves as it is zoomed across: the board only scales. */
+  shown = (at: Point, id = ''): Point => ({ x: at.x, y: at.y + (this.#insets.get(id) ?? 0) });
+  stored = (at: Point, id = ''): Point => ({ x: at.x, y: at.y - (this.#insets.get(id) ?? 0) });
+  /** Where a card let go at this place is kept. */
   dropped(id: string, at: Point): Point {
-    const inset = this.#insets.get(id) ?? 0;
-    let y = this.squeezed.back(at.y) - inset;
-    // Zoomed out, the board holds still after a drop: the place is read off it as it is.
-    if (this.brief) return { x: at.x, y };
-    for (let tries = 0; tries < 4; tries++)
-      y = this.#squeeze((one, kept) => (one === id ? y : kept.y)).back(at.y) - inset;
-    return { x: at.x, y };
+    return this.stored(at, id);
   }
 
   /** The cards as drawn. */
@@ -639,6 +595,32 @@ class Board {
    * The cards an app leads that hang under it stay clear of it, however it grew (its steps showing as the page filled
    * in, a note): its own at least the usual gap under it, and none over the card above it.
    */
+  /** Each tunnel, queue or outside card's width when last drawn. */
+  #widths: Record<string, number | undefined> = {};
+  /**
+   * A tunnel, queue or outside card that turned wider and now lies on an app card moves out to the side it is on, the
+   * usual half gap away. One merely placed or dragged there stays.
+   */
+  #offApps(apps: CardNode[], cards: InfraNode[]): InfraNode[] {
+    return cards.map(card => {
+      const w = card.measured?.width;
+      const h = card.measured?.height;
+      const was = this.#widths[card.id];
+      if (w) this.#widths[card.id] = w;
+      if (card.dragging || !w || !h || (was !== undefined && w <= was)) return card;
+      let { x } = card.position;
+      const { y } = card.position;
+      for (const app of apps) {
+        const aw = app.measured?.width;
+        const ah = Math.max(app.measured?.height ?? 0, this.fullHeights[app.id] ?? 0);
+        if (!aw || !ah) continue;
+        const { x: ax, y: ay } = app.position;
+        if (x >= ax + aw || ax >= x + w || y >= ay + ah || ay >= y + h) continue;
+        x = x + w / 2 < ax + aw / 2 ? ax - w - TUNNEL.gap / 2 : ax + aw + TUNNEL.gap / 2;
+      }
+      return x === card.position.x ? card : { ...card, position: { x, y } };
+    });
+  }
   #clear(apps: CardNode[], cards: InfraNode[]): InfraNode[] {
     let result = cards;
     for (const { id, position, measured } of apps) {
@@ -946,7 +928,7 @@ class Board {
     );
   }
 
-  /** The cards as the flow draws them: squeezed into view when far away. */
+  /** The cards as the flow draws them: short ones in the middle of their full form's room. */
   flowNodes(): (CardNode | InfraNode)[] {
     return [...this.nodes, ...this.infra].map(node => {
       const position = this.shown(node.position, node.id);
@@ -1004,7 +986,7 @@ class Board {
       const height = measured?.height;
       if (height) this.#heights[id] = { brief, height };
       if (height && height !== last?.height) resized.push(id);
-      // Only growing in the same form moves what is under it: a change of form is squeezed on screen instead.
+      // Only growing in the same form moves what is under it: a change of form is drawn in the full form's room.
       const by = settled && last?.brief === brief && height ? height - last.height : 0;
       if (by) grew[id] = { bottom: last?.height ?? 0, by };
       const box = this.boxes.get(id);
@@ -1032,9 +1014,9 @@ class Board {
       apps.filter(app => resized.includes(app.id)),
       infra,
     );
+    infra = this.#offApps(apps, infra);
     this.nodes = apps;
     this.infra = infra;
-    if (this.brief && drawn.some(node => node.dragging || kept.get(node.id)?.dragging)) this.#held = this.#shape();
     return Object.keys(grew).length > 0;
   }
 
