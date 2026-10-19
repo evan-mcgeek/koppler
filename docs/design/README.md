@@ -9,7 +9,7 @@ This folder keeps what came out of it, so the design travels with the code.
 
 | Design | What it settles |
 |---|---|
-| [Design system](images/design-system.png) | Colours and schemes, type, space, shape, components, the board, the review, the landing hero and social card |
+| [Design system](images/design-system.png) | Colours and schemes, type, space, shape, components, the board, the review, the landing hero, the social card and the README banner |
 | [Patch bay fixes](images/patch-bay-fixes.png) | State colours, type hierarchy, icons, tunnel and queue cards, the review, focus, cable ends |
 | [Settings panel](images/settings-panel.png) | The settings side panel; the canvas uses option 1b |
 | [Databases](images/databases.png) | Databases as their own cards ([#509](https://github.com/evan-mcgeek/koppler/issues/509)) |

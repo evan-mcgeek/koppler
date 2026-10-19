@@ -12,5 +12,5 @@
       "source": "./plugin"
     }
   ],
-  "description": "Koppler: run the part of your stack you need locally."
+  "description": "Koppler: plug your local code into the real stack."
 }

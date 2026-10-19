@@ -1,7 +1,7 @@
 {
   "name": "koppler",
   "version": "0.0.9",
-  "description": "Run the part of your stack you need locally, wired together, while the rest keeps calling a deployed environment.",
+  "description": "Plug your local code into the real stack: the apps you change run locally, wired together, while the rest keeps calling a deployed environment.",
   "license": "MIT",
   "author": "Ivan Yanowsky",
   "homepage": "https://github.com/evan-mcgeek/koppler",

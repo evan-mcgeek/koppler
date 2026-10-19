@@ -1,8 +1,9 @@
 # Koppler
 
-<img alt="koppler: run the part of your stack you need on your own machine. Pick apps on a canvas and plug cables between them, then press Run" src="docs/images/hero.png">
+<img alt="koppler: plug your local code into the real stack. npm install -g koppler, on macOS and Linux" src="docs/images/banner.png">
 
-Run the part of your stack you need on your own machine, without learning how each backend is run.
+Plug your local code into the real stack.
+The apps you change run on your own machine, the rest keeps calling the deployed environment, and you never learn how each backend is run.
 
 Pick apps on a canvas and plug cables between them, then press **Run**.
 Koppler does the wiring, the tunnels, the local queues and the start order, and reverts all of it when you press Stop.

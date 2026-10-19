@@ -88,7 +88,7 @@ a:hover{opacity:0.75}
 <div style="display:grid;grid-template-columns:56px 120px minmax(0,1fr) 90px;gap:16px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)"><span style="height:32px;background:var(--mute)"></span><span style="font-family:'Sometype Mono',monospace;font-size:12px">ink-muted</span><span style="font-size:13px;color:var(--mute)">Labels, secondary text, 4.5:1 on panel</span><span style="font-family:'Sometype Mono',monospace;font-size:12px;color:var(--mute)">{{ t.mute }}</span></div>
 <div style="display:grid;grid-template-columns:56px 120px minmax(0,1fr) 90px;gap:16px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)"><span style="height:32px;background:var(--local)"></span><span style="font-family:'Sometype Mono',monospace;font-size:12px">local</span><span style="font-size:13px;color:var(--mute)">Cables and Run: what runs here</span><span style="font-family:'Sometype Mono',monospace;font-size:12px;color:var(--mute)">{{ t.local }}</span></div>
 <div style="display:grid;grid-template-columns:56px 120px minmax(0,1fr) 90px;gap:16px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)"><span style="height:32px;background:var(--live)"></span><span style="font-family:'Sometype Mono',monospace;font-size:12px">live</span><span style="font-size:13px;color:var(--mute)">Running LEDs and the agent dot. Never the same hue as local</span><span style="font-family:'Sometype Mono',monospace;font-size:12px;color:var(--mute)">{{ t.live }}</span></div>
-<div style="display:grid;grid-template-columns:56px 120px minmax(0,1fr) 90px;gap:16px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)"><span style="height:32px;background:var(--deployed)"></span><span style="font-family:'Sometype Mono',monospace;font-size:12px">deployed</span><span style="font-size:13px;color:var(--mute)">Tunnels, deployed queues, outside systems, "Calls QA"</span><span style="font-family:'Sometype Mono',monospace;font-size:12px;color:var(--mute)">{{ t.deployed }}</span></div>
+<div style="display:grid;grid-template-columns:56px 120px minmax(0,1fr) 90px;gap:16px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)"><span style="height:32px;background:var(--deployed)"></span><span style="font-family:'Sometype Mono',monospace;font-size:12px">deployed</span><span style="font-size:13px;color:var(--mute)">Tunnels, deployed databases and queues, outside systems, "Calls QA"</span><span style="font-family:'Sometype Mono',monospace;font-size:12px;color:var(--mute)">{{ t.deployed }}</span></div>
 <div style="display:grid;grid-template-columns:56px 120px minmax(0,1fr) 90px;gap:16px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)"><span style="height:32px;background:var(--warn)"></span><span style="font-family:'Sometype Mono',monospace;font-size:12px">warn</span><span style="font-size:13px;color:var(--mute)">Starting, waiting for you, needs a step</span><span style="font-family:'Sometype Mono',monospace;font-size:12px;color:var(--mute)">{{ t.warn }}</span></div>
 <div style="display:grid;grid-template-columns:56px 120px minmax(0,1fr) 90px;gap:16px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)"><span style="height:32px;background:repeating-linear-gradient(-45deg,var(--prod) 0 8px,var(--prod2) 8px 16px)"></span><span style="font-family:'Sometype Mono',monospace;font-size:12px">prod</span><span style="font-size:13px;color:var(--mute)">PROD mode and failures. Not customisable</span><span style="font-family:'Sometype Mono',monospace;font-size:12px;color:var(--mute)">{{ t.prod }}</span></div>
 </div>
@@ -121,6 +121,7 @@ a:hover{opacity:0.75}
 <span style="font-family:'Barlow',sans-serif;font-size:12px;color:var(--mute)">Shape and line</span>
 <div style="display:flex;flex-direction:column;gap:8px;font-size:13px">
 <div style="display:flex;align-items:center;gap:10px"><span style="width:28px;height:18px;border:1px solid var(--line2)"></span>Corners 0. Circles only for sockets and the agent dot</div>
+<div style="display:flex;align-items:center;gap:10px"><span style="width:28px;height:18px;border:1px dashed var(--deployed)"></span>Dashed edge and dotted cable: deployed. Solid: on this Mac</div>
 <div style="display:flex;align-items:center;gap:10px"><span style="width:28px;height:0;border-top:1px solid var(--line2)"></span>1px hairlines, no shadows</div>
 <div style="display:flex;align-items:center;gap:10px"><span style="width:28px;height:0;border-top:2px solid var(--local)"></span>2px cables</div>
 <div style="display:flex;align-items:center;gap:10px"><span style="width:28px;height:0;border-top:3px solid var(--prod)"></span>3px PROD frame</div>
@@ -272,27 +273,28 @@ a:hover{opacity:0.75}
 <div style="flex:1;position:relative;background-image:radial-gradient(var(--line) 1px,transparent 1px);background-size:20px 20px">
 <div style="position:absolute;left:24px;top:20px;display:flex;border:1px solid var(--line2);background:var(--panel)"><span style="font-size:13px;font-weight:600;padding:6px 14px;background:var(--line2)">Edit</span><span style="font-size:13px;padding:6px 14px;color:var(--mute)">Live</span></div>
 <svg width="1140" height="844" style="position:absolute;inset:0">
-<path d="M320 150 C 380 150, 360 300, 420 300" fill="none" stroke="{{ t.local }}" stroke-width="2"></path>
-<path d="M320 500 C 380 500, 360 340, 420 340" fill="none" stroke="{{ t.local }}" stroke-width="2"></path>
-<path d="M690 300 C 750 300, 740 140, 800 140" fill="none" stroke="{{ t.local }}" stroke-width="2"></path>
-<path d="M500 444 L 500 540" fill="none" stroke="{{ cableDeployed }}" stroke-width="2" stroke-dasharray="2 6" stroke-linecap="round"></path>
-<path d="M640 444 C 640 510, 860 520, 860 580" fill="none" stroke="{{ t.local }}" stroke-width="1.5"></path>
-<path d="M930 226 L 930 430" fill="none" stroke="{{ cableDeployed }}" stroke-width="2" stroke-dasharray="2 6" stroke-linecap="round"></path>
+<path d="M300 139 C 340 139, 340 270, 374 270" fill="none" stroke="{{ t.local }}" stroke-width="2"></path>
+<path d="M300 399 C 340 399, 340 310, 374 310" fill="none" stroke="{{ t.local }}" stroke-width="2"></path>
+<path d="M657 270 C 710 270, 700 120, 754 120" fill="none" stroke="{{ t.local }}" stroke-width="2"></path>
+<path d="M420 421 C 420 470, 360 501, 374 501" fill="none" stroke="{{ cableDeployed }}" stroke-width="2" stroke-dasharray="2 6" stroke-linecap="round"></path>
+<path d="M650 400 C 700 400, 710 385, 760 385" fill="none" stroke="{{ t.local }}" stroke-width="2"></path>
+<path d="M608 577 C 640 577, 640 526, 674 526" fill="none" stroke="{{ cableDeployed }}" stroke-width="2" stroke-dasharray="2 6" stroke-linecap="round"></path>
+<path d="M890 192 L 890 240" fill="none" stroke="{{ cableDeployed }}" stroke-width="2" stroke-dasharray="2 6" stroke-linecap="round"></path>
 </svg>
-<div style="position:absolute;left:60px;top:80px;width:260px;background:var(--panel);border:1px solid var(--line2)">
+<div style="position:absolute;left:40px;top:70px;width:260px;background:var(--panel);border:1px solid var(--line2)">
 <div style="display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--line)"><span style="width:7px;height:7px;background:var(--live)"></span><span style="font-size:15px;font-weight:600;flex:1">Mobile App</span><span style="font-family:'Sometype Mono',monospace;font-size:10px;padding:2px 5px;border:1px solid var(--line2);color:var(--mute)">FLUTTER</span></div>
 <div style="padding:10px 12px;display:flex;flex-direction:column;gap:6px"><span style="font-family:'Barlow',sans-serif;font-size:12px;color:var(--mute)">Branch</span><span style="font-family:'Sometype Mono',monospace;font-size:12px;padding:6px 8px;background:var(--desk);border:1px solid var(--line)">feature/checkout</span>
 <div style="display:grid;grid-template-columns:auto minmax(0,1fr);gap:6px 12px;padding-top:4px;align-items:center"><span style="font-family:'Barlow',sans-serif;font-size:12px;color:var(--mute)">Started by</span><span style="font-family:'Barlow',sans-serif;font-size:12px;color:var(--mute)">Device</span><div style="display:flex;border:1px solid var(--line2)"><span style="font-size:12px;font-weight:600;padding:4px 8px;background:var(--line2)">Koppler</span><span style="font-size:12px;padding:4px 8px;color:var(--mute)">Me</span></div><span style="font-size:13px">iOS simulator</span></div></div>
 <div style="display:flex;justify-content:space-between;padding:8px 12px;border-top:1px solid var(--line);font-family:'Barlow',sans-serif;font-size:12px"><span>Running</span><span style="font-family:'Sometype Mono',monospace;font-size:11px;color:var(--mute)">3/3 steps</span></div>
 <span style="position:absolute;right:-7px;top:63px;width:12px;height:12px;border-radius:50%;background:var(--desk);border:2px solid var(--local)"></span>
 </div>
-<div style="position:absolute;left:60px;top:430px;width:260px;background:var(--panel);border:1px solid var(--line2)">
+<div style="position:absolute;left:40px;top:330px;width:260px;background:var(--panel);border:1px solid var(--line2)">
 <div style="display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--line)"><span style="width:7px;height:7px;background:var(--live)"></span><span style="font-size:15px;font-weight:600;flex:1">Web Shop</span><span style="font-family:'Sometype Mono',monospace;font-size:10px;padding:2px 5px;border:1px solid var(--line2);color:var(--mute)">NODE</span></div>
 <div style="padding:10px 12px;display:flex;flex-direction:column;gap:6px"><span style="font-family:'Barlow',sans-serif;font-size:12px;color:var(--mute)">Branch</span><span style="font-family:'Sometype Mono',monospace;font-size:12px;padding:6px 8px;background:var(--desk);border:1px solid var(--line)">feature/checkout</span></div>
 <div style="display:flex;justify-content:space-between;padding:8px 12px;border-top:1px solid var(--line);font-family:'Barlow',sans-serif;font-size:12px"><span>Running</span><span style="color:var(--deployed)">Calls {{ envUpper }}: Catalog API</span></div>
 <span style="position:absolute;right:-7px;top:63px;width:12px;height:12px;border-radius:50%;background:var(--desk);border:2px solid var(--local)"></span>
 </div>
-<div style="position:absolute;left:420px;top:200px;width:270px">
+<div style="position:absolute;left:380px;top:170px;width:270px">
 <div style="display:flex;gap:1px;background:var(--line2);border:1px solid var(--line2);width:max-content;margin-bottom:8px">
 <span style="background:var(--panel);font-family:'Barlow',sans-serif;font-size:12px;padding:6px 8px">Run alone</span>
 <span style="background:var(--panel);font-family:'Barlow',sans-serif;font-size:12px;padding:6px 8px">Log</span>
@@ -301,7 +303,7 @@ a:hover{opacity:0.75}
 <span style="background:var(--panel);font-family:'Sometype Mono',monospace;font-size:10px;padding:6px 8px">×</span>
 </div>
 </div>
-<div style="position:absolute;left:420px;top:236px;width:270px;background:var(--panel);border:1px solid var(--ink)">
+<div style="position:absolute;left:380px;top:206px;width:270px;background:var(--panel);border:1px solid var(--ink)">
 <div style="display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--line)"><span style="width:7px;height:7px;background:var(--live)"></span><span style="font-size:15px;font-weight:600;flex:1">Orders API</span><span style="font-family:'Sometype Mono',monospace;font-size:10px;padding:2px 5px;border:1px solid var(--line2);color:var(--mute)">.NET</span></div>
 <div style="padding:10px 12px;display:flex;flex-direction:column;gap:6px"><span style="font-family:'Barlow',sans-serif;font-size:12px;color:var(--mute)">Branch</span><span style="font-family:'Sometype Mono',monospace;font-size:12px;padding:6px 8px;background:var(--desk);border:1px solid var(--line)">feature/checkout</span>
 <div style="display:flex;gap:16px;padding-top:4px;align-items:center"><span style="display:flex;align-items:center;gap:6px;font-size:12px"><span style="width:26px;height:14px;box-sizing:border-box;display:flex;justify-content:flex-end;padding:2px;background:var(--ink)"><span style="width:8px;height:8px;background:var(--panel)"></span></span>Tunnels</span><span style="display:flex;align-items:center;gap:6px;font-size:12px"><span style="width:26px;height:14px;box-sizing:border-box;display:flex;justify-content:flex-end;padding:2px;background:var(--ink)"><span style="width:8px;height:8px;background:var(--panel)"></span></span>Queues</span></div>
@@ -311,23 +313,34 @@ a:hover{opacity:0.75}
 <span style="position:absolute;left:-7px;top:98px;width:12px;height:12px;border-radius:50%;box-sizing:border-box;border:2px solid var(--local);background:var(--live);box-shadow:inset 0 0 0 2px var(--desk)"></span>
 <span style="position:absolute;right:-7px;top:58px;width:12px;height:12px;border-radius:50%;background:var(--desk);border:2px solid var(--local)"></span>
 </div>
-<div style="position:absolute;left:800px;top:80px;width:260px;background:var(--panel);border:1px solid var(--line2)">
+<div style="position:absolute;left:760px;top:60px;width:260px;background:var(--panel);border:1px solid var(--line2)">
 <div style="display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--line)"><span style="width:7px;height:7px;border:1.5px solid var(--warn);box-sizing:border-box"></span><span style="font-size:15px;font-weight:600;flex:1">Payments API</span><span style="font-family:'Sometype Mono',monospace;font-size:10px;padding:2px 5px;border:1px solid var(--line2);color:var(--mute)">.NET</span></div>
 <div style="padding:10px 12px;display:flex;flex-direction:column;gap:6px"><span style="font-family:'Barlow',sans-serif;font-size:12px;color:var(--mute)">Note for the agent</span><span style="font-size:13px;line-height:1.4">Use the sandbox merchant account, not the live one</span></div>
 <div style="display:flex;justify-content:space-between;padding:8px 12px;border-top:1px solid var(--line);font-family:'Barlow',sans-serif;font-size:12px"><span style="color:var(--warn)">Starting</span><span style="font-family:'Sometype Mono',monospace;font-size:11px;color:var(--mute)">2/3 steps</span></div>
 <span style="position:absolute;left:-7px;top:54px;width:12px;height:12px;border-radius:50%;box-sizing:border-box;border:2px solid var(--local);background:var(--live);box-shadow:inset 0 0 0 2px var(--desk)"></span>
 </div>
-<div style="position:absolute;left:800px;top:430px;width:260px;border:1px dashed var(--deployed);background:var(--desk)">
+<div style="position:absolute;left:760px;top:240px;width:260px;border:1px dashed var(--deployed);background:var(--desk)">
 <div style="display:flex;align-items:center;gap:8px;padding:10px 12px 4px"><span style="font-size:15px;font-weight:600;flex:1">Payment provider</span><span style="font-family:'Sometype Mono',monospace;font-size:10px;letter-spacing:0.06em;color:var(--deployed);white-space:nowrap;padding:2px 5px;border:1px dashed var(--deployed)">OUTSIDE</span></div>
 <div style="padding:0 12px 10px;font-size:12px;color:var(--mute)">Always uses deployed {{ envUpper }}</div>
 </div>
-<div style="position:absolute;left:420px;top:540px;width:300px;background:var(--panel);border:1px dashed var(--deployed);padding:10px 12px;display:flex;flex-direction:column;gap:4px">
-<div style="display:flex;align-items:center;gap:8px"><span style="width:7px;height:7px;background:var(--live)"></span><span style="font-size:15px;font-weight:600;flex:1">Database (Postgres)</span><span style="font-family:'Sometype Mono',monospace;font-size:10px;letter-spacing:0.06em;padding:2px 5px;border:1px dashed var(--deployed);color:var(--deployed)">TUNNEL · {{ envUpper }}</span></div>
-<span style="font-family:'Sometype Mono',monospace;font-size:11px;color:var(--mute)">localhost:5432 → db.{{ envLower }}.acme.example</span>
+<div style="position:absolute;left:380px;top:480px;width:220px;background:var(--panel);border:1px dashed var(--deployed)">
+<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid var(--line)"><span style="font-size:14px;font-weight:600;flex:1">Tunnel</span><span style="font-family:'Sometype Mono',monospace;font-size:10px;letter-spacing:0.06em;padding:2px 5px;border:1px dashed var(--deployed);color:var(--deployed)">TUNNEL</span></div>
+<div style="padding:8px 10px;display:flex;flex-direction:column;gap:3px;border-bottom:1px solid var(--line)"><span style="font-family:'Sometype Mono',monospace;font-size:11px;color:var(--deployed)">db.{{ envLower }}.acme.example</span><span style="font-family:'Sometype Mono',monospace;font-size:11px;color:var(--mute)">localhost:5432</span></div>
+<div style="position:relative;display:flex;justify-content:space-between;align-items:center;padding:7px 10px;border-bottom:1px solid var(--line);font-size:12px"><span>Orders</span><span style="color:var(--mute)">Through</span><span style="position:absolute;right:-7px;top:9px;width:12px;height:12px;border-radius:50%;background:var(--desk);border:2px solid var(--deployed);box-sizing:border-box"></span></div>
+<div style="display:flex;align-items:center;gap:8px;padding:6px 10px"><span style="width:7px;height:7px;background:var(--live)"></span><span style="font-size:12px;flex:1">Open · <span style="font-family:'Sometype Mono',monospace;font-size:11px;color:var(--mute)">1</span> database</span><span title="Reconnect" aria-label="Reconnect" style="width:28px;height:28px;display:flex;align-items:center;justify-content:center;border:1px solid var(--line2)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--ink)"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"></path><path d="M21 3v5h-5"></path><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"></path><path d="M8 16H3v5"></path></svg></span></div>
+<span style="position:absolute;left:-7px;top:14px;width:12px;height:12px;border-radius:50%;box-sizing:border-box;border:2px solid var(--deployed);background:var(--live);box-shadow:inset 0 0 0 2px var(--desk)"></span>
 </div>
-<div style="position:absolute;left:760px;top:580px;width:220px;background:var(--panel);border:1px solid var(--line2);padding:10px 12px;display:flex;flex-direction:column;gap:8px">
+<div style="position:absolute;left:680px;top:490px;width:200px;background:var(--panel);border:1px dashed var(--deployed)">
+<div style="display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--line)"><span style="width:7px;height:7px;background:var(--live)"></span><span style="font-size:15px;font-weight:600;flex:1">Orders</span><span style="font-family:'Sometype Mono',monospace;font-size:10px;letter-spacing:0.06em;padding:2px 5px;border:1px solid var(--line2);color:var(--mute)">POSTGRES</span></div>
+<div style="padding:10px 12px;display:flex;flex-direction:column;gap:8px">
+<div style="display:flex;align-items:center;gap:8px"><div style="display:flex;border:1px solid var(--line2)"><span style="font-size:12px;font-weight:600;padding:4px 9px;background:var(--line2)">Deployed</span><span style="font-size:12px;padding:4px 9px;color:var(--mute)">Local</span></div><span style="font-family:'Sometype Mono',monospace;font-size:10px;letter-spacing:0.06em;padding:2px 5px;border:1px dashed var(--deployed);color:var(--deployed)">{{ envUpper }}</span></div>
+<span style="font-family:'Sometype Mono',monospace;font-size:11px;color:var(--mute)">Through tunnel · :5432</span></div>
+<div style="padding:8px 12px;border-top:1px solid var(--line);font-size:12px">Reachable</div>
+<span style="position:absolute;left:-7px;top:30px;width:12px;height:12px;border-radius:50%;box-sizing:border-box;border:2px solid var(--deployed);background:var(--live);box-shadow:inset 0 0 0 2px var(--desk)"></span>
+</div>
+<div style="position:absolute;left:760px;top:350px;width:200px;box-sizing:border-box;background:var(--panel);border:1px solid var(--line2);padding:10px 12px;display:flex;flex-direction:column;gap:8px">
 <div style="display:flex;align-items:center;gap:8px"><span style="font-size:15px;font-weight:600;flex:1">Order events</span><span style="font-family:'Sometype Mono',monospace;font-size:10px;letter-spacing:0.06em;padding:2px 5px;border:1px solid var(--line2);color:var(--mute)">SQS</span></div>
-<div style="display:flex;border:1px solid var(--line2);width:max-content"><span style="font-size:12px;padding:4px 10px;color:var(--mute)">Deployed</span><span style="font-size:12px;font-weight:600;padding:4px 10px;background:var(--local);color:var(--desk)">Local</span></div>
+<div style="display:flex;border:1px solid var(--line2);width:max-content"><span style="font-size:12px;padding:4px 10px;color:var(--mute)">Deployed</span><span style="font-size:12px;font-weight:600;padding:4px 10px;background:var(--line2)">Local</span></div>
 </div>
 <div style="position:absolute;left:24px;right:24px;bottom:20px;display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:end;gap:16px">
 <span></span>
@@ -379,7 +392,7 @@ a:hover{opacity:0.75}
 </div>
 <div style="display:grid;grid-template-columns:160px minmax(0,1fr);border-bottom:1px solid var(--line)">
 <div style="padding:18px 0 18px 28px"><span style="font-family:'Sometype Mono',monospace;font-size:10px;;color:var(--mute);line-height:1.4;font-family:'Barlow',sans-serif;font-size:13px;font-weight:600">Opens tunnels</span></div>
-<div style="padding:14px 28px 14px 0;display:flex;flex-direction:column;gap:3px"><span style="font-size:15px;font-weight:600">Database (Postgres) on localhost:5432</span><span style="font-family:'Sometype Mono',monospace;font-size:12px;color:var(--mute)">db.qa.acme.example</span></div>
+<div style="padding:14px 28px 14px 0;display:flex;flex-direction:column;gap:3px"><span style="font-size:15px;font-weight:600">Tunnel to db.qa.acme.example</span><span style="font-family:'Sometype Mono',monospace;font-size:12px;color:var(--mute)">localhost:5432 · opens first</span><span style="font-size:13px;color:var(--deployed);padding-top:6px">Orders (Postgres), deployed QA, through this tunnel</span></div>
 </div>
 <div style="padding:18px 28px;display:flex;justify-content:flex-end;align-items:center;gap:10px">
 <span style="padding:8px 16px;border:1px solid var(--line2);font-family:'Sometype Mono',monospace;font-size:13px;font-weight:600">Cancel</span>
@@ -431,7 +444,7 @@ a:hover{opacity:0.75}
 <div style="flex:1;display:grid;grid-template-columns:minmax(0,1fr) 620px;min-height:0">
 <div style="padding:72px 56px;display:flex;flex-direction:column;gap:28px;justify-content:center">
 <span style="font-family:'Barlow',sans-serif;font-size:12px;color:var(--mute)">Local development · macos and linux</span>
-<h1 style="margin:0;font-family:'Barlow Semi Condensed',sans-serif;font-size:54px;font-weight:600;letter-spacing:-0.005em;line-height:1.08;text-wrap:balance">Run the part of your stack you need on your own machine.</h1>
+<h1 style="margin:0;font-family:'Barlow Semi Condensed',sans-serif;font-size:54px;font-weight:600;letter-spacing:-0.005em;line-height:1.08;text-wrap:balance">Plug your local code into the real stack.</h1>
 <p style="margin:0;font-size:18px;line-height:1.55;color:var(--mute);max-width:600px;text-wrap:pretty">Pick apps on a canvas and plug cables between them, then press Run. Everything you leave unplugged keeps calling the deployed environment you chose.</p>
 <div style="display:flex;flex-direction:column;border:1px solid var(--line2);max-width:460px;font-family:'Sometype Mono',monospace;font-size:14px">
 <span style="padding:12px 16px;border-bottom:1px solid var(--line)"><span style="color:var(--mute)">$ </span>npm install -g koppler</span>
@@ -494,8 +507,8 @@ a:hover{opacity:0.75}
 <span style="position:absolute;left:83px;bottom:-7px;width:12px;height:12px;border-radius:50%;background:var(--desk);border:2px solid var(--deployed);box-sizing:border-box"></span>
 </div>
 <div style="position:absolute;left:1080px;top:470px;width:180px;border:1px dashed var(--deployed);background:var(--panel)">
-<div style="padding:10px 12px 4px;font-size:15px;font-weight:600">Database</div>
-<div style="padding:0 12px 10px;font-family:'Sometype Mono',monospace;font-size:10px;letter-spacing:0.06em;color:var(--deployed)">TUNNEL · QA</div>
+<div style="display:flex;align-items:center;gap:8px;padding:10px 12px 6px"><span style="width:7px;height:7px;background:var(--live)"></span><span style="font-size:15px;font-weight:600;flex:1">Orders</span><span style="font-family:'Sometype Mono',monospace;font-size:10px;letter-spacing:0.06em;padding:2px 5px;border:1px solid var(--line2);color:var(--mute)">POSTGRES</span></div>
+<div style="padding:0 12px 10px;font-size:12px;color:var(--deployed)">Deployed QA, through the tunnel</div>
 </div>
 <div style="position:absolute;left:80px;top:80px;bottom:80px;width:720px;display:flex;flex-direction:column;justify-content:space-between">
 <div style="display:flex;align-items:center;gap:20px">
@@ -503,11 +516,36 @@ a:hover{opacity:0.75}
 <span style="font-family:'Barlow Semi Condensed',sans-serif;font-size:76px;font-weight:600;letter-spacing:-0.005em">koppler</span>
 </div>
 <div style="display:flex;flex-direction:column;gap:20px">
-<span style="font-size:38px;font-weight:600;line-height:1.2;letter-spacing:-0.01em;text-wrap:balance">Run the part of your stack you need on your own machine.</span>
+<span style="font-size:38px;font-weight:600;line-height:1.2;letter-spacing:-0.01em;text-wrap:balance">Plug your local code into the real stack.</span>
 <span style="font-family:'Sometype Mono',monospace;font-size:18px;color:var(--mute)">github.com/evan-mcgeek/koppler</span>
 </div>
 </div>
 </section>
+<section data-screen-label="08 README banner" style="width:1280px;height:400px;flex:none;position:relative;overflow:hidden;background-color:var(--desk);background-image:radial-gradient(var(--line) 1px,transparent 1px);background-size:20px 20px;border:1px solid var(--line)">
+<div style="position:absolute;left:0;top:0;bottom:0;width:640px;background:var(--desk);border-right:1px solid var(--line)"></div>
+<div style="position:absolute;left:64px;top:64px;bottom:64px;width:540px;display:flex;flex-direction:column;justify-content:space-between">
+<div style="display:flex;align-items:center;gap:16px">
+<dc-import name="KopplerMark" size="{{ 64 }}" dark="{{ true }}" cable="{{ t.local }}" ink="{{ t.ink }}" hole="{{ t.desk }}" hint-size="64px,64px"></dc-import>
+<span style="font-family:'Barlow Semi Condensed',sans-serif;font-size:60px;font-weight:600;letter-spacing:-0.005em;line-height:1">koppler</span>
+</div>
+<span style="font-size:26px;font-weight:600;line-height:1.25;text-wrap:balance">Plug your local code into the real stack.</span>
+<div style="display:flex;align-items:center;gap:16px">
+<span style="font-family:'Sometype Mono',monospace;font-size:15px;padding:9px 14px;border:1px solid var(--line2)"><span style="color:var(--mute)">$ </span>npm install -g koppler</span>
+<span style="font-size:14px;color:var(--mute)">macOS and Linux</span>
+</div>
+</div>
+<svg width="1280" height="400" style="position:absolute;inset:0">
+<path d="M880 108 C 920 108, 910 182, 950 182" fill="none" stroke="{{ t.local }}" stroke-width="2"></path>
+<path d="M880 288 C 920 288, 910 208, 950 208" fill="none" stroke="{{ t.local }}" stroke-width="2"></path>
+<path d="M1040 229 L 1040 304" fill="none" stroke="{{ t.deployed }}" stroke-width="2" stroke-dasharray="2 6" stroke-linecap="round"></path>
+</svg>
+<div style="position:absolute;left:700px;top:70px;width:180px;background:var(--panel);border:1px solid var(--line2)"><div style="display:flex;align-items:center;gap:8px;padding:9px 11px;border-bottom:1px solid var(--line)"><span style="width:7px;height:7px;background:var(--live)"></span><span style="font-size:14px;font-weight:600;flex:1">Mobile App</span></div><div style="padding:8px 11px;font-family:'Sometype Mono',monospace;font-size:11px;color:var(--mute)">feature/checkout</div></div>
+<div style="position:absolute;left:700px;top:250px;width:180px;background:var(--panel);border:1px solid var(--line2)"><div style="display:flex;align-items:center;gap:8px;padding:9px 11px;border-bottom:1px solid var(--line)"><span style="width:7px;height:7px;background:var(--live)"></span><span style="font-size:14px;font-weight:600;flex:1">Web Shop</span></div><div style="padding:8px 11px;font-family:'Sometype Mono',monospace;font-size:11px;color:var(--mute)">feature/checkout</div></div>
+<div style="position:absolute;left:950px;top:160px;width:180px;background:var(--panel);border:1px solid var(--ink)"><div style="display:flex;align-items:center;gap:8px;padding:9px 11px;border-bottom:1px solid var(--line)"><span style="width:7px;height:7px;background:var(--live)"></span><span style="font-size:14px;font-weight:600;flex:1">Orders API</span></div><div style="padding:8px 11px;font-family:'Sometype Mono',monospace;font-size:11px;color:var(--mute)">.NET · running</div></div>
+<div style="position:absolute;left:950px;top:304px;width:180px;background:var(--panel);border:1px dashed var(--deployed)"><div style="display:flex;align-items:center;gap:8px;padding:9px 11px"><span style="font-size:14px;font-weight:600;flex:1">Orders</span><span style="font-family:'Sometype Mono',monospace;font-size:10px;letter-spacing:0.06em;padding:2px 5px;border:1px solid var(--line2);color:var(--mute)">POSTGRES</span></div><div style="padding:0 11px 9px;font-size:12px;color:var(--deployed)">Deployed QA</div></div>
+<span style="position:absolute;left:874px;top:102px;width:12px;height:12px;border-radius:50%;box-sizing:border-box;border:2px solid var(--local);background:var(--desk);box-shadow:inset 0 0 0 2px var(--desk)"></span><span style="position:absolute;left:874px;top:282px;width:12px;height:12px;border-radius:50%;box-sizing:border-box;border:2px solid var(--local);background:var(--desk);box-shadow:inset 0 0 0 2px var(--desk)"></span><span style="position:absolute;left:944px;top:176px;width:12px;height:12px;border-radius:50%;box-sizing:border-box;border:2px solid var(--local);background:var(--live);box-shadow:inset 0 0 0 2px var(--desk)"></span><span style="position:absolute;left:944px;top:202px;width:12px;height:12px;border-radius:50%;box-sizing:border-box;border:2px solid var(--local);background:var(--live);box-shadow:inset 0 0 0 2px var(--desk)"></span>
+</section>
+
 
 </div>
 </x-dc>
