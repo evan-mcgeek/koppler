@@ -2,12 +2,13 @@
 // file named for the version that introduces it, and the format's version moves to it.
 import { migrate, type Format, type Raw } from '../run.ts';
 import { databasesNamedOnce } from './0.2.0.ts';
+import { databasesNamedOnceAgain } from './0.2.1.ts';
 
 export const STACK_FORMAT: Format = {
   name: 'The stack',
   key: 'koppler',
-  version: '0.2.0',
-  migrations: [databasesNamedOnce],
+  version: '0.2.1',
+  migrations: [databasesNamedOnce, databasesNamedOnceAgain],
 };
 
 /** A stack as written, in this Koppler's format: what every reader of the stack works with. */

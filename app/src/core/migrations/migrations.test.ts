@@ -147,6 +147,46 @@ test('0.2.0: a name every app of a database dials goes with the database', () =>
   expect(reached(stack)).toEqual(reached(both));
 });
 
+test("0.2.1: a stack 0.2.0 left alone gets its databases, each tunnel's command kept and each app's note on its use", () => {
+  const stamped = structuredClone(old) as OldStack & { koppler: string };
+  stamped.koppler = '0.2.0';
+  for (const app of Object.values(stamped.apps))
+    for (const list of [app.prereqs, ...Object.values(app.envs ?? {}).map(one => one.prereqs)])
+      for (const need of list)
+        if (need.tunnel?.startsWith('aurora'))
+          Object.assign(need, { cmd: `open ${need.tunnel}`, note: `${app.name} reads it` });
+  const done = migrateStack(stamped as never);
+  expect(done.applied?.map(one => one.migration.version)).toEqual(['0.2.1']);
+  const stack = done.value as unknown as OldStack & { databases: Record<string, Record<string, unknown>> };
+  expect(stack.databases['orders']).toMatchObject({
+    cmd: 'open aurora.qa.acme.example',
+    envs: { prod: { cmd: 'open aurora.prod.acme.example' } },
+  });
+  expect(stack.apps['payments']?.uses).toEqual({ orders: { note: 'Payments API reads it' } });
+  expect(stack).toMatchObject({ koppler: '0.2.1' });
+});
+
+test('a database its tunnel only calls "Database" is named after its host, without the environment', () => {
+  const plain: OldStack = {
+    envs: ['qa'],
+    apps: {
+      wallet: {
+        name: 'Wallet API',
+        prereqs: [{ tunnel: 'aurora-shop-dev.internal.acme.example', port: 5432, what: 'Database (Aurora)' }],
+      },
+    },
+  };
+  const stack = migrateStack(plain as never).value as unknown as OldStack;
+  expect(stack.databases).toEqual({
+    'aurora-shop': {
+      name: 'Aurora shop',
+      kind: 'postgres',
+      tunnel: 'aurora-shop-dev.internal.acme.example',
+      port: 5432,
+    },
+  });
+});
+
 test('0.2.0 leaves a stack alone when it cannot keep every need, and one already in its format', () => {
   // Payments API has no PROD list, so it borrowed QA's tunnel there: as a database it would reach PROD's instead.
   const odd = structuredClone(old);
