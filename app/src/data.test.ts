@@ -17,8 +17,8 @@ afterEach(() => {
 
 test('a run file comes back as it was written, readable by the user alone', () => {
   expect(readData('registry')).toBeNull();
-  writeData('registry', { name: 'Acme Shop', envs: ['qa'] });
-  expect(readData('registry')).toEqual({ name: 'Acme Shop', envs: ['qa'] });
+  writeData('registry', { name: 'Acme Shop', koppler: '0.2.0', envs: ['qa'] });
+  expect(readData('registry')).toEqual({ name: 'Acme Shop', koppler: '0.2.0', envs: ['qa'] });
   expect(dataFile('registry')).toBe(path.join(dir, 'registry.json'));
   expect(fs.statSync(dataFile('registry')).mode & 0o777).toBe(0o600);
   expect(fs.readdirSync(dir)).toEqual(['registry.json']);
@@ -43,8 +43,15 @@ test('a board saved in the old script form is still read, and the JSON file wins
   );
   expect(readData('state')).toEqual({ env: 'prod', nodes: { web: { x: 1 } } });
   expect(readData('registry')).toEqual({ name: 'Old' });
-  writeData('state', { env: 'qa' });
-  expect(readData('state')).toEqual({ env: 'qa' });
+  writeData('state', { koppler: '0.2.0', env: 'qa' });
+  expect(readData('state')).toEqual({ koppler: '0.2.0', env: 'qa' });
+});
+
+test('a run file from before its version is read in this format and written back with it', () => {
+  writeData('state', { env: 'qa', presets: [{ name: 'Old', nodes: { web: {} }, edges: [] }] });
+  const read = readData('state');
+  expect(read).toMatchObject({ koppler: '0.2.0', presets: [{ koppler: '0.1.0', nodes: { web: { run: 'cli' } } }] });
+  expect(JSON.parse(fs.readFileSync(dataFile('state'), 'utf8'))).toEqual(read);
 });
 
 test('what is not an object is not a run file', () => {

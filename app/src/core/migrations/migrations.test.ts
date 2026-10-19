@@ -36,10 +36,9 @@ test('a file runs every migration newer than its version, oldest first, and is s
   expect(migrate({ koppler: '0.3.0' }, steps).applied).toEqual([]);
 });
 
-test('a file from a newer Koppler is refused, and an older numbered one is read by its number', () => {
+test('a file from a newer Koppler is refused, and one with no version runs every migration', () => {
   expect(migrate({ koppler: '0.4.0' }, steps).error).toMatch(/written for Koppler 0.4.0.*update Koppler/);
-  const legacy = { ...steps, legacy: () => '0.1.0' };
-  expect(migrate({}, legacy).applied?.map(one => one.migration.version)).toEqual(['0.3.0']);
+  expect(migrate({ version: 1 }, steps).applied?.map(one => one.migration.version)).toEqual(['0.1.0', '0.3.0']);
 });
 
 test("every format's migrations are in order and none is newer than the format", () => {

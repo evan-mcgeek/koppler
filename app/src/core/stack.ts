@@ -451,7 +451,7 @@ export const StackSchema = z.looseObject(
       .string()
       .regex(/^\d+\.\d+\.\d+$/, 'a Koppler version, such as 0.2.0')
       .optional()
-      .describe('The Koppler version whose format it is written in; set by koppler stack migrate'),
+      .describe('The Koppler version whose format it is written in; Koppler sets it as it reads the file'),
     /** The environments, the first being the one apps run against by default. */
     envs: z.custom<string[]>(isEnvList, ENVS),
     /** The environments where a mistake costs something; without this, every one but the first. */

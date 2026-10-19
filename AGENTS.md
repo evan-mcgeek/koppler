@@ -23,7 +23,8 @@ A change to what one of them holds, beyond adding a field older files can do wit
 
 - One migration per Koppler version per file, in `app/src/core/migrations/<file>/<version>.ts`, added last to that file's list, with the format's `version` moved to it.
 - It takes the raw JSON in the format before and gives it in the new one; it never loses a fact, and when it cannot be sure, it leaves the file as it was.
-- Files are migrated on every read, in memory. One is written in the new format only when the user asks (`koppler stack migrate --apply`, or Update the file on the canvas), since teammates on an older Koppler cannot read it after.
+- Migrating is internal: reading a file runs every migration newer than its version (none means older than any), then sets the version and writes the file back. There is no command or button for it.
+- A file from a newer Koppler is refused with "update Koppler".
 - Its tests give a file in the old format and check the new one, and that a file already in the new format is left alone.
 
 ## Before every release: pull the designs

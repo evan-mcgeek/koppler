@@ -8,8 +8,6 @@ export const BOARD_FORMAT: Format = {
   key: 'koppler',
   version: '0.1.0',
   migrations: [everyAppSaysHowItRuns],
-  // Before it said its Koppler version, a board numbered its format: 1 is 0.1.0's.
-  legacy: raw => (raw['version'] === 1 ? '0.1.0' : undefined),
 };
 
 export const migrateBoard = (raw: Raw) => migrate(raw, BOARD_FORMAT);

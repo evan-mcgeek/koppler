@@ -19,7 +19,6 @@ import {
   addApps,
   addOutside,
   editStack,
-  migrateStackFile,
   removeApp,
   refreshRegistry,
   replaceStack,
@@ -218,14 +217,6 @@ export const ROUTES: Record<string, Route> = {
   '/stack-save': body => {
     const result = replaceStack(body['stack']);
     if (result.error !== undefined) return { status: 400, body: result };
-    refreshRegistry();
-    forgetStacks();
-    return { status: 200, body: { ok: true } };
-  },
-  // The stack file brought up to this Koppler's format, at the person's click on the board's note.
-  '/stack-migrate': () => {
-    const done = migrateStackFile(true);
-    if (done.error !== undefined) return { status: 400, body: done };
     refreshRegistry();
     forgetStacks();
     return { status: 200, body: { ok: true } };

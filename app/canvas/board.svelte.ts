@@ -1764,17 +1764,12 @@ class Board {
     const loaded = await load();
     if (loaded) this.open(loaded);
   }
-  /** What would bring the stack file up to this Koppler's format; it is read that way meanwhile. */
-  stackUpdates = $state.raw<{ version: string; about: string; changes: string[] }[]>([]);
   /** Why the stack cannot be read in this Koppler's format: it is from a newer one. */
   formatError = $state('');
   open({ stack: written, clones, roots, saved: kept }: Loaded): void {
-    // Read in this Koppler's format; the files stay as they are written until the user updates them.
+    // Read in this Koppler's format, which the server has written the files in already.
     const migrated = migrateStack(written);
     this.formatError = migrated.error ?? '';
-    this.stackUpdates = (migrated.applied ?? [])
-      .filter(one => one.changes.length)
-      .map(({ migration, changes }) => ({ version: migration.version, about: migration.about, changes }));
     const raw = (migrated.value ?? written) as Registry;
     const file = kept ? migrateBoardFile(kept) : undefined;
     const saved: SavedBoard | null = file?.value ?? kept;

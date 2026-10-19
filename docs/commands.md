@@ -66,7 +66,6 @@ You can run these yourself too; the agent uses them to do its part.
 | `koppler stack get [<path>]` \| `set <path> <value>` \| `unset <path>` | Read or change any field of the stack, such as `apps.orders.url` or `apps.orders.envs.prod.prereqs`; each change is checked before it is kept. With the canvas's settings, the only way to change `stack.json` |
 | `koppler stack lock <path>` \| `unlock <path>` \| `locks` | `lock` keeps a field as it is for commands, the canvas and the agent; `unlock` asks you in the terminal, so an agent cannot; `locks` lists them |
 | `koppler stack check [<file>]` | Every check the stack must pass, for the team repo's CI: prints each problem and exits 1. See [ci.md](ci.md) |
-| `koppler stack migrate [--apply]` | What would bring `stack.json` up to this Koppler's format, change by change. Koppler already reads an older stack that way, so nothing has to be written; `--apply` writes it, after which teammates need this Koppler or a later one |
 | `koppler stack schema` | The JSON Schema of `stack.json`, for an editor's `$schema` |
 | `koppler stack propose` | A pull request on the stack's repo with what this copy changed since its last commit, made on the stack as the team has it now |
 | `koppler actions [--json]` \| `add '<json>'` \| `add --file <json file>` \| `clear [--app <app>]` | The action log: every temporary change, which Stop undoes. `add` logs a change before it is made (checked, never a secret value); `clear` empties it after a revert. The only way to write it |

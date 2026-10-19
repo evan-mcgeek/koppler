@@ -23,8 +23,6 @@ export interface Format {
   version: string;
   /** Oldest first. */
   migrations: readonly Migration[];
-  /** The version of a file from before it had `key`, when something else in it says. */
-  legacy?: (raw: Raw) => string | undefined;
 }
 export interface Migrated {
   value: Raw;
@@ -47,10 +45,10 @@ export function compareVersions(a: string, b: string): number {
   return 0;
 }
 
-/** The version a file says it is written in. */
+/** The version a file says it is written in; one with none is older than any. */
 export const versionOf = (raw: Raw, format: Format): string => {
   const own = raw[format.key];
-  return isVersion(own) ? own : (format.legacy?.(raw) ?? '0.0.0');
+  return isVersion(own) ? own : '0.0.0';
 };
 
 /**

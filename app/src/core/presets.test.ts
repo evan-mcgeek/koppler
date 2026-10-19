@@ -35,9 +35,9 @@ test('an older preset is brought to the current format; a current one is left al
   });
   const current = { name: 'Now', version: VERSION, koppler: '0.1.0', nodes: { api: { run: 'cli' } }, edges: [] };
   expect(migrate(current)).toEqual({ preset: current, migratedFrom: null });
-  // Numbered 1, from before boards said their Koppler version: already 0.1.0's.
+  // No Koppler version yet: read as the oldest, run through every migration, and stamped.
   const numbered = { name: 'Then', version: VERSION, nodes: { api: { run: 'ide' } }, edges: [] };
-  expect(migrate(numbered)).toEqual({ preset: { ...numbered, koppler: '0.1.0' }, migratedFrom: null });
+  expect(migrate(numbered)).toEqual({ preset: { ...numbered, koppler: '0.1.0' }, migratedFrom: '0.0.0' });
   expect(migrate({ ...current, koppler: '9.0.0' }).error).toMatch(/newer Koppler/);
 });
 

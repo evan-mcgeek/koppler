@@ -119,11 +119,7 @@
       label: `Settings for ${data.name}`,
       title: 'Settings: its name, and its tunnel and hosts entry on each environment',
       icon: 'cog',
-      run: () => {
-        // Named by this Koppler's reading of an older stack file: not in the file until it is updated.
-        if (board.stackUpdates.length) toasts.show('Update the stack file first, from the note beside the board.');
-        else void dialogs.settings?.open({ title: data.name, path: `databases.${data.database}` });
-      },
+      run: () => void dialogs.settings?.open({ title: data.name, path: `databases.${data.database}` }),
     },
   ]}
 >

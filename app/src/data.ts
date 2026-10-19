@@ -6,6 +6,8 @@ import { withDatabases } from './core/databases.ts';
 import { resolveExpressions } from './core/expressions.ts';
 import { migrateStack } from './core/migrations/stack/index.ts';
 import { fail } from './failure.ts';
+import { upgradeBoardFile, upgradeStack, type Upgrade } from './core/migrations/files.ts';
+import { readUpgraded } from './upgraded.ts';
 import type { Stack } from './core/stack.ts';
 import { readJson, writeJson } from './json-files.ts';
 import { tempDir } from './paths.ts';
@@ -33,9 +35,13 @@ function readOldForm(name: DataName): unknown {
 
 /** One of the run files, or null when it is not there yet (before `koppler init`) or unreadable. */
 export function readData(name: DataName): Data | null {
-  const value = readJson(dataFile(name)) ?? readOldForm(name);
+  // The stack's copy and the board file are brought up to this Koppler's format as they are read.
+  const upgrade = UPGRADES[name];
+  const upgraded = upgrade ? readUpgraded(dataFile(name), upgrade) : undefined;
+  const value = upgraded?.value ?? readJson(dataFile(name)) ?? readOldForm(name);
   return isData(value) ? value : null;
 }
+const UPGRADES: Partial<Record<DataName, Upgrade>> = { registry: upgradeStack, state: upgradeBoardFile };
 
 /** The stack in use, as the last sync copied it: the stack file, where it came from, and calls found in the code. */
 export type Registry = Stack & {

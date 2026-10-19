@@ -5,16 +5,12 @@
   // still called in the deployed environment. Each note is dismissed for this board.
   import { describePlan } from '../src/core/ports.ts';
   import { board } from './board.svelte.ts';
-  import { post } from './data.ts';
-  import { toasts } from './toast.svelte.ts';
 
   interface Note {
     key: string;
     text: string;
     /** The cable that would put it right. */
     cable?: { from: string; to: string };
-    /** It offers to bring the stack file up to date. */
-    update?: true;
   }
   const name = board.nameOf;
   const ports = $derived(
@@ -34,32 +30,10 @@
         })),
     ),
   );
-  // The stack file in an older format works as it is; updating it is the user's choice, as their teammates need this
-  // Koppler or a later one to read it after.
-  const updates = $derived(
-    board.stackUpdates.map((update): Note => ({
-      key: `update:${update.version}`,
-      text: `This stack is written for an older Koppler and works as it is. Updating the file: ${update.about.toLowerCase()}. Teammates then need Koppler ${update.version} or later.`,
-      update: true,
-    })),
-  );
   const tooNew = $derived<Note[]>(
     board.formatError ? [{ key: `format:${board.formatError}`, text: `${board.formatError}.` }] : [],
   );
-  const notes = $derived(
-    [...tooNew, ...updates, ...ports, ...unwired].filter(note => !board.dismissed.includes(note.key)),
-  );
-  let updating = $state(false);
-  const update = async () => {
-    updating = true;
-    const done = await post<{ ok: true }>('stack-migrate');
-    updating = false;
-    if ('error' in done) toasts.show(`Not updated: ${done.error}`, 'warning');
-    else {
-      toasts.show('The stack file is up to date. Commit it once your teammates have this Koppler.');
-      await board.reload();
-    }
-  };
+  const notes = $derived([...tooNew, ...ports, ...unwired].filter(note => !board.dismissed.includes(note.key)));
 </script>
 
 {#if notes.length && !board.live}
@@ -76,9 +50,6 @@
             board.dismissed = [...board.dismissed, note.key];
           }}><Icon of={X} size={14} /></button
         >
-        {#if note.update}
-          <button class="do" type="button" disabled={updating} onclick={() => void update()}>Update the file</button>
-        {/if}
         {#if cable}
           <button
             class="do"
