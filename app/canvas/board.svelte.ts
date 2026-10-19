@@ -3,6 +3,9 @@
 import type { Edge, Node } from '@xyflow/svelte';
 import { resolveExpressions } from '../src/core/expressions.ts';
 import { databasesOf, withDatabases } from '../src/core/databases.ts';
+import { BOARD_FORMAT } from '../src/core/migrations/board/index.ts';
+import { BOARD_FILE_FORMAT, migrateBoardFile } from '../src/core/migrations/board-file/index.ts';
+import { migrateStack } from '../src/core/migrations/stack/index.ts';
 import { arrange, sidesFor, type Point, type Side } from '../src/core/arrange.ts';
 import { endOffsets, orderSlots, sidePoint, SIDES, type Box, type Cable } from '../src/core/cables.ts';
 import { of as kindOf } from '../src/core/kinds.ts';
@@ -1422,6 +1425,7 @@ class Board {
     return {
       name,
       version: PRESET_VERSION,
+      koppler: BOARD_FORMAT.version,
       nodes: Object.fromEntries(
         this.nodes.map(({ id, data }) => [
           id,
@@ -1592,7 +1596,8 @@ class Board {
   }
   asShared(preset: StoredPreset): string {
     const { name, nodes, edges } = preset;
-    return JSON.stringify({ name, version: migrate(preset).preset?.version ?? PRESET_VERSION, nodes, edges }, null, 2);
+    const version = migrate(preset).preset?.version ?? PRESET_VERSION;
+    return JSON.stringify({ name, version, koppler: BOARD_FORMAT.version, nodes, edges }, null, 2);
   }
 
   /** The notes about this board the user dismissed. */
@@ -1759,7 +1764,20 @@ class Board {
     const loaded = await load();
     if (loaded) this.open(loaded);
   }
-  open({ stack: raw, clones, roots, saved }: Loaded): void {
+  /** What would bring the stack file up to this Koppler's format; it is read that way meanwhile. */
+  stackUpdates = $state.raw<{ version: string; about: string; changes: string[] }[]>([]);
+  /** Why the stack cannot be read in this Koppler's format: it is from a newer one. */
+  formatError = $state('');
+  open({ stack: written, clones, roots, saved: kept }: Loaded): void {
+    // Read in this Koppler's format; the files stay as they are written until the user updates them.
+    const migrated = migrateStack(written);
+    this.formatError = migrated.error ?? '';
+    this.stackUpdates = (migrated.applied ?? [])
+      .filter(one => one.changes.length)
+      .map(({ migration, changes }) => ({ version: migration.version, about: migration.about, changes }));
+    const raw = (migrated.value ?? written) as Registry;
+    const file = kept ? migrateBoardFile(kept) : undefined;
+    const saved: SavedBoard | null = file?.value ?? kept;
     // The board works with the facts; Settings edits the stack as written.
     const stack = withDatabases(resolveExpressions(raw));
     this.#resolved = resolveExpressions(raw);
@@ -1874,6 +1892,7 @@ class Board {
     const before = this.#kept.nodes ?? {};
     return {
       mode: 'auto',
+      koppler: BOARD_FILE_FORMAT.version,
       ...this.#kept,
       preset: this.name,
       presets: this.own,
@@ -2067,7 +2086,7 @@ class Board {
       const stored =
         this.own.find(one => one.name === name) ??
         this.team.find(one => one.name === name) ??
-        (create ? { name, version: PRESET_VERSION, nodes: {}, edges: [] } : undefined);
+        (create ? { name, version: PRESET_VERSION, koppler: BOARD_FORMAT.version, nodes: {}, edges: [] } : undefined);
       if (!stored) return false;
       const changed = { ...editPreset(stored, change), name };
       if (JSON.stringify(changed) === JSON.stringify(stored)) return false;

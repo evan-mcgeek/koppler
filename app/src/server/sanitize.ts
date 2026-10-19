@@ -1,5 +1,6 @@
 // What the page sends is never taken as it comes: a board, a layout or a prompt keeps only its known fields, each cut
 // to size, so no endpoint can be used to write anything else.
+import { isVersion } from '../core/migrations/run.ts';
 import fs from 'node:fs';
 import path from 'node:path';
 import { githubFile, readFile } from '../github.ts';
@@ -288,6 +289,7 @@ export function sanitizeLayout(input: unknown): Loose | null {
   const { keptLive, tidy, preset } = input;
   const pan = fieldsOf(input['pan']);
   return {
+    ...(isVersion(input['koppler']) && { koppler: input['koppler'] }),
     env: text(input['env'], 8),
     mode: text(input['mode'], 8),
     ...(dismissed.length && { dismissed }),

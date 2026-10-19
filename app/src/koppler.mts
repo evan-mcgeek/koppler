@@ -34,7 +34,15 @@ import { appliedCommand, historyCommand, planCommand, runningNames, sessionComma
 import { updateClones } from './engine/clones.ts';
 import { readIndex } from './engine/config.ts';
 import { candidateRepos } from './engine/repos.ts';
-import { addApps, addOutside, editStack, stackSource, readStackAt, removeApp } from './engine/stack-file.ts';
+import {
+  addApps,
+  addOutside,
+  editStack,
+  migrateStackFile,
+  stackSource,
+  readStackAt,
+  removeApp,
+} from './engine/stack-file.ts';
 import { createStack, currentStack } from './engine/stacks.ts';
 import { init as initStack, stacksCommand, sync, useCommand } from './engine/sync.ts';
 import { up } from './engine/up.ts';
@@ -314,6 +322,27 @@ async function stackCommand(args: string[]): Promise<void> {
   }
   if (what === 'propose') {
     await proposeStack();
+    return;
+  }
+  if (what === 'migrate') {
+    const apply = args.includes('--apply');
+    const done = migrateStackFile(apply);
+    if (done.error !== undefined) fail(done.error);
+    const changed = done.updates.filter(one => one.changes.length);
+    if (!changed.length) {
+      if (apply && done.updates.length) console.log(`The stack now says it is in the Koppler ${done.to} format.`);
+      else console.log(`The stack is in the Koppler ${done.to} format; nothing to update.`);
+      return;
+    }
+    const written = done.from === '0.0.0' ? 'before stacks said their Koppler version' : `for Koppler ${done.from}`;
+    console.log(`The stack is written ${written}; this Koppler reads it in the ${done.to} format.`);
+    for (const update of changed)
+      console.log(`\n${update.version}: ${update.about}\n${update.changes.map(one => `  ${one}`).join('\n')}`);
+    console.log(
+      apply
+        ? `\nWritten. Teammates need Koppler ${done.to} or later to read it; commit it when they have it.`
+        : `\nNothing written: it works as it is. koppler stack migrate --apply writes it; teammates then need Koppler ${done.to} or later.`,
+    );
     return;
   }
   if (what === 'get') {
@@ -739,7 +768,7 @@ const COMMANDS: Command[] = [
   {
     name: 'stack',
     who: 'agent',
-    args: 'get [<path>] | set <path> <value> | unset <path> | lock <path> | unlock <path> | locks | check [<file>] | schema | propose',
+    args: 'get [<path>] | set <path> <value> | unset <path> | lock <path> | unlock <path> | locks | check [<file>] | schema | propose | migrate [--apply]',
     forms: [
       ['get [<path>]', 'print a field of the stack in use, or the whole stack, as JSON'],
       ['set <path> <value>', 'set a field: text, or JSON for a number, a list or an object; checked before it is kept'],
@@ -750,6 +779,10 @@ const COMMANDS: Command[] = [
       ['check [<file>]', "every check the stack must pass, for the team repo's CI; fails with each problem"],
       ['schema', "the JSON Schema of stack.json, for an editor's $schema"],
       ['propose', "a pull request on the stack's repo with what this copy changed since its last commit"],
+      [
+        'migrate [--apply]',
+        "what would bring the stack file up to this Koppler's format (it is read that way meanwhile); --apply writes it",
+      ],
     ],
     about: 'read and change any field of the stack, the only way to change stack.json',
     run: stackCommand,

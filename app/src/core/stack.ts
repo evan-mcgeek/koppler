@@ -6,6 +6,8 @@ import { expressionProblems, resolveExpressions } from './expressions.ts';
 import { BUILT_IN_KINDS } from './kinds.ts';
 import { QUEUE_TYPES } from './plan.ts';
 import { VERSION as PRESET_VERSION } from './presets.ts';
+import { BOARD_FORMAT } from './migrations/board/index.ts';
+import { compareVersions, isVersion } from './migrations/run.ts';
 import { SECRET_TYPES } from './secret-types.ts';
 
 // Values that end up in commands (tunnels, sign-ins, hosts entries, secret steps, clone commands) must look like what
@@ -417,6 +419,11 @@ const Preset = z.looseObject(
   {
     name: required,
     version: z.number({ error: PRESET_VERSION_NEEDED }).int(PRESET_VERSION_NEEDED),
+    koppler: z
+      .string()
+      .regex(/^\d+\.\d+\.\d+$/, 'a Koppler version, such as 0.1.0')
+      .optional()
+      .describe('The Koppler board format it is written in'),
     nodes: z
       .record(z.string(), z.looseObject({}, { error: 'an object ({} for the defaults)' }), {
         error: 'an object keyed by app id',
@@ -439,6 +446,12 @@ const PROTECTED =
 export const StackSchema = z.looseObject(
   {
     name: z.string().optional(),
+    /** The Koppler version whose format the stack is written in; Koppler sets it when it brings the file up to date. */
+    koppler: z
+      .string()
+      .regex(/^\d+\.\d+\.\d+$/, 'a Koppler version, such as 0.2.0')
+      .optional()
+      .describe('The Koppler version whose format it is written in; set by koppler stack migrate'),
     /** The environments, the first being the one apps run against by default. */
     envs: z.custom<string[]>(isEnvList, ENVS),
     /** The environments where a mistake costs something; without this, every one but the first. */
@@ -536,6 +549,11 @@ function presetProblems(index: number, preset: Loose, stack: Loose): string[] {
   if (typeof version === 'number' && version > PRESET_VERSION)
     problems.push(
       `${at}.version: ${String(version)} is newer than this Koppler reads (${String(PRESET_VERSION)}); update Koppler`,
+    );
+  const format = preset['koppler'];
+  if (isVersion(format) && compareVersions(format, BOARD_FORMAT.version) > 0)
+    problems.push(
+      `${at}.koppler: ${format} is newer than this Koppler reads (${BOARD_FORMAT.version}); update Koppler`,
     );
   for (const [id] of entries(preset['nodes']))
     if (!has(stack['apps'], id)) problems.push(`${at}.nodes.${id}: no such app`);

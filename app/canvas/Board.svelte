@@ -272,12 +272,13 @@
       const taken = (key: string, side: Side) =>
         board.boxes.has(key) && !!board.ledBy(key).length && board.infraSide(key) === side;
       if (!own && (taken(from, sides[0]) || taken(to, sides[1]))) sides = level;
-      // A database's line leaves its tunnel card from the database's own row, on the side facing it.
+      // A database's line leaves its tunnel card from the database's own row, on the right unless it lies to the left.
       const row = database ? board.rowY[from]?.[database] : undefined;
       if (row !== undefined)
         sides = [
-          dx > 0 ? 'right' : 'left',
-          b.x > a.x + a.w ? 'left' : b.x + b.w < a.x ? 'right' : dy > 0 ? 'top' : 'bottom',
+          b.x + b.w < a.x ? 'left' : 'right',
+          // Stacked with the tunnel card, it comes round on the same side instead of back behind the card.
+          b.x > a.x + a.w ? 'left' : b.x + b.w < a.x ? 'right' : 'right',
         ];
       let [start, end] = [
         row === undefined ? sidePoint(a, sides[0]) : { x: sides[0] === 'right' ? a.x + a.w : a.x, y: a.y + row },

@@ -4,6 +4,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { withDatabases } from './core/databases.ts';
 import { resolveExpressions } from './core/expressions.ts';
+import { migrateStack } from './core/migrations/stack/index.ts';
+import { fail } from './failure.ts';
 import type { Stack } from './core/stack.ts';
 import { readJson, writeJson } from './json-files.ts';
 import { tempDir } from './paths.ts';
@@ -52,11 +54,16 @@ export interface Clone {
   /** Clones of libraries the app depends on, which it can use in place of the published ones. */
   libraries?: { name: string; path: string; ecosystem: 'dart' | 'npm' }[];
 }
-/** The stack in use, its expressions filled in. It passed the stack check when it was copied here, so it is read as one. */
-/** The stack in use, its databases folded into its apps' needs; those in `local` run on this Mac and bring none. */
+/**
+ * The stack in use as this Koppler reads it: brought up to its format, its expressions filled in, and its databases
+ * folded into its apps' needs (those in `local` run on this Mac and bring none). The file itself is left as written.
+ */
 export const readStack = (local?: ReadonlySet<string>): Registry | null => {
-  const stack = resolveExpressions(readData('registry')) as Registry | null;
-  return stack ? withDatabases(stack, local) : null;
+  const raw = readData('registry');
+  if (!raw) return null;
+  const migrated = migrateStack(raw);
+  if (migrated.error !== undefined) fail(`The stack: ${migrated.error}`);
+  return withDatabases(resolveExpressions(migrated.value) as Registry, local);
 };
 /** The clones the last sync found, by app. */
 export const readClones = () => (readData('local')?.['apps'] ?? {}) as Record<string, Clone | null | undefined>;

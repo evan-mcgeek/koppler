@@ -1,4 +1,5 @@
 // Changes to the stack file in use: adding and removing apps and outside systems, and setting any field.
+import { migrateStack, STACK_FORMAT } from '../core/migrations/stack/index.ts';
 import path from 'node:path';
 import { readJson, writeJson } from '../json-files.ts';
 import { kindsFor } from '../core/kinds.ts';
@@ -94,6 +95,31 @@ export function replaceStack(
   const problems = validateStack(next).filter(problem => !before.has(problem));
   if (problems.length) return { error: problems.slice(0, 5).join('; '), problems };
   return saveStack(used.source, used.stack, next) ?? { problems: [] };
+}
+
+/**
+ * Brings the stack file up to this Koppler's format, checked and written like any other change: what would change, and
+ * with `apply`, the file written. Teammates on an older Koppler cannot read it after.
+ */
+export function migrateStackFile(
+  apply: boolean,
+  { config = loadConfig() }: { config?: Config } = {},
+):
+  | { from: string; to: string; updates: { version: string; about: string; changes: string[] }[]; error?: undefined }
+  | { error: string } {
+  const used = stackInUse(config);
+  if (used.error !== undefined) return used;
+  const migrated = migrateStack(used.stack as unknown as Record<string, unknown>);
+  if (migrated.error !== undefined) return migrated;
+  const updates = migrated.applied.map(({ migration, changes }) => ({
+    version: migration.version,
+    about: migration.about,
+    changes,
+  }));
+  const result = { from: migrated.from, to: STACK_FORMAT.version, updates };
+  if (!apply || !updates.length) return result;
+  const written = replaceStack(migrated.value, { config });
+  return written.error === undefined ? result : written;
 }
 
 /** What the stack in use holds at a path (the whole stack without one). */

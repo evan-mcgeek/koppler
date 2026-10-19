@@ -30,6 +30,8 @@ const app = (name: string, kind: string, port: number, extra: Record<string, unk
 });
 export const STACK: Stack = {
   name: 'Acme Shop',
+  // In this Koppler's format: its tunnels are the apps' own, not databases a migration would name.
+  koppler: '0.2.0',
   envs: ['qa', 'prod'],
   apps: {
     web: app('Web Shop', 'node', 3000, {
@@ -64,6 +66,7 @@ export const STACK: Stack = {
 
 type Stack = {
   name: string;
+  koppler?: string;
   envs: string[];
   protected?: string[];
   apps: Record<string, Record<string, unknown>>;

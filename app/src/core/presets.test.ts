@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { check, migrate, MIGRATIONS, VERSION, type StackFacts } from './presets.ts';
+import { check, migrate, VERSION, type StackFacts } from './presets.ts';
 
 const stack: StackFacts = {
   known: id => ['app', 'api', 'db-api', 'far'].includes(id),
@@ -24,12 +24,21 @@ test('what cannot be a preset is refused with a reason', () => {
 
 test('an older preset is brought to the current format; a current one is left alone', () => {
   expect(migrate({ name: 'Old', nodes: { api: {}, app: { run: 'ide' } } })).toEqual({
-    preset: { name: 'Old', nodes: { api: { run: 'cli' }, app: { run: 'ide' } }, edges: [], version: VERSION },
-    migratedFrom: 0,
+    preset: {
+      name: 'Old',
+      nodes: { api: { run: 'cli' }, app: { run: 'ide' } },
+      edges: [],
+      version: VERSION,
+      koppler: '0.1.0',
+    },
+    migratedFrom: '0.0.0',
   });
-  const current = { name: 'Now', version: VERSION, nodes: { api: { run: 'cli' } }, edges: [] };
+  const current = { name: 'Now', version: VERSION, koppler: '0.1.0', nodes: { api: { run: 'cli' } }, edges: [] };
   expect(migrate(current)).toEqual({ preset: current, migratedFrom: null });
-  for (let v = 0; v < VERSION; v++) expect(MIGRATIONS[v], `the step from version ${String(v)}`).toBeTypeOf('function');
+  // Numbered 1, from before boards said their Koppler version: already 0.1.0's.
+  const numbered = { name: 'Then', version: VERSION, nodes: { api: { run: 'ide' } }, edges: [] };
+  expect(migrate(numbered)).toEqual({ preset: { ...numbered, koppler: '0.1.0' }, migratedFrom: null });
+  expect(migrate({ ...current, koppler: '9.0.0' }).error).toMatch(/newer Koppler/);
 });
 
 test('only what this stack can run opens, and every change is noted', () => {
@@ -58,6 +67,7 @@ test('only what this stack can run opens, and every change is noted', () => {
   expect(result.preset).toEqual({
     name: 'PR 12',
     version: VERSION,
+    koppler: '0.1.0',
     source: 'pr.json',
     nodes: {
       app: { run: 'cli', platform: 'ios' },
@@ -85,7 +95,7 @@ test('a clean preset opens with nothing to say', () => {
     nodes: { app: { run: 'ide' }, api: { run: 'cli', branch: 'main' } },
     edges: [{ from: 'app', to: 'api' }],
   };
-  expect(check(clean, stack)).toEqual({ preset: clean, notes: [] });
+  expect(check(clean, stack)).toEqual({ preset: { ...clean, koppler: '0.1.0' }, notes: [] });
 });
 
 test('nothing left to open is an error, not an empty board', () => {
