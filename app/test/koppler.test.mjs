@@ -482,3 +482,33 @@ test('A request that was no run (filling in settings, an answer) is finished wit
   assert.match(koppler('history', 'done').out, /no run is waiting to be applied/);
   fs.rmSync(dir, { recursive: true });
 });
+
+test("An app stopped or restarted leaves no steps on its card: the agent's checklist and the run's steps both go.", async () => {
+  const { spawnSync } = await import('node:child_process');
+  const fs = await import('node:fs'), os = await import('node:os'), path = await import('node:path'), { fileURLToPath } = await import('node:url');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-steps-'));
+  const env = { ...process.env, KOPPLER_STATE: dir, KOPPLER_TEMP: dir, KOPPLER_CONFIG_DIR: dir };
+  const bin = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'dist', 'koppler.mjs');
+  cleanups.push(() => spawnSync('node', [bin, 'stop', '--all', '--yes'], { env }));
+  const koppler = (...args) => { const r = spawnSync('node', [bin, ...args], { encoding: 'utf8', env }); return (r.stdout + r.stderr).trim(); };
+  const read = file => JSON.parse(fs.readFileSync(path.join(dir, file), 'utf8'));
+  // A run left both: the agent's checklist for api and web, and Koppler's own steps for both.
+  const started = () => {
+    assert.match(koppler('run', 'api', '--', 'sleep', '30'), /started api/);
+    for (const app of ['api', 'web']) koppler('status', 'step', app, 'Start', 'done');
+    fs.writeFileSync(path.join(dir, 'progress.json'), JSON.stringify({ run: 'r1', env: 'qa', apps: { api: [{ label: 'Start', state: 'done' }], web: [{ label: 'Start', state: 'done' }] } }));
+  };
+  started();
+  assert.match(koppler('stop', 'api'), /api: stopped/);
+  assert.equal(read('status.json').apps?.api?.steps, undefined);
+  assert.equal(read('progress.json').apps.api, undefined);
+  // The others keep theirs.
+  assert.equal(read('status.json').apps.web.steps.length, 1);
+  assert.equal(read('progress.json').apps.web.length, 1);
+  started();
+  assert.match(koppler('restart', 'api'), /api/);
+  assert.equal(read('status.json').apps?.api?.steps, undefined);
+  assert.equal(read('progress.json').apps.api, undefined);
+  koppler('stop', 'api');
+  fs.rmSync(dir, { recursive: true, force: true });
+});

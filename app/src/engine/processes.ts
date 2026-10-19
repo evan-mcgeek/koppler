@@ -6,13 +6,13 @@ import https from 'node:https';
 import path from 'node:path';
 import { execFileSync, spawn } from 'node:child_process';
 import { fail, Failure } from '../failure.ts';
-import { CODE, logsDir, stateDir } from '../paths.ts';
+import { CODE, logsDir, stateDir, tempDir } from '../paths.ts';
 import { appEnv } from '../safe-env.ts';
 import { redact } from '../scrub.ts';
 import { keepRunLog } from './run-logs.ts';
 import { keepPreviousLog } from './session.ts';
 import { APP_ID } from '../ids.ts';
-import { writeJson } from '../json-files.ts';
+import { readJson, writeJson } from '../json-files.ts';
 
 const PROCS = path.join(stateDir(), 'procs');
 /** What a process started by Koppler can be called. */
@@ -398,11 +398,30 @@ export async function restartOne(record: ProcessRecord): Promise<string> {
   await startProcess(start);
   return `${stopped}, started again`;
 }
+/** A stopped app's card shows no steps: the agent's checklist for it and the run's steps for it go; others' stay. */
+function forgetSteps(name: string): void {
+  type Loose = Record<string, unknown>;
+  const status = path.join(tempDir(), 'status.json');
+  const shown = readJson<{ apps?: Record<string, Loose> } | null>(status, null);
+  const app = shown?.apps?.[name];
+  if (shown && app && 'steps' in app) {
+    const { steps: _gone, ...rest } = app;
+    writeJson(status, { ...shown, apps: { ...shown.apps, [name]: rest } });
+  }
+  const file = path.join(tempDir(), 'progress.json');
+  const progress = readJson<{ apps?: Loose } | null>(file, null);
+  if (progress?.apps && Object.hasOwn(progress.apps, name)) {
+    const { [name]: _gone, ...apps } = progress.apps;
+    writeJson(file, { ...progress, apps });
+  }
+}
+
 export async function stopOne(record: ProcessRecord): Promise<string> {
   const forget = () => {
     // Some apps outlive their process, e.g. a mobile app on a simulator: close them too.
     runAll(record.onStop);
     fs.rmSync(recordPath(record.name), { force: true });
+    forgetSteps(record.name);
   };
   if (!alive(record)) {
     forget();
