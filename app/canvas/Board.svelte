@@ -933,6 +933,7 @@
   .area {
     position: absolute;
     inset: 0;
+    container-type: inline-size;
   }
   .empty {
     position: absolute;
@@ -1004,7 +1005,19 @@
   /* Centred, clear of the overview on either side. */
   .area :global(.svelte-flow__panel.bottom.center) {
     --overview-room: 230px;
+    /* Centred from the middle, it would only get the right half's width: its own, up to the limit, keeps one row. */
+    width: max-content;
     max-width: calc(100% - 2 * var(--overview-room));
+  }
+  /* Too narrow for the toolbar between two overview-wide margins (a panel open beside it): the overview goes, and the
+     toolbar keeps its one row. */
+  @container (max-width: 880px) {
+    .area :global(.svelte-flow__minimap) {
+      display: none;
+    }
+    .area :global(.svelte-flow__panel.bottom.center) {
+      max-width: calc(100% - 32px);
+    }
   }
   .area :global(.svelte-flow__minimap) {
     margin: 0 15px 15px 0;
