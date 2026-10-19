@@ -55,7 +55,7 @@ test('an older stack is read in this format and written back with its version, w
   };
   await expect(page.locator('.svelte-flow__node-database')).toHaveText([/Orders/]);
   await expect(page.getByRole('note')).not.toContainText(['older Koppler']);
-  expect(read(copy)).toMatchObject({ koppler: '0.2.0', databases: named });
+  expect(read(copy)).toMatchObject({ koppler: '0.2.1', databases: named });
 
   // The stack file itself, as the next stack command reads it.
   const file = path.join(canvas.dir, 'stack', 'stack.json');
@@ -66,7 +66,7 @@ test('an older stack is read in this format and written back with its version, w
   execFileSync('node', [path.join(here, '..', 'dist', 'koppler.mjs'), 'stack', 'get', 'name'], {
     env: { ...process.env, KOPPLER_CONFIG_DIR: path.join(canvas.dir, 'config'), KOPPLER_TEMP: canvas.temp },
   });
-  expect(read(file)).toMatchObject({ koppler: '0.2.0', databases: named });
+  expect(read(file)).toMatchObject({ koppler: '0.2.1', databases: named });
   expect((read(file)['presets'] as { koppler?: string }[]).map(one => one.koppler)).toEqual(['0.1.0', '0.1.0']);
 });
 

@@ -31,7 +31,7 @@ const app = (name: string, kind: string, port: number, extra: Record<string, unk
 export const STACK: Stack = {
   name: 'Acme Shop',
   // In this Koppler's format: its tunnels are the apps' own, not databases a migration would name.
-  koppler: '0.2.0',
+  koppler: '0.2.1',
   envs: ['qa', 'prod'],
   apps: {
     web: app('Web Shop', 'node', 3000, {

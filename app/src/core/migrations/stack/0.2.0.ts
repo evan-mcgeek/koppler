@@ -1,7 +1,6 @@
 // 0.2.0: databases are named once under `databases` and apps `uses` them, where before each app stated a tunnel to
 // each database (and the hosts entry its settings dial) among its own needs.
 import { withDatabases } from '../../databases.ts';
-import { tunnelKind } from '../../ports.ts';
 import type { Migration, Raw } from '../run.ts';
 
 interface Need {
@@ -10,8 +9,7 @@ interface Need {
   hosts?: string;
   what?: string;
   cmd?: string;
-  env?: string;
-  connectsAs?: string;
+  note?: string;
   [key: string]: unknown;
 }
 interface App {
@@ -28,12 +26,13 @@ interface Stack {
 
 const PORTS: Record<number, string> = { 5432: 'postgres', 3306: 'mysql', 6379: 'valkey', 6380: 'valkey' };
 const ENGINE = /postgres|mysql|aurora|rds|cluster|valkey|redis|elasticache|database|\bdb\b|cache/i;
+/** The fields of a tunnel to a database that each have a place once it is a database; one with any other stays. */
+const MOVED = new Set(['tunnel', 'port', 'what', 'cmd', 'note']);
 /** A tunnel to a database or cache: by its port, or by what it says it reaches. One a setting points at stays. */
 const isDatabase = (need: Need) =>
+  Object.keys(need).every(field => MOVED.has(field)) &&
   !!need.tunnel &&
   !!need.port &&
-  !need.env &&
-  !need.connectsAs &&
   (!!PORTS[need.port] || ENGINE.test(`${need.tunnel} ${need.what ?? ''}`));
 const kindOf = (need: Need) =>
   /redis/i.test(need.tunnel ?? '')
@@ -41,6 +40,22 @@ const kindOf = (need: Need) =>
     : (PORTS[need.port ?? 0] ?? (/mysql/i.test(need.what ?? '') ? 'mysql' : 'postgres'));
 /** A hosts entry for a database endpoint, not for an app. */
 const isEndpoint = (need: Need) => !!need.hosts && !need.tunnel && ENGINE.test(need.hosts);
+const ENVIRONMENTS = new Set(['dev', 'qa', 'test', 'uat', 'stg', 'staging', 'prod', 'production', 'internal']);
+/**
+ * A database's name: what its tunnel said it reaches ("Orders (Postgres)" is Orders), or, when that says only "Database"
+ * or "Cache", its host's first label without the environment's words.
+ */
+const nameOf = (need: Need): string => {
+  const said = (need.what ?? '').replace(/\s*\([^)]*\)$/, '');
+  if (said && !/^(database|cache|tunnel)$/i.test(said)) return said;
+  const words =
+    (need.tunnel ?? '')
+      .split('.')[0]
+      ?.split('-')
+      .filter(word => word && !ENVIRONMENTS.has(word)) ?? [];
+  const text = words.join(' ');
+  return text ? text.charAt(0).toUpperCase() + text.slice(1) : 'Database';
+};
 const slug = (text: string) =>
   text
     .toLowerCase()
@@ -78,8 +93,7 @@ function up(raw: Raw, say: (change: string) => void): Raw {
       let key = byHost.get(host);
       if (!key) {
         // "Orders (Postgres)" is the database Orders; its kind is said apart.
-        const said = need.what && !/^(database|cache)\b/i.test(need.what) ? need.what : tunnelKind({ tunnel: host });
-        const name = said.replace(/\s*\([^)]*\)$/, '') || said;
+        const name = nameOf(need);
         key = slug(name);
         while (databases[key]) key = `${key}-2`;
         byHost.set(host, key);
@@ -95,6 +109,7 @@ function up(raw: Raw, say: (change: string) => void): Raw {
       (app.uses ??= {})[key] ??= {};
       changes.push(`${app.name ?? id} uses ${key} instead of its own tunnel to ${host}`);
     }
+    const notes: Record<string, [string, string][]> = {};
     // On each environment, the tunnel of the same port, in the same order, reaches the same database there.
     for (const env of own.length ? stack.envs : []) {
       const list = env === first ? app.prereqs : app.envs?.[env]?.prereqs;
@@ -108,13 +123,28 @@ function up(raw: Raw, say: (change: string) => void): Raw {
         const database = databases[key];
         if (!there || !database) continue;
         const reach =
-          env === first ? database : ((database.envs ??= {})[env] ??= { tunnel: there.tunnel, port: there.port });
+          env === first
+            ? database
+            : ((database.envs ??= {})[env] ??= {
+                tunnel: there.tunnel,
+                port: there.port,
+                ...(there.cmd && { cmd: there.cmd }),
+              });
         if (reach['tunnel'] !== there.tunnel || reach['port'] !== there.port) continue;
         list.splice(list.indexOf(there), 1);
+        // What an app said about its tunnel is about how it uses the database: it goes with its use.
+        if (there.note) (notes[key] ??= []).push([env, there.note]);
         const users = dials.get(`${key}@${env}`) ?? [];
         users.push({ list, endpoint: own.length === 1 && endpoints.length === 1 ? endpoints[0] : undefined });
         dials.set(`${key}@${env}`, users);
       }
+    }
+    // One note for every environment, or each said with its environment.
+    for (const [key, said] of Object.entries(notes)) {
+      const kept = [...new Set(said.map(([, note]) => note))];
+      const note = kept.length === 1 ? kept[0] : said.map(([env, one]) => `${env.toUpperCase()}: ${one}`).join('\n');
+      const use = app.uses?.[key];
+      if (use && note) use['note'] = note;
     }
   }
   // The name a database's apps dial goes with it when every one of them dials it.
