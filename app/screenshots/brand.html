@@ -1,0 +1,503 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Koppler</title>
+    <!-- The README's banner and the repository's social card, from the design system's sections 07 and 08, drawn with the
+         canvas's own fonts and tokens. -->
+    <link rel="stylesheet" href="../src/fonts/fonts.css" />
+    <link rel="stylesheet" href="../canvas/tokens.css" />
+    <style>
+      :root {
+        --line2: var(--line-strong);
+        --mute: var(--ink-muted);
+      }
+      body {
+        margin: 0;
+        padding: 20px;
+        display: grid;
+        gap: 20px;
+        justify-content: start;
+        background: #050505;
+        color: var(--ink);
+        font-family: var(--sans);
+        -webkit-font-smoothing: antialiased;
+      }
+      section {
+        box-sizing: border-box;
+      }
+    </style>
+  </head>
+  <body>
+    <template id="mark">
+      <svg viewBox="0 0 64 64" aria-hidden="true" style="display: block; flex: none">
+        <rect x="10" y="8" width="10" height="48" rx="5" style="fill: var(--ink)" />
+        <path
+          d="M20 32 C 34 32, 34 14, 47 14 M20 32 C 34 32, 34 50, 47 50"
+          fill="none"
+          stroke-width="6"
+          stroke-linecap="round"
+          style="stroke: var(--local)"
+        />
+        <circle cx="49" cy="14" r="7.5" style="fill: var(--ink)" />
+        <circle cx="49" cy="50" r="7.5" style="fill: var(--ink)" />
+        <circle cx="49" cy="14" r="2.5" style="fill: var(--desk)" />
+        <circle cx="49" cy="50" r="2.5" style="fill: var(--desk)" />
+      </svg>
+    </template>
+
+    <section
+      id="banner"
+      style="
+        width: 1280px;
+        height: 400px;
+        flex: none;
+        position: relative;
+        overflow: hidden;
+        background-color: var(--desk);
+        background-image: radial-gradient(var(--line) 1px, transparent 1px);
+        background-size: 20px 20px;
+        border: 1px solid var(--line);
+      "
+    >
+      <div
+        style="
+          position: absolute;
+          left: 0;
+          top: 0;
+          bottom: 0;
+          width: 640px;
+          background: var(--desk);
+          border-right: 1px solid var(--line);
+        "
+      ></div>
+      <div
+        style="
+          position: absolute;
+          left: 64px;
+          top: 64px;
+          bottom: 64px;
+          width: 540px;
+          display: flex;
+          flex-direction: column;
+          justify-content: space-between;
+        "
+      >
+        <div style="display: flex; align-items: center; gap: 16px">
+          <span data-mark="64"></span>
+          <span
+            style="
+              font-family: 'Barlow Semi Condensed', sans-serif;
+              font-size: 60px;
+              font-weight: 600;
+              letter-spacing: -0.005em;
+              line-height: 1;
+            "
+            >koppler</span
+          >
+        </div>
+        <span style="font-size: 26px; font-weight: 600; line-height: 1.25; text-wrap: balance"
+          >Plug your local code into the real stack.</span
+        >
+        <div style="display: flex; align-items: center; gap: 16px">
+          <span
+            style="
+              font-family: 'Sometype Mono', monospace;
+              font-size: 15px;
+              padding: 9px 14px;
+              border: 1px solid var(--line2);
+            "
+            ><span style="color: var(--mute)">$ </span>npm install -g koppler</span
+          >
+          <span style="font-size: 14px; color: var(--mute)">macOS and Linux</span>
+        </div>
+      </div>
+      <svg width="1280" height="400" style="position: absolute; inset: 0">
+        <path d="M880 108 C 920 108, 910 182, 950 182" fill="none" style="stroke: var(--local)" stroke-width="2"></path>
+        <path d="M880 288 C 920 288, 910 208, 950 208" fill="none" style="stroke: var(--local)" stroke-width="2"></path>
+        <path
+          d="M1040 229 L 1040 304"
+          fill="none"
+          style="stroke: var(--deployed)"
+          stroke-width="2"
+          stroke-dasharray="2 6"
+          stroke-linecap="round"
+        ></path>
+      </svg>
+      <div
+        style="
+          position: absolute;
+          left: 700px;
+          top: 70px;
+          width: 180px;
+          background: var(--panel);
+          border: 1px solid var(--line2);
+        "
+      >
+        <div
+          style="display: flex; align-items: center; gap: 8px; padding: 9px 11px; border-bottom: 1px solid var(--line)"
+        >
+          <span style="width: 7px; height: 7px; background: var(--live)"></span
+          ><span style="font-size: 14px; font-weight: 600; flex: 1">Mobile App</span>
+        </div>
+        <div style="padding: 8px 11px; font-family: 'Sometype Mono', monospace; font-size: 11px; color: var(--mute)">
+          feature/checkout
+        </div>
+      </div>
+      <div
+        style="
+          position: absolute;
+          left: 700px;
+          top: 250px;
+          width: 180px;
+          background: var(--panel);
+          border: 1px solid var(--line2);
+        "
+      >
+        <div
+          style="display: flex; align-items: center; gap: 8px; padding: 9px 11px; border-bottom: 1px solid var(--line)"
+        >
+          <span style="width: 7px; height: 7px; background: var(--live)"></span
+          ><span style="font-size: 14px; font-weight: 600; flex: 1">Web Shop</span>
+        </div>
+        <div style="padding: 8px 11px; font-family: 'Sometype Mono', monospace; font-size: 11px; color: var(--mute)">
+          feature/checkout
+        </div>
+      </div>
+      <div
+        style="
+          position: absolute;
+          left: 950px;
+          top: 160px;
+          width: 180px;
+          background: var(--panel);
+          border: 1px solid var(--ink);
+        "
+      >
+        <div
+          style="display: flex; align-items: center; gap: 8px; padding: 9px 11px; border-bottom: 1px solid var(--line)"
+        >
+          <span style="width: 7px; height: 7px; background: var(--live)"></span
+          ><span style="font-size: 14px; font-weight: 600; flex: 1">Orders API</span>
+        </div>
+        <div style="padding: 8px 11px; font-family: 'Sometype Mono', monospace; font-size: 11px; color: var(--mute)">
+          .NET · running
+        </div>
+      </div>
+      <div
+        style="
+          position: absolute;
+          left: 950px;
+          top: 304px;
+          width: 180px;
+          background: var(--panel);
+          border: 1px dashed var(--deployed);
+        "
+      >
+        <div style="display: flex; align-items: center; gap: 8px; padding: 9px 11px">
+          <span style="font-size: 14px; font-weight: 600; flex: 1">Orders</span
+          ><span
+            style="
+              font-family: 'Sometype Mono', monospace;
+              font-size: 10px;
+              letter-spacing: 0.06em;
+              padding: 2px 5px;
+              border: 1px solid var(--line2);
+              color: var(--mute);
+            "
+            >POSTGRES</span
+          >
+        </div>
+        <div style="padding: 0 11px 9px; font-size: 12px; color: var(--deployed)">Deployed QA</div>
+      </div>
+      <span
+        style="
+          position: absolute;
+          left: 874px;
+          top: 102px;
+          width: 12px;
+          height: 12px;
+          border-radius: 50%;
+          box-sizing: border-box;
+          border: 2px solid var(--local);
+          background: var(--desk);
+          box-shadow: inset 0 0 0 2px var(--desk);
+        "
+      ></span
+      ><span
+        style="
+          position: absolute;
+          left: 874px;
+          top: 282px;
+          width: 12px;
+          height: 12px;
+          border-radius: 50%;
+          box-sizing: border-box;
+          border: 2px solid var(--local);
+          background: var(--desk);
+          box-shadow: inset 0 0 0 2px var(--desk);
+        "
+      ></span
+      ><span
+        style="
+          position: absolute;
+          left: 944px;
+          top: 176px;
+          width: 12px;
+          height: 12px;
+          border-radius: 50%;
+          box-sizing: border-box;
+          border: 2px solid var(--local);
+          background: var(--live);
+          box-shadow: inset 0 0 0 2px var(--desk);
+        "
+      ></span
+      ><span
+        style="
+          position: absolute;
+          left: 944px;
+          top: 202px;
+          width: 12px;
+          height: 12px;
+          border-radius: 50%;
+          box-sizing: border-box;
+          border: 2px solid var(--local);
+          background: var(--live);
+          box-shadow: inset 0 0 0 2px var(--desk);
+        "
+      ></span>
+    </section>
+
+    <section
+      id="social"
+      style="
+        width: 1280px;
+        height: 640px;
+        flex: none;
+        position: relative;
+        overflow: hidden;
+        background-color: var(--desk);
+        background-image: radial-gradient(var(--line) 1px, transparent 1px);
+        background-size: 24px 24px;
+        border: 1px solid var(--line);
+      "
+    >
+      <svg width="1280" height="640" style="position: absolute; inset: 0">
+        <path
+          d="M1030 184 C 1060 184, 1050 284, 1080 284"
+          fill="none"
+          style="stroke: var(--local)"
+          stroke-width="2.5"
+        ></path>
+        <path
+          d="M1030 444 C 1060 444, 1050 314, 1080 314"
+          fill="none"
+          style="stroke: var(--local)"
+          stroke-width="2.5"
+        ></path>
+        <circle cx="1170" cy="325" r="6" style="fill: var(--desk); stroke: var(--deployed)" stroke-width="2"></circle>
+        <path
+          d="M1170 331 L 1170 470"
+          fill="none"
+          style="stroke: var(--deployed)"
+          stroke-width="2.5"
+          stroke-dasharray="2 7"
+          stroke-linecap="round"
+        ></path>
+      </svg>
+      <div
+        style="
+          position: absolute;
+          left: 850px;
+          top: 140px;
+          width: 180px;
+          background: var(--panel);
+          border: 1px solid var(--line2);
+        "
+      >
+        <div
+          style="display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--line)"
+        >
+          <span style="width: 7px; height: 7px; background: var(--live)"></span
+          ><span style="font-size: 15px; font-weight: 600">Mobile App</span>
+        </div>
+        <div style="padding: 10px 12px; font-family: 'Sometype Mono', monospace; font-size: 11px; color: var(--mute)">
+          feature/checkout
+        </div>
+        <span
+          style="
+            position: absolute;
+            right: -7px;
+            top: 38px;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: var(--desk);
+            border: 2px solid var(--local);
+          "
+        ></span>
+      </div>
+      <div
+        style="
+          position: absolute;
+          left: 850px;
+          top: 400px;
+          width: 180px;
+          background: var(--panel);
+          border: 1px solid var(--line2);
+        "
+      >
+        <div
+          style="display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--line)"
+        >
+          <span style="width: 7px; height: 7px; background: var(--live)"></span
+          ><span style="font-size: 15px; font-weight: 600">Web Shop</span>
+        </div>
+        <div style="padding: 10px 12px; font-family: 'Sometype Mono', monospace; font-size: 11px; color: var(--mute)">
+          feature/checkout
+        </div>
+        <span
+          style="
+            position: absolute;
+            right: -7px;
+            top: 38px;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: var(--desk);
+            border: 2px solid var(--local);
+          "
+        ></span>
+      </div>
+      <div
+        style="
+          position: absolute;
+          left: 1080px;
+          top: 250px;
+          width: 180px;
+          background: var(--panel);
+          border: 1px solid var(--ink);
+        "
+      >
+        <div
+          style="display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--line)"
+        >
+          <span style="width: 7px; height: 7px; background: var(--live)"></span
+          ><span style="font-size: 15px; font-weight: 600; flex: 1">Orders API</span
+          ><span style="font-family: 'Sometype Mono', monospace; font-size: 10px; color: var(--mute)">.NET</span>
+        </div>
+        <div style="padding: 10px 12px; font-family: 'Barlow', sans-serif; font-size: 12px">Running</div>
+        <span
+          style="
+            position: absolute;
+            left: -7px;
+            top: 28px;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            box-sizing: border-box;
+            border: 2px solid var(--local);
+            background: var(--live);
+            box-shadow: inset 0 0 0 2px var(--desk);
+          "
+        ></span>
+        <span
+          style="
+            position: absolute;
+            left: -7px;
+            top: 58px;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            box-sizing: border-box;
+            border: 2px solid var(--local);
+            background: var(--live);
+            box-shadow: inset 0 0 0 2px var(--desk);
+          "
+        ></span>
+        <span
+          style="
+            position: absolute;
+            left: 83px;
+            bottom: -7px;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: var(--desk);
+            border: 2px solid var(--deployed);
+            box-sizing: border-box;
+          "
+        ></span>
+      </div>
+      <div
+        style="
+          position: absolute;
+          left: 1080px;
+          top: 470px;
+          width: 180px;
+          border: 1px dashed var(--deployed);
+          background: var(--panel);
+        "
+      >
+        <div style="display: flex; align-items: center; gap: 8px; padding: 10px 12px 6px">
+          <span style="width: 7px; height: 7px; background: var(--live)"></span
+          ><span style="font-size: 15px; font-weight: 600; flex: 1">Orders</span
+          ><span
+            style="
+              font-family: 'Sometype Mono', monospace;
+              font-size: 10px;
+              letter-spacing: 0.06em;
+              padding: 2px 5px;
+              border: 1px solid var(--line2);
+              color: var(--mute);
+            "
+            >POSTGRES</span
+          >
+        </div>
+        <div style="padding: 0 12px 10px; font-size: 12px; color: var(--deployed)">Deployed QA, through the tunnel</div>
+      </div>
+      <div
+        style="
+          position: absolute;
+          left: 80px;
+          top: 80px;
+          bottom: 80px;
+          width: 720px;
+          display: flex;
+          flex-direction: column;
+          justify-content: space-between;
+        "
+      >
+        <div style="display: flex; align-items: center; gap: 20px">
+          <span data-mark="88"></span>
+          <span
+            style="
+              font-family: 'Barlow Semi Condensed', sans-serif;
+              font-size: 76px;
+              font-weight: 600;
+              letter-spacing: -0.005em;
+            "
+            >koppler</span
+          >
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 20px">
+          <span style="font-size: 38px; font-weight: 600; line-height: 1.2; letter-spacing: -0.01em; text-wrap: balance"
+            >Plug your local code into the real stack.</span
+          >
+          <span style="font-family: 'Sometype Mono', monospace; font-size: 18px; color: var(--mute)"
+            >github.com/evan-mcgeek/koppler</span
+          >
+        </div>
+      </div>
+    </section>
+
+    <script>
+      for (const slot of document.querySelectorAll('[data-mark]')) {
+        const svg = document.getElementById('mark').content.firstElementChild.cloneNode(true);
+        svg.setAttribute('width', slot.dataset.mark);
+        svg.setAttribute('height', slot.dataset.mark);
+        slot.replaceWith(svg);
+      }
+    </script>
+  </body>
+</html>

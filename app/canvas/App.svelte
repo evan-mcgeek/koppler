@@ -2,7 +2,6 @@
   import CommandDialog from './CommandDialog.svelte';
   import Icon from './Icon.svelte';
   import PanelLeft from '@lucide/svelte/icons/panel-left';
-  import Square from '@lucide/svelte/icons/square';
   import Cog from './Cog.svelte';
   import Command from './Command.svelte';
   import { SvelteFlowProvider } from '@xyflow/svelte';
@@ -19,6 +18,7 @@
   import History from './History.svelte';
   import Traces from './Traces.svelte';
   import Logs from './Logs.svelte';
+  import Mark from './Mark.svelte';
   import LogsButton from './LogsButton.svelte';
   import Tip from './Tip.svelte';
   import Menu from './Menu.svelte';
@@ -241,7 +241,15 @@
   };
   $effect(() => {
     if (!bar) return;
-    const watch = new ResizeObserver(fitBar);
+    // Fitted on the next frame, and only when its width changed: dropping the words changes its height, and a change
+    // of size made while the browser hands out sizes is what it reports as a ResizeObserver loop.
+    let width = 0;
+    const watch = new ResizeObserver(([entry]) => {
+      const now = Math.round(entry?.contentRect.width ?? 0);
+      if (now === width) return;
+      width = now;
+      requestAnimationFrame(fitBar);
+    });
     watch.observe(bar);
     return () => {
       watch.disconnect();
@@ -263,21 +271,27 @@
       // Not remembered where the browser keeps nothing.
     }
   };
-  // From the folded rail: its board button lands on the board picker.
-  // A pinch zooms the board only: anywhere else the browser would zoom the whole page.
+  // A trackpad pinch the board did not take would zoom the page; Ctrl held with the wheel still zooms it.
   $effect(() => {
-    const outside = (ev: Event) => {
-      if (!(ev.target instanceof Element && ev.target.closest('.svelte-flow'))) ev.preventDefault();
+    let ctrl = false;
+    const key = (ev: KeyboardEvent) => {
+      if (ev.key === 'Control') ctrl = ev.type === 'keydown';
     };
     const wheel = (ev: WheelEvent) => {
-      if (ev.ctrlKey) outside(ev);
+      if (ev.ctrlKey && !ctrl) ev.preventDefault();
     };
+    const gesture = (ev: Event) => {
+      ev.preventDefault();
+    };
+    window.addEventListener('keydown', key);
+    window.addEventListener('keyup', key);
     window.addEventListener('wheel', wheel, { passive: false });
-    // Safari's pinch.
-    window.addEventListener('gesturestart', outside);
+    window.addEventListener('gesturestart', gesture);
     return () => {
+      window.removeEventListener('keydown', key);
+      window.removeEventListener('keyup', key);
       window.removeEventListener('wheel', wheel);
-      window.removeEventListener('gesturestart', outside);
+      window.removeEventListener('gesturestart', gesture);
     };
   });
   const openSide = async (at?: 'board') => {
@@ -315,8 +329,9 @@
   >
     <Icon of={PanelLeft} size={16} />
   </button>
-  <span class="title">Koppler</span>
+  <span class="brand"><Mark size={22} /><span class="word">koppler</span></span>
   {#if board.stack}
+    <span class="slash" aria-hidden="true">/</span>
     <StackPicker />
     <button
       class="side-toggle gear"
@@ -325,14 +340,22 @@
       title="Stack settings: its environments, apps, queues, sign-ins and team boards"
       onclick={() => void dialogs.settings?.open({ title: `${board.stack} settings`, path: '' })}
     >
-      <Cog size={16} />
+      <Cog size={16} /><span class="words">Settings</span>
     </button>
-    <span class="env" class:prod={board.protected}>{board.env.toUpperCase()}</span>
+    <div class="seg env" role="radiogroup" aria-label="Environment">
+      {#each board.envs as env (env)}
+        <label class:prod={board.protected}
+          ><input type="radio" name="env" value={env} bind:group={board.env} />{env.toUpperCase()}</label
+        >
+      {/each}
+    </div>
   {/if}
   <span class="spacer"></span>
-  {#if board.stack}<Health /><Agent /><LogsButton />{/if}
-  {#if board.stack}<History /><Traces /><Credentials />{/if}
-  <Help />
+  {#if board.stack}<Health /><Agent />{/if}
+  <span class="strip">
+    {#if board.stack}<LogsButton /><History /><Traces /><Credentials />{/if}
+    <Help />
+  </span>
   {#if board.stack}
     <span class="split" inert={!!loading}>
       <button
@@ -347,7 +370,7 @@
           runs.stop();
         }}
       >
-        <Icon of={Square} size={12} filled />
+        <span class="stop-mark" aria-hidden="true"></span>
         <span class="words">Stop</span>
       </button>
       <Menu
@@ -395,7 +418,7 @@
           : 'Add an app to the board first'}
         onclick={() => {
           runs.start();
-        }}>Run</button
+        }}><span class="play" aria-hidden="true"></span>Run</button
       >
       {#if board.nodes.length}
         <Menu
@@ -456,6 +479,7 @@
   <div class="banner" role="alert">
     {board.env.toUpperCase()}: local code runs against real {board.env.toUpperCase()} data and secrets.
   </div>
+  <div class="frame" aria-hidden="true"></div>
 {/if}
 <div class="work">
   {#if loading}
@@ -499,9 +523,9 @@
   header {
     display: flex;
     align-items: center;
-    gap: 12px;
-    min-height: 53px;
-    padding: 10px 16px;
+    gap: 16px;
+    min-height: 56px;
+    padding: 8px 16px;
     border-bottom: 1px solid var(--line);
     background: var(--panel);
     color: var(--ink);
@@ -514,25 +538,99 @@
     display: none;
   }
   header.protected {
-    border-bottom: 3px solid var(--prod);
+    border-bottom-color: var(--prod);
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .word {
+    font: 600 20px var(--display);
+    letter-spacing: -0.005em;
+  }
+  .slash {
+    margin: 0 -8px;
+    color: var(--line-strong);
+  }
+  .env label {
+    padding: 6px 12px;
+  }
+  .env label.prod:has(input:checked) {
+    background: var(--prod-stripes);
+    color: var(--on-prod);
+    font-weight: 700;
+  }
+  .env:has(.prod) {
+    border-color: var(--prod);
+  }
+  /* The board's tools, as one strip of words printed on the panel. */
+  .strip {
+    display: flex;
+    gap: 1px;
+    border: 1px solid var(--line);
+    background: var(--line);
+  }
+  .strip > :global(button) {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: auto;
+    height: auto;
+    margin: 0;
+    padding: 8px 10px;
+    border: 0;
+    background: var(--panel);
+    color: var(--ink);
+    font: 600 12px var(--sans);
+    cursor: pointer;
+  }
+  .strip > :global(button:hover),
+  .strip > :global(button[aria-expanded='true']),
+  .strip > :global(button[aria-pressed='true']) {
+    background: var(--line-strong);
+    color: var(--ink);
+  }
+  .stop-mark {
+    width: 8px;
+    height: 8px;
+    background: currentColor;
+  }
+  .play {
+    width: 0;
+    height: 0;
+    border-top: 4.5px solid transparent;
+    border-bottom: 4.5px solid transparent;
+    border-left: 7px solid currentColor;
+  }
+  .frame {
+    position: fixed;
+    z-index: 90;
+    inset: 0;
+    border: 3px solid var(--prod);
+    pointer-events: none;
   }
   .spacer {
     flex: 1;
   }
   .banner {
-    padding: 6px 16px;
-    background: color-mix(in oklab, var(--prod) 14%, var(--panel));
-    color: var(--prod);
-    font: 600 13px var(--sans);
+    display: flex;
+    align-items: center;
+    min-height: 30px;
+    padding: 0 16px;
+    background: repeating-linear-gradient(-45deg, var(--prod) 0 12px, var(--prod-strong) 12px 24px);
+    color: var(--on-prod);
+    font: 700 11px var(--mono);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
   }
   .stop,
   .run {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-    padding: 6px 12px;
+    gap: 8px;
+    padding: 7px 14px;
     border: 1px solid transparent;
-    border-radius: 8px;
     font: 600 13px var(--sans);
     cursor: pointer;
   }
@@ -592,53 +690,42 @@
     color: var(--on-accent);
   }
   .stop {
-    border-color: color-mix(in oklab, var(--prod) 45%, transparent);
+    border-color: var(--line-strong);
     background: none;
-    color: var(--prod);
+    color: var(--ink);
   }
   .stop:disabled {
-    border-color: var(--line);
-    color: var(--muted);
+    color: var(--ink-muted);
     cursor: not-allowed;
   }
   .stop:disabled + :global(.more.stop) {
-    border-color: var(--line);
-    color: var(--muted);
+    color: var(--ink-muted);
   }
   .stop:not(:disabled):hover {
-    background: color-mix(in oklab, var(--prod) 12%, transparent);
+    background: color-mix(in oklab, var(--ink) 8%, transparent);
   }
   .run {
-    background: var(--cable);
-    color: var(--on-accent);
+    background: var(--local);
+    color: var(--desk);
+  }
+  /* The ring stands off the white fill so it reads against it. */
+  .run:focus-visible {
+    outline-color: var(--local);
+    outline-offset: 3px;
   }
   .run:hover {
-    background: color-mix(in oklab, var(--cable) 85%, var(--ink));
+    background: color-mix(in oklab, var(--local) 85%, var(--desk));
   }
-  .protected .run {
+  .protected .run,
+  .protected .run + :global(.more.run) {
     background: var(--prod);
+    color: var(--on-prod);
   }
   .run:disabled {
-    border-color: var(--line);
-    background: color-mix(in oklab, var(--ink) 8%, transparent);
-    color: var(--muted);
+    border: 1px dashed var(--line-strong);
+    background: none;
+    color: var(--ink-muted);
     cursor: not-allowed;
-  }
-  .title {
-    font-weight: 700;
-    font-size: 17px;
-    letter-spacing: -0.01em;
-  }
-  .env {
-    padding: 1px 8px;
-    border-radius: 999px;
-    background: color-mix(in oklab, var(--ink) 8%, transparent);
-    color: var(--muted);
-    font: 600 12px/1.5 var(--sans);
-  }
-  .env.prod {
-    background: color-mix(in oklab, var(--prod) 14%, transparent);
-    color: var(--prod);
   }
   .side-toggle {
     display: grid;
@@ -657,7 +744,13 @@
     background: color-mix(in oklab, var(--ink) 7%, transparent);
   }
   .gear {
+    display: inline-flex;
+    gap: 6px;
+    width: auto;
     margin: 0 0 0 -8px;
+    padding: 0 8px;
+    color: var(--ink);
+    font: 600 12px var(--sans);
   }
   .dropping {
     position: fixed;

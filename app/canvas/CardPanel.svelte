@@ -77,7 +77,7 @@
     color: var(--ink);
   }
   .x:focus-visible {
-    outline: 2px solid var(--cable);
+    outline: 2px solid var(--ink);
     outline-offset: 1px;
   }
 </style>

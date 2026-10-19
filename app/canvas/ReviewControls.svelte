@@ -98,17 +98,24 @@
       </label>
     {/if}
     {#if app.runIn.length > 1}
-      <label>
+      <span class="started">
         Started by
-        <select
-          value={data.run}
-          onchange={ev => {
-            set({ run: ev.currentTarget.value });
-          }}
-        >
-          {#each app.runIn as [value] (value)}<option {value}>{STARTED_BY[value] ?? value}</option>{/each}
-        </select>
-      </label>
+        <span class="seg" role="radiogroup" aria-label="Started by">
+          {#each app.runIn as [value] (value)}
+            <label
+              ><input
+                type="radio"
+                name="review-run-{id}"
+                {value}
+                checked={data.run === value}
+                onchange={() => {
+                  set({ run: value });
+                }}
+              />{STARTED_BY[value] ?? value}</label
+            >
+          {/each}
+        </span>
+      </span>
     {/if}
     {#if board.tunnelsOf(id).length}
       <label class="check">
@@ -127,6 +134,16 @@
 {/if}
 
 <style>
+  .started {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--muted);
+    font: 12px var(--sans);
+  }
+  .seg label {
+    padding: 4px 10px;
+  }
   .alone {
     display: grid;
     gap: 8px;

@@ -81,7 +81,7 @@
     aria-expanded={inbox.open}
     onclick={() => (inbox.open = !inbox.open)}
   >
-    <span class="dot" aria-hidden="true"></span><span class="words">{label}</span>
+    <span class="dot round" aria-hidden="true"></span><span class="words">{label}</span>
   </button>
   {#if listening === 'none' || listening === 'quiet'}
     <button
@@ -136,51 +136,45 @@
     display: inline-flex;
     align-items: center;
     gap: 7px;
-    height: 32px;
+    height: 30px;
     padding: 0 10px;
-    border: 1px solid transparent;
-    border-radius: 8px;
+    border: 1px solid var(--line-strong);
     background: none;
-    color: var(--muted);
+    color: var(--ink);
     cursor: pointer;
-    font: 500 12.5px var(--sans);
+    font: 400 13px var(--sans);
     white-space: nowrap;
   }
   .agent:hover,
   .agent[aria-expanded='true'] {
-    border-color: var(--line);
-    color: var(--ink);
+    background: color-mix(in oklab, var(--ink) 6%, transparent);
   }
-  .agent[data-state='question'] {
-    border-color: color-mix(in oklab, var(--warn) 55%, transparent);
-    background: color-mix(in oklab, var(--warn) 12%, transparent);
-    color: var(--ink);
-    font-weight: 600;
+  .agent[data-state='listening'] .dot,
+  .agent[data-state='busy'] .dot {
+    color: var(--live);
   }
-  .agent[data-state='quiet'] {
+  .agent[data-state='question'] .dot {
     color: var(--warn);
   }
-  [data-state='quiet'] .dot {
-    background: var(--warn);
+  .agent[data-state='none'] {
+    border-style: dashed;
+    color: var(--ink-muted);
   }
-  [data-state='question'] .dot {
-    background: var(--warn);
+  .agent[data-state='quiet'] .dot {
+    color: var(--warn);
   }
   .dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: var(--muted);
+    width: 6px;
+    height: 6px;
+    border: 1px solid currentColor;
   }
-  [data-state='listening'] .dot {
-    background: var(--ok);
+  [data-state='listening'] .dot,
+  [data-state='question'] .dot,
+  [data-state='quiet'] .dot {
+    background: currentColor;
   }
   [data-state='busy'] .dot {
-    background: var(--cable);
     animation: working 1.4s ease-in-out infinite;
-  }
-  [data-state='none'] .dot {
-    background: var(--warn);
   }
   @keyframes working {
     50% {

@@ -112,7 +112,7 @@
               : ''}"
           >
             Started by
-            <span class="seg">
+            <span class="seg" role="radiogroup" aria-label="Started by">
               {#each starters as value (value)}
                 <label>
                   <input
@@ -280,11 +280,15 @@
     grid-template-columns: 1fr 1fr;
     gap: 8px;
   }
+  /* Its label printed on the panel: small mono capitals; what it labels keeps its own type. */
   .field {
     display: grid;
-    gap: 3px;
-    font-size: 12px;
-    color: var(--muted);
+    gap: 5px;
+    color: var(--ink-muted);
+    font: 400 12px var(--sans);
+  }
+  .field > :global(*) {
+    font: 400 12px var(--sans);
   }
   .combo {
     position: relative;
@@ -383,7 +387,7 @@
     color: var(--muted);
   }
   :is(select, textarea, .note-toggle):focus-visible {
-    outline: 2px solid var(--cable);
+    outline: 2px solid var(--ink);
     outline-offset: 1px;
   }
 </style>

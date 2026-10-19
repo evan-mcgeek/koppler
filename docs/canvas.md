@@ -17,10 +17,7 @@ A board file can also be opened, dropped on the page or linked from GitHub.
 
 ## Cards
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="images/board-dark.png">
-  <img alt="One feature, Checkout, worked on across four apps: the mobile app and web shop cabled to a local Orders API, which calls a local Payments API; each runs its feature/checkout branch, Orders API has a database tunnel and a local SQS queue, two apps carry a note for the agent, and everything runs" src="images/board-light.png">
-</picture>
+<img alt="One feature, Checkout, worked on across four apps: the mobile app and web shop cabled to a local Orders API, which calls a local Payments API; each runs its feature/checkout branch, Orders API has a database tunnel and a local SQS queue, two apps carry a note for the agent, and everything runs" src="images/board.png">
 
 Each app is a card with:
 
@@ -35,19 +32,13 @@ Apps you have not cloned yet show greyed out, with the command to clone them.
 
 Pointing at a card shows its actions above it: run it alone, stop or restart it while it runs, its log, its settings, and taking it off the board.
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="images/card-dark.png">
-  <img alt="A running card: its actions above it, its branch, all its steps done, and the deployed app it still calls" src="images/card-light.png" width="320">
-</picture>
+<img alt="A running card: its actions above it, its branch, all its steps done, and the deployed app it still calls" src="images/card.png" width="320">
 
 ## Settings
 
-The gear on a card, on a queue or outside system, and beside the stack's name opens settings: every fact the stack holds about that thing, in tabs.
+**Settings** in a card's tools, the gear on a queue or outside system, and the gear beside the stack's name open settings: every fact the stack holds about that thing, in tabs.
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="images/settings-dark.png">
-  <img alt="An app's settings: its name, kind and slug, then tabs; Runs here shows its start command, local address, readiness check and more, each with a lock" src="images/settings-light.png" width="480">
-</picture>
+<img alt="An app's settings: its name, kind and slug, then tabs; Runs here shows its start command, local address, readiness check and more, each with a lock" src="images/settings.png" width="480">
 
 - Changes are a draft until **Save**, which checks the whole stack and says where anything is wrong. **Discard** drops them, and closing with changes asks first.
 - **Needs first** lists what an app needs before it runs, one row each: a tunnel, an AWS sign-in, a hosts entry, a sign-in of the stack's own, the local HTTPS certificate, a private package feed. **Add a need** asks which, then shows only that kind's fields.
@@ -57,6 +48,14 @@ The gear on a card, on a queue or outside system, and beside the stack's name op
 - **Ask the agent to fill in** has the agent read the repo and propose the empty fields; locked fields stay.
 
 The same fields can be read and changed with `koppler stack get`, `set` and `unset`.
+
+## Appearance
+
+The canvas is dark, with square corners and hairlines, and colour only as a signal: one colour for what runs on your machine, one for what still calls the deployed environment, amber when something needs you, and red for PROD and failures.
+The gear at the bottom of the side pane opens **Appearance**: eight schemes, five dark (Mono, the default, then Patch bay, Signal, Scope and Sodium) and three light (Paper, Blueprint and Workshop), and the local and deployed colours picked by hand over the scheme.
+Warning and PROD colours are never among the picks, so a custom colour can never be mistaken for either.
+PROD stays red and striped in every scheme.
+Your choice is kept in this browser.
 Nobody edits `stack.json` by hand.
 
 ## Cables
@@ -73,6 +72,7 @@ Every call without a cable goes to the deployed app of the chosen environment.
 - **Arrange** lays the board out by who calls whom.
 
 Cables are always curves, so any board you see is one you could draw yourself.
+A cable leaves its caller from a hollow ring and plugs into the app it calls at a solid socket.
 
 ## Tunnels, queues and outside systems
 
@@ -85,8 +85,9 @@ These appear next to the app that uses them, and show or hide with it.
 
 ## Environment
 
-The environment picker lists the stack's environments.
+The environment switch in the header lists the stack's environments.
 Unplugged calls, tunnels and deployed queues follow it.
+On PROD the whole page is framed in red, with a striped band under the header.
 
 On a production environment the review shows anything that blocks the run first, keeps the plan's header and footer in view, and pressing Run there is the confirmation.
 Queries against production stay in your own terminal.
@@ -96,10 +97,7 @@ Queries against production stay in your own terminal.
 **Run** shows the plan first: what starts, restarts and stops, and what you have to do before (a sign-in, a secret, a `sudo` step).
 Nothing starts, stops or restarts until you confirm it there; then Koppler runs the board by itself.
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="images/review-dark.png">
-  <img alt="The review before a Run on QA: the four apps that start on feature/checkout with their notes for the agent, what keeps calling deployed QA, and the tunnel that opens" src="images/review-light.png" width="480">
-</picture>
+<img alt="The review before a Run on QA: the four apps that start on feature/checkout with their notes for the agent, what keeps calling deployed QA, and the tunnel that opens" src="images/review.png" width="480">
 
 With the agent add-on, Run's menu has two more ways: **Run with a note for the agent…** passes an instruction for the whole run, and **Get a checklist instead** asks the agent for a per-app checklist instead of changing anything.
 The agent answers on the canvas, with buttons for its questions.
@@ -119,17 +117,11 @@ The agent chip in the toolbar says where the agent is:
 
 **Edit** shows every field of a card; **Live** shows what runs, with short cards.
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="images/live-dark.png">
-  <img alt="The Live view: short cards with their state, every app running" src="images/live-light.png">
-</picture>
+<img alt="The Live view: short cards with their state, every app running" src="images/live.png">
 
 Zoomed out below 60%, cards are short in Edit too: pick one and its fields open in a panel on the right of the board, where they change the card as they would on it. The × or a click on the empty board closes it.
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="images/zoomed-out-dark.png">
-  <img alt="Zoomed out: short cards, and the picked Orders API's branch, who starts it and its cables in the panel on the right" src="images/zoomed-out-light.png">
-</picture>
+<img alt="Zoomed out: short cards, and the picked Orders API's branch, who starts it and its cables in the panel on the right" src="images/zoomed-out.png">
 
 **Present** shows the board alone, full screen.
 

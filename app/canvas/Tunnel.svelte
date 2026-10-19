@@ -1,6 +1,6 @@
 <script lang="ts">
   import X from '@lucide/svelte/icons/x';
-  import RotateCw from '@lucide/svelte/icons/rotate-cw';
+  import RefreshCw from '@lucide/svelte/icons/refresh-cw';
   import type { NodeProps } from '@xyflow/svelte';
   import InfraCard, { type CardAction } from './InfraCard.svelte';
   import { dialogs } from './dialogs.svelte.ts';
@@ -18,16 +18,6 @@
     else toasts.show(`The ${data.what} tunnel started again.`);
   };
   const actions = $derived<CardAction[]>([
-    ...(on === undefined
-      ? []
-      : [
-          {
-            label: `Restart the ${data.what} tunnel`,
-            title: 'Close the tunnel and open it again, for when calls through it hang or fail',
-            icon: RotateCw,
-            run: () => void restart(),
-          },
-        ]),
     {
       label: `Settings for the ${data.what} tunnel`,
       title: 'Settings: the host, its port and how it is opened',
@@ -50,21 +40,45 @@
   {id}
   kind="tunnel"
   name={data.what}
-  detail={data.local}
-  detailWarn={data.moved}
+  tag="Tunnel"
   hasDot
   dot={on}
   dotTitle={on ? 'Tunnel is up' : on === false ? 'Nothing is listening on this port' : 'Not running'}
+  status={on ? 'Connected' : on === false ? 'Nothing is listening' : 'Not running'}
   title={[data.host, ...data.about].join('\n')}
   {selected}
   {actions}
+  act={on === undefined
+    ? undefined
+    : {
+        label: `Restart the ${data.what} tunnel`,
+        word: 'Reconnect',
+        title: 'Close the tunnel and open it again, for when calls through it hang or fail',
+        icon: RefreshCw,
+        run: () => void restart(),
+      }}
 >
+  <span class="label">Local port</span>
+  <span class="well" class:moved={data.moved}>{data.local}</span>
+  <span class="label">Goes to</span>
   <span class="host">{data.host}</span>
 </InfraCard>
 
 <style>
+  .well {
+    padding: 6px 8px;
+    border: 1px solid var(--line);
+    background: var(--desk);
+    font: 12px var(--mono);
+  }
+  .well.moved {
+    border-color: var(--warn);
+    color: var(--warn);
+  }
   .host {
     display: block;
     max-width: 34ch;
+    color: var(--ink-muted);
+    font: 12px var(--mono);
   }
 </style>

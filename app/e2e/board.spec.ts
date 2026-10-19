@@ -184,6 +184,43 @@ test('scrolling moves the board, and only a pinch or Ctrl with the wheel zooms i
   await expect(zoom).not.toHaveText(before.zoom);
 });
 
+test('a pinch over a panel zooms neither the board nor the page', async ({ page }) => {
+  const zoom = page.getByTitle('Reset to 100%');
+  const before = await zoom.innerText();
+  // A trackpad pinch reaches the page as a wheel with Ctrl held; left alone, the browser zooms the whole page.
+  await card(page, 'web').hover();
+  await expect(page.locator('.svelte-flow__node-toolbar')).toBeVisible();
+  for (const where of [
+    'aside',
+    'header',
+    '.svelte-flow__node-toolbar',
+    '[aria-label="Board"]',
+    '.svelte-flow__minimap',
+  ]) {
+    const kept = await page
+      .locator(where)
+      .first()
+      .evaluate(el => {
+        const pinch = new WheelEvent('wheel', { deltaY: -40, ctrlKey: true, bubbles: true, cancelable: true });
+        return el.dispatchEvent(pinch);
+      });
+    expect(kept, `a pinch over ${where} is the page's to handle`).toBe(false);
+  }
+  await expect(zoom).toHaveText(before);
+});
+
+test('Ctrl held with the wheel over a panel still zooms the page, as the browser does', async ({ page }) => {
+  await page.keyboard.down('Control');
+  const kept = await page
+    .locator('aside')
+    .first()
+    .evaluate(el =>
+      el.dispatchEvent(new WheelEvent('wheel', { deltaY: -40, ctrlKey: true, bubbles: true, cancelable: true })),
+    );
+  await page.keyboard.up('Control');
+  expect(kept, 'the browser zooms the page').toBe(true);
+});
+
 test('the Select tool picks the cards in a dragged area, and the Hand tool moves the board', async ({ page }) => {
   await expect(page.getByRole('radio', { name: /^Select/ })).toBeChecked();
   const web = await middle(card(page, 'web'));

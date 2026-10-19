@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Semi+Condensed:wght@500;600;700&family=Sometype+Mono:wght@400;500;600;700&display=swap">
+<style>
+html{background:#050505}
+body{margin:0;background:#050505;color:#E8E8E8;-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:underline;text-underline-offset:3px}
+a:hover{opacity:0.75}
+</style>
+</helmet>
+<div ref="{{ rootRef }}" style="--desk:#0D0D0D;--panel:#161616;--line:#2B2B2B;--line2:#404040;--ink:#E8E8E8;--mute:#A3A3A3;--local:#FFFFFF;--live:#4ADE80;--deployed:#9A9A9A;--warn:#FFC940;--prod:#FF3B30;--prod2:#DB2A20;--onProd:#0D0D0D;padding:64px;display:flex;flex-direction:column;gap:64px;font-family:'Barlow',sans-serif;color:var(--ink);background:#050505">
+
+<section data-screen-label="01 Cover" style="width:1440px;flex:none;background:var(--desk);border:1px solid var(--line);display:grid;grid-template-columns:minmax(0,1fr) 520px">
+<div style="padding:56px;display:flex;flex-direction:column;gap:28px;border-right:1px solid var(--line)">
+<div style="display:flex;align-items:center;gap:18px">
+<dc-import name="KopplerMark" variant="k" size="{{ 72 }}" dark="{{ true }}" cable="{{ t.local }}" ink="{{ t.ink }}" hole="{{ t.desk }}" bg="{{ t.desk }}" hint-size="72px,72px"></dc-import>
+<span style="font-family:'Barlow Semi Condensed',sans-serif;font-size:52px;font-weight:600;letter-spacing:-0.005em">koppler</span>
+</div>
+<div style="font-family:'Barlow',sans-serif;font-size:13px;color:var(--mute)">Design system · Patch bay · dark first, three light schemes</div>
+<p style="margin:0;font-size:18px;line-height:1.55;max-width:640px;text-wrap:pretty">Graphite hardware with its labels printed on the panel. Square corners, hairlines. Mono caps only for codes: kind tags, QA and PROD, the PROD banner. Labels and actions are sentence-case sans; values you could copy are plain mono. Colour is a signal: one for what runs locally, one for what still calls the deployed environment, a live colour for running and passed tests, and red for PROD and failures. Mono is the default scheme; four more dark and three light schemes ship in Appearance, and local and deployed can be set by hand.</p>
+<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line);max-width:760px">
+<div style="background:var(--desk);padding:16px;display:flex;flex-direction:column;gap:8px"><span style="font-family:'Barlow',sans-serif;font-size:12px;color:var(--mute)">Truth</span><span style="font-size:14px;line-height:1.45">The board shows what actually runs. A lit LED means running.</span></div>
+<div style="background:var(--desk);padding:16px;display:flex;flex-direction:column;gap:8px"><span style="font-family:'Barlow',sans-serif;font-size:12px;color:var(--mute)">Quiet</span><span style="font-size:14px;line-height:1.45">Grey until something needs you. Colour is never decoration.</span></div>
+<div style="background:var(--desk);padding:16px;display:flex;flex-direction:column;gap:8px"><span style="font-family:'Barlow',sans-serif;font-size:12px;color:var(--mute)">Loud PROD</span><span style="font-size:14px;line-height:1.45">PROD is red and striped in every scheme, and nobody can change it.</span></div>
+</div>
+</div>
+<div style="padding:32px;display:flex;flex-direction:column;gap:16px;background:var(--panel)">
+<div style="display:flex;align-items:baseline;justify-content:space-between"><span style="font-family:'Barlow',sans-serif;font-size:12px;color:var(--mute)">Appearance · scheme</span><span style="font-size:12px;color:var(--mute)">Try one; the whole page follows</span></div>
+<div style="display:flex;flex-direction:column;gap:6px">
+<span style="font-family:'Barlow',sans-serif;font-size:12px;color:var(--mute)">Dark</span>
+<div style="display:flex;flex-direction:column;border:1px solid var(--line)">
+<sc-for list="{{ darkSchemes }}" as="s" hint-placeholder-count="5">
+<button onClick="{{ s.pick }}" style="all:unset;cursor:pointer;display:grid;grid-template-columns:18px 56px minmax(0,1fr);align-items:center;gap:14px;padding:12px 14px;border-bottom:1px solid var(--line)" style-hover="background:var(--desk)">
+<sc-if value="{{ s.on }}" hint-placeholder-val="{{ false }}"><span style="width:12px;height:12px;border:1.5px solid var(--ink);display:flex;align-items:center;justify-content:center;box-sizing:border-box"><span style="width:6px;height:6px;background:var(--ink)"></span></span></sc-if>
+<sc-if value="{{ s.off }}" hint-placeholder-val="{{ true }}"><span style="width:12px;height:12px;border:1.5px solid var(--line2);box-sizing:border-box"></span></sc-if>
+<span style="display:flex;height:22px;border:1px solid var(--line2)"><span style="flex:1;background:{{ s.desk }}"></span><span style="flex:1;background:{{ s.local }}"></span><span style="flex:1;background:{{ s.deployed }}"></span></span>
+<span style="display:flex;flex-direction:column;gap:2px"><span style="font-size:14px;font-weight:600">{{ s.name }}</span><span style="font-size:12px;color:var(--mute)">{{ s.note }}</span></span>
+</button>
+</sc-for>
+</div>
+</div>
+<div style="display:flex;flex-direction:column;gap:6px">
+<span style="font-family:'Barlow',sans-serif;font-size:12px;color:var(--mute)">Light</span>
+<div style="display:flex;flex-direction:column;border:1px solid var(--line)">
+<sc-for list="{{ lightSchemes }}" as="s" hint-placeholder-count="3">
+<button onClick="{{ s.pick }}" style="all:unset;cursor:pointer;display:grid;grid-template-columns:18px 56px minmax(0,1fr);align-items:center;gap:14px;padding:12px 14px;border-bottom:1px solid var(--line)" style-hover="background:var(--desk)">
+<sc-if value="{{ s.on }}" hint-placeholder-val="{{ false }}"><span style="width:12px;height:12px;border:1.5px solid var(--ink);display:flex;align-items:center;justify-content:center;box-sizing:border-box"><span style="width:6px;height:6px;background:var(--ink)"></span></span></sc-if>
+<sc-if value="{{ s.off }}" hint-placeholder-val="{{ true }}"><span style="width:12px;height:12px;border:1.5px solid var(--line2);box-sizing:border-box"></span></sc-if>
+<span style="display:flex;height:22px;border:1px solid var(--line2)"><span style="flex:1;background:{{ s.desk }}"></span><span style="flex:1;background:{{ s.local }}"></span><span style="flex:1;background:{{ s.deployed }}"></span></span>
+<span style="display:flex;flex-direction:column;gap:2px"><span style="font-size:14px;font-weight:600">{{ s.name }}</span><span style="font-size:12px;color:var(--mute)">{{ s.note }}</span></span>
+</button>
+</sc-for>
+</div>
+</div>
+<div style="display:flex;flex-direction:column;gap:10px;padding-top:4px">
+<div style="display:flex;align-items:center;justify-content:space-between"><span style="font-family:'Barlow',sans-serif;font-size:12px;color:var(--mute)">Local</span><button onClick="{{ resetCustom }}" style="all:unset;cursor:pointer;font-size:12px;color:var(--mute);text-decoration:underline;text-underline-offset:3px">Scheme default</button></div>
+<div style="display:flex;gap:8px">
+<sc-for list="{{ localOpts }}" as="c" hint-placeholder-count="6"><button onClick="{{ c.pick }}" aria-label="{{ c.hex }}" style="all:unset;cursor:pointer;width:32px;height:32px;box-sizing:border-box;border:2px solid {{ c.ring }};padding:3px"><span style="display:block;width:100%;height:100%;background:{{ c.hex }}"></span></button></sc-for>
+</div>
+<span style="font-family:'Barlow',sans-serif;font-size:12px;color:var(--mute);padding-top:4px">Deployed</span>
+<div style="display:flex;gap:8px">
+<sc-for list="{{ deployedOpts }}" as="c" hint-placeholder-count="6"><button onClick="{{ c.pick }}" aria-label="{{ c.hex }}" style="all:unset;cursor:pointer;width:32px;height:32px;box-sizing:border-box;border:2px solid {{ c.ring }};padding:3px"><span style="display:block;width:100%;height:100%;background:{{ c.hex }}"></span></button></sc-for>
+</div>
+<span style="font-size:12px;line-height:1.45;color:var(--mute)">Warning and PROD colours are left out of both rows, so a custom pick can never be mistaken for either.</span>
+</div>
+</div>
+</section>
+
+<section data-screen-label="02 Tokens" style="width:1440px;flex:none;background:var(--desk);border:1px solid var(--line);display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr)">
+<div style="padding:48px;border-right:1px solid var(--line);display:flex;flex-direction:column;gap:20px">
+<div style="display:flex;align-items:baseline;gap:14px"><span style="font-family:'Sometype Mono',monospace;font-size:11px;color:var(--mute)">02</span><h2 style="margin:0;font-family:'Barlow Semi Condensed',sans-serif;font-size:28px;font-weight:600;letter-spacing:-0.005em">Colour</h2><span style="font-size:13px;color:var(--mute)">{{ t.name }} scheme</span></div>
+<div style="display:flex;flex-direction:column;border-top:1px solid var(--line)">
+<div style="display:grid;grid-template-columns:56px 120px minmax(0,1fr) 90px;gap:16px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)"><span style="height:32px;background:var(--desk);border:1px solid var(--line2)"></span><span style="font-family:'Sometype Mono',monospace;font-size:12px">desk</span><span style="font-size:13px;color:var(--mute)">Board, page, input wells</span><span style="font-family:'Sometype Mono',monospace;font-size:12px;color:var(--mute)">{{ t.desk }}</span></div>
+<div style="display:grid;grid-template-columns:56px 120px minmax(0,1fr) 90px;gap:16px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)"><span style="height:32px;background:var(--panel);border:1px solid var(--line2)"></span><span style="font-family:'Sometype Mono',monospace;font-size:12px">panel</span><span style="font-size:13px;color:var(--mute)">Cards, bars, dialogs</span><span style="font-family:'Sometype Mono',monospace;font-size:12px;color:var(--mute)">{{ t.panel }}</span></div>
+<div style="display:grid;grid-template-columns:56px 120px minmax(0,1fr) 90px;gap:16px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)"><span style="height:32px;background:var(--line)"></span><span style="font-family:'Sometype Mono',monospace;font-size:12px">line</span><span style="font-size:13px;color:var(--mute)">Hairlines inside a panel, the dot grid</span><span style="font-family:'Sometype Mono',monospace;font-size:12px;color:var(--mute)">{{ t.line }}</span></div>
+<div style="display:grid;grid-template-columns:56px 120px minmax(0,1fr) 90px;gap:16px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)"><span style="height:32px;background:var(--line2)"></span><span style="font-family:'Sometype Mono',monospace;font-size:12px">line-strong</span><span style="font-size:13px;color:var(--mute)">Card and control edges</span><span style="font-family:'Sometype Mono',monospace;font-size:12px;color:var(--mute)">{{ t.line2 }}</span></div>
+<div style="display:grid;grid-template-columns:56px 120px minmax(0,1fr) 90px;gap:16px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)"><span style="height:32px;background:var(--ink)"></span><span style="font-family:'Sometype Mono',monospace;font-size:12px">ink</span><span style="font-size:13px;color:var(--mute)">Text, the mark's stem, selected states</span><span style="font-family:'Sometype Mono',monospace;font-size:12px;color:var(--mute)">{{ t.ink }}</span></div>
+<div style="display:grid;grid-template-columns:56px 120px minmax(0,1fr) 90px;gap:16px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)"><span style="height:32px;background:var(--mute)"></span><span style="font-family:'Sometype Mono',monospace;font-size:12px">ink-muted</span><span style="font-size:13px;color:var(--mute)">Labels, secondary text, 4.5:1 on panel</span><span style="font-family:'Sometype Mono',monospace;font-size:12px;color:var(--mute)">{{ t.mute }}</span></div>
+<div style="display:grid;grid-template-columns:56px 120px minmax(0,1fr) 90px;gap:16px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)"><span style="height:32px;background:var(--local)"></span><span style="font-family:'Sometype Mono',monospace;font-size:12px">local</span><span style="font-size:13px;color:var(--mute)">Cables and Run: what runs here</span><span style="font-family:'Sometype Mono',monospace;font-size:12px;color:var(--mute)">{{ t.local }}</span></div>
+<div style="display:grid;grid-template-columns:56px 120px minmax(0,1fr) 90px;gap:16px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)"><span style="height:32px;background:var(--live)"></span><span style="font-family:'Sometype Mono',monospace;font-size:12px">live</span><span style="font-size:13px;color:var(--mute)">Running LEDs and the agent dot. Never the same hue as local</span><span style="font-family:'Sometype Mono',monospace;font-size:12px;color:var(--mute)">{{ t.live }}</span></div>
+<div style="display:grid;grid-template-columns:56px 120px minmax(0,1fr) 90px;gap:16px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)"><span style="height:32px;background:var(--deployed)"></span><span style="font-family:'Sometype Mono',monospace;font-size:12px">deployed</span><span style="font-size:13px;color:var(--mute)">Tunnels, deployed databases and queues, outside systems, "Calls QA"</span><span style="font-family:'Sometype Mono',monospace;font-size:12px;color:var(--mute)">{{ t.deployed }}</span></div>
+<div style="display:grid;grid-template-columns:56px 120px minmax(0,1fr) 90px;gap:16px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)"><span style="height:32px;background:var(--warn)"></span><span style="font-family:'Sometype Mono',monospace;font-size:12px">warn</span><span style="font-size:13px;color:var(--mute)">Starting, waiting for you, needs a step</span><span style="font-family:'Sometype Mono',monospace;font-size:12px;color:var(--mute)">{{ t.warn }}</span></div>
+<div style="display:grid;grid-template-columns:56px 120px minmax(0,1fr) 90px;gap:16px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)"><span style="height:32px;background:repeating-linear-gradient(-45deg,var(--prod) 0 8px,var(--prod2) 8px 16px)"></span><span style="font-family:'Sometype Mono',monospace;font-size:12px">prod</span><span style="font-size:13px;color:var(--mute)">PROD mode and failures. Not customisable</span><span style="font-family:'Sometype Mono',monospace;font-size:12px;color:var(--mute)">{{ t.prod }}</span></div>
+</div>
+</div>
+<div style="padding:48px;display:flex;flex-direction:column;gap:28px">
+<div style="display:flex;align-items:baseline;gap:14px"><span style="font-family:'Sometype Mono',monospace;font-size:11px;color:var(--mute)">03</span><h2 style="margin:0;font-family:'Barlow Semi Condensed',sans-serif;font-size:28px;font-weight:600;letter-spacing:-0.005em">Type</h2></div>
+<div style="display:flex;flex-direction:column;border-top:1px solid var(--line)">
+<div style="display:grid;grid-template-columns:150px minmax(0,1fr);gap:16px;align-items:baseline;padding:14px 0;border-bottom:1px solid var(--line)"><span style="font-family:'Sometype Mono',monospace;font-size:11px;color:var(--mute)">display 56/600</span><span style="font-family:'Barlow Semi Condensed',sans-serif;font-size:56px;font-weight:600;letter-spacing:-0.005em;line-height:1">Run on QA</span></div>
+<div style="display:grid;grid-template-columns:150px minmax(0,1fr);gap:16px;align-items:baseline;padding:14px 0;border-bottom:1px solid var(--line)"><span style="font-family:'Sometype Mono',monospace;font-size:11px;color:var(--mute)">title 28/600</span><span style="font-family:'Barlow Semi Condensed',sans-serif;font-size:28px;font-weight:600;letter-spacing:-0.005em">Calls deployed QA</span></div>
+<div style="display:grid;grid-template-columns:150px minmax(0,1fr);gap:16px;align-items:baseline;padding:14px 0;border-bottom:1px solid var(--line)"><span style="font-family:'Sometype Mono',monospace;font-size:11px;color:var(--mute)">name 15/600</span><span style="font-size:15px;font-weight:600">Orders API</span></div>
+<div style="display:grid;grid-template-columns:150px minmax(0,1fr);gap:16px;align-items:baseline;padding:14px 0;border-bottom:1px solid var(--line)"><span style="font-family:'Sometype Mono',monospace;font-size:11px;color:var(--mute)">body 15/400</span><span style="font-size:15px;line-height:1.5">Everything you leave unplugged keeps calling the deployed environment you chose.</span></div>
+<div style="display:grid;grid-template-columns:150px minmax(0,1fr);gap:16px;align-items:baseline;padding:14px 0;border-bottom:1px solid var(--line)"><span style="font-family:'Sometype Mono',monospace;font-size:11px;color:var(--mute)">value 12/400</span><span style="font-family:'Sometype Mono',monospace;font-size:12px">feature/checkout · localhost:5432</span></div>
+<div style="display:grid;grid-template-columns:150px minmax(0,1fr);gap:16px;align-items:baseline;padding:14px 0;border-bottom:1px solid var(--line)"><span style="font-family:'Sometype Mono',monospace;font-size:11px;color:var(--mute)">label 10/500 caps</span><span style="font-family:'Barlow',sans-serif;font-size:12px;color:var(--mute)">Note for the agent</span></div>
+</div>
+<div style="font-size:13px;line-height:1.5;color:var(--mute)">Barlow Semi Condensed for the wordmark and titles. Barlow for names, labels, buttons and anything read as a sentence. Sometype Mono for values, tags and the PROD banner.</div>
+<div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:32px">
+<div style="display:flex;flex-direction:column;gap:12px">
+<span style="font-family:'Barlow',sans-serif;font-size:12px;color:var(--mute)">Space · 4px base</span>
+<div style="display:flex;align-items:flex-end;gap:10px">
+<div style="display:flex;flex-direction:column;align-items:center;gap:6px"><span style="width:4px;height:4px;background:var(--ink)"></span><span style="font-family:'Sometype Mono',monospace;font-size:10px;color:var(--mute)">4</span></div>
+<div style="display:flex;flex-direction:column;align-items:center;gap:6px"><span style="width:8px;height:8px;background:var(--ink)"></span><span style="font-family:'Sometype Mono',monospace;font-size:10px;color:var(--mute)">8</span></div>
+<div style="display:flex;flex-direction:column;align-items:center;gap:6px"><span style="width:12px;height:12px;background:var(--ink)"></span><span style="font-family:'Sometype Mono',monospace;font-size:10px;color:var(--mute)">12</span></div>
+<div style="display:flex;flex-direction:column;align-items:center;gap:6px"><span style="width:16px;height:16px;background:var(--ink)"></span><span style="font-family:'Sometype Mono',monospace;font-size:10px;color:var(--mute)">16</span></div>
+<div style="display:flex;flex-direction:column;align-items:center;gap:6px"><span style="width:24px;height:24px;background:var(--ink)"></span><span style="font-family:'Sometype Mono',monospace;font-size:10px;color:var(--mute)">24</span></div>
+<div style="display:flex;flex-direction:column;align-items:center;gap:6px"><span style="width:32px;height:32px;background:var(--ink)"></span><span style="font-family:'Sometype Mono',monospace;font-size:10px;color:var(--mute)">32</span></div>
+<div style="display:flex;flex-direction:column;align-items:center;gap:6px"><span style="width:48px;height:48px;background:var(--ink)"></span><span style="font-family:'Sometype Mono',monospace;font-size:10px;color:var(--mute)">48</span></div>
+</div>
+</div>
+<div style="display:flex;flex-direction:column;gap:12px">
+<span style="font-family:'Barlow',sans-serif;font-size:12px;color:var(--mute)">Shape and line</span>
+<div style="display:flex;flex-direction:column;gap:8px;font-size:13px">
+<div style="display:flex;align-items:center;gap:10px"><span style="width:28px;height:18px;border:1px solid var(--line2)"></span>Corners 0. Circles only for sockets and the agent dot</div>
+<div style="display:flex;align-items:center;gap:10px"><span style="width:28px;height:18px;border:1px dashed var(--deployed)"></span>Dashed edge and dotted cable: deployed. Solid: on this Mac</div>
+<div style="display:flex;align-items:center;gap:10px"><span style="width:28px;height:0;border-top:1px solid var(--line2)"></span>1px hairlines, no shadows</div>
+<div style="display:flex;align-items:center;gap:10px"><span style="width:28px;height:0;border-top:2px solid var(--local)"></span>2px cables</div>
+<div style="display:flex;align-items:center;gap:10px"><span style="width:28px;height:0;border-top:3px solid var(--prod)"></span>3px PROD frame</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+
+<section data-screen-label="03 Components" style="width:1440px;flex:none;background:var(--desk);border:1px solid var(--line);padding:48px;box-sizing:border-box;display:flex;flex-direction:column;gap:28px">
+<div style="display:flex;align-items:baseline;gap:14px"><span style="font-family:'Sometype Mono',monospace;font-size:11px;color:var(--mute)">04</span><h2 style="margin:0;font-family:'Barlow Semi Condensed',sans-serif;font-size:28px;font-weight:600;letter-spacing:-0.005em">Components</h2></div>
+<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line)">
+
+<div style="background:var(--desk);padding:24px;display:flex;flex-direction:column;gap:16px">
+<span style="font-family:'Barlow',sans-serif;font-size:12px;color:var(--mute)">Buttons</span>
+<div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center">
+<span style="display:flex;align-items:stretch;background:var(--local);color:var(--desk);font-family:'Sometype Mono',monospace;font-size:13px;font-weight:600"><span style="display:flex;align-items:center;gap:8px;padding:9px 16px"><span style="width:0;height:0;border-left:8px solid var(--desk);border-top:5px solid transparent;border-bottom:5px solid transparent"></span>Run</span><span style="padding:9px 10px;border-left:1px solid var(--desk)">▾</span></span>
+<span style="display:flex;align-items:center;gap:8px;padding:8px 16px;border:1px solid var(--line2);font-family:'Sometype Mono',monospace;font-size:13px;font-weight:600"><span style="width:8px;height:8px;background:var(--ink)"></span>Stop</span>
+<span style="padding:8px 16px;border:1px solid var(--line2);font-family:'Sometype Mono',monospace;font-size:13px;font-weight:600">Cancel</span>
+<span style="padding:8px 4px;font-size:13px;text-decoration:underline;text-underline-offset:3px">Add repos…</span>
+</div>
+<div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center">
+<span style="padding:9px 16px;background:var(--prod);color:var(--onProd);font-family:'Sometype Mono',monospace;font-size:13px;font-weight:700">Run on PROD</span>
+<span style="padding:8px 16px;border:1px dashed var(--line2);color:var(--mute);font-family:'Sometype Mono',monospace;font-size:13px">Run · nothing to start</span>
+</div>
+</div>
+
+<div style="background:var(--desk);padding:24px;display:flex;flex-direction:column;gap:16px">
+<span style="font-family:'Barlow',sans-serif;font-size:12px;color:var(--mute)">Switches</span>
+<div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap">
+<div style="display:flex;border:1px solid var(--line2)"><span style="font-family:'Barlow',sans-serif;font-size:13px;font-weight:600;padding:7px 14px;background:var(--line2);color:var(--ink)">QA</span><span style="font-family:'Barlow',sans-serif;font-size:13px;font-weight:600;padding:7px 14px;color:var(--mute)">PROD</span></div>
+<div style="display:flex;border:1px solid var(--prod)"><span style="font-family:'Barlow',sans-serif;font-size:13px;font-weight:600;padding:7px 14px;color:var(--mute)">QA</span><span style="font-family:'Barlow',sans-serif;font-size:13px;font-weight:700;padding:7px 14px;background:repeating-linear-gradient(-45deg,var(--prod) 0 8px,var(--prod2) 8px 16px);color:var(--onProd)">PROD</span></div>
+</div>
+<div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap">
+<div style="display:flex;border:1px solid var(--line2)"><span style="font-size:13px;font-weight:600;padding:6px 12px;background:var(--line2)">Koppler</span><span style="font-size:13px;padding:6px 12px;color:var(--mute)">Me</span></div>
+<div style="display:flex;border:1px solid var(--line2)"><span style="font-size:13px;font-weight:600;padding:6px 12px;background:var(--line2)">Edit</span><span style="font-size:13px;padding:6px 12px;color:var(--mute)">Live</span></div>
+<span style="display:flex;align-items:center;gap:8px;font-size:13px"><span style="width:30px;height:16px;border:1px solid var(--ink);box-sizing:border-box;display:flex;justify-content:flex-end;padding:2px;background:var(--ink)"><span style="width:10px;height:10px;background:var(--desk)"></span></span>On</span>
+<span style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--mute)"><span style="width:30px;height:16px;border:1px solid var(--line2);box-sizing:border-box;display:flex;padding:2px"><span style="width:10px;height:10px;background:var(--mute)"></span></span>Off</span>
+</div>
+</div>
+
+<div style="background:var(--desk);padding:24px;display:flex;flex-direction:column;gap:12px">
+<span style="font-family:'Barlow',sans-serif;font-size:12px;color:var(--mute)">Status · LED plus words</span>
+<div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 16px;font-size:13px">
+<span style="display:flex;align-items:center;gap:8px"><span style="width:7px;height:7px;background:var(--live)"></span>Running</span>
+<span style="display:flex;align-items:center;gap:8px"><span style="width:7px;height:7px;border:1.5px solid var(--warn);box-sizing:border-box"></span>Starting, 2 of 3 steps</span>
+<span style="display:flex;align-items:center;gap:8px"><span style="width:7px;height:7px;background:var(--warn)"></span>Waiting for you</span>
+<span style="display:flex;align-items:center;gap:8px"><span style="width:7px;height:7px;background:var(--prod)"></span>Failed, see log</span>
+<span style="display:flex;align-items:center;gap:8px;color:var(--mute)"><span style="width:7px;height:7px;border:1.5px solid var(--mute);box-sizing:border-box"></span>Stopped</span>
+<span style="display:flex;align-items:center;gap:8px;color:var(--mute)"><span style="width:7px;height:7px;border:1.5px dashed var(--mute);box-sizing:border-box"></span>Not cloned</span>
+</div>
+<div style="display:flex;align-items:center;gap:4px;font-family:'Sometype Mono',monospace;font-size:10px;letter-spacing:0.06em;padding-top:4px"><span style="width:14px;height:4px;background:var(--local)"></span><span style="width:14px;height:4px;background:var(--local)"></span><span style="width:14px;height:4px;border:1px solid var(--line2);box-sizing:border-box"></span><span style="padding-left:8px;font-size:11px;color:var(--mute)">2/3 steps</span></div>
+</div>
+
+<div style="background:var(--desk);padding:24px;display:flex;flex-direction:column;gap:10px">
+<span style="font-family:'Barlow',sans-serif;font-size:12px;color:var(--mute)">Fields</span>
+<span style="font-family:'Barlow',sans-serif;font-size:12px;color:var(--mute)">Branch</span>
+<span style="font-family:'Sometype Mono',monospace;font-size:12px;padding:8px 10px;background:var(--desk);border:1px solid var(--line2)">feature/checkout</span>
+<span style="font-family:'Sometype Mono',monospace;font-size:12px;padding:8px 10px;border:1px solid var(--line2);background:var(--desk);outline:2px solid var(--ink);outline-offset:2px">feature/checkout<span style="display:inline-block;width:7px;height:13px;background:var(--ink);vertical-align:-2px;margin-left:2px"></span></span>
+<span style="display:flex;justify-content:space-between;font-size:13px;padding:8px 10px;border:1px solid var(--line2)">Add or remove…<span style="color:var(--mute)">▾</span></span>
+<span style="font-size:13px;padding:8px 10px;border:1px solid var(--line2);color:var(--mute)">Find or filter: a name, .net, lambda</span>
+</div>
+
+<div style="background:var(--desk);padding:24px;display:flex;flex-direction:column;gap:14px">
+<span style="font-family:'Barlow',sans-serif;font-size:12px;color:var(--mute)">Tags and agent chip</span>
+<div style="display:flex;flex-wrap:wrap;gap:6px">
+<span style="font-family:'Sometype Mono',monospace;font-size:10px;letter-spacing:0.06em;padding:3px 6px;border:1px solid var(--line2);color:var(--mute)">.NET</span>
+<span style="font-family:'Sometype Mono',monospace;font-size:10px;letter-spacing:0.06em;padding:3px 6px;border:1px solid var(--line2);color:var(--mute)">FLUTTER</span>
+<span style="font-family:'Sometype Mono',monospace;font-size:10px;letter-spacing:0.06em;padding:3px 6px;border:1px solid var(--line2);color:var(--mute)">NODE</span>
+<span style="font-family:'Sometype Mono',monospace;font-size:10px;letter-spacing:0.06em;padding:3px 6px;border:1px solid var(--line2);color:var(--mute)">LAMBDA</span>
+<span style="font-family:'Sometype Mono',monospace;font-size:10px;letter-spacing:0.06em;padding:3px 6px;border:1px solid var(--line2);color:var(--mute)">SQS</span>
+<span style="font-family:'Sometype Mono',monospace;font-size:10px;letter-spacing:0.06em;padding:3px 6px;border:1px dashed var(--deployed);color:var(--deployed)">CALLS QA</span>
+</div>
+<div style="display:flex;flex-direction:column;gap:8px;align-items:flex-start;font-size:13px">
+<span style="display:flex;align-items:center;gap:8px;padding:5px 10px;border:1px solid var(--line2)"><span style="width:6px;height:6px;border-radius:50%;background:var(--live)"></span>Agent connected</span>
+<span style="display:flex;align-items:center;gap:8px;padding:5px 10px;border:1px solid var(--line2)"><span style="width:6px;height:6px;border-radius:50%;border:1.5px solid var(--live);box-sizing:border-box"></span>Agent working, 4 min</span>
+<span style="display:flex;align-items:center;gap:8px;padding:5px 10px;border:1px solid var(--warn);color:var(--warn)"><span style="width:6px;height:6px;border-radius:50%;background:var(--warn)"></span>Agent needs you</span>
+<span style="display:flex;align-items:center;gap:8px;padding:5px 10px;border:1px dashed var(--line2);color:var(--mute)"><span style="width:6px;height:6px;border-radius:50%;border:1.5px solid var(--mute);box-sizing:border-box"></span>No agent listening, 2 waiting</span>
+</div>
+</div>
+
+<div style="background:var(--desk);padding:24px;display:flex;flex-direction:column;gap:14px">
+<span style="font-family:'Barlow',sans-serif;font-size:12px;color:var(--mute)">Board parts</span>
+<div style="position:relative;height:150px;background-image:radial-gradient(var(--line) 1px,transparent 1px);background-size:16px 16px">
+<svg width="380" height="150" style="position:absolute;inset:0;overflow:visible">
+<path d="M16 30 C 110 30, 110 30, 200 30" fill="none" stroke="{{ t.local }}" stroke-width="2"></path>
+<path d="M16 75 C 110 75, 110 75, 200 75" fill="none" stroke="{{ t.deployed }}" stroke-width="2" stroke-dasharray="2 6" stroke-linecap="round"></path>
+<path d="M16 120 L 100 120 L 140 104 L 200 120" fill="none" stroke="{{ t.local }}" stroke-width="2"></path>
+<circle cx="100" cy="120" r="4" fill="{{ t.desk }}" stroke="{{ t.local }}" stroke-width="2"></circle>
+<circle cx="16" cy="30" r="6" fill="{{ t.desk }}" stroke="{{ t.local }}" stroke-width="2"></circle>
+<circle cx="200" cy="30" r="6" fill="{{ t.desk }}" stroke="{{ t.local }}" stroke-width="2"></circle><circle cx="200" cy="30" r="2.6" fill="{{ t.live }}"></circle>
+<circle cx="16" cy="75" r="6" fill="{{ t.desk }}" stroke="{{ t.deployed }}" stroke-width="2"></circle>
+</svg>
+<span style="position:absolute;left:220px;top:22px;font-size:12px">Cable · plugged, test passed</span>
+<span style="position:absolute;left:220px;top:67px;font-size:12px;color:var(--deployed)">Link to a tunnel or outside system</span>
+<span style="position:absolute;left:220px;top:112px;font-size:12px">Waypoint</span>
+</div>
+<div style="display:flex;gap:10px;align-items:center">
+<div style="display:flex;border:1px solid var(--line2)"><span style="font-size:12px;padding:5px 10px;color:var(--mute)">Deployed</span><span style="font-size:12px;font-weight:600;padding:5px 10px;background:var(--local);color:var(--desk)">Local</span></div>
+<span style="font-size:12px;color:var(--mute)">Queue switch</span>
+</div>
+</div>
+
+</div>
+</section>
+
+<section data-screen-label="04 Board" style="width:1440px;height:900px;flex:none;background:var(--desk);border:1px solid var(--line);display:flex;flex-direction:column;position:relative;overflow:hidden">
+<div style="height:56px;flex:none;display:flex;align-items:center;gap:16px;padding:0 16px;background:var(--panel);border-bottom:1px solid var(--line)">
+<dc-import name="KopplerMark" variant="k" size="{{ 24 }}" dark="{{ true }}" cable="{{ t.local }}" ink="{{ t.ink }}" hole="{{ t.panel }}" bg="{{ t.panel }}" hint-size="24px,24px"></dc-import>
+<span style="font-family:'Barlow Semi Condensed',sans-serif;font-size:16px;font-weight:600;letter-spacing:-0.005em">koppler</span>
+<span style="color:var(--line2)">/</span>
+<span style="font-size:15px;font-weight:600">Acme Shop <span style="color:var(--mute);font-weight:400">▾</span></span>
+<sc-if value="{{ notProd }}" hint-placeholder-val="{{ true }}">
+<div style="display:flex;border:1px solid var(--line2);margin-left:8px"><span style="font-family:'Barlow',sans-serif;font-size:13px;font-weight:600;padding:6px 12px;background:var(--line2);color:var(--ink)">QA</span><span style="font-family:'Barlow',sans-serif;font-size:13px;font-weight:600;padding:6px 12px;color:var(--mute)">PROD</span></div>
+</sc-if>
+<sc-if value="{{ prod }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;border:1px solid var(--prod);margin-left:8px"><span style="font-family:'Barlow',sans-serif;font-size:13px;font-weight:600;padding:6px 12px;color:var(--mute)">QA</span><span style="font-family:'Barlow',sans-serif;font-size:13px;font-weight:700;padding:6px 12px;background:repeating-linear-gradient(-45deg,var(--prod) 0 8px,var(--prod2) 8px 16px);color:var(--onProd)">PROD</span></div>
+</sc-if>
+<span style="flex:1"></span>
+<span style="display:flex;align-items:center;gap:8px;padding:5px 10px;border:1px solid var(--line2);font-size:13px"><span style="width:7px;height:7px;background:var(--live)"></span>4 running</span>
+<span style="display:flex;align-items:center;gap:8px;padding:5px 10px;border:1px solid var(--line2);font-size:13px"><span style="width:6px;height:6px;border-radius:50%;background:var(--live)"></span>Agent connected</span>
+<div style="display:flex;gap:1px;background:var(--line);border:1px solid var(--line)">
+<span style="background:var(--panel);font-family:'Barlow',sans-serif;font-size:12px;padding:8px 10px;color:var(--mute)">History</span>
+<span style="background:var(--panel);font-family:'Barlow',sans-serif;font-size:12px;padding:8px 10px;color:var(--mute)">Flow check</span>
+<span style="background:var(--panel);font-family:'Barlow',sans-serif;font-size:12px;padding:8px 10px;color:var(--mute)">Credentials</span>
+<span style="background:var(--panel);font-family:'Barlow',sans-serif;font-size:12px;padding:8px 10px;color:var(--mute)" title="Help">Help</span>
+</div>
+<span style="display:flex;align-items:center;gap:8px;padding:7px 14px;border:1px solid var(--line2);font-family:'Sometype Mono',monospace;font-size:12px;font-weight:600"><span style="width:8px;height:8px;background:var(--ink)"></span>Stop</span>
+<span style="display:flex;align-items:stretch;background:var(--local);color:var(--desk);font-family:'Sometype Mono',monospace;font-size:12px;font-weight:600"><span style="display:flex;align-items:center;gap:8px;padding:8px 14px"><span style="width:0;height:0;border-left:7px solid var(--desk);border-top:4.5px solid transparent;border-bottom:4.5px solid transparent"></span>Run</span><span style="padding:8px 9px;border-left:1px solid var(--desk)">▾</span></span>
+</div>
+<sc-if value="{{ prod }}" hint-placeholder-val="{{ false }}">
+<div style="height:30px;flex:none;display:flex;align-items:center;padding:0 16px;background:repeating-linear-gradient(-45deg,var(--prod) 0 12px,var(--prod2) 12px 24px);color:var(--onProd);font-family:'Sometype Mono',monospace;font-size:11px;font-weight:700;letter-spacing:0.08em">PROD · EVERY UNPLUGGED CALL GOES TO PRODUCTION</div>
+</sc-if>
+<div style="flex:1;display:flex;min-height:0">
+<aside style="width:300px;flex:none;background:var(--panel);border-right:1px solid var(--line);display:flex;flex-direction:column;gap:14px;padding:16px">
+<span style="display:flex;justify-content:space-between;font-size:14px;font-weight:600;padding:9px 12px;border:1px solid var(--line2)">Mobile App + 3<span style="color:var(--mute);font-weight:400">▾</span></span>
+<div style="display:flex;justify-content:space-between;align-items:baseline;padding-top:8px"><span style="font-family:'Barlow',sans-serif;font-size:12px;color:var(--mute)">Apps · 5 of 6 on the board</span><span style="font-family:'Sometype Mono',monospace;font-size:10px;color:var(--mute)">A–Z</span></div>
+<span style="font-size:13px;padding:8px 10px;border:1px solid var(--line2);color:var(--mute)">Find or filter: a name, .net, lambda</span>
+<div style="display:flex;flex-direction:column">
+<div style="display:grid;grid-template-columns:62px minmax(0,1fr) 10px;align-items:center;gap:8px;padding:8px 0"><span style="font-family:'Sometype Mono',monospace;font-size:10px;color:var(--mute)">FLUTTER</span><span style="font-size:14px">Mobile App</span><span style="width:7px;height:7px;background:var(--live)"></span></div>
+<div style="display:grid;grid-template-columns:62px minmax(0,1fr) 10px;align-items:center;gap:8px;padding:8px 0"><span style="font-family:'Sometype Mono',monospace;font-size:10px;color:var(--mute)">.NET</span><span style="font-size:14px">Orders API</span><span style="width:7px;height:7px;background:var(--live)"></span></div>
+<div style="display:grid;grid-template-columns:62px minmax(0,1fr) 10px;align-items:center;gap:8px;padding:8px 0"><span style="font-family:'Sometype Mono',monospace;font-size:10px;color:var(--mute)">OUTSIDE</span><span style="font-size:14px">Payment provider</span><span></span></div>
+<div style="display:grid;grid-template-columns:62px minmax(0,1fr) 10px;align-items:center;gap:8px;padding:8px 0"><span style="font-family:'Sometype Mono',monospace;font-size:10px;color:var(--mute)">.NET</span><span style="font-size:14px">Payments API</span><span style="width:7px;height:7px;border:1.5px solid var(--warn);box-sizing:border-box"></span></div>
+<div style="display:grid;grid-template-columns:62px minmax(0,1fr) 10px;align-items:center;gap:8px;padding:8px 0"><span style="font-family:'Sometype Mono',monospace;font-size:10px;color:var(--mute)">NODE</span><span style="font-size:14px">Web Shop</span><span style="width:7px;height:7px;background:var(--live)"></span></div>
+<div style="display:grid;grid-template-columns:62px minmax(0,1fr) 10px;align-items:center;gap:8px;padding:8px 0;border-top:1px solid var(--line);margin-top:6px;color:var(--mute)"><span style="font-family:'Sometype Mono',monospace;font-size:10px">NODE</span><span style="font-size:14px">Catalog API</span><span style="width:7px;height:7px;border:1.5px dashed var(--mute);box-sizing:border-box"></span></div>
+</div>
+<div style="display:flex;gap:16px;font-size:13px"><span style="text-decoration:underline;text-underline-offset:3px">Add repos…</span><span style="text-decoration:underline;text-underline-offset:3px">Add outside system…</span></div>
+</aside>
+<div style="flex:1;position:relative;background-image:radial-gradient(var(--line) 1px,transparent 1px);background-size:20px 20px">
+<div style="position:absolute;left:24px;top:20px;display:flex;border:1px solid var(--line2);background:var(--panel)"><span style="font-size:13px;font-weight:600;padding:6px 14px;background:var(--line2)">Edit</span><span style="font-size:13px;padding:6px 14px;color:var(--mute)">Live</span></div>
+<svg width="1140" height="844" style="position:absolute;inset:0">
+<path d="M300 139 C 340 139, 340 270, 374 270" fill="none" stroke="{{ t.local }}" stroke-width="2"></path>
+<path d="M300 399 C 340 399, 340 310, 374 310" fill="none" stroke="{{ t.local }}" stroke-width="2"></path>
+<path d="M657 270 C 710 270, 700 120, 754 120" fill="none" stroke="{{ t.local }}" stroke-width="2"></path>
+<path d="M420 421 C 420 470, 360 501, 374 501" fill="none" stroke="{{ cableDeployed }}" stroke-width="2" stroke-dasharray="2 6" stroke-linecap="round"></path>
+<path d="M650 400 C 700 400, 710 385, 760 385" fill="none" stroke="{{ t.local }}" stroke-width="2"></path>
+<path d="M608 577 C 640 577, 640 526, 674 526" fill="none" stroke="{{ cableDeployed }}" stroke-width="2" stroke-dasharray="2 6" stroke-linecap="round"></path>
+<path d="M890 192 L 890 240" fill="none" stroke="{{ cableDeployed }}" stroke-width="2" stroke-dasharray="2 6" stroke-linecap="round"></path>
+</svg>
+<div style="position:absolute;left:40px;top:70px;width:260px;background:var(--panel);border:1px solid var(--line2)">
+<div style="display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--line)"><span style="width:7px;height:7px;background:var(--live)"></span><span style="font-size:15px;font-weight:600;flex:1">Mobile App</span><span style="font-family:'Sometype Mono',monospace;font-size:10px;padding:2px 5px;border:1px solid var(--line2);color:var(--mute)">FLUTTER</span></div>
+<div style="padding:10px 12px;display:flex;flex-direction:column;gap:6px"><span style="font-family:'Barlow',sans-serif;font-size:12px;color:var(--mute)">Branch</span><span style="font-family:'Sometype Mono',monospace;font-size:12px;padding:6px 8px;background:var(--desk);border:1px solid var(--line)">feature/checkout</span>
+<div style="display:grid;grid-template-columns:auto minmax(0,1fr);gap:6px 12px;padding-top:4px;align-items:center"><span style="font-family:'Barlow',sans-serif;font-size:12px;color:var(--mute)">Started by</span><span style="font-family:'Barlow',sans-serif;font-size:12px;color:var(--mute)">Device</span><div style="display:flex;border:1px solid var(--line2)"><span style="font-size:12px;font-weight:600;padding:4px 8px;background:var(--line2)">Koppler</span><span style="font-size:12px;padding:4px 8px;color:var(--mute)">Me</span></div><span style="font-size:13px">iOS simulator</span></div></div>
+<div style="display:flex;justify-content:space-between;padding:8px 12px;border-top:1px solid var(--line);font-family:'Barlow',sans-serif;font-size:12px"><span>Running</span><span style="font-family:'Sometype Mono',monospace;font-size:11px;color:var(--mute)">3/3 steps</span></div>
+<span style="position:absolute;right:-7px;top:63px;width:12px;height:12px;border-radius:50%;background:var(--desk);border:2px solid var(--local)"></span>
+</div>
+<div style="position:absolute;left:40px;top:330px;width:260px;background:var(--panel);border:1px solid var(--line2)">
+<div style="display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--line)"><span style="width:7px;height:7px;background:var(--live)"></span><span style="font-size:15px;font-weight:600;flex:1">Web Shop</span><span style="font-family:'Sometype Mono',monospace;font-size:10px;padding:2px 5px;border:1px solid var(--line2);color:var(--mute)">NODE</span></div>
+<div style="padding:10px 12px;display:flex;flex-direction:column;gap:6px"><span style="font-family:'Barlow',sans-serif;font-size:12px;color:var(--mute)">Branch</span><span style="font-family:'Sometype Mono',monospace;font-size:12px;padding:6px 8px;background:var(--desk);border:1px solid var(--line)">feature/checkout</span></div>
+<div style="display:flex;justify-content:space-between;padding:8px 12px;border-top:1px solid var(--line);font-family:'Barlow',sans-serif;font-size:12px"><span>Running</span><span style="color:var(--deployed)">Calls {{ envUpper }}: Catalog API</span></div>
+<span style="position:absolute;right:-7px;top:63px;width:12px;height:12px;border-radius:50%;background:var(--desk);border:2px solid var(--local)"></span>
+</div>
+<div style="position:absolute;left:380px;top:170px;width:270px">
+<div style="display:flex;gap:1px;background:var(--line2);border:1px solid var(--line2);width:max-content;margin-bottom:8px">
+<span style="background:var(--panel);font-family:'Barlow',sans-serif;font-size:12px;padding:6px 8px">Run alone</span>
+<span style="background:var(--panel);font-family:'Barlow',sans-serif;font-size:12px;padding:6px 8px">Log</span>
+<span style="background:var(--panel);font-family:'Barlow',sans-serif;font-size:12px;padding:6px 8px">Restart</span>
+<span style="background:var(--panel);font-family:'Barlow',sans-serif;font-size:12px;padding:6px 8px">Settings</span>
+<span style="background:var(--panel);font-family:'Sometype Mono',monospace;font-size:10px;padding:6px 8px">×</span>
+</div>
+</div>
+<div style="position:absolute;left:380px;top:206px;width:270px;background:var(--panel);border:1px solid var(--ink)">
+<div style="display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--line)"><span style="width:7px;height:7px;background:var(--live)"></span><span style="font-size:15px;font-weight:600;flex:1">Orders API</span><span style="font-family:'Sometype Mono',monospace;font-size:10px;padding:2px 5px;border:1px solid var(--line2);color:var(--mute)">.NET</span></div>
+<div style="padding:10px 12px;display:flex;flex-direction:column;gap:6px"><span style="font-family:'Barlow',sans-serif;font-size:12px;color:var(--mute)">Branch</span><span style="font-family:'Sometype Mono',monospace;font-size:12px;padding:6px 8px;background:var(--desk);border:1px solid var(--line)">feature/checkout</span>
+<div style="display:flex;gap:16px;padding-top:4px;align-items:center"><span style="display:flex;align-items:center;gap:6px;font-size:12px"><span style="width:26px;height:14px;box-sizing:border-box;display:flex;justify-content:flex-end;padding:2px;background:var(--ink)"><span style="width:8px;height:8px;background:var(--panel)"></span></span>Tunnels</span><span style="display:flex;align-items:center;gap:6px;font-size:12px"><span style="width:26px;height:14px;box-sizing:border-box;display:flex;justify-content:flex-end;padding:2px;background:var(--ink)"><span style="width:8px;height:8px;background:var(--panel)"></span></span>Queues</span></div>
+<span style="font-family:'Barlow',sans-serif;font-size:12px;color:var(--mute);padding-top:4px">Note for the agent</span><span style="font-size:13px;line-height:1.4">Seed two test orders after it starts</span></div>
+<div style="display:flex;justify-content:space-between;padding:8px 12px;border-top:1px solid var(--line);font-family:'Barlow',sans-serif;font-size:12px"><span>Running</span><span style="font-family:'Sometype Mono',monospace;font-size:11px;color:var(--mute)">3/3 steps</span></div>
+<span style="position:absolute;left:-7px;top:58px;width:12px;height:12px;border-radius:50%;box-sizing:border-box;border:2px solid var(--local);background:var(--live);box-shadow:inset 0 0 0 2px var(--desk)"></span>
+<span style="position:absolute;left:-7px;top:98px;width:12px;height:12px;border-radius:50%;box-sizing:border-box;border:2px solid var(--local);background:var(--live);box-shadow:inset 0 0 0 2px var(--desk)"></span>
+<span style="position:absolute;right:-7px;top:58px;width:12px;height:12px;border-radius:50%;background:var(--desk);border:2px solid var(--local)"></span>
+</div>
+<div style="position:absolute;left:760px;top:60px;width:260px;background:var(--panel);border:1px solid var(--line2)">
+<div style="display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--line)"><span style="width:7px;height:7px;border:1.5px solid var(--warn);box-sizing:border-box"></span><span style="font-size:15px;font-weight:600;flex:1">Payments API</span><span style="font-family:'Sometype Mono',monospace;font-size:10px;padding:2px 5px;border:1px solid var(--line2);color:var(--mute)">.NET</span></div>
+<div style="padding:10px 12px;display:flex;flex-direction:column;gap:6px"><span style="font-family:'Barlow',sans-serif;font-size:12px;color:var(--mute)">Note for the agent</span><span style="font-size:13px;line-height:1.4">Use the sandbox merchant account, not the live one</span></div>
+<div style="display:flex;justify-content:space-between;padding:8px 12px;border-top:1px solid var(--line);font-family:'Barlow',sans-serif;font-size:12px"><span style="color:var(--warn)">Starting</span><span style="font-family:'Sometype Mono',monospace;font-size:11px;color:var(--mute)">2/3 steps</span></div>
+<span style="position:absolute;left:-7px;top:54px;width:12px;height:12px;border-radius:50%;box-sizing:border-box;border:2px solid var(--local);background:var(--live);box-shadow:inset 0 0 0 2px var(--desk)"></span>
+</div>
+<div style="position:absolute;left:760px;top:240px;width:260px;border:1px dashed var(--deployed);background:var(--desk)">
+<div style="display:flex;align-items:center;gap:8px;padding:10px 12px 4px"><span style="font-size:15px;font-weight:600;flex:1">Payment provider</span><span style="font-family:'Sometype Mono',monospace;font-size:10px;letter-spacing:0.06em;color:var(--deployed);white-space:nowrap;padding:2px 5px;border:1px dashed var(--deployed)">OUTSIDE</span></div>
+<div style="padding:0 12px 10px;font-size:12px;color:var(--mute)">Always uses deployed {{ envUpper }}</div>
+</div>
+<div style="position:absolute;left:380px;top:480px;width:220px;background:var(--panel);border:1px dashed var(--deployed)">
+<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid var(--line)"><span style="font-size:14px;font-weight:600;flex:1">Tunnel</span><span style="font-family:'Sometype Mono',monospace;font-size:10px;letter-spacing:0.06em;padding:2px 5px;border:1px dashed var(--deployed);color:var(--deployed)">TUNNEL</span></div>
+<div style="padding:8px 10px;display:flex;flex-direction:column;gap:3px;border-bottom:1px solid var(--line)"><span style="font-family:'Sometype Mono',monospace;font-size:11px;color:var(--deployed)">db.{{ envLower }}.acme.example</span><span style="font-family:'Sometype Mono',monospace;font-size:11px;color:var(--mute)">localhost:5432</span></div>
+<div style="position:relative;display:flex;justify-content:space-between;align-items:center;padding:7px 10px;border-bottom:1px solid var(--line);font-size:12px"><span>Orders</span><span style="color:var(--mute)">Through</span><span style="position:absolute;right:-7px;top:9px;width:12px;height:12px;border-radius:50%;background:var(--desk);border:2px solid var(--deployed);box-sizing:border-box"></span></div>
+<div style="display:flex;align-items:center;gap:8px;padding:6px 10px"><span style="width:7px;height:7px;background:var(--live)"></span><span style="font-size:12px;flex:1">Open · <span style="font-family:'Sometype Mono',monospace;font-size:11px;color:var(--mute)">1</span> database</span><span title="Reconnect" aria-label="Reconnect" style="width:28px;height:28px;display:flex;align-items:center;justify-content:center;border:1px solid var(--line2)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--ink)"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"></path><path d="M21 3v5h-5"></path><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"></path><path d="M8 16H3v5"></path></svg></span></div>
+<span style="position:absolute;left:-7px;top:14px;width:12px;height:12px;border-radius:50%;box-sizing:border-box;border:2px solid var(--deployed);background:var(--live);box-shadow:inset 0 0 0 2px var(--desk)"></span>
+</div>
+<div style="position:absolute;left:680px;top:490px;width:200px;background:var(--panel);border:1px dashed var(--deployed)">
+<div style="display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--line)"><span style="width:7px;height:7px;background:var(--live)"></span><span style="font-size:15px;font-weight:600;flex:1">Orders</span><span style="font-family:'Sometype Mono',monospace;font-size:10px;letter-spacing:0.06em;padding:2px 5px;border:1px solid var(--line2);color:var(--mute)">POSTGRES</span></div>
+<div style="padding:10px 12px;display:flex;flex-direction:column;gap:8px">
+<div style="display:flex;align-items:center;gap:8px"><div style="display:flex;border:1px solid var(--line2)"><span style="font-size:12px;font-weight:600;padding:4px 9px;background:var(--line2)">Deployed</span><span style="font-size:12px;padding:4px 9px;color:var(--mute)">Local</span></div><span style="font-family:'Sometype Mono',monospace;font-size:10px;letter-spacing:0.06em;padding:2px 5px;border:1px dashed var(--deployed);color:var(--deployed)">{{ envUpper }}</span></div>
+<span style="font-family:'Sometype Mono',monospace;font-size:11px;color:var(--mute)">Through tunnel · :5432</span></div>
+<div style="padding:8px 12px;border-top:1px solid var(--line);font-size:12px">Reachable</div>
+<span style="position:absolute;left:-7px;top:30px;width:12px;height:12px;border-radius:50%;box-sizing:border-box;border:2px solid var(--deployed);background:var(--live);box-shadow:inset 0 0 0 2px var(--desk)"></span>
+</div>
+<div style="position:absolute;left:760px;top:350px;width:200px;box-sizing:border-box;background:var(--panel);border:1px solid var(--line2);padding:10px 12px;display:flex;flex-direction:column;gap:8px">
+<div style="display:flex;align-items:center;gap:8px"><span style="font-size:15px;font-weight:600;flex:1">Order events</span><span style="font-family:'Sometype Mono',monospace;font-size:10px;letter-spacing:0.06em;padding:2px 5px;border:1px solid var(--line2);color:var(--mute)">SQS</span></div>
+<div style="display:flex;border:1px solid var(--line2);width:max-content"><span style="font-size:12px;padding:4px 10px;color:var(--mute)">Deployed</span><span style="font-size:12px;font-weight:600;padding:4px 10px;background:var(--line2)">Local</span></div>
+</div>
+<div style="position:absolute;left:24px;right:24px;bottom:20px;display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:end;gap:16px">
+<span></span>
+<div style="display:flex;gap:1px;background:var(--line2);border:1px solid var(--line2)">
+<span title="Select V" aria-label="Select V" style="background:var(--line2);width:32px;height:32px;display:flex;align-items:center;justify-content:center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--ink)"><path d="M4.037 4.688a.495.495 0 0 1 .651-.651l16 6.5a.5.5 0 0 1-.063.947l-6.124 1.58a2 2 0 0 0-1.438 1.435l-1.579 6.126a.5.5 0 0 1-.947.063z"></path></svg></span>
+<span title="Move H" aria-label="Move H" style="background:var(--panel);width:32px;height:32px;display:flex;align-items:center;justify-content:center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--ink)"><path d="M18 11V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2"></path><path d="M14 10V4a2 2 0 0 0-2-2a2 2 0 0 0-2 2v2"></path><path d="M10 10.5V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2v8"></path><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"></path></svg></span>
+<span title="Undo" aria-label="Undo" style="background:var(--panel);width:32px;height:32px;display:flex;align-items:center;justify-content:center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--ink)"><path d="M9 14 4 9l5-5"></path><path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5a5.5 5.5 0 0 1-5.5 5.5H11"></path></svg></span>
+<span title="Arrange" aria-label="Arrange" style="background:var(--panel);width:32px;height:32px;display:flex;align-items:center;justify-content:center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--ink)"><rect width="7" height="7" x="3" y="3" rx="1"></rect><rect width="7" height="7" x="14" y="3" rx="1"></rect><rect width="7" height="7" x="14" y="14" rx="1"></rect><rect width="7" height="7" x="3" y="14" rx="1"></rect></svg></span>
+<span title="Zoom to fit F" aria-label="Zoom to fit F" style="background:var(--panel);width:32px;height:32px;display:flex;align-items:center;justify-content:center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--ink)"><circle cx="12" cy="12" r="3"></circle><path d="M3 7V5a2 2 0 0 1 2-2h2"></path><path d="M17 3h2a2 2 0 0 1 2 2v2"></path><path d="M21 17v2a2 2 0 0 1-2 2h-2"></path><path d="M7 21H5a2 2 0 0 1-2-2v-2"></path></svg></span>
+<span style="background:var(--panel);display:flex;align-items:center"><span title="Zoom out" aria-label="Zoom out" style="width:32px;height:32px;display:flex;align-items:center;justify-content:center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--ink)"><path d="M5 12h14"></path></svg></span><span style="font-family:'Sometype Mono',monospace;font-size:12px;width:40px;text-align:center">72%</span><span title="Zoom in" aria-label="Zoom in" style="width:32px;height:32px;display:flex;align-items:center;justify-content:center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--ink)"><path d="M5 12h14"></path><path d="M12 5v14"></path></svg></span></span>
+<span title="Present P" aria-label="Present P" style="background:var(--panel);width:32px;height:32px;display:flex;align-items:center;justify-content:center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--ink)"><path d="M8 3H5a2 2 0 0 0-2 2v3"></path><path d="M21 8V5a2 2 0 0 0-2-2h-3"></path><path d="M3 16v3a2 2 0 0 0 2 2h3"></path><path d="M16 21h3a2 2 0 0 0 2-2v-3"></path></svg></span>
+</div>
+<div style="width:180px;height:110px;background:var(--panel);border:1px solid var(--line2);position:relative;justify-self:end">
+<span style="position:absolute;left:14px;top:14px;width:36px;height:30px;background:var(--line2)"></span>
+<span style="position:absolute;left:14px;top:62px;width:36px;height:22px;background:var(--line2)"></span>
+<span style="position:absolute;left:72px;top:34px;width:38px;height:40px;background:var(--ink)"></span>
+<span style="position:absolute;left:128px;top:14px;width:36px;height:24px;background:var(--line2)"></span>
+<span style="position:absolute;left:128px;top:62px;width:36px;height:16px;border:1px dashed var(--deployed);box-sizing:border-box"></span>
+</div>
+</div>
+</div>
+</div>
+<sc-if value="{{ prod }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;inset:0;border:3px solid var(--prod);pointer-events:none"></div></sc-if>
+</section>
+
+<section data-screen-label="05 Run review" style="width:1440px;flex:none;background-color:var(--desk);background-image:radial-gradient(var(--line) 1px,transparent 1px);background-size:20px 20px;border:1px solid var(--line);padding:56px;box-sizing:border-box;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:48px;align-items:start">
+
+<div style="background:var(--panel);border:1px solid var(--line2);display:flex;flex-direction:column">
+<div style="padding:28px 28px 20px;display:flex;flex-direction:column;gap:8px;border-bottom:1px solid var(--line)">
+<span style="font-family:'Barlow',sans-serif;font-size:12px;color:var(--mute)">Review before run</span>
+<h3 style="margin:0;font-family:'Barlow Semi Condensed',sans-serif;font-size:32px;font-weight:600;letter-spacing:-0.005em">Run on QA</h3>
+<p style="margin:0;font-size:15px;line-height:1.5;color:var(--mute)">The agent does exactly this, with your note, and asks before anything else.</p>
+</div>
+<div style="display:grid;grid-template-columns:160px minmax(0,1fr);border-bottom:1px solid var(--line)">
+<div style="padding:18px 0 18px 28px;display:flex;flex-direction:column;gap:6px"><span style="font-family:'Barlow',sans-serif;font-size:12px">Starts</span><span style="font-family:'Barlow Semi Condensed',sans-serif;font-size:22px;font-weight:600">4</span></div>
+<div style="display:flex;flex-direction:column">
+<div style="padding:14px 28px 14px 0;display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:12px;align-items:center;border-bottom:1px solid var(--line)"><span style="display:flex;align-items:center;gap:8px;font-size:15px;font-weight:600"><span style="width:7px;height:7px;border:1.5px solid var(--local);box-sizing:border-box"></span>Mobile App</span><span style="font-family:'Sometype Mono',monospace;font-size:12px;padding:6px 9px;border:1px solid var(--line2);background:var(--desk);outline:2px solid var(--ink);outline-offset:2px">feature/checkout</span><div style="display:flex;border:1px solid var(--line2)"><span style="font-size:12px;font-weight:600;padding:4px 8px;background:var(--line2)">Koppler</span><span style="font-size:12px;padding:4px 8px;color:var(--mute)">Me</span></div></div>
+<div style="padding:14px 28px 14px 0;display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:12px;align-items:center;border-bottom:1px solid var(--line)"><span style="display:flex;align-items:center;gap:8px;font-size:15px;font-weight:600"><span style="width:7px;height:7px;border:1.5px solid var(--local);box-sizing:border-box"></span>Web Shop</span><span style="font-family:'Sometype Mono',monospace;font-size:12px;padding:6px 9px;border:1px solid var(--line2);background:var(--desk)">feature/checkout</span><div style="display:flex;border:1px solid var(--line2)"><span style="font-size:12px;font-weight:600;padding:4px 8px;background:var(--line2)">Koppler</span><span style="font-size:12px;padding:4px 8px;color:var(--mute)">Me</span></div></div>
+<div style="padding:14px 28px 14px 0;display:flex;flex-direction:column;gap:6px;border-bottom:1px solid var(--line)"><div style="display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:12px;align-items:center"><span style="display:flex;align-items:center;gap:8px;font-size:15px;font-weight:600"><span style="width:7px;height:7px;border:1.5px solid var(--local);box-sizing:border-box"></span>Orders API</span><span style="font-family:'Sometype Mono',monospace;font-size:12px;padding:6px 9px;border:1px solid var(--line2);background:var(--desk)">feature/checkout</span><div style="display:flex;border:1px solid var(--line2)"><span style="font-size:12px;font-weight:600;padding:4px 8px;background:var(--line2)">Koppler</span><span style="font-size:12px;padding:4px 8px;color:var(--mute)">Me</span></div></div><span style="font-size:13px;color:var(--mute)">Note: Seed two test orders after it starts · Tunnels on</span></div>
+<div style="padding:14px 28px 14px 0;display:flex;flex-direction:column;gap:6px"><div style="display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:12px;align-items:center"><span style="display:flex;align-items:center;gap:8px;font-size:15px;font-weight:600"><span style="width:7px;height:7px;border:1.5px solid var(--local);box-sizing:border-box"></span>Payments API</span><span style="font-family:'Sometype Mono',monospace;font-size:12px;padding:6px 9px;border:1px solid var(--line2);background:var(--desk)">feature/checkout</span><div style="display:flex;border:1px solid var(--line2)"><span style="font-size:12px;font-weight:600;padding:4px 8px;background:var(--line2)">Koppler</span><span style="font-size:12px;padding:4px 8px;color:var(--mute)">Me</span></div></div><span style="font-size:13px;color:var(--mute)">Note: Use the sandbox merchant account, not the live one</span></div>
+</div>
+</div>
+<div style="display:grid;grid-template-columns:160px minmax(0,1fr);border-bottom:1px solid var(--line)">
+<div style="padding:18px 0 18px 28px"><span style="font-family:'Sometype Mono',monospace;font-size:10px;;color:var(--deployed);line-height:1.4;font-family:'Barlow',sans-serif;font-size:13px;font-weight:600;white-space:nowrap">Calls deployed QA</span></div>
+<div style="display:flex;flex-direction:column">
+<div style="padding:14px 28px 14px 0;display:flex;justify-content:space-between;align-items:center;gap:12px;border-bottom:1px solid var(--line)"><span style="display:flex;flex-direction:column;gap:3px"><span style="font-size:15px;font-weight:600">Catalog API</span><span style="font-size:13px;color:var(--mute)">From Web Shop, Orders API</span></span><span style="font-family:'Sometype Mono',monospace;font-size:12px;font-weight:600;padding:6px 10px;border:1px solid var(--line2)">Run locally</span></div>
+<div style="padding:14px 28px 14px 0;display:flex;flex-direction:column;gap:3px"><span style="font-size:15px;font-weight:600">Payment provider</span><span style="font-size:13px;color:var(--mute)">From Payments API</span></div>
+</div>
+</div>
+<div style="display:grid;grid-template-columns:160px minmax(0,1fr);border-bottom:1px solid var(--line)">
+<div style="padding:18px 0 18px 28px"><span style="font-family:'Sometype Mono',monospace;font-size:10px;;color:var(--mute);line-height:1.4;font-family:'Barlow',sans-serif;font-size:13px;font-weight:600">Opens tunnels</span></div>
+<div style="padding:14px 28px 14px 0;display:flex;flex-direction:column;gap:3px"><span style="font-size:15px;font-weight:600">Tunnel to db.qa.acme.example</span><span style="font-family:'Sometype Mono',monospace;font-size:12px;color:var(--mute)">localhost:5432 · opens first</span><span style="font-size:13px;color:var(--deployed);padding-top:6px">Orders (Postgres), deployed QA, through this tunnel</span></div>
+</div>
+<div style="padding:18px 28px;display:flex;justify-content:flex-end;align-items:center;gap:10px">
+<span style="padding:8px 16px;border:1px solid var(--line2);font-family:'Sometype Mono',monospace;font-size:13px;font-weight:600">Cancel</span>
+<span style="display:flex;align-items:center;gap:8px;padding:9px 18px;background:var(--local);color:var(--desk);font-family:'Sometype Mono',monospace;font-size:13px;font-weight:600"><span style="width:0;height:0;border-left:8px solid var(--desk);border-top:5px solid transparent;border-bottom:5px solid transparent"></span>Run</span>
+</div>
+</div>
+
+<div style="background:var(--panel);border:3px solid var(--prod);display:flex;flex-direction:column">
+<div style="height:30px;display:flex;align-items:center;padding:0 20px;background:repeating-linear-gradient(-45deg,var(--prod) 0 12px,var(--prod2) 12px 24px);color:var(--onProd);font-family:'Sometype Mono',monospace;font-size:11px;font-weight:700;letter-spacing:0.08em">PROD · PRODUCTION DATA AND CUSTOMERS</div>
+<div style="padding:24px 28px 20px;display:flex;flex-direction:column;gap:8px;border-bottom:1px solid var(--line)">
+<span style="font-family:'Barlow',sans-serif;font-size:12px;color:var(--mute)">Review before run</span>
+<h3 style="margin:0;font-family:'Barlow Semi Condensed',sans-serif;font-size:32px;font-weight:600;letter-spacing:-0.005em;color:var(--prod)">Run on PROD</h3>
+<p style="margin:0;font-size:15px;line-height:1.5;color:var(--mute)">Pressing Run here is the confirmation.</p>
+</div>
+<div style="display:grid;grid-template-columns:160px minmax(0,1fr);border-bottom:1px solid var(--line);background:var(--desk)">
+<div style="padding:18px 0 18px 28px"><span style="font-family:'Sometype Mono',monospace;font-size:10px;;color:var(--warn);line-height:1.4;font-family:'Barlow',sans-serif;font-size:13px;font-weight:600">Blocks the run</span></div>
+<div style="padding:14px 28px 14px 0;display:flex;flex-direction:column;gap:8px"><span style="display:flex;align-items:center;gap:8px;font-size:15px;font-weight:600"><span style="width:7px;height:7px;background:var(--warn)"></span>Payments API needs an AWS sign-in</span><span style="font-size:13px;color:var(--mute)">Run this in your terminal, then come back:</span><span style="font-family:'Sometype Mono',monospace;font-size:12px;padding:8px 10px;border:1px solid var(--line2)">aws sso login --profile acme-prod</span></div>
+</div>
+<div style="display:grid;grid-template-columns:160px minmax(0,1fr);border-bottom:1px solid var(--line)">
+<div style="padding:18px 0 18px 28px;display:flex;flex-direction:column;gap:6px"><span style="font-family:'Barlow',sans-serif;font-size:12px">Starts</span><span style="font-family:'Barlow Semi Condensed',sans-serif;font-size:22px;font-weight:600">2</span></div>
+<div style="display:flex;flex-direction:column">
+<div style="padding:14px 28px 14px 0;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;border-bottom:1px solid var(--line)"><span style="font-size:15px;font-weight:600">Mobile App</span><span style="font-family:'Sometype Mono',monospace;font-size:12px;padding:6px 9px;border:1px solid var(--line2);background:var(--desk)">main</span></div>
+<div style="padding:14px 28px 14px 0;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center"><span style="font-size:15px;font-weight:600">Payments API</span><span style="font-family:'Sometype Mono',monospace;font-size:12px;padding:6px 9px;border:1px solid var(--line2);background:var(--desk)">fix/refund-rounding</span></div>
+</div>
+</div>
+<div style="display:grid;grid-template-columns:160px minmax(0,1fr);border-bottom:1px solid var(--line)">
+<div style="padding:18px 0 18px 28px"><span style="font-family:'Sometype Mono',monospace;font-size:10px;;color:var(--prod);line-height:1.4;font-family:'Barlow',sans-serif;font-size:13px;font-weight:600">Calls deployed PROD</span></div>
+<div style="padding:14px 28px 14px 0;display:flex;flex-direction:column;gap:3px"><span style="font-size:15px;font-weight:600">Orders API, Catalog API, Payment provider</span><span style="font-size:13px;color:var(--mute)">Real orders and real payments</span></div>
+</div>
+<div style="padding:18px 28px;display:flex;justify-content:space-between;align-items:center;gap:10px">
+<span style="font-size:13px;color:var(--mute)">Off until signed in</span>
+<div style="display:flex;gap:10px">
+<span style="padding:8px 16px;border:1px solid var(--line2);font-family:'Sometype Mono',monospace;font-size:13px;font-weight:600">Cancel</span>
+<span style="padding:9px 18px;border:1px dashed var(--prod);color:var(--prod);font-family:'Sometype Mono',monospace;font-size:13px;font-weight:700;white-space:nowrap">Run on PROD</span>
+</div>
+</div>
+</div>
+</section>
+
+<section data-screen-label="06 Landing hero" style="width:1440px;height:840px;flex:none;background:var(--desk);border:1px solid var(--line);display:flex;flex-direction:column;overflow:hidden">
+<nav style="height:72px;flex:none;display:flex;align-items:center;gap:32px;padding:0 56px;border-bottom:1px solid var(--line)">
+<span style="display:flex;align-items:center;gap:10px"><dc-import name="KopplerMark" variant="k" size="{{ 28 }}" dark="{{ true }}" cable="{{ t.local }}" ink="{{ t.ink }}" hole="{{ t.desk }}" bg="{{ t.desk }}" hint-size="28px,28px"></dc-import><span style="font-family:'Barlow Semi Condensed',sans-serif;font-size:19px;font-weight:600;letter-spacing:-0.005em">koppler</span></span>
+<span style="flex:1"></span>
+<span style="font-family:'Barlow',sans-serif;font-size:12px;color:var(--mute)">Docs</span>
+<span style="font-family:'Barlow',sans-serif;font-size:12px;color:var(--mute)">Commands</span>
+<span style="font-family:'Barlow',sans-serif;font-size:12px;color:var(--mute)">Agent add-on</span>
+<span style="font-family:'Barlow',sans-serif;font-size:12px;padding:9px 12px;border:1px solid var(--line2)">Github</span>
+</nav>
+<div style="flex:1;display:grid;grid-template-columns:minmax(0,1fr) 620px;min-height:0">
+<div style="padding:72px 56px;display:flex;flex-direction:column;gap:28px;justify-content:center">
+<span style="font-family:'Barlow',sans-serif;font-size:12px;color:var(--mute)">Local development · macos and linux</span>
+<h1 style="margin:0;font-family:'Barlow Semi Condensed',sans-serif;font-size:54px;font-weight:600;letter-spacing:-0.005em;line-height:1.08;text-wrap:balance">Plug your local code into the real stack.</h1>
+<p style="margin:0;font-size:18px;line-height:1.55;color:var(--mute);max-width:600px;text-wrap:pretty">Pick apps on a canvas and plug cables between them, then press Run. Everything you leave unplugged keeps calling the deployed environment you chose.</p>
+<div style="display:flex;flex-direction:column;border:1px solid var(--line2);max-width:460px;font-family:'Sometype Mono',monospace;font-size:14px">
+<span style="padding:12px 16px;border-bottom:1px solid var(--line)"><span style="color:var(--mute)">$ </span>npm install -g koppler</span>
+<span style="padding:12px 16px;border-bottom:1px solid var(--line)"><span style="color:var(--mute)">$ </span>koppler init</span>
+<span style="padding:12px 16px"><span style="color:var(--mute)">$ </span>koppler canvas</span>
+</div>
+<div style="display:flex;gap:12px;align-items:center">
+<span style="padding:12px 20px;background:var(--local);color:var(--desk);font-family:'Sometype Mono',monospace;font-size:14px;font-weight:600">Get started</span>
+<span style="padding:11px 20px;border:1px solid var(--line2);font-family:'Sometype Mono',monospace;font-size:14px;font-weight:600">Read the canvas guide</span>
+</div>
+</div>
+<div style="position:relative;border-left:1px solid var(--line);background-image:radial-gradient(var(--line) 1px,transparent 1px);background-size:20px 20px">
+<svg width="620" height="768" style="position:absolute;inset:0">
+<path d="M260 230 C 330 230, 300 380, 360 380" fill="none" stroke="{{ t.local }}" stroke-width="2"></path>
+<path d="M260 520 C 330 520, 300 410, 360 410" fill="none" stroke="{{ t.local }}" stroke-width="2"></path>
+
+</svg>
+<div style="position:absolute;left:40px;top:180px;width:220px;background:var(--panel);border:1px solid var(--line2)">
+<div style="display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--line)"><span style="width:7px;height:7px;background:var(--live)"></span><span style="font-size:15px;font-weight:600;flex:1">Mobile App</span></div>
+<div style="padding:10px 12px;font-family:'Sometype Mono',monospace;font-size:11px;color:var(--mute)">feature/checkout</div>
+<span style="position:absolute;right:-7px;top:44px;width:12px;height:12px;border-radius:50%;background:var(--desk);border:2px solid var(--local)"></span>
+</div>
+<div style="position:absolute;left:40px;top:470px;width:220px;background:var(--panel);border:1px solid var(--line2)">
+<div style="display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--line)"><span style="width:7px;height:7px;background:var(--live)"></span><span style="font-size:15px;font-weight:600;flex:1">Web Shop</span></div>
+<div style="padding:10px 12px;font-family:'Sometype Mono',monospace;font-size:11px;color:var(--mute)">feature/checkout</div>
+<span style="position:absolute;right:-7px;top:44px;width:12px;height:12px;border-radius:50%;background:var(--desk);border:2px solid var(--local)"></span>
+</div>
+<div style="position:absolute;left:360px;top:340px;width:240px;background:var(--panel);border:1px solid var(--ink)">
+<div style="display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--line)"><span style="width:7px;height:7px;background:var(--live)"></span><span style="font-size:15px;font-weight:600;flex:1">Orders API</span><span style="font-family:'Sometype Mono',monospace;font-size:10px;color:var(--mute)">.NET</span></div>
+<div style="padding:10px 12px;display:flex;justify-content:space-between;font-family:'Barlow',sans-serif;font-size:12px"><span>Running</span><span style="color:var(--deployed)">Calls QA</span></div>
+<span style="position:absolute;left:-7px;top:34px;width:12px;height:12px;border-radius:50%;box-sizing:border-box;border:2px solid var(--local);background:var(--live);box-shadow:inset 0 0 0 2px var(--desk)"></span>
+<span style="position:absolute;left:-7px;top:64px;width:12px;height:12px;border-radius:50%;box-sizing:border-box;border:2px solid var(--local);background:var(--live);box-shadow:inset 0 0 0 2px var(--desk)"></span>
+</div>
+</div>
+</div>
+</section>
+
+<section data-screen-label="07 Social card" style="width:1280px;height:640px;flex:none;position:relative;overflow:hidden;background-color:var(--desk);background-image:radial-gradient(var(--line) 1px,transparent 1px);background-size:24px 24px;border:1px solid var(--line)">
+<svg width="1280" height="640" style="position:absolute;inset:0">
+<path d="M1030 184 C 1060 184, 1050 284, 1080 284" fill="none" stroke="{{ t.local }}" stroke-width="2.5"></path>
+<path d="M1030 444 C 1060 444, 1050 314, 1080 314" fill="none" stroke="{{ t.local }}" stroke-width="2.5"></path>
+<circle cx="1170" cy="325" r="6" fill="{{ t.desk }}" stroke="{{ t.deployed }}" stroke-width="2"></circle>
+<path d="M1170 331 L 1170 470" fill="none" stroke="{{ t.deployed }}" stroke-width="2.5" stroke-dasharray="2 7" stroke-linecap="round"></path>
+</svg>
+<div style="position:absolute;left:850px;top:140px;width:180px;background:var(--panel);border:1px solid var(--line2)">
+<div style="display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--line)"><span style="width:7px;height:7px;background:var(--live)"></span><span style="font-size:15px;font-weight:600">Mobile App</span></div>
+<div style="padding:10px 12px;font-family:'Sometype Mono',monospace;font-size:11px;color:var(--mute)">feature/checkout</div>
+<span style="position:absolute;right:-7px;top:38px;width:12px;height:12px;border-radius:50%;background:var(--desk);border:2px solid var(--local)"></span>
+</div>
+<div style="position:absolute;left:850px;top:400px;width:180px;background:var(--panel);border:1px solid var(--line2)">
+<div style="display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--line)"><span style="width:7px;height:7px;background:var(--live)"></span><span style="font-size:15px;font-weight:600">Web Shop</span></div>
+<div style="padding:10px 12px;font-family:'Sometype Mono',monospace;font-size:11px;color:var(--mute)">feature/checkout</div>
+<span style="position:absolute;right:-7px;top:38px;width:12px;height:12px;border-radius:50%;background:var(--desk);border:2px solid var(--local)"></span>
+</div>
+<div style="position:absolute;left:1080px;top:250px;width:180px;background:var(--panel);border:1px solid var(--ink)">
+<div style="display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--line)"><span style="width:7px;height:7px;background:var(--live)"></span><span style="font-size:15px;font-weight:600;flex:1">Orders API</span><span style="font-family:'Sometype Mono',monospace;font-size:10px;color:var(--mute)">.NET</span></div>
+<div style="padding:10px 12px;font-family:'Barlow',sans-serif;font-size:12px">Running</div>
+<span style="position:absolute;left:-7px;top:28px;width:12px;height:12px;border-radius:50%;box-sizing:border-box;border:2px solid var(--local);background:var(--live);box-shadow:inset 0 0 0 2px var(--desk)"></span>
+<span style="position:absolute;left:-7px;top:58px;width:12px;height:12px;border-radius:50%;box-sizing:border-box;border:2px solid var(--local);background:var(--live);box-shadow:inset 0 0 0 2px var(--desk)"></span>
+<span style="position:absolute;left:83px;bottom:-7px;width:12px;height:12px;border-radius:50%;background:var(--desk);border:2px solid var(--deployed);box-sizing:border-box"></span>
+</div>
+<div style="position:absolute;left:1080px;top:470px;width:180px;border:1px dashed var(--deployed);background:var(--panel)">
+<div style="display:flex;align-items:center;gap:8px;padding:10px 12px 6px"><span style="width:7px;height:7px;background:var(--live)"></span><span style="font-size:15px;font-weight:600;flex:1">Orders</span><span style="font-family:'Sometype Mono',monospace;font-size:10px;letter-spacing:0.06em;padding:2px 5px;border:1px solid var(--line2);color:var(--mute)">POSTGRES</span></div>
+<div style="padding:0 12px 10px;font-size:12px;color:var(--deployed)">Deployed QA, through the tunnel</div>
+</div>
+<div style="position:absolute;left:80px;top:80px;bottom:80px;width:720px;display:flex;flex-direction:column;justify-content:space-between">
+<div style="display:flex;align-items:center;gap:20px">
+<dc-import name="KopplerMark" variant="k" size="{{ 88 }}" dark="{{ true }}" cable="{{ t.local }}" ink="{{ t.ink }}" hole="{{ t.desk }}" bg="{{ t.desk }}" hint-size="88px,88px"></dc-import>
+<span style="font-family:'Barlow Semi Condensed',sans-serif;font-size:76px;font-weight:600;letter-spacing:-0.005em">koppler</span>
+</div>
+<div style="display:flex;flex-direction:column;gap:20px">
+<span style="font-size:38px;font-weight:600;line-height:1.2;letter-spacing:-0.01em;text-wrap:balance">Plug your local code into the real stack.</span>
+<span style="font-family:'Sometype Mono',monospace;font-size:18px;color:var(--mute)">github.com/evan-mcgeek/koppler</span>
+</div>
+</div>
+</section>
+<section data-screen-label="08 README banner" style="width:1280px;height:400px;flex:none;position:relative;overflow:hidden;background-color:var(--desk);background-image:radial-gradient(var(--line) 1px,transparent 1px);background-size:20px 20px;border:1px solid var(--line)">
+<div style="position:absolute;left:0;top:0;bottom:0;width:640px;background:var(--desk);border-right:1px solid var(--line)"></div>
+<div style="position:absolute;left:64px;top:64px;bottom:64px;width:540px;display:flex;flex-direction:column;justify-content:space-between">
+<div style="display:flex;align-items:center;gap:16px">
+<dc-import name="KopplerMark" size="{{ 64 }}" dark="{{ true }}" cable="{{ t.local }}" ink="{{ t.ink }}" hole="{{ t.desk }}" hint-size="64px,64px"></dc-import>
+<span style="font-family:'Barlow Semi Condensed',sans-serif;font-size:60px;font-weight:600;letter-spacing:-0.005em;line-height:1">koppler</span>
+</div>
+<span style="font-size:26px;font-weight:600;line-height:1.25;text-wrap:balance">Plug your local code into the real stack.</span>
+<div style="display:flex;align-items:center;gap:16px">
+<span style="font-family:'Sometype Mono',monospace;font-size:15px;padding:9px 14px;border:1px solid var(--line2)"><span style="color:var(--mute)">$ </span>npm install -g koppler</span>
+<span style="font-size:14px;color:var(--mute)">macOS and Linux</span>
+</div>
+</div>
+<svg width="1280" height="400" style="position:absolute;inset:0">
+<path d="M880 108 C 920 108, 910 182, 950 182" fill="none" stroke="{{ t.local }}" stroke-width="2"></path>
+<path d="M880 288 C 920 288, 910 208, 950 208" fill="none" stroke="{{ t.local }}" stroke-width="2"></path>
+<path d="M1040 229 L 1040 304" fill="none" stroke="{{ t.deployed }}" stroke-width="2" stroke-dasharray="2 6" stroke-linecap="round"></path>
+</svg>
+<div style="position:absolute;left:700px;top:70px;width:180px;background:var(--panel);border:1px solid var(--line2)"><div style="display:flex;align-items:center;gap:8px;padding:9px 11px;border-bottom:1px solid var(--line)"><span style="width:7px;height:7px;background:var(--live)"></span><span style="font-size:14px;font-weight:600;flex:1">Mobile App</span></div><div style="padding:8px 11px;font-family:'Sometype Mono',monospace;font-size:11px;color:var(--mute)">feature/checkout</div></div>
+<div style="position:absolute;left:700px;top:250px;width:180px;background:var(--panel);border:1px solid var(--line2)"><div style="display:flex;align-items:center;gap:8px;padding:9px 11px;border-bottom:1px solid var(--line)"><span style="width:7px;height:7px;background:var(--live)"></span><span style="font-size:14px;font-weight:600;flex:1">Web Shop</span></div><div style="padding:8px 11px;font-family:'Sometype Mono',monospace;font-size:11px;color:var(--mute)">feature/checkout</div></div>
+<div style="position:absolute;left:950px;top:160px;width:180px;background:var(--panel);border:1px solid var(--ink)"><div style="display:flex;align-items:center;gap:8px;padding:9px 11px;border-bottom:1px solid var(--line)"><span style="width:7px;height:7px;background:var(--live)"></span><span style="font-size:14px;font-weight:600;flex:1">Orders API</span></div><div style="padding:8px 11px;font-family:'Sometype Mono',monospace;font-size:11px;color:var(--mute)">.NET · running</div></div>
+<div style="position:absolute;left:950px;top:304px;width:180px;background:var(--panel);border:1px dashed var(--deployed)"><div style="display:flex;align-items:center;gap:8px;padding:9px 11px"><span style="font-size:14px;font-weight:600;flex:1">Orders</span><span style="font-family:'Sometype Mono',monospace;font-size:10px;letter-spacing:0.06em;padding:2px 5px;border:1px solid var(--line2);color:var(--mute)">POSTGRES</span></div><div style="padding:0 11px 9px;font-size:12px;color:var(--deployed)">Deployed QA</div></div>
+<span style="position:absolute;left:874px;top:102px;width:12px;height:12px;border-radius:50%;box-sizing:border-box;border:2px solid var(--local);background:var(--desk);box-shadow:inset 0 0 0 2px var(--desk)"></span><span style="position:absolute;left:874px;top:282px;width:12px;height:12px;border-radius:50%;box-sizing:border-box;border:2px solid var(--local);background:var(--desk);box-shadow:inset 0 0 0 2px var(--desk)"></span><span style="position:absolute;left:944px;top:176px;width:12px;height:12px;border-radius:50%;box-sizing:border-box;border:2px solid var(--local);background:var(--live);box-shadow:inset 0 0 0 2px var(--desk)"></span><span style="position:absolute;left:944px;top:202px;width:12px;height:12px;border-radius:50%;box-sizing:border-box;border:2px solid var(--local);background:var(--live);box-shadow:inset 0 0 0 2px var(--desk)"></span>
+</section>
+
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;scheme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;mono&quot;,&quot;lime&quot;,&quot;signal&quot;,&quot;scope&quot;,&quot;sodium&quot;,&quot;paper&quot;,&quot;blueprint&quot;,&quot;workshop&quot;],&quot;default&quot;:&quot;mono&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Theme&quot;},&quot;prod&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Preview&quot;}}">
+const SCHEMES = {
+  mono:   { name: 'Mono', note: 'No hue until something needs you', desk:'#0D0D0D', panel:'#161616', line:'#2B2B2B', line2:'#404040', ink:'#E8E8E8', mute:'#A3A3A3', local:'#FFFFFF', live:'#4ADE80', deployed:'#9A9A9A', warn:'#FFC940', prod:'#FF3B30', prod2:'#DB2A20' },
+  lime:   { name: 'Patch bay', note: 'Lime local, periwinkle deployed', desk:'#0E0F10', panel:'#16181A', line:'#2C2F33', line2:'#3D4146', ink:'#ECEAE4', mute:'#A9A8A1', local:'#C8F03C', live:'#4FD6C4', deployed:'#8EA2FF', warn:'#F5B841', prod:'#FF4A3D', prod2:'#E0362A' },
+  signal: { name: 'Signal', note: 'Orange local, steel deployed, warm black', desk:'#100E0C', panel:'#1A1714', line:'#2E2A25', line2:'#433C35', ink:'#F0E9DF', mute:'#ADA497', local:'#FF8A1F', live:'#5BD97A', deployed:'#7FC4D8', warn:'#F2D14B', prod:'#FF3B6B', prod2:'#E02656' },
+  scope:  { name: 'Scope', note: 'Phosphor green local, cyan deployed', desk:'#0A0D0B', panel:'#121713', line:'#243028', line2:'#35443A', ink:'#E2EDE4', mute:'#98A89C', local:'#52F29A', live:'#FFFFFF', deployed:'#5CC8FF', warn:'#FFB547', prod:'#FF4A4A', prod2:'#E03636' },
+  paper:  { light: true, name: 'Paper', note: 'Mono on off-white, ink local', desk:'#F4F4F2', panel:'#FFFFFF', line:'#E2E2DE', line2:'#C4C4BE', ink:'#141414', mute:'#5E5E5A', local:'#141414', live:'#1A8F4C', deployed:'#6B6B6B', warn:'#A15C07', prod:'#D92D20', prod2:'#B42318' },
+  blueprint: { light: true, name: 'Blueprint', note: 'Blue local, violet deployed, cool grey', desk:'#EDF1F5', panel:'#FFFFFF', line:'#DAE1E8', line2:'#B6C2CE', ink:'#0F1A26', mute:'#4E5D6C', local:'#1F4FD8', live:'#15803D', deployed:'#7652C2', warn:'#A65306', prod:'#DC2626', prod2:'#B91C1C' },
+  workshop: { light: true, name: 'Workshop', note: 'Burnt orange local, teal deployed, warm paper', desk:'#F5F1EA', panel:'#FFFDF9', line:'#E6DED2', line2:'#CBBFAE', ink:'#1C1712', mute:'#665C50', local:'#B4490A', live:'#2B8048', deployed:'#22738A', warn:'#946000', prod:'#D21F55', prod2:'#AE1145' },
+  sodium: { name: 'Sodium', note: 'Yellow local, violet deployed, cool slate', desk:'#0C0E12', panel:'#151820', line:'#272C38', line2:'#3A4150', ink:'#E8EAF0', mute:'#A0A5B3', local:'#FFD43B', live:'#4ADE80', deployed:'#A98BFF', warn:'#FF9F43', prod:'#FF3B5C', prod2:'#E0254A' },
+};
+const LOCALS = ['#FFFFFF', '#C8F03C', '#52F29A', '#5CE1E6', '#FFD43B', '#FF8A1F'];
+const DEPLOYEDS = ['#9A9A9A', '#8EA2FF', '#A98BFF', '#7FC4D8', '#5CC8FF', '#E6A3D8'];
+const LOCALS_L = ['#141414', '#1F4FD8', '#B4490A', '#0F766E', '#7A3FC8', '#1A6E2E'];
+const DEPLOYEDS_L = ['#6B6B6B', '#7652C2', '#22738A', '#4A5FB5', '#8A5A2B', '#A3407A'];
+
+class Component extends DCLogic {
+  state = { scheme: null, local: null, deployed: null };
+  rootRef = React.createRef();
+  key() { return this.state.scheme ?? this.props.scheme ?? 'mono'; }
+  tokens() {
+    const s = SCHEMES[this.key()] ?? SCHEMES.mono;
+    const local = this.state.local ?? s.local;
+    const greenLocals = ['#C8F03C', '#52F29A', '#1A6E2E'];
+    const greenLives = ['#4ADE80', '#5BD97A', '#1A8F4C', '#15803D', '#2B8048'];
+    const live = greenLocals.includes(local) && greenLives.includes(s.live) ? (s.light ? '#141414' : '#FFFFFF') : s.live;
+    return { ...s, local, live, onProd: s.light ? '#FFFFFF' : '#0D0D0D', deployed: this.state.deployed ?? s.deployed };
+  }
+  apply() {
+    const el = this.rootRef.current; if (!el) return;
+    const t = this.tokens();
+    ['desk','panel','line','line2','ink','mute','local','live','deployed','warn','prod','prod2','onProd'].forEach(k => el.style.setProperty('--' + k, t[k]));
+  }
+  componentDidMount() { this.apply(); }
+  componentDidUpdate() { this.apply(); }
+  renderVals() {
+    const t = this.tokens();
+    const k = this.key();
+    const prod = !!this.props.prod;
+    return {
+      rootRef: this.rootRef, t, prod, notProd: !prod,
+      envUpper: prod ? 'PROD' : 'QA', envLower: prod ? 'prod' : 'qa',
+      cableDeployed: prod ? t.prod : t.deployed,
+      ...(() => { const all = Object.entries(SCHEMES).map(([id, s]) => ({ ...s, on: id === k, off: id !== k, pick: () => this.setState({ scheme: id, local: null, deployed: null }) })); return { darkSchemes: all.filter(s => !s.light), lightSchemes: all.filter(s => s.light) }; })(),
+      localOpts: (t.light ? LOCALS_L : LOCALS).map(hex => ({ hex, ring: hex === t.local ? t.ink : 'transparent', pick: () => this.setState({ local: hex }) })),
+      deployedOpts: (t.light ? DEPLOYEDS_L : DEPLOYEDS).map(hex => ({ hex, ring: hex === t.deployed ? t.ink : 'transparent', pick: () => this.setState({ deployed: hex }) })),
+      resetCustom: () => this.setState({ local: null, deployed: null }),
+    };
+  }
+}
+</script>
+</body>
+</html>
+

@@ -10,7 +10,8 @@ const kept = async (page: Page, url: string) =>
   (await (await page.request.get(`${url}data/state.json`)).json()) as {
     preset?: string | null;
     presets?: { name: string; nodes: Record<string, { branch?: string }>; layout?: { nodes?: object } }[];
-  };
+    // Nothing kept yet, as just after the board on screen was deleted.
+  } | null;
 
 test('a team board opens arranged, and changing it makes a copy of your own', async ({ page, canvas }) => {
   await expect(picker(page)).toHaveText('New board');
@@ -36,16 +37,16 @@ test('a team board opens arranged, and changing it makes a copy of your own', as
   await page.screenshot({ path: 'test-results/next-board-opened.png' });
   await saveSettles(page);
   // Opened and untouched, it stays the team's: nothing of the user's own is kept.
-  expect((await kept(page, canvas.url)).presets ?? []).toEqual([]);
+  expect((await kept(page, canvas.url))?.presets ?? []).toEqual([]);
 
   await card(page, 'orders').getByLabel('Branch').click();
   await card(page, 'orders').getByLabel('Branch').fill('feature/checkout');
   await card(page, 'orders').getByLabel('Branch').blur();
   await expect(picker(page)).toHaveText('Checkout (local)');
   await expect
-    .poll(async () => (await kept(page, canvas.url)).presets?.map(one => one.name))
+    .poll(async () => (await kept(page, canvas.url))?.presets?.map(one => one.name))
     .toEqual(['Checkout (local)']);
-  const mine = (await kept(page, canvas.url)).presets?.[0];
+  const mine = (await kept(page, canvas.url))?.presets?.[0];
   expect(mine?.nodes['orders']?.branch).toBe('feature/checkout');
   expect(Object.keys(mine?.layout?.nodes ?? {}).sort()).toEqual(['orders', 'payments', 'web']);
 });
@@ -67,7 +68,7 @@ test('your own board comes back as you left it, and a new board starts empty', a
   await expect(picker(page)).toHaveText('New board');
   await saveSettles(page);
   // The copy is untouched by the empty board that followed it.
-  expect(Object.keys((await kept(page, canvas.url)).presets?.[0]?.nodes ?? {})).toHaveLength(3);
+  expect(Object.keys((await kept(page, canvas.url))?.presets?.[0]?.nodes ?? {})).toHaveLength(3);
 
   await picker(page).click();
   await expect(opens(page)).toHaveText([/Checkout/, /Browse\s*2 apps/, /Browse \(local\)\s*3 apps/]);
@@ -137,10 +138,11 @@ test('a board of your own is renamed, copied, shared, deleted and restored', asy
   await boards(page).getByText('Recently deleted (1)').click();
   await boards(page).getByRole('button', { name: 'Restore Orders work copy' }).click();
   await expect(page.locator('.svelte-flow__node-app')).toHaveCount(2);
-  await saveSettles(page);
-  const now = await kept(page, canvas.url);
-  expect(now.presets?.map(one => one.name)).toEqual(['Orders work', 'Orders work copy']);
-  expect(now.preset).toBe('Orders work copy');
+  // Restored, the board is kept again once the view has settled.
+  await expect
+    .poll(async () => (await kept(page, canvas.url))?.presets?.map(one => one.name))
+    .toEqual(['Orders work', 'Orders work copy']);
+  expect((await kept(page, canvas.url))?.preset).toBe('Orders work copy');
 });
 
 test('a board opens from a file dropped on the page, and from a link the server fetches', async ({ page }) => {

@@ -274,7 +274,7 @@ test('the review lists remembered changes, and a card is changed or a call run l
 
   // A deployed app that is cloned here can run locally too: it joins the board, cabled from its caller.
   const calls = review(page)
-    .locator('li', { has: page.locator('[data-verb="calls"]') })
+    .locator('li', { has: page.locator('[data-verb="deployed"]') })
     .first();
   await calls.getByRole('button', { name: 'Run locally' }).first().click();
   await expect(page.locator('.svelte-flow__node-app')).toHaveCount(3);

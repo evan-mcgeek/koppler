@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { arrange, layerDepths, layoutBox, sidesFor, type Point, squeeze } from './arrange.ts';
+import { arrange, layerDepths, layoutBox, sidesFor, type Point } from './arrange.ts';
 
 const card = () => ({ w: 200, h: 100 });
 const calls = (...pairs: string[]) =>
@@ -73,26 +73,6 @@ test('a cable leaves and enters on the sides that face each other, unless a side
     fromSide: 'right',
     toSide: 'left',
   });
-});
-
-test('the room only full cards need is closed up, what anything else covers stays, and back finds every place again', () => {
-  // Two cards in a row, 100 and 60 tall drawn short, 400 and 300 in full; a card under them; one beside them reaching lower.
-  const taken: [number, number][] = [
-    [0, 100],
-    [0, 60],
-    [500, 600],
-    [0, 250],
-  ];
-  const needed: [number, number][] = [
-    [100, 400],
-    [60, 300],
-  ];
-  const { show, back } = squeeze(taken, needed);
-  expect([0, 100, 250, 400, 500, 600].map(show)).toEqual([0, 100, 250, 250, 350, 450]);
-  for (const y of [-50, 0, 100, 200, 450, 500, 700]) expect(back(show(y))).toBe(y);
-  // A place drawn where a band was cut out is kept after it.
-  expect(back(250)).toBe(400);
-  expect(squeeze([], []).show(40)).toBe(40);
 });
 
 test('cards in a chain line up, so their cables run straight, whatever their sizes', () => {

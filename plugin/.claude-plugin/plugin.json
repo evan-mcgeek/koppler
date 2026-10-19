@@ -1,6 +1,6 @@
 {
   "name": "koppler",
-  "description": "The agent add-on for Koppler. Your agent builds and runs a local run of your stack from the canvas or chat: config changes, sign-ins, tunnels, apps, and the revert. Needs the koppler app on the PATH. Secrets never pass through the agent.",
+  "description": "Plug your local code into the real stack. The agent add-on for Koppler: your agent builds and runs a local run of your stack from the canvas or chat: config changes, sign-ins, tunnels, apps, and the revert. Needs the koppler app on the PATH. Secrets never pass through the agent.",
   "author": {
     "name": "Ivan Yanowsky",
     "url": "https://github.com/evan-mcgeek"

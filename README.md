@@ -1,6 +1,9 @@
 # Koppler
 
-Run the part of your stack you need on your own machine, without learning how each backend is run.
+<img alt="koppler: plug your local code into the real stack. npm install -g koppler, on macOS and Linux" src="docs/images/banner.png">
+
+Plug your local code into the real stack.
+The apps you change run on your own machine, the rest keeps calling the deployed environment, and you never learn how each backend is run.
 
 Pick apps on a canvas and plug cables between them, then press **Run**.
 Koppler does the wiring, the tunnels, the local queues and the start order, and reverts all of it when you press Stop.
@@ -9,10 +12,7 @@ Everything you leave unplugged keeps calling the deployed environment you chose.
 Koppler is for local development.
 It helps most when you work on one app (a mobile app, a front end, one API) and need a few of its neighbours running next to it.
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/images/board-dark.png">
-  <img alt="One feature, Checkout, worked on across four apps: the mobile app and web shop cabled to a local Orders API, which calls a local Payments API; each runs its feature/checkout branch, Orders API has a database tunnel and a local SQS queue, two apps carry a note for the agent, and everything runs" src="docs/images/board-light.png">
-</picture>
+<img alt="One feature, Checkout, worked on across four apps: the mobile app and web shop cabled to a local Orders API, which calls a local Payments API; each runs its feature/checkout branch, Orders API has a database tunnel and a local SQS queue, two apps carry a note for the agent, and everything runs" src="docs/images/board.png">
 
 ## How it works
 
@@ -24,10 +24,7 @@ It helps most when you work on one app (a mobile app, a front end, one API) and 
 - **Stop and revert.** One click stops what Koppler started and undoes every temporary change. Apps you started yourself are left alone.
 - **Secrets stay yours.** You store them in the macOS Keychain (on Linux, in files only you can read); Koppler starts an app with them and never shows them.
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/images/review-dark.png">
-  <img alt="The review before a Run on QA: the four apps that start on feature/checkout with their notes for the agent, what keeps calling deployed QA, and the tunnel that opens" src="docs/images/review-light.png" width="520">
-</picture>
+<img alt="The review before a Run on QA: the four apps that start on feature/checkout with their notes for the agent, what keeps calling deployed QA, and the tunnel that opens" src="docs/images/review.png" width="520">
 
 ## Install
 
@@ -85,7 +82,7 @@ Everything else depends on your stack (the .NET SDK, Flutter, Docker, the AWS CL
 Koppler runs from `app/dist/`, which `npm run build` makes from `app/src/` (`npm install` first).
 While working on Koppler itself, link `app/scripts/koppler-dev.mjs` as `koppler`: it rebuilds when the source is newer, then runs the build.
 Run the tests with `npm test` in `app/`; unit tests sit next to their module as `<name>.test.ts`.
-The documentation's screenshots come from `npm run screenshots` in `app/`: it drives the canvas on a demo stack and writes `docs/images/`, each in a light and a dark copy.
+The documentation's screenshots come from `npm run screenshots` in `app/`: it drives the canvas on a demo stack and writes `docs/images/`, with the hero and the social card drawn from `app/screenshots/brand.html`.
 The canvas has tests of its own that drive it in a browser: `npm install`, `npx playwright install chromium` once, then `npm run test:canvas`.
 `npm run lint`, `npm run types` and `npm run format:check` are what CI checks besides the tests; `npm run format` formats.
 

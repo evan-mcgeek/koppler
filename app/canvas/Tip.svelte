@@ -23,7 +23,9 @@
     tip.style.left = `${String(left)}px`;
     tip.style.top = `${String(below ? at.bottom + 6 : at.top - 6 - own.height)}px`;
   };
-  const over = (ev: PointerEvent) => {
+  const over = (ev: Event) => {
+    // Shown for keyboard focus too, never for a click's.
+    if (ev.type === 'focusin' && !(ev.target instanceof Element && ev.target.matches(':focus-visible'))) return;
     const el = ev.target instanceof Element ? ev.target.closest('[title]') : null;
     if (!el || el === held?.el) return;
     const title = el.getAttribute('title') ?? '';
@@ -41,7 +43,14 @@
   };
 </script>
 
-<svelte:document onpointerover={over} onpointerout={out} onpointerdown={hide} onkeydown={hide} />
+<svelte:document
+  onpointerover={over}
+  onpointerout={out}
+  onfocusin={over}
+  onfocusout={hide}
+  onpointerdown={hide}
+  onkeydown={hide}
+/>
 <svelte:window onscroll={hide} onblur={hide} />
 
 <div bind:this={tip} class="tip" popover="manual" role="tooltip">{text}</div>
@@ -53,10 +62,8 @@
     max-width: 320px;
     margin: 0;
     padding: 6px 9px;
-    border: 1px solid var(--line);
-    border-radius: 6px;
-    background: var(--surface);
-    box-shadow: 0 4px 14px color-mix(in oklab, var(--ink) 18%, transparent);
+    border: 1px solid var(--line-strong);
+    background: var(--panel);
     color: var(--ink);
     font: 500 12px/1.4 var(--sans);
     white-space: pre-line;

@@ -1,6 +1,4 @@
 <script lang="ts">
-  import Icon from './Icon.svelte';
-  import Waypoints from '@lucide/svelte/icons/waypoints';
   // Traces across the local apps: started here, then opened, where one request is followed across the board.
   import { post } from './data.ts';
   import { live } from './live.svelte.ts';
@@ -32,7 +30,7 @@
       : 'Collect traces from the apps Koppler starts (Jaeger in Docker)'}
   onclick={() => void go()}
 >
-  <Icon of={Waypoints} size={16} />
+  Traces
 </button>
 
 <style>

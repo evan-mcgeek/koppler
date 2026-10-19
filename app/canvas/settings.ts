@@ -35,6 +35,8 @@ export interface Ctx {
   options: (path: string) => Choice | null;
   /** The stack as the panel has it now. */
   stack: () => unknown;
+  /** Whether the value at the path differs from the one kept. */
+  changed?: (path: string) => boolean;
   /** Set where a new item is being filled in: nothing of it can be locked or taken out yet. */
   fresh?: true;
 }
@@ -168,11 +170,15 @@ export const lockedBy = (locks: string[], path: string) =>
 export interface Tab {
   name: string;
   keys: string[];
+  /** What the tab holds, in a few words. */
+  about?: string;
   /** A view of its own: what each environment uses, or the stack's apps. */
   view?: 'envs' | 'apps';
 }
-/** An app's settings: what it is, above the tabs; then how it runs here, where it is deployed, and the rest. */
+/** An app's settings: what it is first; then how it runs here, where it is deployed, and the rest. */
 export const APP_HEAD = ['name', 'kind', 'slug'];
+const ENVS_ABOUT = 'What it uses differently per environment';
+export const OTHER_ABOUT = 'Fields with no tab of their own';
 /** The fields for how one kind of app starts; an app is shown its own kind's, the others are a click away. */
 export const BY_KIND: Record<string, string[]> = {
   dotnet: ['project', 'launchSettings', 'baseProfile'],
@@ -185,6 +191,7 @@ export const KIND_FIELDS = [...new Set(Object.values(BY_KIND).flat())];
 export const APP_TABS: Tab[] = [
   {
     name: 'Runs here',
+    about: 'How Koppler starts it on this Mac',
     keys: [
       'start',
       'url',
@@ -204,27 +211,35 @@ export const APP_TABS: Tab[] = [
       'localChanges',
     ],
   },
-  { name: 'Deployed', keys: ['deployedUrl', 'cors', 'outside'] },
-  { name: 'Calls', keys: ['consumes', 'publishes', 'reads'] },
-  { name: 'Needs first', keys: ['prereqs'] },
-  { name: 'Secrets', keys: ['secrets'] },
-  { name: 'Environments', keys: ['envs'], view: 'envs' },
+  { name: 'Deployed', about: 'Where it runs in the deployed environments', keys: ['deployedUrl', 'cors', 'outside'] },
+  {
+    name: 'Calls',
+    about: 'What it calls, and the queues it sends to and reads',
+    keys: ['consumes', 'publishes', 'reads'],
+  },
+  { name: 'Needs first', about: 'What has to be ready before it starts', keys: ['prereqs'] },
+  { name: 'Secrets', about: 'The secrets it needs, and how to get each', keys: ['secrets'] },
+  { name: 'Environments', about: ENVS_ABOUT, keys: ['envs'], view: 'envs' },
 ];
 /** An outside system never runs here: only where it is, what it calls, and per environment. */
 export const OUTSIDE_TABS: Tab[] = [
-  { name: 'Deployed', keys: ['outside', 'deployedUrl'] },
-  { name: 'Calls', keys: ['consumes'] },
-  { name: 'Environments', keys: ['envs'], view: 'envs' },
+  { name: 'Deployed', about: 'Where it is and what it is', keys: ['outside', 'deployedUrl'] },
+  { name: 'Calls', about: 'What it calls', keys: ['consumes'] },
+  { name: 'Environments', about: ENVS_ABOUT, keys: ['envs'], view: 'envs' },
 ];
 export const STACK_HEAD = ['name'];
 export const STACK_TABS: Tab[] = [
-  { name: 'Environments', keys: ['envs', 'protected', 'envAliases'] },
-  { name: 'Apps', keys: ['apps'], view: 'apps' },
-  { name: 'Queues', keys: ['queues'] },
-  { name: 'Sign-ins', keys: ['signIns'] },
-  { name: 'Checks', keys: ['checks'] },
-  { name: 'Kinds', keys: ['kinds'] },
-  { name: 'Team boards', keys: ['presets'] },
+  {
+    name: 'Environments',
+    about: 'Where the stack is deployed, and which need a second look',
+    keys: ['envs', 'protected', 'envAliases'],
+  },
+  { name: 'Apps', about: 'Every app in the stack', keys: ['apps'], view: 'apps' },
+  { name: 'Queues', about: 'The queues and topics between apps', keys: ['queues'] },
+  { name: 'Sign-ins', about: 'Sign-ins the needs of its apps can use', keys: ['signIns'] },
+  { name: 'Checks', about: 'What is checked on this Mac', keys: ['checks'] },
+  { name: 'Kinds', about: 'Kinds of app beyond the ones Koppler knows', keys: ['kinds'] },
+  { name: 'Team boards', about: 'Boards shared with the team', keys: ['presets'] },
 ];
 /** The fields an environment of an app most often uses its own value for; any other can be added. */
 export const ENV_FIELDS = ['deployedUrl', 'start', 'prereqs', 'secrets'];

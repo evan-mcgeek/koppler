@@ -18,13 +18,15 @@ export const JSON_HEADERS = { 'content-type': 'application/json; charset=utf-8',
 /** The files the page may load, by the path it asks for; `temp/` ones come from the run folder. */
 const PAGE_FILES: Record<string, string> = {
   '': 'page/index.html',
-  'theme.js': 'page/theme.js',
+  'appearance.js': 'page/appearance.js',
+  'favicon.svg': 'page/favicon.svg',
   'temp/debug.jsonl': 'temp/debug.jsonl',
 };
 const CONTENT_TYPES: Record<string, string> = {
   html: 'text/html; charset=utf-8',
   css: 'text/css; charset=utf-8',
   woff2: 'font/woff2',
+  svg: 'image/svg+xml',
   jsonl: 'text/plain; charset=utf-8',
 };
 const DATA_FILE = /^data\/(registry|local|repos|state)\.json$/;

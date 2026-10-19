@@ -19,10 +19,10 @@
   {id}
   kind="queue"
   name={data.name}
-  detail={data.kind}
+  tag={data.kind}
+  status={data.upstream ? 'Stays deployed' : data.local ? 'Runs on your Mac' : 'Uses the deployed queue'}
   title={data.about.join('\n')}
   {selected}
-  active={data.local}
   actions={[
     {
       label: `Settings for ${data.name}`,
@@ -48,9 +48,8 @@
         title={data.about.slice(1).join('\n')}><Icon of={TriangleAlert} size={13} /></span
       >{/if}
   {/snippet}
-  {#if data.upstream}
-    <span class="stays">Stays deployed</span>
-  {:else}
+  {#if !data.upstream}
+    <span class="label">Messages go to</span>
     <span class="seg nodrag" class:local={data.local} role="radiogroup" aria-label="Which {data.name} its apps use">
       <label title="The {env} queue">
         <input
@@ -83,28 +82,12 @@
 </InfraCard>
 
 <style>
-  .stays {
-    color: var(--muted);
-    font: 500 12px var(--sans);
-  }
-  .seg {
-    display: inline-flex;
-    font-family: var(--sans);
-  }
   .seg label {
-    padding: 2px 10px;
-    font-size: 12px;
-  }
-  .seg.local label:has(input:checked) {
-    background: var(--msg);
-    color: var(--on-accent);
+    flex: 1;
+    padding: 6px 12px;
   }
   .seg label[aria-disabled='true'] input {
     opacity: 0;
-  }
-  .seg label:has(input:focus-visible) {
-    outline: 2px solid var(--cable);
-    outline-offset: 1px;
   }
   .warn {
     display: inline-grid;

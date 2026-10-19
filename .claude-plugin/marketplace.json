@@ -8,9 +8,9 @@
   "plugins": [
     {
       "name": "koppler",
-      "description": "The agent add-on for Koppler: your agent builds, runs and reverts local runs of your stack. Needs the koppler app (npm i -g koppler).",
+      "description": "Plug your local code into the real stack. The agent add-on for Koppler: your agent builds, runs and reverts local runs of your stack. Needs the koppler app (npm i -g koppler).",
       "source": "./plugin"
     }
   ],
-  "description": "Koppler: run the part of your stack you need locally."
+  "description": "Koppler: plug your local code into the real stack."
 }

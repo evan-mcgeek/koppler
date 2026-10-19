@@ -799,7 +799,7 @@ function help(command?: Command): void {
       '\n',
     );
   const lines = [
-    'Koppler runs the part of your stack you need on this Mac, wired together; the rest keeps calling a deployed environment.',
+    'Koppler plugs your local code into the real stack: the apps you change run on this Mac, wired together; the rest keeps calling a deployed environment.',
     '',
     'usage: koppler <command> [options]',
     '',

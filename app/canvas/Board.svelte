@@ -1,13 +1,4 @@
 <script lang="ts">
-  import Minus from '@lucide/svelte/icons/minus';
-  import Plus from '@lucide/svelte/icons/plus';
-  import Icon from './Icon.svelte';
-  import Hand from '@lucide/svelte/icons/hand';
-  import Maximize from '@lucide/svelte/icons/maximize';
-  import Minimize from '@lucide/svelte/icons/minimize';
-  import MousePointer2 from '@lucide/svelte/icons/mouse-pointer-2';
-  import Redo2 from '@lucide/svelte/icons/redo-2';
-  import Undo2 from '@lucide/svelte/icons/undo-2';
   import {
     Background,
     BackgroundVariant,
@@ -24,6 +15,17 @@
   import type { Side } from '../src/core/arrange.ts';
   import { cablePath, sidePoint, SIDES, throughPath, type Box } from '../src/core/cables.ts';
   import { untrack } from 'svelte';
+  import Hand from '@lucide/svelte/icons/hand';
+  import LayoutGrid from '@lucide/svelte/icons/layout-grid';
+  import Focus from '@lucide/svelte/icons/focus';
+  import Maximize from '@lucide/svelte/icons/maximize';
+  import Minus from '@lucide/svelte/icons/minus';
+  import MousePointer2 from '@lucide/svelte/icons/mouse-pointer-2';
+  import Plus from '@lucide/svelte/icons/plus';
+  import Redo2 from '@lucide/svelte/icons/redo-2';
+  import Undo2 from '@lucide/svelte/icons/undo-2';
+  import Icon from './Icon.svelte';
+  import { appearance, isLight } from './appearance.svelte.ts';
   import AppCard from './AppCard.svelte';
   import Cable from './Cable.svelte';
   import Outside from './Outside.svelte';
@@ -36,7 +38,6 @@
   import { live } from './live.svelte.ts';
   import { probes, type Job, type Probe } from './probes.svelte.ts';
   import { runs } from './run.svelte.ts';
-  import { theme } from './theme.svelte.ts';
 
   const flow = useSvelteFlow();
   board.toFlow = at => flow.screenToFlowPosition(at, { snapToGrid: false });
@@ -256,7 +257,6 @@
         board.boxes.has(key) && !!board.ledBy(key).length && board.infraSide(key) === side;
       if (!own && (taken(from, sides[0]) || taken(to, sides[1]))) sides = level;
       const [start, end] = [sidePoint(a, sides[0]), sidePoint(b, sides[1])];
-      const [x, y] = SIDES[sides[1]];
       return [
         {
           key: `${from}>${to}`,
@@ -264,8 +264,7 @@
           to,
           d: cablePath(start, sides[0], end, sides[1]),
           start,
-          // No socket sits at this end: the tip touches the card's edge.
-          head: `translate(${String(end.x + x * 2)} ${String(end.y + y * 2)}) rotate(${String((Math.atan2(-y, -x) * 180) / Math.PI)})`,
+          end,
           kind: queue ? (board.queues[queue] === 'local' ? 'msg local' : 'msg') : 'ext',
           via,
           // Beside the link, not on it: right of one running up or down, over one running across.
@@ -319,8 +318,10 @@
     await frame();
     await fit();
   };
-  // Fitted in full when the whole board fits that close; else zoomed out, where the cards are short and closed up.
+  // Fitted in full when the whole board fits that close; else zoomed out, where the cards are short.
   // The view is worked out here and set once: a fit the flow queues runs again each time the cards change form.
+  const MAX_FRAMES = 40;
+  const STEADY_FRAMES = 3;
   const fit = async (duration = FIT.duration) => {
     const viewFor = (boxes: Box[], maxZoom: number) => {
       const x = Math.min(...boxes.map(box => box.x));
@@ -338,15 +339,30 @@
       ...board.infra.map(card => ({ ...card.position, ...(board.infraBoxes.get(card.id) ?? CARD) })),
     ];
     const drawn = () => [...board.boxes.values(), ...board.infraBoxes.values()];
+    // Zoomed in, the cards turn full a few frames later: wait until their sizes hold.
+    const untilSizesSettle = async () => {
+      const sizes = () => JSON.stringify([...board.boxes.values(), ...board.infraBoxes.values()]);
+      let last = '';
+      let held = 0;
+      for (let wait = 0; wait < MAX_FRAMES && held < STEADY_FRAMES; wait++) {
+        await frame();
+        const now = sizes();
+        held = now === last && !board.brief ? held + 1 : 0;
+        last = now;
+      }
+    };
     if (!area || !board.nodes.length) return;
     for (let tries = 0; tries < 2; tries++) {
       const close = viewFor(inFull(), FIT.maxZoom);
       if (close.zoom < FAR_ZOOM) break;
       await flow.setViewport(close, { duration: tries ? duration : 0 });
-      await frame();
-      await frame();
-      // Fitted with sizes guessed for cards never seen in full: measured now, it holds if it still fits.
-      if (viewFor(inFull(), FIT.maxZoom).zoom >= FAR_ZOOM) return;
+      await untilSizesSettle();
+      // Measured in full, the cards under a grown card have moved down with it: fitted to where all are drawn now.
+      const now = viewFor(drawn(), FIT.maxZoom);
+      if (now.zoom >= FAR_ZOOM) {
+        await flow.setViewport(now, { duration });
+        return;
+      }
     }
     if (!board.brief) {
       await flow.setViewport(viewFor(inFull(), FIT.maxZoom), { duration: 0 });
@@ -451,8 +467,10 @@
     panOnScrollSpeed={1}
     panOnDrag={panning ? true : [1, 2]}
     selectionOnDrag={!panning}
+    onselectionstart={() => (board.selecting = true)}
+    onselectionend={() => (board.selecting = false)}
     selectionMode={SelectionMode.Partial}
-    colorMode={theme.now}
+    colorMode={isLight(appearance.now.scheme) ? 'light' : 'dark'}
     minZoom={0.2}
     proOptions={{ hideAttribution: true }}
     {...start}
@@ -460,7 +478,7 @@
       if (!board.live) board.view = { ...viewport, x: viewport.x + shift };
     }}
   >
-    <Background variant={BackgroundVariant.Dots} gap={24} size={2.4} bgColor="var(--paper)" patternColor="var(--dot)" />
+    <Background variant={BackgroundVariant.Dots} gap={20} size={1.4} bgColor="var(--desk)" patternColor="var(--line)" />
     <Panel position="top-left">
       <div
         class="views"
@@ -490,7 +508,7 @@
         </label>
       </div>
     </Panel>
-    <Panel position="bottom-right">
+    <Panel position="bottom-center">
       <div class="tools" role="toolbar" aria-label="Board">
         <div class="switch" role="radiogroup" aria-label="Dragging on the board">
           {#each TOOLS as [name, title, icon] (name)}
@@ -503,11 +521,10 @@
               {title}
               onclick={() => (tool = name)}
             >
-              <Icon of={icon} size={15} />
+              <Icon of={icon} size={16} />
             </button>
           {/each}
         </div>
-        <span class="sep" aria-hidden="true"></span>
         <button
           class="tool"
           type="button"
@@ -518,7 +535,7 @@
             undo.undo();
           }}
         >
-          <Icon of={Undo2} size={15} />
+          <Icon of={Undo2} size={16} />
         </button>
         <button
           class="tool"
@@ -530,20 +547,24 @@
             undo.redo();
           }}
         >
-          <Icon of={Redo2} size={15} />
+          <Icon of={Redo2} size={16} />
         </button>
-        <span class="sep" aria-hidden="true"></span>
-        <button title="Arrange cards by who calls whom, callers on top" onclick={() => void arrange()}>Arrange</button>
-        <button title="Zoom to fit all apps (F)" onclick={() => void fit()}>Fit</button>
-        <span class="sep" aria-hidden="true"></span>
+        <button
+          aria-label="Arrange"
+          title="Arrange cards by who calls whom, callers on top"
+          onclick={() => void arrange()}><Icon of={LayoutGrid} size={16} /></button
+        >
+        <button aria-label="Fit" title="Zoom to fit all apps (F)" onclick={() => void fit()}
+          ><Icon of={Focus} size={16} /></button
+        >
         <div class="zoom" role="group" aria-label="Zoom">
-          <button aria-label="Zoom out" onclick={zoomBy(1 / 1.2)}><Icon of={Minus} size={13} /></button>
+          <button aria-label="Zoom out" title="Zoom out" onclick={zoomBy(1 / 1.2)}><Icon of={Minus} size={16} /></button
+          >
           <button class="percent" title="Reset to 100%" onclick={() => void flow.setZoom(1, { duration: 200 })}>
             {Math.round(viewport.current.zoom * 100)}%
           </button>
-          <button aria-label="Zoom in" onclick={zoomBy(1.2)}><Icon of={Plus} size={13} /></button>
+          <button aria-label="Zoom in" title="Zoom in" onclick={zoomBy(1.2)}><Icon of={Plus} size={16} /></button>
         </div>
-        <span class="sep" aria-hidden="true"></span>
         <button
           class="tool"
           type="button"
@@ -552,10 +573,9 @@
           aria-pressed={board.present}
           onclick={() => void present()}
         >
-          <Icon of={board.present ? Minimize : Maximize} size={15} />
+          <Icon of={Maximize} size={16} />
         </button>
         {#if !board.present}
-          <span class="sep" aria-hidden="true"></span>
           <button
             class="clear"
             title="Remove every card from this board. Undo brings them back."
@@ -587,9 +607,9 @@
       width={168}
       height={112}
       ariaLabel="Overview of the board"
-      nodeBorderRadius={8}
+      nodeBorderRadius={0}
       nodeStrokeWidth={0}
-      nodeColor={node => (node.type === 'app' ? 'color-mix(in oklab, var(--cable) 60%, var(--panel))' : 'var(--line)')}
+      nodeColor={node => (node.type === 'app' ? 'var(--ink-muted)' : 'var(--line-strong)')}
       bgColor="var(--panel)"
       maskColor="color-mix(in oklab, var(--desk) 72%, transparent)"
       maskStrokeColor="var(--line)"
@@ -617,7 +637,7 @@
           >
             <path class="under" d={flow.d} />
             <path class="wire" d={flow.d} />
-            <path class="head" d="M-9,-4.5 L0,0 L-9,4.5 L-6.75,0 Z" transform={flow.head} />
+            <circle class="socket" cx={flow.end.x} cy={flow.end.y} r="5" />
             <circle class="plug" cx={flow.start.x} cy={flow.start.y} r="5" />
             {#if flow.via}<text class="via" x={flow.label.x} y={flow.label.y} text-anchor={flow.label.anchor}
                 >{flow.via}</text
@@ -674,10 +694,11 @@
                 class:dimmed={board.dimmedLink(edge.source, edge.target)}
                 class:tested
                 data-cable={edge.id}
+                data-state={tested ? probe?.state : undefined}
                 class:grabbed={wiring.grabbed?.id === edge.id && wiring.grabbed.end === 'to'}
                 cx={b.x}
                 cy={b.y}
-                r="8"
+                r="7"
                 onpointerdown={ev => {
                   pressedAt = { x: ev.clientX, y: ev.clientY };
                   wiring.grabEnd(ev, edge.id, 'to');
@@ -715,6 +736,7 @@
               }}
               class="socket tested press nodrag nopan"
               data-link={link.key}
+              data-state={probe?.state}
               cx={link.end.x}
               cy={link.end.y}
               r="7"
@@ -838,13 +860,16 @@
     font-size: 12px;
   }
   /* Over the toolbar, with the other ways to move the view. */
+  /* Centred, clear of the overview on either side. */
+  .area :global(.svelte-flow__panel.bottom.center) {
+    --overview-room: 230px;
+    max-width: calc(100% - 2 * var(--overview-room));
+  }
   .area :global(.svelte-flow__minimap) {
-    margin: 0 15px 66px 0;
+    margin: 0 15px 15px 0;
     overflow: hidden;
-    border: 1px solid var(--line);
-    border-radius: 10px;
+    border: 1px solid var(--line-strong);
     background: var(--panel);
-    box-shadow: var(--lift);
   }
   .links {
     position: absolute;
@@ -883,13 +908,13 @@
   .flow .wire {
     stroke-width: 2;
   }
-  .flow .head {
+  .flow .socket {
     stroke-width: 1.5;
   }
-  .flow.msg :is(.wire, .head) {
+  .flow.msg :is(.wire, .socket) {
     stroke: var(--msg);
   }
-  .flow.msg .head {
+  .flow.msg .socket {
     fill: var(--msg);
   }
   .flow.msg .wire {
@@ -905,11 +930,11 @@
     stroke: var(--surface);
     stroke-width: 2;
   }
-  .flow.ext :is(.wire, .head) {
+  .flow.ext :is(.wire, .socket) {
     stroke: var(--socket-rim);
     stroke-width: 1.5;
   }
-  .flow.ext .head {
+  .flow.ext .socket {
     fill: var(--socket-rim);
   }
   .flow.ext .wire {
@@ -921,30 +946,30 @@
   /* The picked card's own links stand out like its cables. */
   /* Snapped straight while a card is dragged: the line goes a shade darker, nothing more. */
   .link.snapped,
-  .flow.ext.snapped :is(.wire, .head) {
+  .flow.ext.snapped :is(.wire, .socket) {
     stroke: var(--ink);
   }
-  .flow.ext.snapped .head {
+  .flow.ext.snapped .socket {
     fill: var(--ink);
   }
-  .flow.msg.snapped :is(.wire, .head) {
+  .flow.msg.snapped :is(.wire, .socket) {
     stroke: color-mix(in oklab, var(--msg) 60%, var(--ink));
   }
-  .flow.msg.snapped .head {
+  .flow.msg.snapped .socket {
     fill: color-mix(in oklab, var(--msg) 60%, var(--ink));
   }
   .link.lit,
-  .flow.ext.lit :is(.wire, .head) {
+  .flow.ext.lit :is(.wire, .socket) {
     stroke: var(--ink);
     stroke-width: 2.5;
   }
-  .flow.ext.lit .head {
+  .flow.ext.lit .socket {
     fill: var(--ink);
   }
   .flow.msg.lit .wire {
     stroke-width: 3.5;
   }
-  .flow.msg.lit .head {
+  .flow.msg.lit .socket {
     stroke-width: 2.5;
   }
   .ends {
@@ -963,13 +988,14 @@
   .reordering * {
     cursor: grabbing;
   }
+  /* Where a cable leaves: a small ring. Where it plugs in: a larger ring whose hole holds the last connection test. */
   .plug {
-    fill: var(--cable);
-    stroke: var(--surface);
+    fill: var(--desk);
+    stroke: var(--cable);
     stroke-width: 2;
   }
   .plug.idle {
-    fill: color-mix(in oklab, var(--cable) 38%, var(--line));
+    stroke: color-mix(in oklab, var(--cable) 45%, var(--line-strong));
   }
   .plug.cut {
     fill: var(--bad);
@@ -978,9 +1004,15 @@
     r: 7.5px;
   }
   .socket {
-    fill: var(--socket);
-    stroke: var(--socket-rim);
+    fill: var(--desk);
+    stroke: var(--local);
     stroke-width: 2;
+  }
+  .socket.tested:hover {
+    stroke: var(--ink);
+  }
+  .socket[data-state='bad'] {
+    stroke: var(--prod);
   }
   .socket.press {
     cursor: pointer;
@@ -993,28 +1025,40 @@
   .socket.grabbed {
     r: 10px;
   }
+  /* The test's result has a shape of its own, never colour alone: nothing until tested, a turning arc while it
+     tests, a solid dot when it works, a hollow ring when it answered oddly, and red when it fails. */
   .light {
-    fill: var(--socket-rim);
+    display: none;
+    fill: none;
+    stroke-width: 1.5;
+  }
+  .light[data-state='ok'],
+  .light[data-state='bad'] {
+    display: inline;
+    r: 3.4px;
   }
   .light[data-state='ok'] {
-    fill: var(--ok);
-  }
-  .light[data-state='warn'] {
-    fill: var(--warn);
+    fill: var(--live);
   }
   .light[data-state='bad'] {
-    fill: var(--bad);
-    stroke: color-mix(in oklab, var(--bad) 35%, transparent);
-    stroke-width: 5;
-    paint-order: stroke;
+    fill: var(--prod);
+  }
+  .light[data-state='warn'],
+  .light[data-state='busy'] {
+    display: inline;
+    r: 2.65px;
+    stroke: var(--warn);
   }
   .light[data-state='busy'] {
-    fill: var(--warn);
-    animation: testing 0.9s ease-in-out infinite alternate;
+    /* Three quarters of the ring. */
+    stroke-dasharray: 12.5 16.7;
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: testing 0.9s linear infinite;
   }
   @keyframes testing {
     to {
-      opacity: 0.25;
+      rotate: 360deg;
     }
   }
   @media (prefers-reduced-motion: reduce) {
@@ -1059,7 +1103,7 @@
       0 1px 2px rgb(0 0 0 / 0.12);
   }
   .views label:has(input:focus-visible) {
-    outline: 2px solid var(--cable);
+    outline: 2px solid var(--ink);
     outline-offset: -2px;
   }
   /* In Live nothing on the board is pulled or unplugged. */
@@ -1073,59 +1117,57 @@
   .area:has(.ends.still) :global(.svelte-flow__edge) {
     pointer-events: none;
   }
+  /* The board's tools: words printed on one strip, each with its key. */
+  /* Each word keeps its own edge, so a strip that wraps on a narrow board stays a clean grid. */
   .tools {
     display: flex;
-    align-items: center;
-    gap: 2px;
-    padding: 3px;
-    border: 1px solid var(--line);
-    border-radius: 10px;
-    background: var(--panel);
+    flex-wrap: wrap;
+    align-items: stretch;
+    padding: 1px 0 0 1px;
   }
-  .zoom {
+  .zoom,
+  .switch {
     display: flex;
-    gap: 2px;
   }
-  .tools .percent {
-    width: 62px;
-    padding-inline: 0;
-    font-variant-numeric: tabular-nums;
-  }
+  /* Canvas tools as icons in square cells, as in other canvas tools; Clear stays a word. */
   .tools button {
-    padding: 6px 12px;
-    border: 1px solid transparent;
-    border-radius: 8px;
-    background: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 32px;
+    height: 32px;
+    margin: -1px 0 0 -1px;
+    padding: 0 8px;
+    border: 1px solid var(--line-strong);
+    background: var(--panel);
     color: var(--ink);
-    font: 600 13px var(--sans);
+    font: 600 12px var(--sans);
     white-space: nowrap;
     cursor: pointer;
   }
-  .tools button:hover {
-    background: color-mix(in oklab, var(--ink) 7%, transparent);
+  .tools button:hover:not(:disabled) {
+    background: color-mix(in oklab, var(--ink) 8%, var(--panel));
   }
-  .switch {
-    display: flex;
-    gap: 2px;
+  .tools button:focus-visible {
+    position: relative;
+    z-index: 1;
   }
-  .tools .tool {
-    display: grid;
-    place-items: center;
-    width: 30px;
-    height: 28px;
-    padding: 0;
-    color: var(--muted);
+  .tools .percent {
+    width: 56px;
+    font: 400 12px var(--mono);
+    font-variant-numeric: tabular-nums;
   }
-  .tools .tool[aria-checked='true'] {
-    background: color-mix(in oklab, var(--cable) 22%, transparent);
+  .tools .tool[aria-checked='true'],
+  .tools .tool[aria-pressed='true'] {
+    background: var(--line-strong);
     color: var(--ink);
   }
-  .tools .tool:disabled {
-    opacity: 0.35;
+  .tools button:disabled {
+    color: color-mix(in oklab, var(--ink-muted) 45%, transparent);
     cursor: default;
   }
   .tools .clear:hover {
-    color: var(--bad);
+    color: var(--prod);
   }
   .line path {
     fill: none;

@@ -1,4 +1,4 @@
-// A pinch (a wheel with Ctrl) zooms the board only: over a panel it does nothing, never the whole page.
+// A pinch zooms the board only: over a panel it does nothing, never the whole page.
 import { at, expect, test } from './canvas.ts';
 
 test.use({
@@ -16,12 +16,12 @@ test('a pinch over the side pane is ignored, and over the board it zooms the boa
     });
   });
   const pinches = () => page.evaluate(() => (window as unknown as { pinches: boolean[] }).pinches);
-  const side = await page.getByRole('complementary', { name: 'Board and apps' }).boundingBox();
-  if (!side) throw new Error('no side pane');
-  await page.mouse.move(side.x + side.width / 2, side.y + side.height / 2);
-  await page.keyboard.down('Control');
-  await page.mouse.wheel(0, 40);
-  await page.keyboard.up('Control');
+  // A trackpad pinch reaches the page as a wheel flagged with Ctrl, though no Ctrl key is held.
+  await page
+    .getByRole('complementary', { name: 'Board and apps' })
+    .evaluate(el =>
+      el.dispatchEvent(new WheelEvent('wheel', { deltaY: 40, ctrlKey: true, bubbles: true, cancelable: true })),
+    );
   await expect.poll(pinches).toEqual([true]);
   await expect(page.getByText('100%', { exact: true })).toBeVisible();
 

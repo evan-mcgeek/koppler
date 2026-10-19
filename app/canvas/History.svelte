@@ -1,6 +1,4 @@
 <script lang="ts">
-  import Icon from './Icon.svelte';
-  import Clock from '@lucide/svelte/icons/clock';
   // Every run and Stop, and how it ended; what stopped outside a run is told among them. Newest first, this session's
   // on top and older ones folded under "Earlier".
   import { VERSION } from '../src/core/presets.ts';
@@ -59,7 +57,7 @@
   title={waiting ? 'A run is waiting for the agent' : 'Every run and Stop, and how it ended'}
   popovertarget={id}
 >
-  <Icon of={Clock} size={16} />
+  History
 </button>
 <div
   bind:this={pop}

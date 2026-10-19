@@ -665,7 +665,7 @@
     border-radius: 999px;
     background: color-mix(in oklab, var(--kind, var(--ink)) 12%, transparent);
     color: var(--kind, var(--ink));
-    font: 600 12px var(--mono);
+    font: 600 12px var(--sans);
   }
   .tag button {
     padding: 2px 4px 2px 10px;
@@ -710,7 +710,7 @@
   }
   input.tag {
     padding: 2px 10px;
-    outline: 2px solid var(--cable);
+    outline: 2px solid var(--ink);
   }
   .no-time .row {
     grid-template-columns: 0 58px minmax(0, 1fr);

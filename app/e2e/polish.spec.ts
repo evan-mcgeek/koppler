@@ -85,7 +85,7 @@ test('a protected environment marks the frame, and an emptied board says how to 
   await expect(page.getByText('Click the apps you want to run together.')).toBeVisible();
 });
 
-test('the shortcuts sheet opens with ?, and the theme is picked in Settings and kept', async ({ page }) => {
+test('the shortcuts sheet opens with ?, and the appearance is picked in Settings and kept', async ({ page }) => {
   const sheet = page.locator('#help');
   await expect(sheet).toBeHidden();
   await page.keyboard.press('?');
@@ -98,13 +98,37 @@ test('the shortcuts sheet opens with ?, and the theme is picked in Settings and 
   await page.keyboard.press('Escape');
 
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  await page.getByRole('radio', { name: 'Dark' }).click();
-  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+  await page.getByRole('radio', { name: /^Scope/ }).click();
+  await expect(page.locator('html')).toHaveAttribute('data-scheme', 'scope');
+  // A local colour picked by hand stays over the scheme; a scheme picked again drops it.
+  await page.getByRole('radio', { name: 'Local #ffd43b' }).click();
+  const local = () =>
+    page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--local').trim());
+  expect(await local()).toBe('#ffd43b');
   await page.reload();
-  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+  await expect(page.locator('html')).toHaveAttribute('data-scheme', 'scope');
+  expect(await local()).toBe('#ffd43b');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  await expect(page.getByRole('radio', { name: 'Dark' })).toBeChecked();
-  await page.screenshot({ path: 'test-results/next-dark.png' });
+  await expect(page.getByRole('radio', { name: /^Scope/ })).toBeChecked();
+  await expect(page.getByRole('radio', { name: 'Local #ffd43b' })).toBeChecked();
+  await page.screenshot({ path: 'test-results/next-appearance.png' });
+  await page.getByRole('button', { name: 'Scheme default' }).click();
+  expect(await local()).toBe('#52f29a');
+  await page.getByRole('radio', { name: /^Mono/ }).click();
+  await expect(page.locator('html')).not.toHaveAttribute('data-scheme');
+  expect(await local()).toMatch(/^#f{3}(f{3})?$/);
+
+  // A light scheme: the page turns light, and the colours offered by hand are ones that read on it.
+  await page.getByRole('radio', { name: /^Paper/ }).click();
+  await expect(page.locator('html')).toHaveAttribute('data-scheme', 'paper');
+  expect(await page.evaluate(() => getComputedStyle(document.body).backgroundColor)).toBe('rgb(244, 244, 242)');
+  await expect(page.getByRole('radio', { name: 'Local #1f4fd8' })).toBeVisible();
+  await expect(page.getByRole('radio', { name: 'Local #ffd43b' })).toHaveCount(0);
+  // A green local cable would read as running: the running light takes the ink colour then.
+  await page.getByRole('radio', { name: 'Local #1a6e2e' }).click();
+  const live = () => page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--live').trim());
+  expect(await live()).toBe('#141414');
+  await page.screenshot({ path: 'test-results/next-appearance-light.png' });
 });
 
 test('the keyboard: Space presses the focused button, and shortcuts stay off under an open menu', async ({ page }) => {
@@ -123,4 +147,15 @@ test('the keyboard: Space presses the focused button, and shortcuts stay off und
   await page.keyboard.press('Escape');
   await page.keyboard.press('l');
   await expect(live).toBeChecked();
+});
+
+test('a narrow window drops the words from the top bar, and a wide one brings them back', async ({ page }) => {
+  const bar = page.locator('header').first();
+  const logs = bar.getByRole('button', { name: 'Logs' });
+  await expect(bar).not.toHaveClass(/compact/);
+  await page.setViewportSize({ width: 760, height: 800 });
+  await expect(bar).toHaveClass(/compact/);
+  await page.setViewportSize({ width: 1600, height: 800 });
+  await expect(bar).not.toHaveClass(/compact/);
+  await expect(logs).toBeVisible();
 });

@@ -1,98 +1,150 @@
+/* Patch bay's colours are signals (local, deployed, live, warn, prod), set by one of eight schemes, five dark, three light. */
 :root {
-  --desk: #dce2e8;
-  --paper: #e9edf1;
-  --panel: #f7f9fb;
-  --surface: #ffffff;
-  --ink: #18222d;
-  --muted: #5b6875;
-  --chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 16 16' fill='none' stroke='%235b6875' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E");
-  --line: #c5cdd6;
-  --dot: #c9d0d8;
-  --cable: #2b59c3;
-  --cable-ink: #1b3a86;
-  --prod: #c8372d;
-  --prod-ink: #8e2119;
-  --ok: #2f855a;
-  --bad: #c8372d;
-  --warn: #a36400;
-  --on-accent: #ffffff;
-  --socket: #1a222b;
-  --socket-rim: #8a97a5;
-  --dotnet: #5737c2;
-  --flutter: #086a7e;
-  --node: #2d6e30;
-  --web: #8f4b06;
-  --lambda: #a8326f;
-  --other: #5b6673;
-  --msg: #0f7b6c;
-  /* Floating layers keep a defined edge (their border) with a short, tight lift, not a wide halo. */
-  --lift: 0 1px 2px rgb(0 0 0 / 0.12), 0 4px 8px -2px rgb(0 0 0 / 0.2);
-  --lift-high: 0 2px 4px rgb(0 0 0 / 0.16), 0 8px 8px -4px rgb(0 0 0 / 0.3);
-  --sans: 'Schibsted Grotesk', system-ui, sans-serif;
-  --mono: 'JetBrains Mono', ui-monospace, monospace;
-  color-scheme: light;
-}
-/* Dark follows the system unless the theme switch says otherwise. */
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme='light']) {
-    --desk: #10151b;
-    --paper: #161c23;
-    --panel: #1c232b;
-    --surface: #222a33;
-    --ink: #e6ebf0;
-    --muted: #93a0ad;
-    --chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 16 16' fill='none' stroke='%2393a0ad' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E");
-    --line: #34404c;
-    --dot: #2a333d;
-    --cable: #6e93f0;
-    --cable-ink: #3f63c2;
-    --prod: #ff6b5e;
-    --prod-ink: #b83a2f;
-    --ok: #5bc48c;
-    --bad: #ff6b5e;
-    --warn: #f0b429;
-    --on-accent: #0f1722;
-    --socket: #0b0f14;
-    --socket-rim: #4a5664;
-    --dotnet: #a28bff;
-    --flutter: #3cc3db;
-    --node: #71c774;
-    --web: #f2a04a;
-    --lambda: #f07ab8;
-    --other: #9aa7b5;
-    --msg: #3cc9b4;
-    color-scheme: dark;
-  }
-}
-:root[data-theme='dark'] {
-  --desk: #10151b;
-  --paper: #161c23;
-  --panel: #1c232b;
-  --surface: #222a33;
-  --ink: #e6ebf0;
-  --muted: #93a0ad;
-  --chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 16 16' fill='none' stroke='%2393a0ad' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E");
-  --line: #34404c;
-  --dot: #2a333d;
-  --cable: #6e93f0;
-  --cable-ink: #3f63c2;
-  --prod: #ff6b5e;
-  --prod-ink: #b83a2f;
-  --ok: #5bc48c;
-  --bad: #ff6b5e;
-  --warn: #f0b429;
-  --on-accent: #0f1722;
-  --socket: #0b0f14;
-  --socket-rim: #4a5664;
-  --dotnet: #a28bff;
-  --flutter: #3cc3db;
-  --node: #71c774;
-  --web: #f2a04a;
-  --lambda: #f07ab8;
-  --other: #9aa7b5;
-  --msg: #3cc9b4;
+  --desk: #0d0d0d;
+  --panel: #161616;
+  --line: #2b2b2b;
+  --line-strong: #404040;
+  --ink: #e8e8e8;
+  --ink-muted: #a3a3a3;
+  --local: #ffffff;
+  --deployed: #9a9a9a;
+  --live: #4ade80;
+  --warn: #ffc940;
+  --prod: #ff3b30;
+  --prod-strong: #db2a20;
+  --prod-stripes: repeating-linear-gradient(-45deg, var(--prod) 0 8px, var(--prod-strong) 8px 16px);
+  /* Words on a PROD fill. */
+  --on-prod: #0d0d0d;
+
+  /* The names the components were written with, in this scheme's terms. */
+  --paper: var(--desk);
+  --surface: var(--panel);
+  --muted: var(--ink-muted);
+  --dot: var(--line);
+  --cable: var(--local);
+  --cable-ink: var(--local);
+  --ok: var(--live);
+  --bad: var(--prod);
+  --msg: var(--deployed);
+  --on-accent: var(--desk);
+  --socket: var(--desk);
+  --socket-rim: var(--local);
+  --dotnet: var(--ink-muted);
+  --flutter: var(--ink-muted);
+  --node: var(--ink-muted);
+  --web: var(--ink-muted);
+  --lambda: var(--ink-muted);
+  --other: var(--ink-muted);
+  --chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 16 16' fill='none' stroke='%23a3a3a3' stroke-width='1.8' stroke-linecap='square'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E");
+  /* Hairlines, no shadows: a floating layer is set apart by its edge. */
+  --lift: none;
+  --lift-high: none;
+  --sans: 'Barlow', system-ui, sans-serif;
+  --display: 'Barlow Semi Condensed', 'Barlow', system-ui, sans-serif;
+  --mono: 'Sometype Mono', ui-monospace, monospace;
   color-scheme: dark;
 }
-:root[data-theme='light'] {
+:root[data-scheme='lime'] {
+  --desk: #0e0f10;
+  --panel: #16181a;
+  --line: #2c2f33;
+  --line-strong: #3d4146;
+  --ink: #eceae4;
+  --ink-muted: #a9a8a1;
+  --local: #c8f03c;
+  --deployed: #8ea2ff;
+  --live: #4fd6c4;
+  --warn: #f5b841;
+  --prod: #ff4a3d;
+  --prod-strong: #e0362a;
+}
+:root[data-scheme='signal'] {
+  --desk: #100e0c;
+  --panel: #1a1714;
+  --line: #2e2a25;
+  --line-strong: #433c35;
+  --ink: #f0e9df;
+  --ink-muted: #ada497;
+  --local: #ff8a1f;
+  --deployed: #7fc4d8;
+  --live: #5bd97a;
+  --warn: #f2d14b;
+  --prod: #ff3b6b;
+  --prod-strong: #e02656;
+}
+:root[data-scheme='scope'] {
+  --desk: #0a0d0b;
+  --panel: #121713;
+  --line: #243028;
+  --line-strong: #35443a;
+  --ink: #e2ede4;
+  --ink-muted: #98a89c;
+  --local: #52f29a;
+  --deployed: #5cc8ff;
+  --live: #ffffff;
+  --warn: #ffb547;
+  --prod: #ff4a4a;
+  --prod-strong: #e03636;
+}
+:root[data-scheme='sodium'] {
+  --desk: #0c0e12;
+  --panel: #151820;
+  --line: #272c38;
+  --line-strong: #3a4150;
+  --ink: #e8eaf0;
+  --ink-muted: #a0a5b3;
+  --local: #ffd43b;
+  --deployed: #a98bff;
+  --live: #4ade80;
+  --warn: #ff9f43;
+  --prod: #ff3b5c;
+  --prod-strong: #e0254a;
+}
+/* The light schemes: words and PROD fills read dark on light, and the browser's own controls follow. */
+:root:is([data-scheme='paper'], [data-scheme='blueprint'], [data-scheme='workshop']) {
+  --on-prod: #ffffff;
+  --chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 16 16' fill='none' stroke='%235e5e5a' stroke-width='1.8' stroke-linecap='square'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E");
   color-scheme: light;
+}
+:root[data-scheme='paper'] {
+  --desk: #f4f4f2;
+  --panel: #ffffff;
+  --line: #e2e2de;
+  --line-strong: #c4c4be;
+  --ink: #141414;
+  --ink-muted: #5e5e5a;
+  --local: #141414;
+  --deployed: #6b6b6b;
+  --live: #1a8f4c;
+  --warn: #a15c07;
+  --prod: #d92d20;
+  --prod-strong: #b42318;
+}
+:root[data-scheme='blueprint'] {
+  --desk: #edf1f5;
+  --panel: #ffffff;
+  --line: #dae1e8;
+  --line-strong: #b6c2ce;
+  --ink: #0f1a26;
+  --ink-muted: #4e5d6c;
+  --local: #1f4fd8;
+  --deployed: #7652c2;
+  --live: #15803d;
+  --warn: #a65306;
+  --prod: #dc2626;
+  --prod-strong: #b91c1c;
+}
+:root[data-scheme='workshop'] {
+  --desk: #f5f1ea;
+  --panel: #fffdf9;
+  --line: #e6ded2;
+  --line-strong: #cbbfae;
+  --ink: #1c1712;
+  --ink-muted: #665c50;
+  --local: #b4490a;
+  --deployed: #22738a;
+  --live: #2b8048;
+  --warn: #946000;
+  --prod: #d21f55;
+  --prod-strong: #ae1145;
 }

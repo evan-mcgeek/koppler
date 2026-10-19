@@ -42,7 +42,8 @@ test('The state folder does not exist yet, as on a machine where Koppler never r
     // The page and the files it names, and nothing else from its folder.
     const script = /assets\/[\w.-]+\.js/.exec(got.body.toString())[0];
     assert.equal((await call('GET', page.pathname + script)).headers['content-type'], 'text/javascript; charset=utf-8');
-    assert.equal((await call('GET', `${page.pathname}theme.js`)).status, 200);
+    assert.equal((await call('GET', `${page.pathname}appearance.js`)).status, 200);
+    assert.equal((await call('GET', `${page.pathname}favicon.svg`)).headers['content-type'], 'image/svg+xml');
     // Where the canvas was while it was built beside the page it replaced: sent on to its address.
     for (const [old, to] of [['next', './'], ['next/', '../']]) {
       const moved = await call('GET', page.pathname + old);

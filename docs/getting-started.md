@@ -46,10 +46,7 @@ koppler canvas
 It starts the canvas server when needed and opens it in your browser.
 The agent chip in the toolbar shows whether an agent session is connected; you only need one for notes, checklists and fixes.
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="images/board-dark.png">
-  <img alt="One feature, Checkout, worked on across four apps: the mobile app and web shop cabled to a local Orders API, which calls a local Payments API; each runs its feature/checkout branch, Orders API has a database tunnel and a local SQS queue, two apps carry a note for the agent, and everything runs" src="images/board-light.png">
-</picture>
+<img alt="One feature, Checkout, worked on across four apps: the mobile app and web shop cabled to a local Orders API, which calls a local Payments API; each runs its feature/checkout branch, Orders API has a database tunnel and a local SQS queue, two apps carry a note for the agent, and everything runs" src="images/board.png">
 
 ## 5. Your first run
 

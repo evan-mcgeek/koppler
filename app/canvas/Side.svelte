@@ -1,13 +1,11 @@
 <script lang="ts">
   import Icon from './Icon.svelte';
-  import ArrowDown from '@lucide/svelte/icons/arrow-down';
   import Play from '@lucide/svelte/icons/play';
   import Plus from '@lucide/svelte/icons/plus';
   import Trash from '@lucide/svelte/icons/trash';
   import X from '@lucide/svelte/icons/x';
   import Command from './Command.svelte';
   import BoardPicker from './BoardPicker.svelte';
-  import KindIcon from './KindIcon.svelte';
   import Needs from './Needs.svelte';
   import Summary from './Summary.svelte';
   import Settings from './Settings.svelte';
@@ -122,11 +120,6 @@
 <aside aria-label="Board and apps" class:protected={board.protected}>
   <div class="head">
     <BoardPicker />
-    <div class="seg" role="radiogroup" aria-label="Environment">
-      {#each board.envs as env (env)}
-        <label><input type="radio" name="env" value={env} bind:group={board.env} />{env.toUpperCase()}</label>
-      {/each}
-    </div>
   </div>
   <section aria-labelledby="apps-title">
     <h2 id="apps-title">
@@ -135,8 +128,7 @@
         <span class="count">{onBoard.length} of {board.apps.length} on the board</span>
       {/if}
       <button class="sort" type="button" onclick={toggleSort} title={sortHint} aria-label={sortHint}>
-        <Icon of={ArrowDown} size={11} />
-        {sort === 'name' ? 'Az' : 'Added'}
+        Sort: {sort === 'name' ? 'A–Z' : 'Added'}
       </button>
     </h2>
     <input
@@ -153,7 +145,7 @@
         {@const on = onBoard.includes(app.id)}
         {@const missing = !!app.outside || !app.cloned}
         <div class="app" class:on class:missing class:first-off={app === firstOff && app !== shown[0]} role="listitem">
-          <KindIcon kind={app.kind} label={app.kindLabel} />
+          <span class="kind">{app.outside ? 'Outside' : app.kindLabel}</span>
           {#if on}
             <button
               class="main"
@@ -167,9 +159,12 @@
             </button>
             {@const up = live.up(app.id)}
             {#if up !== null}
-              <span class="live" data-on={up} role="img" aria-label={up ? 'Running' : 'Not answering'}
-                >{up ? '' : '!'}</span
-              >
+              <span
+                class="led"
+                data-state={up ? 'running' : 'failed'}
+                role="img"
+                aria-label={up ? 'Running' : 'Not answering'}
+              ></span>
             {/if}
             <button
               class="act remove"
@@ -344,42 +339,32 @@
     border-bottom: 1px solid var(--line);
     background: var(--panel);
   }
-  .seg label {
-    flex: 1;
-    padding: 3px 12px;
-    text-align: center;
-    white-space: nowrap;
-  }
   h2 {
     display: flex;
     align-items: baseline;
     gap: 6px;
-    margin: 0 0 6px;
+    margin: 0 0 8px;
     padding: 0 8px;
-    font-size: 13px;
-    font-weight: 600;
+    color: var(--ink);
+    font: 600 13px var(--sans);
   }
   .count {
-    color: var(--muted);
-    font-weight: 500;
+    color: var(--ink-muted);
+    font: 400 12px var(--sans);
     font-variant-numeric: tabular-nums;
   }
   .sort {
-    display: inline-flex;
-    align-items: center;
-    gap: 3px;
-    min-height: 24px;
     margin-left: auto;
-    padding: 0 6px;
+    padding: 0;
     border: 0;
-    border-radius: 5px;
     background: none;
-    color: var(--muted);
-    font: 500 12px var(--sans);
+    color: var(--ink-muted);
+    font: 400 12px var(--sans);
+    text-decoration: underline;
+    text-underline-offset: 3px;
     cursor: pointer;
   }
   .sort:hover {
-    background: color-mix(in oklab, var(--ink) 8%, transparent);
     color: var(--ink);
   }
   .search {
@@ -405,11 +390,22 @@
     position: relative;
     display: flex;
     align-items: center;
-    gap: 9px;
-    min-height: 30px;
+    gap: 8px;
+    min-height: 34px;
     padding: 3px 8px;
-    border-radius: 6px;
-    color: var(--muted);
+    color: var(--ink-muted);
+    font-size: 14px;
+  }
+  .kind {
+    flex: none;
+    width: 62px;
+    overflow: hidden;
+    color: var(--ink-muted);
+    font: 500 10px var(--mono);
+    letter-spacing: 0.04em;
+    text-overflow: ellipsis;
+    text-transform: uppercase;
+    white-space: nowrap;
   }
   .app:hover {
     background: color-mix(in oklab, var(--ink) 6%, transparent);
@@ -493,38 +489,18 @@
     padding: 6px 4px;
     border: 0;
     background: none;
-    color: var(--cable-ink);
-    font: 600 13px var(--sans);
+    color: var(--ink);
+    font: 400 13px var(--sans);
     text-align: left;
+    text-decoration: underline;
+    text-underline-offset: 3px;
     cursor: pointer;
   }
   .add-repos:hover {
-    text-decoration: underline;
+    color: var(--local);
   }
   .act.add {
     color: var(--cable);
-  }
-  .live {
-    flex: none;
-    display: grid;
-    place-items: center;
-    width: 14px;
-    height: 14px;
-    border-radius: 50%;
-    font-size: 12px;
-    font-weight: 700;
-    line-height: 1;
-  }
-  .live[data-on='true']::before {
-    content: '';
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: var(--ok);
-  }
-  .live[data-on='false'] {
-    background: var(--bad);
-    color: var(--on-accent);
   }
   .empty,
   .note {
@@ -538,10 +514,6 @@
     gap: 8px;
     margin-top: auto;
     padding: 0 2px;
-  }
-  .protected .seg label:has(input:checked) {
-    background: var(--prod);
-    color: var(--on-accent);
   }
   .unsaved {
     margin: 0;
@@ -601,7 +573,7 @@
     margin-top: 8px;
   }
   :focus-visible {
-    outline: 2px solid var(--cable);
+    outline: 2px solid var(--ink);
     outline-offset: 2px;
   }
 </style>
