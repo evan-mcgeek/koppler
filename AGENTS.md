@@ -33,7 +33,6 @@ Koppler's look is designed in Claude Design (project `8557df85-2270-420b-923d-26
 Before every release, pull the current files from that project into `docs/design`, so the release ships with the design it was built from:
 
 - `sources/`: each `.dc.html` as it is now, never `support.js` (Claude Design's runtime, not ours to publish).
-- `briefs/`: each brief (`.md`) sent to Claude Design.
 - `images/`: each design rendered again, full page.
 
 Real stacks' names, hosts and apps never go in: replace them with the Acme Shop examples first, and check the folder for them before committing.
