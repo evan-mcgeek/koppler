@@ -16,14 +16,17 @@ if (!process.argv.includes('--clean')) {
   for (const skill of fs.readdirSync(into)) fs.writeFileSync(path.join(into, skill, 'VERSION'), `${version}\n`);
   fs.copyFileSync(path.join(root, 'LICENSE'), path.join(app, 'LICENSE'));
   const repo = repository.url.replace(/^git\+/, '').replace(/\.git$/, '');
+  // The release's own tag, so a published README keeps its pictures after main changes.
+  const ref = `v${version}`;
   const readme = fs.readFileSync(path.join(root, 'README.md'), 'utf8');
   // A path in the repo, from the README at its root: a page on GitHub.
   const absolute = readme
-    .replace(/\]\((?![a-z]+:|#)([^)]+)\)/g, (_, link) => `](${repo}/blob/main/${link})`)
+    .replace(/\]\((?![a-z]+:|#)([^)]+)\)/g, (_, link) => `](${repo}/blob/${ref}/${link})`)
     // Its images, from GitHub's raw files: a page link would show no picture.
     .replace(
       /\b(src|srcset)="(?![a-z]+:)([^"]+)"/g,
-      (_, attribute, file) => `${attribute}="${repo.replace('github.com', 'raw.githubusercontent.com')}/main/${file}"`,
+      (_, attribute, file) =>
+        `${attribute}="${repo.replace('github.com', 'raw.githubusercontent.com')}/${ref}/${file}"`,
     );
   fs.writeFileSync(path.join(app, 'README.md'), absolute);
 }
