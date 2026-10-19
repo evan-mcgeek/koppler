@@ -28,7 +28,7 @@ test('Run shows what will start, with its tunnels and what stays deployed, and s
   await expect(lines.filter({ hasText: 'Starts' })).toContainText('Orders API');
   await expect(lines.filter({ hasText: 'Starts' })).toContainText('Note: use the test account');
   await expect(lines.filter({ hasText: 'Calls deployed QA' })).toContainText('Payments API');
-  await expect(lines.filter({ hasText: 'Opens tunnels' })).toContainText('Database (Postgres) on localhost:5432');
+  await expect(lines.filter({ hasText: 'Opens first' })).toContainText('Database (Postgres) on localhost:5432');
   await page.screenshot({ path: 'test-results/next-review.png' });
 
   await review(page).getByRole('button', { name: 'Cancel' }).click();

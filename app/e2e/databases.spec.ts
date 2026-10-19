@@ -1,6 +1,6 @@
 // Databases on the board: a card for each, hung from its tunnel, switched between the deployed one and the user's own.
 import type { Page } from '@playwright/test';
-import { at, card, expect, saved, STACK, test } from './canvas.ts';
+import { at, card, expect, saved, sent, STACK, test } from './canvas.ts';
 
 const database = (page: Page, name: string) => page.locator('.svelte-flow__node-database').filter({ hasText: name });
 const tunnel = (page: Page) => page.locator('.svelte-flow__node-tunnel');
@@ -92,4 +92,26 @@ test('switching a database to Local asks once where it runs, then the tunnel sta
   await expect(card(page, 'payments')).toContainText('+ DB_HOST={local}');
   expect((await kept)['databases']).toEqual({ 'payments-db': 'local' });
   await page.screenshot({ path: 'test-results/databases-local.png' });
+});
+
+test('the Run review groups databases by where the data lives, and the run carries the Local choice', async ({
+  page,
+  canvas,
+}) => {
+  await database(page, 'Payments').getByText('Local', { exact: true }).click();
+  const form = page.getByRole('form', { name: 'Where your local Payments runs' });
+  await form.getByLabel('Port').fill('5433');
+  await form.getByRole('button', { name: 'Use local' }).click();
+  await page.getByRole('button', { name: 'Run', exact: true }).click();
+  const lines = page.getByRole('dialog').locator('.lines li');
+  const group = (label: string) => lines.filter({ has: page.locator('.verb').getByText(label, { exact: true }) });
+  await expect(group('Opens first')).toContainText('localhost:5432');
+  await expect(group('Deployed QA databases')).toContainText('Orders');
+  await expect(group('On this Mac')).toContainText('Payments');
+  await expect(group('On this Mac')).toContainText('localhost:5433');
+  await expect(group('Starts')).toContainText('1 line changed for this run, undone on Stop');
+  await page.screenshot({ path: 'test-results/databases-review.png' });
+  await page.getByRole('dialog').getByRole('button', { name: 'Run', exact: true }).click();
+  await expect.poll(() => sent(canvas.temp).at(-1)?.data['databases']).toEqual({ 'payments-db': 'local' });
+  expect(sent(canvas.temp).at(-1)?.text).toContain("DATABASE Payments: local, the user's own on this Mac");
 });
