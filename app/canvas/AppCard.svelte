@@ -98,6 +98,14 @@
     aria-label="{data.name} actions"
     onpointerenter={show}
     onpointerleave={hide}
+    onwheel={event => {
+      // The bar sits outside the board's pan layer: its scroll moves the board as anywhere else.
+      event.preventDefault();
+      event.currentTarget
+        .closest('.svelte-flow')
+        ?.querySelector('.svelte-flow__zoom')
+        ?.dispatchEvent(new WheelEvent('wheel', event));
+    }}
   >
     {#if runs.started.includes(id)}
       <button
