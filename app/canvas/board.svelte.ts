@@ -430,10 +430,16 @@ class Board {
   });
   /**
    * The cards that are an app's own and go where it goes: its tunnels, and the queues nothing else on the board uses.
-   * A queue shared with another app, or with an outside system that sends to it or reads it, is a card of the flow.
+   * A queue shared with another app, or with an outside system that sends to it or reads it, is a card of the flow; so
+   * is one that feeds another queue on the board, or is fed by one.
    */
   ownedBy(id: string): string[] {
-    const alone = (queue: { pubs: string[]; reads: string[] }) =>
+    const shown = new Set(this.shownQueues.map(one => one.id));
+    const chained = (queue: string) =>
+      Object.keys(this.#registry?.queues?.[queue]?.feeds ?? {}).some(to => shown.has(to)) ||
+      this.shownQueues.some(one => Object.hasOwn(one.queue.feeds ?? {}, queue));
+    const alone = (queue: { id: string; pubs: string[]; reads: string[] }) =>
+      !chained(queue.id) &&
       [...queue.pubs, ...queue.reads]
         .filter(app => this.#onBoard.has(app) || (this.#outside(app) && !this.hiddenOutside[app]))
         .every(app => app === id);
