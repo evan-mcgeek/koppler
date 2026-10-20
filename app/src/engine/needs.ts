@@ -8,6 +8,7 @@ import { isProtected } from '../core/plan.ts';
 import { planSteps, planTunnels, tunnelKind } from '../core/ports.ts';
 import { isSignIn, signInOf, type DeclaredSignIn } from '../core/sign-in.ts';
 import { readClones, readData, readStack } from '../data.ts';
+import { devicePage, sdkSignIn } from './aws-sso.ts';
 import { APPROVE, approved, checksFor, envGaps, stackCommands, startsFromStack } from './checks.ts';
 import { storeOf } from '../core/stack.ts';
 
@@ -69,6 +70,8 @@ export interface Step {
   browser?: true;
   /** The stack does not say this for the environment. */
   gap?: true;
+  /** What still holds once it is done. */
+  note?: string | undefined;
 }
 type Shown = Step & { apps: string[]; done: boolean | null };
 export interface Needs {
@@ -207,6 +210,10 @@ const inHosts = (file: string, host: string) => {
   }
 };
 
+/** What to expect from an app whose AWS SDK keeps its own copy of an sso-session sign-in, and that copy has expired. */
+export const sdkNote = (apps: string[], startUrl: string): string =>
+  `${apps.join(', ')} may still ask for ${apps.length === 1 ? 'its' : 'their'} own AWS sign-in in the browser when ${apps.length === 1 ? 'it starts' : 'they start'}: older AWS SDKs read the sign-in from another place, where it has expired. Approve it at ${devicePage(startUrl)} with the code from the app's log; Koppler shows it while it waits.`;
+
 /** Live checks: true when done, false when not, null when it cannot be told. */
 export function isDone(
   check: Check,
@@ -287,6 +294,7 @@ function print(found: Needs, names: string[], onProtected: boolean, notSetUp: st
   }
   const done = steps.filter(step => step.done === true);
   if (done.length) console.log(`\n  Already done: ${done.map(step => step.title).join('; ')}.`);
+  for (const step of done) if (step.note) console.log(`  ${step.note}`);
   console.log(`\n  Koppler does the rest: ${found.koppler.join(', ')}.`);
 }
 
@@ -437,7 +445,13 @@ export function needs(
     .sort((a, b) => rank(a) - rank(b))
     .map((step): Shown => {
       const done = step.gap ? false : isDone(step.check, world);
-      return { ...step, done, title: done && step.doneTitle ? step.doneTitle : step.title };
+      const sdk = done && step.check.sso ? sdkSignIn(step.check.sso) : null;
+      return {
+        ...step,
+        done,
+        title: done && step.doneTitle ? step.doneTitle : step.title,
+        ...(sdk && !sdk.holds && { note: sdkNote(step.apps, sdk.startUrl) }),
+      };
     });
   // A tunnel whose port already answers is not opened again.
   const open = (port: number) => /\bLISTEN\b/.test(run('lsof', ['-nP', `-iTCP:${String(port)}`, '-sTCP:LISTEN']).out);

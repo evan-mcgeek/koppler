@@ -21,7 +21,8 @@ import { inEffect } from '../core/comments.ts';
 import { switchTo, type Carry } from './branch.ts';
 import { APPROVE, approved, missingTunnels, startsFromStack } from './checks.ts';
 import { link } from './libraries.ts';
-import { isDone } from './needs.ts';
+import { sdkSignIn } from './aws-sso.ts';
+import { isDone, sdkNote } from './needs.ts';
 import { alive, listener, readRecord, records, sh, sleep, startProcess, stopOne } from './processes.ts';
 import { watcherOf } from './watch.ts';
 import * as localQueue from './queues.ts';
@@ -603,7 +604,11 @@ async function startApps(up: Up): Promise<void> {
       const setEnv = up.setEnv[id];
       try {
         const how = runIn === 'mock' ? ['--mock'] : platform ? ['--device', platform] : [];
-        await run([id, '--env', env, ...how], setEnv ? { setEnv } : {});
+        // An app waiting on its own AWS sign-in shows the code to approve on its card.
+        const onPrompt = (said: string) => {
+          step(id, 'Start', 'user', said);
+        };
+        await run([id, '--env', env, ...how], { ...(setEnv && { setEnv }), onPrompt });
       } catch (error) {
         if (!(error instanceof Failure)) throw error;
         console.error(error.message);
@@ -693,6 +698,10 @@ async function carryOut(deployed: Registry, args: string[]): Promise<void> {
     fail(
       `Sign in first: ${apps.join(', ')} ${apps.length === 1 ? 'needs' : 'need'} ${expired.map(one => one.signIn.what).join(' and ')} at start, and the sign-in has expired${expired.some(one => one.signIn.account) ? ' or is on another account' : ''}. In your own terminal:\n${expired.map(one => `  ${one.signIn.login}`).join('\n')}\nthen run again`,
     );
+  }
+  for (const { signIn, apps } of signIns.values()) {
+    const sdk = 'argv' in signIn.check ? sdkSignIn(signIn.check.argv.at(-1) ?? '') : null;
+    if (sdk && !sdk.holds) console.log(sdkNote(apps, sdk.startUrl));
   }
   // What a sign-in of the stack's gives its apps is passed to them at start.
   const given = Object.fromEntries(
