@@ -524,6 +524,7 @@
   }}
 >
   <SvelteFlow
+    class={{ panning }}
     bind:nodes={
       () => board.flowNodes(),
       (drawn: (CardNode | InfraNode)[]) => {
@@ -901,6 +902,10 @@
 </div>
 
 <style>
+  /* Moving the board, a drag or scroll on a card's action bar moves it too. */
+  :global(.svelte-flow.panning .svelte-flow__node-toolbar) {
+    pointer-events: none;
+  }
   .links .hit {
     fill: none;
     stroke: transparent;
