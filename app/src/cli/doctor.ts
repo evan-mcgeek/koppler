@@ -135,7 +135,14 @@ export async function doctor(args: string[]): Promise<void> {
   const env = envOf(stack, args);
   const ids = positional(args, ['--env', '--no-tunnels']);
   // Approving runs commands from a shared file on this Mac: only a person at the terminal can say yes, never --yes.
-  const tools = await checkTools({ approve: args.includes('--approve'), confirm: question => confirm(question) });
+  const atTerminal = (question: string) => {
+    if (!process.stdin.isTTY)
+      fail(
+        'not approved: approving needs you to answer at a terminal. Run koppler doctor --approve in your own terminal window, not through an agent or a ! command',
+      );
+    return confirm(question);
+  };
+  const tools = await checkTools({ approve: args.includes('--approve'), confirm: atTerminal });
   if (tools.error !== undefined) fail(tools.error);
   const forNeeds = args.filter(arg => arg !== '--secrets' && arg !== '--approve');
   const todo = ids.length ? needs(forNeeds, { skill: APP, collect: json }) : undefined;
