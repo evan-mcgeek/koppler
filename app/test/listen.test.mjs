@@ -60,6 +60,13 @@ test('The cases a connection must survive, each in its own folder.', async () =>
     const first = run(t, 'take'); assert.match(first.stdout, /run 1/); assert.doesNotMatch(first.stdout, /run 2/);
     assert.match(run(t, 'take').stdout, /run 2/); }
 
+  // An inbox with no prompt in it hands nothing over: the listener keeps waiting for the next real one.
+  { const t = fresh(); fs.writeFileSync(t.file('prompts.jsonl'), '\nnot json\n');
+    const a = await begin(t, 'take'); assert.match(a.out, /connected as session/);
+    await wait(1500); assert.equal(a.code, null);
+    fs.writeFileSync(t.file('prompts.jsonl'), prompt(4)); await ended(a);
+    assert.equal(a.code, 0); assert.match(a.out, /run 4/); }
+
   // After a disconnect, a session cannot come back by listening again as itself.
   { const t = fresh(); const a = await begin(t, 'take'), id = a.out.match(/session (\w+)/)[1];
     assert.match(run(t, 'stop').stdout, /^Disconnected/); await ended(a);
