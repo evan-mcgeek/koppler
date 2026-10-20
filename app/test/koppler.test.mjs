@@ -461,6 +461,19 @@ test('A board is changed from the terminal: kept at once, queued for an open can
   assert.equal(read('state').presets.find(one => one.name === 'Shop').layout, undefined);
   assert.equal(read('board-edits').edits.at(-1).edit.arrange, true);
   assert.deepEqual(read('state').presets.find(one => one.name === 'Empty one').nodes, {});
+  // Deleted: one of the user's boards goes to Recently deleted, queued for an open canvas; a team board is not theirs to delete.
+  const gone = koppler('board', 'delete', 'empty ONE');
+  assert.equal(gone.code, 0, gone.out);
+  assert.match(gone.out, /DELETED Empty one; Recently deleted/);
+  assert.equal(read('state').presets.some(one => one.name === 'Empty one'), false);
+  assert.equal(read('state').trash[0].name, 'Empty one');
+  assert.ok(read('state').trash[0].deleted);
+  assert.deepEqual([read('board-edits').edits.at(-1).board, read('board-edits').edits.at(-1).delete], ['Empty one', true]);
+  // Team was copied as the user's own above: that copy goes, and the team's stays in the stack, not theirs to delete.
+  assert.equal(koppler('board', 'delete', 'Team').code, 0);
+  assert.deepEqual(read('registry').presets.map(one => one.name), ['Team']);
+  assert.match(koppler('board', 'delete', 'Team').out, /Team is not one of your boards/);
+  assert.match(koppler('board', 'delete', 'Nope').out, /Nope is not one of your boards/);
   fs.rmSync(dir, { recursive: true });
 });
 

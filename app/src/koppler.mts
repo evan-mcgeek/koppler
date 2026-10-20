@@ -742,6 +742,7 @@ const COMMANDS: Command[] = [
         'open <file or link> [--no-open]',
         'open a board from a file or a GitHub link: it joins your boards and the canvas shows it; Reload reads it again',
       ],
+      ['delete "<name>"', 'move one of your boards to Recently deleted, where the board picker can bring it back'],
     ],
     about: 'make, change or share a board, even one open on the canvas, which shows the change',
     run: boardCommand,

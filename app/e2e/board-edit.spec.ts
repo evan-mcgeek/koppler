@@ -191,3 +191,19 @@ test('a board opened from a file in the terminal shows on the canvas, and Reload
   await expect(card(page, 'payments')).toBeVisible();
   await expect(page.getByRole('status').filter({ hasText: 'Reloaded Payments flow' })).toBeVisible();
 });
+
+test('a board deleted from the terminal goes to Recently deleted on an open canvas, which says so', async ({
+  page,
+  canvas,
+}) => {
+  await expect(card(page, 'web')).toBeVisible();
+  koppler(canvas, 'board', 'delete', 'Shop');
+  await expect(page.getByRole('status')).toContainText('The agent deleted Shop. Recently deleted brings it back.');
+  await expect.poll(() => waiting(canvas.temp)).toBe(0);
+  // The page keeps it gone, so its own copy never brings the board back.
+  // With no board of the user's left, the page saves no list at all.
+  const own = () => (state(canvas.temp) as { presets?: { name: string }[] }).presets ?? [];
+  await expect.poll(() => own().some(one => one.name === 'Shop')).toBe(false);
+  await page.getByRole('button', { name: /^Board:/ }).click();
+  await expect(page.getByText('Recently deleted (1)')).toBeVisible();
+});
