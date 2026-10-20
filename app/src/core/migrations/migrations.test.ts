@@ -156,14 +156,14 @@ test("0.2.1: a stack 0.2.0 left alone gets its databases, each tunnel's command 
         if (need.tunnel?.startsWith('aurora'))
           Object.assign(need, { cmd: `open ${need.tunnel}`, note: `${app.name} reads it` });
   const done = migrateStack(stamped as never);
-  expect(done.applied?.map(one => one.migration.version)).toEqual(['0.2.1']);
+  expect(done.applied?.map(one => one.migration.version)).toEqual(['0.2.1', '0.2.2']);
   const stack = done.value as unknown as OldStack & { databases: Record<string, Record<string, unknown>> };
   expect(stack.databases['orders']).toMatchObject({
     cmd: 'open aurora.qa.acme.example',
     envs: { prod: { cmd: 'open aurora.prod.acme.example' } },
   });
   expect(stack.apps['payments']?.uses).toEqual({ orders: { note: 'Payments API reads it' } });
-  expect(stack).toMatchObject({ koppler: '0.2.1' });
+  expect(stack).toMatchObject({ koppler: '0.2.2' });
 });
 
 test('a database its tunnel only calls "Database" is named after its host, without the environment', () => {
@@ -196,4 +196,49 @@ test('0.2.0 leaves a stack alone when it cannot keep every need, and one already
   expect(done.applied?.[0]?.changes).toEqual([]);
   expect((done.value as { databases?: unknown }).databases).toBeUndefined();
   expect(migrateStack(migrated(old).value as never).applied).toEqual([]);
+});
+
+test('0.2.2: a stack that still names a removed app on its team boards and in other apps no longer does', () => {
+  const left = {
+    koppler: '0.2.1',
+    envs: ['qa'],
+    apps: {
+      web: {
+        name: 'Web',
+        kind: 'node',
+        slug: 'acme/web',
+        after: ['orders-api', 'cart'],
+        consumes: { 'orders-api': {}, cart: {} },
+      },
+      cart: { name: 'Cart', kind: 'node', slug: 'acme/cart', after: ['orders-api'] },
+    },
+    presets: [
+      {
+        name: 'Checkout',
+        version: 1,
+        nodes: { web: { run: 'cli' }, 'orders-api': { run: 'cli' }, cart: {} },
+        edges: [
+          { from: 'web', to: 'orders-api' },
+          { from: 'web', to: 'cart' },
+        ],
+      },
+      { name: 'Cart', version: 1, nodes: { cart: {} }, edges: [] },
+    ],
+  };
+  const done = migrateStack(left);
+  expect(done.applied?.map(one => [one.migration.version, one.changes])).toEqual([
+    ['0.2.2', ['mentions of removed apps taken out']],
+  ]);
+  expect(done.value).toMatchObject({
+    koppler: '0.2.2',
+    apps: { web: { after: ['cart'], consumes: { cart: {} } } },
+    presets: [{ nodes: { web: { run: 'cli' }, cart: {} }, edges: [{ from: 'web', to: 'cart' }] }, left.presets[1]],
+  });
+  expect((done.value as typeof left).apps.cart).toEqual({ name: 'Cart', kind: 'node', slug: 'acme/cart' });
+  expect(migrateStack(done.value as never).value).toEqual(done.value);
+  const whole = {
+    ...left,
+    apps: { ...left.apps, 'orders-api': { name: 'Orders', kind: 'node', slug: 'acme/orders-api' } },
+  };
+  expect(migrateStack(whole).applied?.[0]?.changes).toEqual([]);
 });
