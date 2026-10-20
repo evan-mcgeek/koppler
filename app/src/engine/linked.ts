@@ -4,7 +4,7 @@
 import path from 'node:path';
 import { validateStack } from '../core/stack.ts';
 import { fileUrl, githubFile, proposeFile, readFile, type GithubFile } from '../github.ts';
-import { setStack } from './stacks.ts';
+import { setStack, switchRefused } from './stacks.ts';
 import { configDir } from '../paths.ts';
 import { readJson, writeJson } from '../json-files.ts';
 
@@ -69,13 +69,16 @@ export async function linkStack(
   const dir = path.join(configDir(), 'stacks', slug);
   const old = sourceOf(dir);
   if (old && old.url !== fileUrl(file)) return { error: `A different linked stack already uses the name ${slug}.` };
+  const configFile = path.join(configDir(), 'config.json');
+  const using = config ?? (readJson(configFile) as Config | null) ?? {};
+  const refused = switchRefused(using, dir);
+  if (refused) return { error: refused };
   if (!old) {
     writeJson(path.join(dir, 'stack.json'), got.stack);
     writeJson(path.join(dir, SOURCE), { url: fileUrl(file), file, base: got.stack, fetchedAt: stamp() });
   }
-  const configFile = path.join(configDir(), 'config.json');
   setStack(
-    config ?? (readJson(configFile) as Config | null) ?? {},
+    using,
     dir,
     save ??
       (next => {

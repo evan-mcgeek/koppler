@@ -59,15 +59,22 @@ const moveFiles = (from: string, to: string, make = true) => {
   for (const file of there) fs.renameSync(path.join(from, file), path.join(to, file));
 };
 
+/** Why the stack in use cannot be switched to `dir` now, or null when it can: asked before writing anything for it. */
+export function switchRefused(config: Config, dir: string): string | null {
+  const from = config.stack;
+  if (from && path.resolve(from) === path.resolve(dir)) return null;
+  // The undo log goes with its stack: switched away mid-run, a Stop would find nothing to revert.
+  const logged = readJson<unknown[]>(path.join(tempDir(), 'actions.json'), []);
+  return Array.isArray(logged) && logged.length
+    ? 'the run on this stack still has changes to undo; stop and revert it first (canvas, or koppler down), then switch'
+    : null;
+}
+
 export function setStack(config: Config, dir: string, save: Save = saveConfig): void {
   const from = config.stack;
   if (from && path.resolve(from) === path.resolve(dir)) return;
-  // The undo log goes with its stack: switched away mid-run, a Stop would find nothing to revert.
-  const logged = readJson<unknown[]>(path.join(tempDir(), 'actions.json'), []);
-  if (Array.isArray(logged) && logged.length)
-    throw new Failure(
-      'the run on this stack still has changes to undo; stop and revert it first (canvas, or koppler down), then switch',
-    );
+  const refused = switchRefused(config, dir);
+  if (refused) throw new Failure(refused);
   const shelf = (stack: string) => path.join(tempDir(), 'stacks', stackKey(stack));
   if (from) {
     fs.mkdirSync(shelf(from), { recursive: true });
@@ -132,6 +139,8 @@ export function createStack(
       .replace(/^-+|-+$/g, '') || 'stack';
   const folder = path.join(dir, slug);
   if (fs.existsSync(path.join(folder, 'stack.json'))) return { error: `You already have a stack called ${name}.` };
+  const refused = switchRefused(config, folder);
+  if (refused) return { error: refused };
   writeJson(path.join(folder, 'stack.json'), { name, envs, apps: {} });
   setStack(config, folder, save);
   return { stack: folder };
