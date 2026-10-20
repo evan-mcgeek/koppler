@@ -1,3 +1,5 @@
+import fs from 'node:fs';
+import path from 'node:path';
 // Databases on the board: a card for each, hung from its tunnel, switched between the deployed one and the user's own.
 import type { Locator, Page } from '@playwright/test';
 import { at, card, expect, saved, sent, STACK, test } from './canvas.ts';
@@ -68,6 +70,7 @@ test('hiding the tunnel for one app draws its cable straight to the database, la
 
 test('switching a database to Local asks once where it runs, then the tunnel stays open for the other', async ({
   page,
+  canvas,
 }) => {
   await database(page, 'Payments').getByText('Local', { exact: true }).click();
   const form = page.getByRole('form', { name: 'Where your local Payments runs' });
@@ -77,7 +80,6 @@ test('switching a database to Local asks once where it runs, then the tunnel sta
   // Asking, the switch stays on Deployed.
   await expect(database(page, 'Payments').getByRole('radio', { name: 'Deployed' })).toBeChecked();
   await page.screenshot({ path: 'test-results/databases-ask.png' });
-  const kept = saved(page).then(r => r.request().postDataJSON() as Record<string, unknown>);
   await form.getByRole('button', { name: 'Use local' }).click();
   await expect(form).toBeHidden();
   await expect(database(page, 'Payments')).toContainText('On this Mac');
@@ -90,7 +92,14 @@ test('switching a database to Local asks once where it runs, then the tunnel sta
   await expect(card(page, 'payments')).toContainText('Payments · Local');
   await card(page, 'payments').getByRole('button', { name: 'Show change' }).click();
   await expect(card(page, 'payments')).toContainText('+ DB_HOST={local}');
-  expect((await kept)['databases']).toEqual({ 'payments-db': 'local' });
+  await expect
+    .poll(
+      () =>
+        (JSON.parse(fs.readFileSync(path.join(canvas.temp, 'state.json'), 'utf8')) as Record<string, unknown>)[
+          'databases'
+        ],
+    )
+    .toEqual({ 'payments-db': 'local' });
   await page.screenshot({ path: 'test-results/databases-local.png' });
 });
 
