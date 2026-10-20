@@ -125,6 +125,11 @@ function keepUnseen(layout: Record<string, unknown>, seen: unknown): Record<stri
 
 export const ROUTES: Record<string, Route> = {
   '/state': body => {
+    // A page still showing the stack it opened with, after a switch, would put its boards in the other one.
+    const shown = body['stack'];
+    const using = currentStack();
+    if (typeof shown === 'string' && shown && using && path.resolve(shown) !== path.resolve(using))
+      return { status: 409 };
     const layout = sanitizeLayout(body);
     if (!layout) return { status: 400 };
     writeData('state', keepUnseen(layout, body['seen']));

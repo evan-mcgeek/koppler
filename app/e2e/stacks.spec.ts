@@ -1,8 +1,12 @@
 // The new canvas's stack picker: every stack on this machine, switching to another, and the wait while one loads.
+import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Page } from '@playwright/test';
+import { fileURLToPath } from 'node:url';
 import { test, expect, STACK } from './canvas.ts';
+
+const here = path.dirname(fileURLToPath(import.meta.url));
 
 test.use({
   board: { env: 'qa', mode: 'auto', nodes: { web: { x: 0, y: 0, run: 'cli', branch: 'main' } }, edges: [] },
@@ -51,6 +55,27 @@ test('the picker lists the stacks, and switching loads the other one behind a no
   await expect(picker(page, 'Other Stack')).toBeVisible({ timeout: 20000 });
   await expect(page.getByRole('complementary')).toContainText('Reports');
   await expect(notice(page)).toHaveCount(0);
+});
+
+test('a page still on the stack it opened with saves nothing into the one switched to', async ({ page, canvas }) => {
+  const { other } = twoStacks(canvas);
+  const state = path.join(canvas.temp, 'state.json');
+  const board = { name: 'Acme checkout', nodes: { web: { x: 0, y: 0 } }, edges: [] };
+  fs.writeFileSync(state, JSON.stringify({ ...JSON.parse(fs.readFileSync(state, 'utf8')), presets: [board] }));
+  await page.reload();
+  await expect(picker(page, 'Acme Shop')).toBeVisible();
+  // `koppler use` in the terminal, before the page has heard of it.
+  await page.route('**/data/status.json', route => route.fulfill({ json: { apps: {} } }));
+  execFileSync('node', [path.join(here, '..', 'dist', 'koppler.mjs'), 'use', other], {
+    env: { ...process.env, KOPPLER_CONFIG_DIR: path.join(canvas.dir, 'config'), KOPPLER_TEMP: canvas.temp },
+  });
+  const saved = page.waitForResponse(answer => answer.url().includes('/state'));
+  await page.getByRole('button', { name: 'Arrange' }).click();
+  const answer = await saved;
+  const names = (file: string) =>
+    ((JSON.parse(fs.readFileSync(file, 'utf8')) as { presets?: { name: string }[] }).presets ?? []).map(b => b.name);
+  expect(fs.existsSync(state) ? names(state) : []).not.toContain('Acme checkout');
+  expect(answer.status()).toBe(409);
 });
 
 test('a stack loaded from elsewhere is named over the board, which waits', async ({ page, canvas }) => {

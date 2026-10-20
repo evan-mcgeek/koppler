@@ -1898,6 +1898,7 @@ class Board {
       preset: this.name,
       presets: this.own,
       seen: this.#seen,
+      stack: this.dir,
       trash: this.trash,
       recent: this.recent,
       scratch: this.scratch || undefined,
