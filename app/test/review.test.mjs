@@ -1,5 +1,6 @@
 // Cases a review of the engine found: an undo that reported more than it did, a run on an environment with another's
 // tunnels, a stack switched under a run, and stack facts that changed after the user allowed them.
+import './sandbox.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';

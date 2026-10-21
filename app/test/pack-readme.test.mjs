@@ -1,4 +1,5 @@
 // The README packed for npmjs.com points at the release's tag, so its links and pictures outlive changes on main.
+import './sandbox.mjs';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';

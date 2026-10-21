@@ -1,4 +1,5 @@
 // The documentation's screenshots: `npm run screenshots` drives the canvas on a demo stack and writes docs/images/.
+import './test/sandbox.mjs';
 import { defineConfig } from '@playwright/test';
 
 export default defineConfig({

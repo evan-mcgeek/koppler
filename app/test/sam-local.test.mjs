@@ -1,3 +1,4 @@
+import './sandbox.mjs';
 import assert from 'node:assert/strict';
 import { declared, functions, overrides } from '../dist/sam-local.mjs';
 import { test } from 'node:test';
