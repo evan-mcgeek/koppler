@@ -45,12 +45,17 @@ export function missingCalls(
   const { unique } = hostOwners(stack);
   const found: Record<string, Record<string, string>> = {};
   for (const [caller, app] of Object.entries(stack.apps)) {
-    const hosts = [...unique].filter(([, owner]) => owner !== caller).map(([host]) => host);
+    // Apps built from the same repo share its code, so their addresses and calls are not this app's calls.
+    const slug = app.slug?.toLowerCase();
+    const repoApps = Object.entries(stack.apps).filter(
+      ([id, other]) => id === caller || (slug && other.slug?.toLowerCase() === slug),
+    );
+    const hosts = [...unique].filter(([, owner]) => !repoApps.some(([id]) => id === owner)).map(([host]) => host);
     if (!hosts.length) continue;
     for (const line of grepRepo(caller, hosts)) {
       const host = hosts.find(one => line.toLowerCase().includes(one));
       const callee = host && unique.get(host);
-      if (!callee || app.consumes?.[callee] || found[caller]?.[callee]) continue;
+      if (!callee || repoApps.some(([, other]) => other.consumes?.[callee]) || found[caller]?.[callee]) continue;
       (found[caller] ??= {})[callee] = line.slice(0, 200);
     }
   }

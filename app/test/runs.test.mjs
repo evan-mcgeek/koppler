@@ -8,10 +8,11 @@ import { readRuns, runRecord } from '../dist/engine/history.js';
 import { strays } from '../dist/engine/runs.js';
 import { test } from 'node:test';
 
-// Never the user's own run folder.
-const empty = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-runs-empty-'));
-process.env.KOPPLER_TEMP = empty;
 const here = path.dirname(fileURLToPath(import.meta.url));
+// In-process calls read the stack too: never the user's own.
+const sandbox = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-runs-own-'));
+Object.assign(process.env, { KOPPLER_STATE: sandbox, KOPPLER_TEMP: sandbox, KOPPLER_CONFIG_DIR: sandbox });
+process.on('exit', () => fs.rmSync(sandbox, { recursive: true, force: true }));
 const send = (id, nodes, edges = [], extra = {}) => ({ tag: 'koppler', at: `2026-01-01T00:00:0${id.at(-1)}Z`, data: { id, env: 'qa', mode: 'auto', nodes, edges, evil: '<script>', plan: { starts: nodes.map(n => ({ id: n.id, why: [] })), restarts: [], stops: [], keeps: [{ id: '../bad' }] }, ...extra } });
 
 let add, dir, done, env, koppler, lines, rec;
@@ -52,7 +53,7 @@ test('The commands, end to end in a throwaway folder: plan, applied, a changed b
 test('An app with nothing to run never makes it into a run, and koppler up refuses it by name.', async () => {
   process.env.KOPPLER_TEMP = dir;
   assert.deepEqual(Object.keys(runRecord(send('run0003', [{ id: 'api', run: 'cli' }, { id: 'docs', run: 'cli' }])).nodes), ['api']);
-  process.env.KOPPLER_TEMP = empty;
+  delete process.env.KOPPLER_TEMP;
   assert.match(koppler('up', 'docs'), /Docs does not run on this Mac: a library, nothing to run/);
   add(runRecord(send('run0004', [{ id: 'api', run: 'cli' }, { id: 'web', run: 'cli' }, { id: 'app', run: 'ide' }])));
   assert.match(koppler('plan'), /START: Orders API, Web, app\n {2}This is what the user confirmed on the canvas\./);

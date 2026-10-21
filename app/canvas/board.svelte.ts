@@ -397,19 +397,23 @@ class Board {
     return !!this.#registry?.apps[id]?.outside;
   }
   /** The queues of the stack that an app on the board publishes to or reads, with who uses each. */
-  boardQueues = $derived.by(() => {
-    const apps = this.#registry?.apps ?? {};
-    return Object.entries(this.#registry?.queues ?? {}).flatMap(([id, queue]) => {
-      const users = (how: 'publishes' | 'reads') =>
-        Object.keys(apps).filter(
-          app => Object.hasOwn(apps[app]?.[how] ?? {}, id) && (this.#onQueues.has(app) || this.#outside(app)),
-        );
-      const [pubs, reads] = [users('publishes'), users('reads')];
+  boardQueues = $derived.by(() =>
+    Object.entries(this.#registry?.queues ?? {}).flatMap(([id, queue]) => {
+      const { pubs, reads } = this.#usersOf(id);
       // A queue between two apps stays for the one that is still on it.
       const shown = !this.hiddenQueues[id] && [...pubs, ...reads].some(app => this.#onQueues.has(app));
       return shown ? [{ id, queue, pubs, reads, upstream: false }] : [];
-    });
-  });
+    }),
+  );
+  /** Who publishes to a queue and who reads it: the apps on the board still on their queues, and outside systems. */
+  #usersOf(id: string): { pubs: string[]; reads: string[] } {
+    const apps = this.#registry?.apps ?? {};
+    const users = (how: 'publishes' | 'reads') =>
+      Object.keys(apps).filter(
+        app => Object.hasOwn(apps[app]?.[how] ?? {}, id) && (this.#onQueues.has(app) || this.#outside(app)),
+      );
+    return { pubs: users('publishes'), reads: users('reads') };
+  }
   /**
    * The queues on the board, and above them what feeds them, however far up: a Kafka topic piped onto a bus that a rule
    * forwards to the queue an app reads. Those upstream stay deployed.
@@ -422,7 +426,7 @@ class Board {
       grew = false;
       for (const [id, queue] of all)
         if (!has(id) && !this.hiddenQueues[id] && Object.keys(queue.feeds ?? {}).some(has)) {
-          shown.push({ id, queue, pubs: [], reads: [], upstream: true });
+          shown.push({ id, queue, ...this.#usersOf(id), upstream: true });
           grew = true;
         }
     }

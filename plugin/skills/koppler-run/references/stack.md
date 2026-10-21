@@ -182,6 +182,7 @@ The draft, with a `suggestions` block shaped like `stack.json`, goes to `<state>
 
 `sso` is shorthand for an AWS profile.
 Add `account` (the 12-digit id) next to it when the profile must be one account: signed in to another one then counts as not signed in, and nothing starts.
+A profile with an `sso_session` can still make an app on an older AWS SDK ask for its own browser sign-in: `koppler doctor` and `koppler up` say so beforehand, and while the app waits `koppler up` prints the page and code to approve and shows them on its card; pass them on to the user.
 A declared sign-in does the same inside its own `check` command.
 Any other sign-in (Azure, Google Cloud, Firebase, a company tool) is declared once at the top of the stack and named by the apps that need it:
 

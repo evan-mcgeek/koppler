@@ -300,7 +300,7 @@ test('A start command from the stack runs only once the user allowed it, and nee
   assert.equal(fs.existsSync(marker), false, 'nothing ran before approval');
   // Only a person at a terminal can approve: not a script, not with --yes.
   const tried = koppler('doctor', '--approve', '--yes');
-  assert.match(tried.out, /touch [\s\S]*not approved/);
+  assert.match(tried.out, /touch [\s\S]*not approved: approving needs you to answer at a terminal/);
   assert.equal(koppler('run', 'api').code, 1);
   allowStack(dir, first);
   assert.equal(koppler('run', 'api').code, 0);

@@ -63,3 +63,38 @@ test('the topic and the buses that feed a queue an app reads stack above it, eac
   expect((await labels.allTextContents()).sort()).toEqual(['pipe', 'rule', 'rule to Lambda']);
   await page.screenshot({ path: 'test-results/next-queue-feeds.png' });
 });
+
+test.describe('outside systems on a chain upstream of a queue an app reads', () => {
+  test.use({
+    stack: {
+      ...STACK,
+      queues: {
+        'crm-topic': { name: 'CRM topic', type: 'kafka', feeds: { events: { via: 'pipe' } } },
+        events: { name: 'Events bus', type: 'eventbridge', feeds: { 'shop-bus': { via: 'rule' } } },
+        'shop-bus': { name: 'Shop bus', type: 'eventbridge' },
+      },
+      apps: {
+        ...STACK.apps,
+        orders: { ...STACK.apps.orders, reads: { 'shop-bus': { via: 'rule to Lambda' } } },
+        crm: { name: 'Acme CRM', kind: 'other', outside: 'SaaS', publishes: { 'crm-topic': {} } },
+        bridge: {
+          name: 'Acme Bridge',
+          kind: 'other',
+          outside: 'Lambda',
+          reads: { 'crm-topic': { via: 'pipe' } },
+          publishes: { events: {} },
+        },
+      },
+    },
+  });
+
+  test('keep their cards and their links to the queues they publish to and read', async ({ page }) => {
+    await expect(queue(page)).toHaveCount(3);
+    const outside = page.locator('.svelte-flow__node-outside');
+    await expect(outside.filter({ hasText: 'Acme CRM' })).toBeVisible();
+    await expect(outside.filter({ hasText: 'Acme Bridge' })).toBeVisible();
+    // CRM to its topic, the topic to the bridge, the bridge to the bus, two feeds, and the bus to Orders API.
+    await expect(page.locator('.links .flow')).toHaveCount(6);
+    await page.screenshot({ path: 'test-results/next-queue-feeds-outside.png' });
+  });
+});

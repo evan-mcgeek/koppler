@@ -78,6 +78,42 @@ test('koppler canvas --new-address gives a running canvas a new address, and the
   }
 });
 
+test('koppler remove takes the app off the team boards and the other apps\' order, so the stack stays valid; one left invalid reads again', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-remove-'));
+  try {
+    const stack = path.join(dir, 'stack');
+    fs.mkdirSync(stack);
+    const file = path.join(stack, 'stack.json');
+    const apps = { web: { name: 'Web', kind: 'node', slug: 'acme/web', after: ['orders-api'], consumes: { 'orders-api': {} } }, 'orders-api': { name: 'Orders API', kind: 'node', slug: 'acme/orders-api' }, cart: { name: 'Cart', kind: 'node', slug: 'acme/cart' } };
+    const presets = [{ name: 'Checkout', version: 1, nodes: { web: { run: 'cli' }, 'orders-api': { run: 'cli' }, cart: { run: 'cli' } }, edges: [{ from: 'web', to: 'orders-api' }, { from: 'web', to: 'cart' }] }];
+    fs.writeFileSync(file, JSON.stringify({ name: 'Acme Shop', koppler: '0.2.1', envs: ['qa'], apps, presets }));
+    const env = { ...process.env, HOME: dir, KOPPLER_STATE: path.join(dir, 'state'), KOPPLER_TEMP: path.join(dir, 'temp'), KOPPLER_CONFIG_DIR: path.join(dir, 'config') };
+    delete env.CLAUDE_CODE_SESSION_ID;
+    const koppler = (...args) => spawnSync('node', [entry, ...args], { encoding: 'utf8', env });
+    assert.equal(koppler('init', '--root', path.join(dir, 'code'), '--stack', stack, '--no-fetch').status, 0);
+    const removed = koppler('remove', 'orders-api');
+    assert.equal(removed.status, 0, removed.stderr);
+    assert.match(removed.stdout, /^Removed Orders API from the stack/m);
+    const after = JSON.parse(fs.readFileSync(file, 'utf8'));
+    assert.deepEqual(Object.keys(after.presets[0].nodes), ['web', 'cart']);
+    assert.deepEqual(after.presets[0].edges, [{ from: 'web', to: 'cart' }]);
+    assert.equal(after.apps.web.after, undefined);
+    assert.deepEqual(after.apps.web.consumes, {});
+    // A stack an older Koppler saved this way, Cart gone but still on the board, reads as valid again.
+    const { cart, ...left } = apps;
+    fs.writeFileSync(file, JSON.stringify({ name: 'Acme Shop', koppler: '0.2.1', envs: ['qa'], apps: left, presets }));
+    const read = koppler('stack', 'get', 'presets');
+    assert.equal(read.status, 0, read.stderr);
+    assert.doesNotMatch(read.stdout + read.stderr, /invalid/);
+    const healed = JSON.parse(fs.readFileSync(file, 'utf8'));
+    assert.deepEqual(Object.keys(healed.presets[0].nodes), ['web', 'orders-api']);
+    assert.deepEqual(healed.presets[0].edges, [{ from: 'web', to: 'orders-api' }]);
+    assert.deepEqual(healed.apps.web.after, ['orders-api']);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('koppler init --new refused while a run has changes to undo creates no stack', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-new-'));
   try {

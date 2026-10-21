@@ -9,6 +9,7 @@ import { fail, Failure } from '../failure.ts';
 import { CODE, logsDir, stateDir, tempDir } from '../paths.ts';
 import { appEnv } from '../safe-env.ts';
 import { redact } from '../scrub.ts';
+import { devicePrompt } from './aws-sso.ts';
 import { keepRunLog } from './run-logs.ts';
 import { keepPreviousLog } from './session.ts';
 import { APP_ID } from '../ids.ts';
@@ -74,6 +75,8 @@ export interface RunOptions {
   ready?: Ready;
   /** It runs to completion: the start waits for it to end with this exit code. */
   once?: Once;
+  /** Told what the user must do while the app waits on them, such as a device sign-in its log asks for. */
+  onPrompt?: (said: string) => void;
 }
 /** A step that runs to completion: the exit code it must end with, and the seconds it may take. */
 export interface Once {
@@ -216,10 +219,20 @@ function refuseWhatIsTaken(options: RunOptions): void {
 }
 
 /** Waits until an app with a port answers on it; a crash while it builds is reported, not "started". */
-async function waitForPort(record: ProcessRecord, port: number): Promise<void> {
+async function waitForPort(record: ProcessRecord, port: number, onPrompt?: (said: string) => void): Promise<void> {
   console.log(`waiting for ${record.name} on port ${String(port)}…`);
   const until = Date.now() + START_WAIT;
-  while (Date.now() < until && alive(record) && !listener(port, record.bind)) await sleep(1000);
+  let asked = '';
+  while (Date.now() < until && alive(record) && !listener(port, record.bind)) {
+    const prompt = devicePrompt(tailOf(record.log, 40));
+    const said = prompt ? `sign in to AWS: open ${prompt.page} and enter the code ${prompt.code}` : '';
+    if (said && said !== asked) {
+      console.log(`${record.name} waits for you to ${said}`);
+      onPrompt?.(`Waits for you to ${said}.`);
+      asked = said;
+    }
+    await sleep(1000);
+  }
   if (!alive(record))
     fail(
       `${record.name} exited before answering on port ${String(port)}; last lines of ${record.log}:\n${tailOf(record.log, 15)}`,
@@ -322,7 +335,7 @@ export async function startProcess(options: RunOptions): Promise<ProcessRecord> 
   writeJson(recordPath(name), record);
   await sleep(700);
   if (!alive(record)) fail(`${name} exited right away; last lines of ${log}:\n${tailOf(log, 15)}`);
-  if (record.port) await waitForPort(record, record.port);
+  if (record.port) await waitForPort(record, record.port, options.onPrompt);
   if (record.port && options.ready) await waitUntilReady(record, record.port, options.ready);
   const answering = record.port ? `, answering on port ${String(record.port)}` : '';
   console.log(`started ${name} (pid ${String(record.pid)})${answering}, log ${log}`);
