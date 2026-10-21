@@ -4,6 +4,9 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+const entry = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'dist', 'koppler.mjs');
 let app, branchList, found, hostOwners, missingCalls, remoteKey, repos, slugMatches, stack, validateStack;
 test('Its own folders, set before the sync module loads: these tests switch stacks, which moves the run files of the stack in use.', async () => {
   const sandbox = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-switch-'));
@@ -226,7 +229,7 @@ test('Updating clones: fetch, then fast-forward only a clean branch that is simp
   assert.equal(updateAction({ upstream: 'origin/main', dirty: 1, ahead: 0, behind: 2 }), 'dirty');
   assert.equal(updateAction({ upstream: 'origin/main', dirty: 0, ahead: 1, behind: 2 }), 'diverged');
 
-  const { execFileSync: sh } = await import('node:child_process');
+  const sh = execFileSync;
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-fetch-'));
   const git = (cwd, ...args) => sh('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', ...args], { cwd, encoding: 'utf8' }).trim();
   const origin = path.join(dir, 'origin'), clean = path.join(dir, 'clean'), dirty = path.join(dir, 'dirty');
@@ -245,15 +248,15 @@ test('Updating clones: fetch, then fast-forward only a clean branch that is simp
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
-test('Removing an app: its entry and other apps\' calls to it go; nothing else changes.', async () => {
+test('Removing an app: its entry, other apps\' calls to it and its cards on the team boards go; nothing else changes.', async () => {
   const { removeApp } = await import('../dist/engine/stack-file.js');
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-remove-'));
-  fs.writeFileSync(path.join(dir, 'stack.json'), JSON.stringify({ name: 'S', koppler: '0.2.1', envs: ['qa'], apps: { a: { name: 'A', kind: 'node', slug: 'x/a', consumes: { b: { how: 'env' }, c: { how: 'env' } } }, b: { name: 'B', kind: 'node', slug: 'x/b' }, c: { name: 'C', kind: 'node', slug: 'x/c' } }, presets: [{ name: 'P', version: 1, koppler: '0.1.0', nodes: { a: {}, b: {} }, edges: [] }] }));
+  fs.writeFileSync(path.join(dir, 'stack.json'), JSON.stringify({ name: 'S', koppler: '0.2.2', envs: ['qa'], apps: { a: { name: 'A', kind: 'node', slug: 'x/a', consumes: { b: { how: 'env' }, c: { how: 'env' } } }, b: { name: 'B', kind: 'node', slug: 'x/b' }, c: { name: 'C', kind: 'node', slug: 'x/c' } }, presets: [{ name: 'P', version: 1, koppler: '0.1.0', nodes: { a: {}, b: {} }, edges: [] }] }));
   assert.deepEqual(removeApp('b', { config: { stack: dir } }), { removed: 'b', name: 'B' });
   const after = JSON.parse(fs.readFileSync(path.join(dir, 'stack.json'), 'utf8'));
   assert.deepEqual(Object.keys(after.apps), ['a', 'c']);
   assert.deepEqual(Object.keys(after.apps.a.consumes), ['c']);
-  assert.deepEqual(after.presets[0].nodes, { a: {}, b: {} });
+  assert.deepEqual(after.presets[0].nodes, { a: {} });
   assert.match(removeApp('zzz', { config: { stack: dir } }).error, /not in the stack/);
   fs.rmSync(dir, { recursive: true, force: true });
 });
@@ -262,7 +265,7 @@ test('An outside system joins the stack with the apps that call it; what cannot 
   const { addOutside } = await import('../dist/engine/stack-file.js');
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-outside-'));
   const file = path.join(dir, 'stack.json');
-  fs.writeFileSync(file, JSON.stringify({ name: 'S', koppler: '0.2.1', envs: ['qa'], apps: { a: { name: 'A', kind: 'node', slug: 'x/a', consumes: { b: { how: 'env' } } }, b: { name: 'B', kind: 'node', slug: 'x/b' }, sf: { name: 'Salesforce', kind: 'other', outside: 'SaaS' } } }));
+  fs.writeFileSync(file, JSON.stringify({ name: 'S', koppler: '0.2.2', envs: ['qa'], apps: { a: { name: 'A', kind: 'node', slug: 'x/a', consumes: { b: { how: 'env' } } }, b: { name: 'B', kind: 'node', slug: 'x/b' }, sf: { name: 'Salesforce', kind: 'other', outside: 'SaaS' } } }));
   const opts = { config: { stack: dir } };
   const before = fs.readFileSync(file, 'utf8');
   assert.match(addOutside({ name: ' ' }, opts).error, /Give the outside system a name/);
@@ -315,13 +318,11 @@ test('Any field of the stack is changed through one checked edit: the value that
 test('A locked field is kept as it is by every change, and only the person unlocks it.', async () => {
   const { editStack, removeApp } = await import('../dist/engine/stack-file.js');
   const { setLock } = await import('../dist/engine/locks.js');
-  const { spawnSync } = await import('node:child_process');
-  const { fileURLToPath } = await import('node:url');
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-lock-'));
   const was = process.env.KOPPLER_CONFIG_DIR;
   process.env.KOPPLER_CONFIG_DIR = dir;
   const file = path.join(dir, 'stack.json');
-  fs.writeFileSync(file, JSON.stringify({ name: 'S', koppler: '0.2.1', envs: ['qa'], apps: { a: { name: 'A', kind: 'node', slug: 'x/a', url: 'http://localhost:3000' }, b: { name: 'B', kind: 'node', slug: 'x/b' } } }));
+  fs.writeFileSync(file, JSON.stringify({ name: 'S', koppler: '0.2.2', envs: ['qa'], apps: { a: { name: 'A', kind: 'node', slug: 'x/a', url: 'http://localhost:3000' }, b: { name: 'B', kind: 'node', slug: 'x/b' } } }));
   const opts = { config: { stack: dir } };
   assert.deepEqual(setLock(file, 'apps.a.url', true), {});
   const before = fs.readFileSync(file, 'utf8');
@@ -334,7 +335,6 @@ test('A locked field is kept as it is by every change, and only the person unloc
   assert.equal(removeApp('b', opts).error, undefined);
   // An agent or a script cannot unlock: there is no one at a terminal to say yes, and --yes is not taken.
   fs.writeFileSync(path.join(dir, 'config.json'), JSON.stringify({ stack: dir }));
-  const entry = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'dist', 'koppler.mjs');
   const unlock = spawnSync('node', [entry, 'stack', 'unlock', 'apps.a.url', '--yes'], { encoding: 'utf8', env: { ...process.env, KOPPLER_CONFIG_DIR: dir } });
   assert.notEqual(unlock.status, 0);
   assert.match(unlock.stdout + unlock.stderr, /stays locked/);
@@ -344,4 +344,34 @@ test('A locked field is kept as it is by every change, and only the person unloc
   if (was === undefined) delete process.env.KOPPLER_CONFIG_DIR;
   else process.env.KOPPLER_CONFIG_DIR = was;
   fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('Two apps from one clone: neither reports the other\'s address, or the other\'s calls, as a call it makes.', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-shared-repo-'));
+  try {
+    const repo = path.join(dir, 'code', 'orders');
+    fs.mkdirSync(path.join(repo, 'src'), { recursive: true });
+    fs.writeFileSync(path.join(repo, 'src', 'Program.cs'), 'Url = "https://orders.acme.dev/",\nPay = "https://payments.acme.dev/",\n');
+    const git = (...args) => execFileSync('git', ['-C', repo, '-c', 'user.name=t', '-c', 'user.email=t@t', ...args]);
+    git('init', '-q'); git('remote', 'add', 'origin', 'git@github.com:acme/orders.git'); git('add', '.'); git('commit', '-qm', 'one');
+    const stack = path.join(dir, 'stack');
+    fs.mkdirSync(stack);
+    fs.writeFileSync(path.join(stack, 'stack.json'), JSON.stringify({ name: 'Acme Shop', envs: ['qa'], apps: {
+      'orders-api': { name: 'Orders API', kind: 'dotnet', slug: 'acme/orders', deployedUrl: 'https://orders.acme.dev/', consumes: { 'payments-api': {} } },
+      'payments-api': { name: 'Payments API', kind: 'dotnet', slug: 'acme/payments', deployedUrl: 'https://payments.acme.dev/' },
+    } }));
+    const env = { ...process.env, HOME: dir, KOPPLER_STATE: path.join(dir, 'state'), KOPPLER_TEMP: path.join(dir, 'temp'), KOPPLER_CONFIG_DIR: path.join(dir, 'config') };
+    delete env.CLAUDE_CODE_SESSION_ID;
+    const koppler = (...args) => spawnSync('node', [entry, ...args], { encoding: 'utf8', env });
+    const init = koppler('init', '--root', path.join(dir, 'code'), '--stack', stack, '--no-fetch');
+    assert.equal(init.status, 0, init.stderr);
+    const set = koppler('stack', 'set', 'apps.orders-db', JSON.stringify({ name: 'Orders DB', kind: 'compose', slug: 'acme/orders', start: 'docker compose up db', url: 'http://localhost:5433' }));
+    assert.equal(set.status, 0, set.stderr + set.stdout);
+    const sync = koppler('sync');
+    assert.equal(sync.status, 0, sync.stderr);
+    assert.match(sync.stdout, /^OK orders-db: /m);
+    assert.doesNotMatch(sync.stdout, /^FOUND /m);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 });

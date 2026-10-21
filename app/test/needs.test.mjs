@@ -87,3 +87,18 @@ test('A tunnel already listening is reported as open, not as something Koppler w
   console.log = log; srv.close();
   assert.deepEqual(JSON.parse(out[0]).koppler, [`tunnel to db on localhost:${port} (already open)`, 'start Wallet']);
 });
+
+test('A file secret with no steps for another environment is a gap that names the file.', async () => {
+  const { spawnSync } = await import('node:child_process');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-filegap-'));
+  try {
+    const env = { ...process.env, KOPPLER_STATE: dir, KOPPLER_TEMP: dir, KOPPLER_CONFIG_DIR: dir };
+    delete env.CLAUDE_CODE_SESSION_ID;
+    const repo = path.join(dir, 'repo'); fs.mkdirSync(repo);
+    const secrets = [{ file: 'src/Orders/appsettings.secrets.json', when: 'always', fetch: { ui: 'README step 1' } }];
+    fs.writeFileSync(path.join(dir, 'registry.json'), JSON.stringify({ envs: ['qa', 'prod'], apps: { 'orders-api': { name: 'Orders API', kind: 'other', secrets } } }));
+    fs.writeFileSync(path.join(dir, 'local.json'), JSON.stringify({ apps: { 'orders-api': { path: repo } } }));
+    const r = spawnSync('node', [path.join(import.meta.dirname, '..', 'dist', 'koppler.mjs'), 'doctor'], { encoding: 'utf8', env, input: '' });
+    assert.match(r.stdout + r.stderr, /^GAP\s+orders-api prod No steps for getting the file src\/Orders\/appsettings\.secrets\.json for Orders API on PROD$/m);
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
