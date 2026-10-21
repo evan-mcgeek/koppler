@@ -105,6 +105,8 @@
 <style>
   .infra {
     display: grid;
+    /* One column as wide as the card, so a long name is cut instead of widening what is inside. */
+    grid-template-columns: minmax(0, 1fr);
     width: max-content;
     min-width: 240px;
     max-width: 420px;
@@ -149,8 +151,12 @@
     padding: 4px 4px 4px 12px;
     border-bottom: 1px solid var(--line);
   }
+  /* A long name is cut short: the tag and the buttons stay on the card. The card's title holds it whole. */
   .name {
+    min-width: 0;
+    overflow: hidden;
     font: 600 15px var(--sans);
+    text-overflow: ellipsis;
     white-space: nowrap;
   }
   .tag {
