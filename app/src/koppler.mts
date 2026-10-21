@@ -375,7 +375,10 @@ function version(): string {
   } catch {
     // An unreadable package file: the commit alone says which Koppler this is.
   }
-  const commit = sh('git', ['-C', CODE, 'rev-parse', '--short', 'HEAD']);
+  // Only Koppler's own clone: an install inside another repo (Homebrew's folder) would name that repo's commit.
+  const [top, head] = (sh('git', ['-C', CODE, 'rev-parse', '--show-toplevel', '--short', 'HEAD']) ?? '').split('\n');
+  const own = top && fs.realpathSync(top) === fs.realpathSync(path.dirname(APP));
+  const commit = own ? head : '';
   return [packaged, commit && `(${commit})`].filter(Boolean).join(' ') || 'unknown';
 }
 
