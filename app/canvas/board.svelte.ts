@@ -334,6 +334,8 @@ class Board {
   unplaced = $state.raw<string[]>([]);
   /** Upstream queue cards placed by guess, put above what they feed once the cards have their sizes. */
   #unplacedAbove: string[] = [];
+  /** Outside cards placed before the board was measured: placed again by settle. */
+  #unplacedOutside: string[] = [];
 
   /** A card set to Mock: its responses from the stack answer in its place, so it has no tunnels, queues or calls. */
   #mock(id: string): boolean {
@@ -1008,11 +1010,9 @@ class Board {
     // What feeds a queue goes above it, the nearest first, so a chain stacks up from the queue an app reads.
     cards = this.#stackAbove(upstream, cards);
     this.#unplacedAbove = [...new Set([...this.#unplacedAbove, ...upstream])];
-    // An outside system goes beside the card it is linked to, on the first spot that is free.
-    for (const card of outside.filter(one => !before.has(one.id) && !at[one.id])) {
-      const spot = this.#nextTo(card.id, cards);
-      cards = cards.map(one => (one.id === card.id ? { ...one, position: spot } : one));
-    }
+    const placed = outside.filter(one => !before.has(one.id) && !at[one.id]).map(one => one.id);
+    cards = this.#placeOutside(placed, cards);
+    this.#unplacedOutside = [...new Set([...this.#unplacedOutside, ...placed])];
     this.infra = cards;
     this.unplaced = [...new Set([...this.unplaced, ...fresh])];
   }
@@ -1117,17 +1117,36 @@ class Board {
       // Still nothing free: down the first choice.
       ...Array.from({ length: 9 }, (_, step) => ({ x: sides[0] ?? 0, y: at.y + (step + 1) * (size.h + 24) })),
     ];
-    return spots.find(free) ?? spots[0] ?? { x: 40, y: 40 };
+    // In view first: a spot off the board, behind the side panel say, only when no other is free.
+    const view = this.area();
+    const from = this.toFlow({ x: view.left, y: view.top });
+    const to = this.toFlow({ x: view.right, y: view.bottom });
+    const seen = (spot: Point) =>
+      !view.width || (spot.x >= from.x && spot.y >= from.y && spot.x + size.w <= to.x && spot.y + size.h <= to.y);
+    return spots.find(spot => free(spot) && seen(spot)) ?? spots.find(free) ?? spots[0] ?? { x: 40, y: 40 };
   }
 
+  /** An outside system goes beside the card it is linked to, on the first spot that is free. */
+  #placeOutside(ids: readonly string[], cards: InfraNode[]): InfraNode[] {
+    let result = cards;
+    for (const id of ids) {
+      const spot = this.#nextTo(id, result);
+      result = result.map(one => (one.id === id ? { ...one, position: spot } : one));
+    }
+    return result;
+  }
   /** New tunnel cards were placed by guess: put right once their app and they have their real sizes. */
   settle(): void {
     const sized = (cards: { measured?: { width?: number } }[]) => cards.every(card => card.measured?.width);
-    if ((!this.unplaced.length && !this.#unplacedAbove.length) || !sized(this.nodes) || !sized(this.infra)) return;
+    const waiting = this.unplaced.length + this.#unplacedAbove.length + this.#unplacedOutside.length;
+    if (!waiting || !sized(this.nodes) || !sized(this.infra)) return;
     let cards = this.infra;
     for (const lead of this.unplaced) cards = this.#beside(lead, cards);
     cards = this.#stackAbove(this.#unplacedAbove, cards);
+    // Placed again now that the board and the cards are measured: in view, by their real sizes.
+    cards = this.#placeOutside(this.#unplacedOutside, cards);
     this.#unplacedAbove = [];
+    this.#unplacedOutside = [];
     this.unplaced = [];
     this.infra = cards;
   }
