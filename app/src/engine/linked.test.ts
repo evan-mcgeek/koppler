@@ -28,6 +28,13 @@ test('a stack linked from GitHub is copied, compared, updated and proposed back'
     (await linkStack(link, { config, save() {}, read: async () => '{"apps": []}' })).error as any,
     /not a stack Koppler can use/,
   );
+  // A run with changes to undo keeps its stack: nothing is linked or written.
+  const actions = path.join(process.env.KOPPLER_TEMP, 'actions.json');
+  fs.writeFileSync(actions, JSON.stringify([{ kind: 'process', name: 'demo' }]));
+  const busy = { stack: path.join(dir, 'other') };
+  assert.match((await linkStack(link, { config: busy, save() {}, read })).error as any, /still has changes to undo/);
+  assert.equal(fs.existsSync(path.join(dir, 'stacks')), false);
+  fs.rmSync(actions);
   const linked = await linkStack(link, { config, save() {}, read });
   assert.equal(ok(linked).name, 'Shop');
   assert.equal((config as any).stack, ok(linked).stack);

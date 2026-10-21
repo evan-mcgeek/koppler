@@ -113,3 +113,28 @@ test('koppler remove takes the app off the team boards and the other apps\' orde
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test('koppler init --new refused while a run has changes to undo creates no stack', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-new-'));
+  try {
+    const config = path.join(dir, 'config');
+    const alpha = path.join(config, 'stacks', 'alpha');
+    fs.mkdirSync(alpha, { recursive: true });
+    fs.writeFileSync(path.join(alpha, 'stack.json'), JSON.stringify({ name: 'Alpha', envs: ['qa', 'prod'], apps: {} }));
+    const env = { ...process.env, HOME: dir, KOPPLER_STATE: path.join(dir, 'state'), KOPPLER_TEMP: path.join(dir, 'temp'), KOPPLER_CONFIG_DIR: config };
+    delete env.CLAUDE_CODE_SESSION_ID;
+    const koppler = (...args) => spawnSync('node', [entry, ...args], { encoding: 'utf8', env });
+    const root = ['--root', path.join(dir, 'code'), '--no-fetch'];
+    assert.equal(koppler('init', '--stack', alpha, ...root).status, 0);
+    assert.equal(koppler('actions', 'add', JSON.stringify({ kind: 'process', name: 'demo', command: 'sleep 1' })).status, 0);
+    const refused = koppler('init', '--new', 'Beta', '--envs', 'qa,prod', ...root);
+    assert.notEqual(refused.status, 0);
+    assert.match(refused.stderr, /^koppler: the run on this stack still has changes to undo/m);
+    assert.equal(fs.existsSync(path.join(config, 'stacks', 'beta')), false);
+    const listed = koppler('use');
+    assert.match(listed.stdout, /^\* Alpha /m);
+    assert.doesNotMatch(listed.stdout, /Beta/);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
