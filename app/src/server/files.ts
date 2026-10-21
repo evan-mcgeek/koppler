@@ -12,6 +12,7 @@ import { awsProfiles, cloneChoices } from './choices.ts';
 import { tail } from './logs.ts';
 import { sharedLog } from './shared-log.ts';
 import { logFile, SOURCE, statusJson } from './status.ts';
+import { joinPage } from './pages.ts';
 
 export const JSON_HEADERS = { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' };
 
@@ -88,6 +89,10 @@ export function serveFile(what: string, url: URL, res: http.ServerResponse): voi
     const id = url.searchParams.get('app') ?? '';
     const clone = APP_ID.test(id) ? readClones()[id]?.path : undefined;
     res.writeHead(200, JSON_HEADERS).end(JSON.stringify({ awsProfiles: awsProfiles(), ...cloneChoices(clone) }));
+    return;
+  }
+  if (what === 'data/events') {
+    joinPage(res);
     return;
   }
   if (what === 'data/status.json') {

@@ -86,23 +86,30 @@
     location.reload();
   });
   /** Asked for once, when the page opens. ponytail: no polling yet; it comes with the live state of the cards. */
+  /** What `koppler canvas` asked to show, in the address or sent to this open page: a board, or the repo picker. */
+  const follow = (hash: string) => {
+    // `koppler canvas --board "<name>"` opens on that board, once: a reload keeps what is opened next.
+    if (hash.startsWith('#board=')) {
+      const want = decodeURIComponent(hash.slice(7)).toLowerCase();
+      const asked = [...board.own, ...board.team].find(one => one.name.toLowerCase() === want);
+      if (asked && asked.name !== board.name) board.openBoard(asked);
+    }
+    // With no stack the page asks for one; with a stack that has no apps yet, for its repos.
+    if (board.setup) dialogs.setup?.open();
+    else if (!board.apps.length || hash === '#pick') void dialogs.repos?.open();
+  };
   const opened = load().then(loaded => {
     if (loaded) {
       board.open(loaded);
       live.watch();
-      // `koppler canvas --board "<name>"` opens on that board, once: a reload keeps what is opened next.
-      if (location.hash.startsWith('#board=')) {
-        const want = decodeURIComponent(location.hash.slice(7)).toLowerCase();
-        const asked = [...board.own, ...board.team].find(one => one.name.toLowerCase() === want);
-        history.replaceState(null, '', location.pathname + location.search);
-        if (asked && asked.name !== board.name) board.openBoard(asked);
-      }
-      // With no stack the page asks for one; with a stack that has no apps yet, for its repos.
-      if (board.setup) dialogs.setup?.open();
-      else if (!board.apps.length || location.hash === '#pick') {
-        history.replaceState(null, '', location.pathname + location.search);
-        void dialogs.repos?.open();
-      }
+      const hash = location.hash;
+      if (hash) history.replaceState(null, '', location.pathname + location.search);
+      follow(hash);
+      // While this page is open, `koppler canvas` shows it instead of opening another tab.
+      new EventSource('data/events').onmessage = event => {
+        follow((JSON.parse(String(event.data)) as { hash: string }).hash);
+        window.focus();
+      };
     }
     return !!loaded;
   });
