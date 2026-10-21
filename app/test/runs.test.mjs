@@ -9,6 +9,10 @@ import { strays } from '../dist/engine/runs.js';
 import { test } from 'node:test';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
+// In-process calls read the stack too: never the user's own.
+const sandbox = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-runs-own-'));
+Object.assign(process.env, { KOPPLER_STATE: sandbox, KOPPLER_TEMP: sandbox, KOPPLER_CONFIG_DIR: sandbox });
+process.on('exit', () => fs.rmSync(sandbox, { recursive: true, force: true }));
 const send = (id, nodes, edges = [], extra = {}) => ({ tag: 'koppler', at: `2026-01-01T00:00:0${id.at(-1)}Z`, data: { id, env: 'qa', mode: 'auto', nodes, edges, evil: '<script>', plan: { starts: nodes.map(n => ({ id: n.id, why: [] })), restarts: [], stops: [], keeps: [{ id: '../bad' }] }, ...extra } });
 
 let add, dir, done, env, koppler, lines, rec;
