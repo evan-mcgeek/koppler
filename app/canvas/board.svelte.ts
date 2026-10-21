@@ -398,12 +398,28 @@ class Board {
   #outside(id: string): boolean {
     return !!this.#registry?.apps[id]?.outside;
   }
+  /** Outside systems on the board for their own sake: pinned, or calling an app on it or called by one. */
+  #anchored = $derived.by(() => {
+    const apps = this.#registry?.apps ?? {};
+    const calls = (from: string, to: string) => Object.hasOwn(apps[from]?.consumes ?? {}, to);
+    return new Set(
+      Object.keys(apps).filter(
+        id =>
+          this.#outside(id) &&
+          !this.hiddenOutside[id] &&
+          (this.pinned.includes(id) || this.cards.some(card => calls(id, card.id) || calls(card.id, id))),
+      ),
+    );
+  });
   /** The queues of the stack that an app on the board publishes to or reads, with who uses each. */
   boardQueues = $derived.by(() =>
     Object.entries(this.#registry?.queues ?? {}).flatMap(([id, queue]) => {
       const { pubs, reads } = this.#usersOf(id);
-      // A queue between two apps stays for the one that is still on it.
-      const shown = !this.hiddenQueues[id] && [...pubs, ...reads].some(app => this.#onQueues.has(app));
+      // A queue between two apps stays for the one that is still on it; one between two cards of the flow shows too.
+      const flow = (app: string) => this.#onQueues.has(app) || this.#anchored.has(app);
+      const shown =
+        !this.hiddenQueues[id] &&
+        ([...pubs, ...reads].some(app => this.#onQueues.has(app)) || (pubs.some(flow) && reads.some(flow)));
       return shown ? [{ id, queue, pubs, reads, upstream: false }] : [];
     }),
   );
@@ -1010,7 +1026,12 @@ class Board {
     // What feeds a queue goes above it, the nearest first, so a chain stacks up from the queue an app reads.
     cards = this.#stackAbove(upstream, cards);
     this.#unplacedAbove = [...new Set([...this.#unplacedAbove, ...upstream])];
-    const placed = outside.filter(one => !before.has(one.id) && !at[one.id]).map(one => one.id);
+    // A queue with no app of the board beside it, between two outside cards, is placed as they are.
+    const loose = this.shownQueues
+      .filter(one => !one.upstream && !this.#leadOf(one))
+      .map(one => `queue:${one.id}`)
+      .filter(id => !before.has(id) && !at[id]);
+    const placed = [...loose, ...outside.filter(one => !before.has(one.id) && !at[one.id]).map(one => one.id)];
     cards = this.#placeOutside(placed, cards);
     this.#unplacedOutside = [...new Set([...this.#unplacedOutside, ...placed])];
     this.infra = cards;
@@ -1119,19 +1140,41 @@ class Board {
     ];
     // In view first: a spot off the board, behind the side panel say, only when no other is free.
     const view = this.area();
-    const from = this.toFlow({ x: view.left, y: view.top });
-    const to = this.toFlow({ x: view.right, y: view.bottom });
+    // Not measured yet, as while the page opens: the saved view and the window say what will be on screen.
+    const kept = this.view;
+    const shown = view.width
+      ? { from: this.toFlow({ x: view.left, y: view.top }), to: this.toFlow({ x: view.right, y: view.bottom }) }
+      : kept && {
+          from: { x: -kept.x / kept.zoom, y: -kept.y / kept.zoom },
+          to: { x: (innerWidth - kept.x) / kept.zoom, y: (innerHeight - kept.y) / kept.zoom },
+        };
     const seen = (spot: Point) =>
-      !view.width || (spot.x >= from.x && spot.y >= from.y && spot.x + size.w <= to.x && spot.y + size.h <= to.y);
+      !shown ||
+      (spot.x >= shown.from.x &&
+        spot.y >= shown.from.y &&
+        spot.x + size.w <= shown.to.x &&
+        spot.y + size.h <= shown.to.y);
     return spots.find(spot => free(spot) && seen(spot)) ?? spots.find(free) ?? spots[0] ?? { x: 40, y: 40 };
   }
 
-  /** An outside system goes beside the card it is linked to, on the first spot that is free. */
+  /**
+   * An outside system, or a queue between two of them, goes beside a card it is linked to, on the first spot that is
+   * free: along the chain from the board's apps, so each goes beside one already placed.
+   */
   #placeOutside(ids: readonly string[], cards: InfraNode[]): InfraNode[] {
     let result = cards;
-    for (const id of ids) {
-      const spot = this.#nextTo(id, result);
-      result = result.map(one => (one.id === id ? { ...one, position: spot } : one));
+    let left = [...ids];
+    const placed = (key: string) => this.nodes.some(node => node.id === key) || (!!key && !left.includes(key));
+    while (left.length) {
+      const next =
+        left.find(id =>
+          this.flows.some(flow => (flow.from === id && placed(flow.to)) || (flow.to === id && placed(flow.from))),
+        ) ??
+        left[0] ??
+        '';
+      left = left.filter(id => id !== next);
+      const spot = this.#nextTo(next, result);
+      result = result.map(one => (one.id === next ? { ...one, position: spot } : one));
     }
     return result;
   }
@@ -1483,6 +1526,9 @@ class Board {
       ),
       edges: this.edges.map(({ source, target }) => ({ from: source, to: target })),
       ...(this.pinned.length && { outside: this.pinned }),
+      // What this board leaves off: a board for one flow drops the queues and outside cards of the others.
+      ...(Object.keys(this.hiddenQueues).length && { hiddenQueues: Object.keys(this.hiddenQueues) }),
+      ...(Object.keys(this.hiddenOutside).length && { hiddenOutside: Object.keys(this.hiddenOutside) }),
     };
   }
   /** Where the cards sit and which sides the cables use, kept with a board so it opens as it was left. */
@@ -1704,8 +1750,10 @@ class Board {
     this.name = preset.name;
     this.queues = {};
     this.databases = {};
-    this.hiddenQueues = {};
-    this.hiddenOutside = {};
+    const listed = (key: string) =>
+      Array.isArray(given[key]) ? (given[key] as unknown[]).filter((id): id is string => typeof id === 'string') : [];
+    this.hiddenQueues = Object.fromEntries(listed('hiddenQueues').map(id => [id, true] as const));
+    this.hiddenOutside = Object.fromEntries(listed('hiddenOutside').map(id => [id, true] as const));
     this.hiddenLogs = {};
     this.logAliases = {};
     this.pinned = Array.isArray(given['outside'])
@@ -1879,9 +1927,10 @@ class Board {
     this.hiddenLogs = (saved?.['hiddenLogs'] ?? {}) as Record<string, true>;
     this.logAliases = (saved?.['logAliases'] ?? {}) as Record<string, string>;
     this.pinned = (Array.isArray(saved?.['outside']) ? saved['outside'] : []) as string[];
-    this.syncInfra((saved?.infra ?? {}) as Record<string, Point | undefined>);
     const { zoom, pan } = saved ?? {};
     this.view = zoom && pan ? { x: pan.x, y: pan.y, zoom } : undefined;
+    // After the view: a new card goes on a spot that is on screen.
+    this.syncInfra((saved?.infra ?? {}) as Record<string, Point | undefined>);
   }
 
   /** Keeps the board on screen among the user's boards (a changed team board becomes their copy), before it is saved. */
