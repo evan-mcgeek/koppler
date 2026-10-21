@@ -66,6 +66,7 @@ test('what is changed on the board comes back after a reload', async ({ page, ca
 });
 
 test('a board that was left with no card in sight is brought back into view', async ({ page }) => {
+  await expect(card(page, 'web')).toBeInViewport();
   const kept = saved(page);
   await page.mouse.move(700, 700);
   await page.mouse.wheel(4000, 4000);
