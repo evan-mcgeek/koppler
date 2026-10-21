@@ -247,15 +247,15 @@ test('Updating clones: fetch, then fast-forward only a clean branch that is simp
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
-test('Removing an app: its entry and other apps\' calls to it go; nothing else changes.', async () => {
+test('Removing an app: its entry, other apps\' calls to it and its cards on the team boards go; nothing else changes.', async () => {
   const { removeApp } = await import('../dist/engine/stack-file.js');
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-remove-'));
-  fs.writeFileSync(path.join(dir, 'stack.json'), JSON.stringify({ name: 'S', koppler: '0.2.1', envs: ['qa'], apps: { a: { name: 'A', kind: 'node', slug: 'x/a', consumes: { b: { how: 'env' }, c: { how: 'env' } } }, b: { name: 'B', kind: 'node', slug: 'x/b' }, c: { name: 'C', kind: 'node', slug: 'x/c' } }, presets: [{ name: 'P', version: 1, koppler: '0.1.0', nodes: { a: {}, b: {} }, edges: [] }] }));
+  fs.writeFileSync(path.join(dir, 'stack.json'), JSON.stringify({ name: 'S', koppler: '0.2.2', envs: ['qa'], apps: { a: { name: 'A', kind: 'node', slug: 'x/a', consumes: { b: { how: 'env' }, c: { how: 'env' } } }, b: { name: 'B', kind: 'node', slug: 'x/b' }, c: { name: 'C', kind: 'node', slug: 'x/c' } }, presets: [{ name: 'P', version: 1, koppler: '0.1.0', nodes: { a: {}, b: {} }, edges: [] }] }));
   assert.deepEqual(removeApp('b', { config: { stack: dir } }), { removed: 'b', name: 'B' });
   const after = JSON.parse(fs.readFileSync(path.join(dir, 'stack.json'), 'utf8'));
   assert.deepEqual(Object.keys(after.apps), ['a', 'c']);
   assert.deepEqual(Object.keys(after.apps.a.consumes), ['c']);
-  assert.deepEqual(after.presets[0].nodes, { a: {}, b: {} });
+  assert.deepEqual(after.presets[0].nodes, { a: {} });
   assert.match(removeApp('zzz', { config: { stack: dir } }).error, /not in the stack/);
   fs.rmSync(dir, { recursive: true, force: true });
 });
@@ -264,7 +264,7 @@ test('An outside system joins the stack with the apps that call it; what cannot 
   const { addOutside } = await import('../dist/engine/stack-file.js');
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-outside-'));
   const file = path.join(dir, 'stack.json');
-  fs.writeFileSync(file, JSON.stringify({ name: 'S', koppler: '0.2.1', envs: ['qa'], apps: { a: { name: 'A', kind: 'node', slug: 'x/a', consumes: { b: { how: 'env' } } }, b: { name: 'B', kind: 'node', slug: 'x/b' }, sf: { name: 'Salesforce', kind: 'other', outside: 'SaaS' } } }));
+  fs.writeFileSync(file, JSON.stringify({ name: 'S', koppler: '0.2.2', envs: ['qa'], apps: { a: { name: 'A', kind: 'node', slug: 'x/a', consumes: { b: { how: 'env' } } }, b: { name: 'B', kind: 'node', slug: 'x/b' }, sf: { name: 'Salesforce', kind: 'other', outside: 'SaaS' } } }));
   const opts = { config: { stack: dir } };
   const before = fs.readFileSync(file, 'utf8');
   assert.match(addOutside({ name: ' ' }, opts).error, /Give the outside system a name/);
@@ -321,7 +321,7 @@ test('A locked field is kept as it is by every change, and only the person unloc
   const was = process.env.KOPPLER_CONFIG_DIR;
   process.env.KOPPLER_CONFIG_DIR = dir;
   const file = path.join(dir, 'stack.json');
-  fs.writeFileSync(file, JSON.stringify({ name: 'S', koppler: '0.2.1', envs: ['qa'], apps: { a: { name: 'A', kind: 'node', slug: 'x/a', url: 'http://localhost:3000' }, b: { name: 'B', kind: 'node', slug: 'x/b' } } }));
+  fs.writeFileSync(file, JSON.stringify({ name: 'S', koppler: '0.2.2', envs: ['qa'], apps: { a: { name: 'A', kind: 'node', slug: 'x/a', url: 'http://localhost:3000' }, b: { name: 'B', kind: 'node', slug: 'x/b' } } }));
   const opts = { config: { stack: dir } };
   assert.deepEqual(setLock(file, 'apps.a.url', true), {});
   const before = fs.readFileSync(file, 'utf8');

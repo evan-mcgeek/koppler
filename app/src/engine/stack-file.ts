@@ -5,6 +5,7 @@ import path from 'node:path';
 import { readJson, writeJson } from '../json-files.ts';
 import { kindsFor } from '../core/kinds.ts';
 import { validateStack } from '../core/stack.ts';
+import { withoutMissingApps } from '../core/missing-apps.ts';
 import { getAt, parsePath, setAt } from '../core/stack-path.ts';
 import { brokenLock, LOCKED } from './locks.ts';
 import { readData, writeData } from '../data.ts';
@@ -204,8 +205,8 @@ export function addOutside(
 }
 
 /**
- * Takes an app out of the stack. Other apps' calls to it go too, since a call to a missing app makes the stack invalid.
- * The clone stays where it is; boards that list the app skip it when they open.
+ * Takes an app out of the stack, and every mention of it: other apps' calls to it and order after it, and its cards on
+ * the team boards. The clone stays where it is; the user's own boards skip it when they open.
  */
 export function removeApp(
   id: string,
@@ -218,11 +219,9 @@ export function removeApp(
   if (!app) return { error: `${id} is not in the stack` };
   const name = app.name ?? id;
   const { [id]: removed, ...apps } = stack.apps;
-  for (const other of Object.values(apps)) if (other.consumes) other.consumes = dropKey(other.consumes, id);
-  return saveStack(source, readJson(source), { ...stack, apps }) ?? { removed: id, name };
-}
-
-function dropKey<T>(from: Record<string, T>, key: string): Record<string, T> {
-  const { [key]: dropped, ...rest } = from;
-  return rest;
+  const next = withoutMissingApps({ ...stack, apps });
+  const before = new Set(validateStack(stack));
+  const broken = validateStack(next).filter(problem => !before.has(problem));
+  if (broken.length) return { error: broken.slice(0, 5).join('; ') };
+  return saveStack(source, readJson(source), next) ?? { removed: id, name };
 }
