@@ -625,7 +625,7 @@ class Board {
   /** The message links and the calls to outside systems, between the cards they join. */
   flows = $derived.by((): Flow[] => {
     const card = (app: string) => (this.#outside(app) ? `outside:${app}` : app);
-    return [
+    const flows: Flow[] = [
       ...this.shownQueues.flatMap(({ id, queue, pubs, reads }) => [
         ...pubs.map(app => ({ from: card(app), to: `queue:${id}`, queue: id })),
         ...reads.map(app => {
@@ -650,6 +650,18 @@ class Board {
               .map(to => ({ from: `outside:${id}`, to }))
           : [],
       ),
+    ];
+    // An outside system calling another, both shown for what else they join: a Lambda pushing through a push service.
+    const shown = new Set([...flows.flatMap(flow => [flow.from, flow.to]), ...this.pinned.map(id => `outside:${id}`)]);
+    return [
+      ...flows,
+      ...[...shown]
+        .filter(key => key.startsWith('outside:'))
+        .flatMap(from =>
+          Object.keys(this.#registry?.apps[from.slice(8)]?.consumes ?? {})
+            .filter(to => this.#outside(to) && shown.has(`outside:${to}`))
+            .map(to => ({ from, to: `outside:${to}` })),
+        ),
     ];
   });
   /** The side of an app its tunnel and queue cards stack on: the first one its cables do not use. */
