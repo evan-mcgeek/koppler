@@ -220,6 +220,10 @@ export async function listen(argv: string[]): Promise<void> {
         text = fs.readFileSync(taking, 'utf8');
       }
       const picked = pickPrompts(text.split('\n'));
+      if (!picked.length) {
+        fs.unlinkSync(taking);
+        return false;
+      }
       // Each prompt handed to the agent is marked in the run history, so the canvas stops showing it as waiting.
       for (const prompt of picked) {
         const id = prompt.data?.['id'];
