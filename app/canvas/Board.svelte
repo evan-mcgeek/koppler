@@ -284,8 +284,7 @@
         row === undefined ? sidePoint(a, sides[0]) : { x: sides[0] === 'right' ? a.x + a.w : a.x, y: a.y + row },
         sidePoint(b, sides[1]),
       ];
-      // A straight line from an app to its database never runs behind another card: it goes round them, on the side
-      // the database leans to.
+      // A line never runs behind another card: it goes round them, on the side its far end leans to.
       const others = [...board.boxes, ...board.infraBoxes].filter(([key]) => key !== from && key !== to);
       const under = (p: Point, q: Point) =>
         others.filter(([, box]) =>
@@ -295,7 +294,9 @@
             return x > box.x && x < box.x + box.w && y > box.y && y < box.y + box.h;
           }),
         );
-      const blocking = database && row === undefined && board.boxes.has(from) ? under(start, end) : [];
+      // Except a card of the app's own stack, joined on whichever side it sits.
+      const routed = row === undefined && (database ? board.boxes.has(from) : !own);
+      const blocking = routed ? under(start, end) : [];
       let detour: Point | undefined;
       if (blocking.length) {
         const side: Side = b.x + b.w / 2 <= a.x + a.w / 2 ? 'left' : 'right';
@@ -719,6 +720,7 @@
         {#each flows as flow (flow.key)}
           <g
             class="flow {flow.kind}"
+            data-link={flow.key}
             class:dimmed={board.dimmedLink(flow.from, flow.to)}
             class:lit={board.lit(flow.from, flow.to)}
             class:snapped={board.snapped.includes(`${flow.from}>${flow.to}`)}
