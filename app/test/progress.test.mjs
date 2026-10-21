@@ -1,3 +1,4 @@
+import './sandbox.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -10,7 +11,7 @@ import { test } from 'node:test';
 let dir, here, koppler, progress;
 test('koppler up writes each app\'s steps for its card as it goes; the step a failed run stopped on is marked failed.', async () => {
   here = path.dirname(fileURLToPath(import.meta.url)), dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-progress-'));
-  const env = { ...process.env, KOPPLER_STATE: dir, KOPPLER_TEMP: dir, KOPPLER_CONFIG_DIR: dir };
+  const env = { ...process.env, KOPPLER_STATE: dir, KOPPLER_TEMP: dir, KOPPLER_CONFIG_DIR: dir, KOPPLER_EARLY_LOG: '1' };
   koppler = (...args) => { const r = spawnSync('node', [path.join(here, '..', 'dist', 'koppler.mjs'), ...args], { encoding: 'utf8', env, timeout: 60000 }); return { out: (r.stdout + r.stderr).trim(), code: r.status }; };
   fs.mkdirSync(path.join(dir, 'repo'));
   const serve = port => `node -e "require('http').createServer((q,s)=>s.end('ok')).listen(${port})"`;

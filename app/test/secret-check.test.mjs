@@ -1,3 +1,4 @@
+import './sandbox.mjs';
 import assert from 'node:assert/strict';
 import net from 'node:net';
 import { check, keyValues, parse } from '../dist/secret-check.mjs';

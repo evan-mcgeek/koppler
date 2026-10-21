@@ -1,3 +1,4 @@
+import './sandbox.mjs';
 import assert from 'node:assert/strict';
 // Whatever a test started is stopped when the file ends, even after a failed assertion, so no port stays held.
 const cleanups = [];
