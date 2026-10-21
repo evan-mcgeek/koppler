@@ -325,7 +325,7 @@ export function needs(
     const own = env === first ? undefined : app?.envs?.[env];
     const merged = { ...app, ...own };
     const secrets = (merged.secrets as SecretNeed[] | undefined)?.map(secret =>
-      noFetch.has(`${id}:${String(secret.env)}`) ? { ...secret, fetch: undefined } : secret,
+      noFetch.has(`${id}:${String(secret.env ?? secret.file)}`) ? { ...secret, fetch: undefined } : secret,
     );
     const all: Need[] = merged.prereqs ?? [];
     // Only the first environment's list is borrowed; an environment's own list is its own, even when it misses a kind.

@@ -34,7 +34,7 @@ interface LooseApp extends LooseEnv {
   kind?: string | undefined;
   outside?: unknown;
   envs?: Record<string, LooseEnv | null> | undefined;
-  secrets?: ({ env?: string | undefined; fetch?: unknown } | null)[] | undefined;
+  secrets?: ({ env?: string | undefined; file?: string | undefined; fetch?: unknown } | null)[] | undefined;
   localChanges?: unknown;
   uses?: Record<string, { change?: Record<string, unknown> | undefined } | null> | undefined;
   commands?: Record<string, { run?: unknown } | null> | undefined;
@@ -186,7 +186,11 @@ export function envGaps(stack: MaybeStack, only?: string): Gap[] {
       if (!own.secrets)
         for (const secret of app.secrets ?? [])
           if (secret?.fetch)
-            gap('secret', secret.env, `No steps for getting ${String(secret.env)} for ${name} on ${label}`);
+            gap(
+              'secret',
+              secret.env ?? secret.file,
+              `No steps for getting ${secret.env ?? `the file ${String(secret.file)}`} for ${name} on ${label}`,
+            );
     }
   return gaps;
 }
