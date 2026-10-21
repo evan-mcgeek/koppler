@@ -39,6 +39,7 @@ import { secretRequest } from './secrets.ts';
 import { drop } from './waiting.ts';
 import { koppler, prompted, reload, type Answer } from './runs.ts';
 import { APP_ID } from '../ids.ts';
+import { showPages } from './pages.ts';
 
 type Loose = Record<string, unknown>;
 type Route = (body: Loose) => Answer | Promise<Answer>;
@@ -134,6 +135,12 @@ export const ROUTES: Record<string, Route> = {
     if (!layout) return { status: 400 };
     writeData('state', keepUnseen(layout, body['seen']));
     return { status: 204 };
+  },
+  // `koppler canvas` with a page open already: that page shows what was asked, and no other tab opens.
+  '/show': body => {
+    const hash =
+      typeof body['hash'] === 'string' && /^(#pick|#board=[^\s]{1,200})?$/.test(body['hash']) ? body['hash'] : '';
+    return { status: 200, body: { shown: showPages(hash) } };
   },
   '/board-edit-done': body => {
     editDone(body['id']);

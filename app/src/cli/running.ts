@@ -63,6 +63,21 @@ export async function restart(args: string[]): Promise<void> {
   }
 }
 
+/** Whether a running canvas has a page open, which then shows `hash`: no second tab is needed. */
+async function shownInOpenPage(urlFile: string, hash: string): Promise<boolean> {
+  if (!fs.existsSync(urlFile)) return false;
+  const at = new URL(fs.readFileSync(urlFile, 'utf8').trim());
+  const token = at.pathname.split('/')[2] ?? '';
+  const answer = await fetch(`${at.origin}/show?token=${encodeURIComponent(token)}`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ hash }),
+    signal: AbortSignal.timeout(2000),
+  }).catch(() => null);
+  const said = answer?.ok ? ((await answer.json()) as { shown?: number }) : null;
+  return (said?.shown ?? 0) > 0;
+}
+
 /** The canvas: started when it is not running, then opened in the browser. */
 export async function canvas(args: string[]): Promise<void> {
   if (args[0] === 'stop') {
@@ -86,6 +101,12 @@ export async function canvas(args: string[]): Promise<void> {
     } else newToken();
     console.log('The canvas has a new address; every address given out before no longer works.');
   }
+  const board = flagValue(args, '--board');
+  const hash = args.includes('--pick') ? '#pick' : board ? `#board=${encodeURIComponent(board)}` : '';
+  if (!args.includes('--no-open') && (await shownInOpenPage(urlFile, hash))) {
+    console.log('The canvas is already open in your browser.');
+    return;
+  }
   if (!record || !alive(record)) {
     const port = String(Number(process.env['KOPPLER_PORT']) || 4747);
     await run(['canvas', '--port', port, '--', process.execPath, path.join(CODE, 'status-watch.mjs')]);
@@ -93,8 +114,6 @@ export async function canvas(args: string[]): Promise<void> {
   for (let tries = 0; tries < 40 && !fs.existsSync(urlFile); tries++) await sleep(250);
   if (!fs.existsSync(urlFile)) fail('the canvas did not start; see koppler logs canvas');
   // The address carries the page's access token, so it goes to the browser and is not printed.
-  const board = flagValue(args, '--board');
-  const hash = args.includes('--pick') ? '#pick' : board ? `#board=${encodeURIComponent(board)}` : '';
   const url = fs.readFileSync(urlFile, 'utf8').trim() + hash;
   if (args.includes('--no-open') || process.platform !== 'darwin') {
     console.log(`The canvas runs on port ${new URL(url).port}; its address is in ${urlFile}`);
