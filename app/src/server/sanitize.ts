@@ -37,6 +37,7 @@ export interface Preset {
   outside?: string[];
   hiddenQueues?: string[];
   hiddenOutside?: string[];
+  cardNotes?: Record<string, string>;
 }
 /** A prompt from the page, on its way to Koppler or the agent. */
 export interface Prompt {
@@ -59,6 +60,17 @@ const xy = (value: unknown): Point => ({ x: num(fieldsOf(value)['x']), y: num(fi
 const note = (value: unknown) => (typeof value === 'string' && value ? { note: text(value, MAX_NOTE) } : {});
 /** A card that is not an app: a tunnel, a queue or an outside system. */
 const CARD = /^(tunnel:[\w.-]{1,253}:\d{1,5}|(queue|outside):[a-z0-9-]{1,64})$/;
+/** Notes on the board's other cards, by card, for the agent: a run carries them. */
+const cardNotes = (given: unknown): Record<string, string> =>
+  Object.fromEntries(
+    Object.entries(isMap(given) ? given : {})
+      .filter(
+        ([key, value]) =>
+          (CARD.test(key) || /^database:[a-z0-9-]{1,64}$/.test(key)) && typeof value === 'string' && value.trim(),
+      )
+      .slice(0, 200)
+      .map(([key, value]) => [key, text(value, MAX_NOTE)]),
+  );
 const WHEN = /^\d{4}-\d\d-\d\dT[\d:.]+Z$/;
 const TIDY = ['down', 'right'];
 const SIDES = ['top', 'right', 'bottom', 'left'];
@@ -155,6 +167,7 @@ export function sanitizePresets(list: unknown): Preset[] {
         ...(ids(preset['outside']).length && { outside: ids(preset['outside']) }),
         ...(ids(preset['hiddenQueues']).length && { hiddenQueues: ids(preset['hiddenQueues']) }),
         ...(ids(preset['hiddenOutside']).length && { hiddenOutside: ids(preset['hiddenOutside']) }),
+        ...(Object.keys(cardNotes(preset['cardNotes'])).length && { cardNotes: cardNotes(preset['cardNotes']) }),
       };
     });
 }
@@ -273,6 +286,7 @@ export function sanitizeLayout(input: unknown): Loose | null {
   const databases = chosen(input['databases'], 'local');
   const hiddenQueues = chosen(input['hiddenQueues'], true);
   const hiddenOutside = chosen(input['hiddenOutside'], true);
+  const notes = cardNotes(input['cardNotes']);
   const hiddenLogs = chosen(input['hiddenLogs'], true);
   const logAliases = Object.fromEntries(
     Object.entries(isMap(input['logAliases']) ? input['logAliases'] : {})
@@ -303,6 +317,7 @@ export function sanitizeLayout(input: unknown): Loose | null {
     ...(Object.keys(databases).length && { databases }),
     ...(Object.keys(hiddenQueues).length && { hiddenQueues }),
     ...(Object.keys(hiddenOutside).length && { hiddenOutside }),
+    ...(Object.keys(notes).length && { cardNotes: notes }),
     ...(Object.keys(hiddenLogs).length && { hiddenLogs }),
     ...(Object.keys(logAliases).length && { logAliases }),
     ...(ids(input['outside']).length && { outside: ids(input['outside']) }),

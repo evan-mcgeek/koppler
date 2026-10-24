@@ -41,6 +41,15 @@ const VERBS = [
 ] as const;
 const newRunId = () => (Date.now().toString(36) + Math.random().toString(36).slice(2, 8)).replace(/[^a-z0-9]/g, '');
 const name = board.nameOf;
+/** A card that is not an app, as the agent reads it: a queue, a database, a tunnel or an outside system. */
+const cardName = (key: string): string => {
+  const [kind = '', ...rest] = key.split(':');
+  const id = rest.join(':');
+  if (kind === 'queue') return `the queue ${board.queueName(id)}`;
+  if (kind === 'database') return `the database ${board.databaseName(id)}`;
+  if (kind === 'outside') return name(id);
+  return `the tunnel to ${id}`;
+};
 const several = (count: number, one: string) => `${String(count)} ${one}${count === 1 ? '' : 's'}`;
 
 class Runs {
@@ -107,6 +116,10 @@ class Runs {
           board.infra.flatMap(card => (card.type === 'queue' && card.data.local ? [[card.data.queue, 'local']] : [])),
         );
     // A restart keeps the databases as they run; a run takes the board's.
+    // The notes on the board's other cards that are on it now.
+    const cardNotes = Object.fromEntries(
+      Object.entries(board.cardNotes).filter(([key]) => board.infra.some(card => card.id === key)),
+    );
     const databases = restart
       ? Object.fromEntries(Object.entries(was?.databases ?? {}).filter(([, where]) => where === 'local'))
       : board.databases;
@@ -118,6 +131,7 @@ class Runs {
       deployed,
       ...(Object.keys(queues).length && { queues }),
       ...(Object.keys(databases).length && { databases }),
+      ...(Object.keys(cardNotes).length && { cardNotes }),
     };
   }
 
@@ -155,6 +169,7 @@ class Runs {
       ...Object.keys(graph.databases ?? {}).map(
         database => `DATABASE ${board.databaseName(database)}: local, the user's own on this Mac`,
       ),
+      ...Object.entries(graph.cardNotes ?? {}).map(([key, note]) => `NOTE on ${cardName(key)}: ${note}`),
       ...graph.nodes.flatMap(node => {
         const platform = board.apps
           .find(app => app.id === node.id)

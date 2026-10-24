@@ -11,6 +11,7 @@
 
 <script lang="ts">
   // The card of a tunnel, database, queue or outside system, framed like an app card: header, body, and a status line with one action.
+  import CardNote from './CardNote.svelte';
   import Cog from './Cog.svelte';
   import Icon from './Icon.svelte';
   import { board } from './board.svelte.ts';
@@ -87,6 +88,16 @@
     </span>
   </span>
   {#if children}<div class="body">{@render children()}</div>{/if}
+  <!-- Edit only: in Live the cards are for reading. The run hands the note to the agent. -->
+  {#if !board.live}<div class="noted">
+      <CardNote
+        value={board.cardNotes[id] ?? ''}
+        placeholder="e.g. purge it before the run"
+        onchange={(note: string) => {
+          board.noteCard(id, note);
+        }}
+      />
+    </div>{/if}
   {#if foot}<div class="foot stack">{@render foot()}</div>
   {:else if status}<p class="foot">
       <span>{status}</span>
@@ -192,6 +203,10 @@
     min-width: 0;
     padding: 10px 12px 12px;
     overflow-wrap: anywhere;
+  }
+  .noted {
+    display: grid;
+    padding: 0 12px 10px;
   }
   .foot {
     display: flex;
