@@ -1,5 +1,6 @@
 <script lang="ts">
   import Laptop from '@lucide/svelte/icons/laptop';
+  import { tick } from 'svelte';
   import type { NodeProps } from '@xyflow/svelte';
   import Icon from './Icon.svelte';
   import InfraCard from './InfraCard.svelte';
@@ -37,6 +38,10 @@
     problem = '';
     tested = null;
     asking = true;
+    // Its form opens under the card: brought into view once drawn, so its buttons are never under the toolbar.
+    void tick().then(() => {
+      board.show(id);
+    });
   };
   const typed = () => ({ host: host.trim(), port: Number(portText), ...(name.trim() && { database: name.trim() }) });
   const test = async () => {

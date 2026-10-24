@@ -214,6 +214,14 @@ export const cable = (from: string, to: string, data: CableData): CableEdge => (
 
 const unselected = <T extends { selected?: boolean }>(one: T): T => (one.selected ? { ...one, selected: false } : one);
 
+/** The card notes of a saved board, or of one opened: text only. */
+const notesOf = (given: unknown): Record<string, string> =>
+  Object.fromEntries(
+    Object.entries(given && typeof given === 'object' ? (given as Record<string, unknown>) : {}).filter(
+      (entry): entry is [string, string] => typeof entry[1] === 'string' && !!entry[1].trim(),
+    ),
+  );
+
 class Board {
   /** The stack's name and the environment the board runs against; empty until the board is opened. */
   stack = $state('');
@@ -262,6 +270,8 @@ class Board {
   hiddenLogs = $state.raw<Record<string, true>>({});
   /** Short names of the user's own for apps in the log of every app. */
   logAliases = $state.raw<Record<string, string>>({});
+  /** Notes for the agent on the board's other cards, by card: a queue, a database, a tunnel, an outside system. */
+  cardNotes = $state.raw<Record<string, string>>({});
   /** The outside systems put on the board by hand: shown even when none of their apps is. */
   pinned = $state.raw<string[]>([]);
   pin(id: string): void {
@@ -1529,6 +1539,7 @@ class Board {
       // What this board leaves off: a board for one flow drops the queues and outside cards of the others.
       ...(Object.keys(this.hiddenQueues).length && { hiddenQueues: Object.keys(this.hiddenQueues) }),
       ...(Object.keys(this.hiddenOutside).length && { hiddenOutside: Object.keys(this.hiddenOutside) }),
+      ...(Object.keys(this.cardNotes).length && { cardNotes: this.cardNotes }),
     };
   }
   /** Where the cards sit and which sides the cables use, kept with a board so it opens as it was left. */
@@ -1713,6 +1724,7 @@ class Board {
     this.hiddenOutside = {};
     this.hiddenLogs = {};
     this.logAliases = {};
+    this.cardNotes = {};
     this.pinned = [];
   }
   /**
@@ -1756,6 +1768,7 @@ class Board {
     this.hiddenOutside = Object.fromEntries(listed('hiddenOutside').map(id => [id, true] as const));
     this.hiddenLogs = {};
     this.logAliases = {};
+    this.cardNotes = notesOf(given['cardNotes']);
     this.pinned = Array.isArray(given['outside'])
       ? (given['outside'] as unknown[]).filter((id): id is string => typeof id === 'string')
       : [];
@@ -1926,6 +1939,7 @@ class Board {
     this.hiddenOutside = (saved?.['hiddenOutside'] ?? {}) as Record<string, true>;
     this.hiddenLogs = (saved?.['hiddenLogs'] ?? {}) as Record<string, true>;
     this.logAliases = (saved?.['logAliases'] ?? {}) as Record<string, string>;
+    this.cardNotes = notesOf(saved?.['cardNotes']);
     this.pinned = (Array.isArray(saved?.['outside']) ? saved['outside'] : []) as string[];
     const { zoom, pan } = saved ?? {};
     this.view = zoom && pan ? { x: pan.x, y: pan.y, zoom } : undefined;
@@ -1961,6 +1975,7 @@ class Board {
       this.hiddenOutside,
       this.hiddenLogs,
       this.logAliases,
+      this.cardNotes,
       this.pinned,
     ];
   }
@@ -2023,6 +2038,7 @@ class Board {
       hiddenOutside: Object.keys(this.hiddenOutside).length ? this.hiddenOutside : undefined,
       hiddenLogs: Object.keys(this.hiddenLogs).length ? this.hiddenLogs : undefined,
       logAliases: Object.keys(this.logAliases).length ? this.logAliases : undefined,
+      cardNotes: Object.keys(this.cardNotes).length ? this.cardNotes : undefined,
       outside: this.pinned.length ? this.pinned : undefined,
       infra: Object.fromEntries(
         this.infra.map(({ id, position }) => [id, { x: Math.round(position.x), y: Math.round(position.y) }]),
@@ -2110,6 +2126,11 @@ class Board {
     const { [id]: _was, ...others } = this.logAliases;
     const name = alias.trim().slice(0, 24);
     this.logAliases = name && name !== this.nameOf(id) ? { ...others, [id]: name } : others;
+  }
+  /** A note for the agent on a card that is not an app; an empty one is taken off. */
+  noteCard(id: string, note: string): void {
+    const { [id]: _was, ...others } = this.cardNotes;
+    this.cardNotes = note.trim() ? { ...others, [id]: note.slice(0, 4000) } : others;
   }
   showLog(id: string, show: boolean): void {
     const { [id]: _was, ...others } = this.hiddenLogs;

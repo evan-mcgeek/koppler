@@ -1,6 +1,7 @@
 <script lang="ts">
   // A card's choices: on the card itself, or in the side panel while the board is zoomed out.
   import BranchPicker from './BranchPicker.svelte';
+  import CardNote from './CardNote.svelte';
   import { board, STARTED_BY } from './board.svelte.ts';
 
   const { id }: { id: string } = $props();
@@ -31,7 +32,6 @@
   const mobile = $derived(!!app?.platforms.length && data?.run === 'cli');
   /** Worked out when the menu is opened. */
   let cables = $state<ReturnType<typeof board.cablesOf>>({ can: [], wired: [] });
-  let noting = $state(false);
   const wire = (ev: Event) => {
     const menu = ev.currentTarget as HTMLSelectElement;
     const [what, to] = [menu.value[0], menu.value.slice(1)];
@@ -53,10 +53,6 @@
     if (!field || field === document.activeElement) return;
     field.focus();
     if (field instanceof HTMLSelectElement) field.showPicker();
-  };
-  const grow = (box: HTMLTextAreaElement) => {
-    box.style.height = 'auto';
-    box.style.height = `${String(box.scrollHeight + 2)}px`;
   };
 </script>
 
@@ -293,24 +289,13 @@
           </select>
         </span>
       </label>
-      {#if data.note || noting}
-        <label class="field">
-          Note for the agent
-          <textarea
-            rows="2"
-            placeholder="e.g. run with the new pricing flag on"
-            value={data.note}
-            {@attach grow}
-            oninput={ev => {
-              grow(ev.currentTarget);
-              board.set(id, { note: ev.currentTarget.value });
-            }}
-            onblur={() => (noting = false)}
-          ></textarea>
-        </label>
-      {:else}
-        <button class="note-toggle" type="button" onclick={() => (noting = true)}>Add a note for the agent</button>
-      {/if}
+      <CardNote
+        value={data.note}
+        placeholder="e.g. run with the new pricing flag on"
+        onchange={(note: string) => {
+          board.set(id, { note });
+        }}
+      />
     {/if}
   </div>
 {/if}
@@ -431,43 +416,7 @@
   .link:hover {
     text-decoration: underline;
   }
-  .note-toggle {
-    display: inline-flex;
-    justify-self: start;
-    align-items: center;
-    gap: 5px;
-    min-height: 24px;
-    padding: 2px 0;
-    border: 0;
-    background: none;
-    color: var(--muted);
-    font: 500 12.5px var(--sans);
-    cursor: pointer;
-  }
-  .note-toggle::before {
-    content: '+';
-    font-size: 16px;
-    line-height: 1;
-  }
-  .note-toggle:hover {
-    color: var(--cable);
-  }
-  textarea {
-    width: 100%;
-    min-height: 52px;
-    padding: 6px 8px;
-    resize: none;
-    overflow: hidden;
-    border: 1px solid var(--line);
-    border-radius: 6px;
-    background: var(--paper);
-    color: var(--ink);
-    font: 13px/1.4 var(--sans);
-  }
-  textarea::placeholder {
-    color: var(--muted);
-  }
-  :is(select, textarea, .note-toggle):focus-visible {
+  select:focus-visible {
     outline: 2px solid var(--ink);
     outline-offset: 1px;
   }
