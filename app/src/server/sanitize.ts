@@ -35,6 +35,8 @@ export interface Preset {
   source?: string;
   layout?: BoardLayout;
   outside?: string[];
+  hiddenQueues?: string[];
+  hiddenOutside?: string[];
 }
 /** A prompt from the page, on its way to Koppler or the agent. */
 export interface Prompt {
@@ -151,6 +153,8 @@ export function sanitizePresets(list: unknown): Preset[] {
         ...(typeof source === 'string' && source && { source: text(source, 300) }),
         ...(layout && { layout }),
         ...(ids(preset['outside']).length && { outside: ids(preset['outside']) }),
+        ...(ids(preset['hiddenQueues']).length && { hiddenQueues: ids(preset['hiddenQueues']) }),
+        ...(ids(preset['hiddenOutside']).length && { hiddenOutside: ids(preset['hiddenOutside']) }),
       };
     });
 }

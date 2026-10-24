@@ -311,11 +311,19 @@
           y: (start.y + end.y) / 2,
         };
       }
+      // Which way it goes: a chevron at the end it arrives at, pointing into that card. A database is read and written.
+      const [nx, ny] = SIDES[sides[1]];
+      const tip = { x: end.x + nx * 9, y: end.y + ny * 9 };
+      const back = { x: end.x + nx * 15, y: end.y + ny * 15 };
+      const arrow = database
+        ? undefined
+        : `M${String(back.x - ny * 4)} ${String(back.y + nx * 4)}L${String(tip.x)} ${String(tip.y)}L${String(back.x + ny * 4)} ${String(back.y - nx * 4)}`;
       return [
         {
           key: `${from}>${to}`,
           from,
           to,
+          arrow,
           // A line straight from an app to a deployed database: its tunnel can be shown again from it.
           tunnel:
             database && !board.databases[database] && board.boxes.has(from) ? board.tunnelOf(database) : undefined,
@@ -739,6 +747,7 @@
               />
             {/if}
             <circle class="socket" cx={flow.end.x} cy={flow.end.y} r="5" />
+            {#if flow.arrow}<path class="arrow" d={flow.arrow} />{/if}
             <circle class="plug" cx={flow.start.x} cy={flow.start.y} r="5" />
             {#if flow.via}<text class="via" x={flow.label.x} y={flow.label.y} text-anchor={flow.label.anchor}
                 >{flow.via}</text
@@ -1072,7 +1081,13 @@
   .flow .socket {
     stroke-width: 1.5;
   }
-  .flow.msg :is(.wire, .socket) {
+  .flow .arrow {
+    fill: none;
+    stroke-width: 1.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .flow.msg :is(.wire, .socket, .arrow) {
     stroke: var(--msg);
   }
   .flow.msg .socket {
@@ -1123,7 +1138,7 @@
   .flow.db.lit .wire {
     stroke-width: 3;
   }
-  .flow.ext :is(.wire, .socket) {
+  .flow.ext :is(.wire, .socket, .arrow) {
     stroke: var(--socket-rim);
     stroke-width: 1.5;
   }
@@ -1139,20 +1154,20 @@
   /* The picked card's own links stand out like its cables. */
   /* Snapped straight while a card is dragged: the line goes a shade darker, nothing more. */
   .link.snapped,
-  .flow.ext.snapped :is(.wire, .socket) {
+  .flow.ext.snapped :is(.wire, .socket, .arrow) {
     stroke: var(--ink);
   }
   .flow.ext.snapped .socket {
     fill: var(--ink);
   }
-  .flow.msg.snapped :is(.wire, .socket) {
+  .flow.msg.snapped :is(.wire, .socket, .arrow) {
     stroke: color-mix(in oklab, var(--msg) 60%, var(--ink));
   }
   .flow.msg.snapped .socket {
     fill: color-mix(in oklab, var(--msg) 60%, var(--ink));
   }
   .link.lit,
-  .flow.ext.lit :is(.wire, .socket) {
+  .flow.ext.lit :is(.wire, .socket, .arrow) {
     stroke: var(--ink);
     stroke-width: 2.5;
   }
@@ -1162,7 +1177,7 @@
   .flow.msg.lit .wire {
     stroke-width: 3.5;
   }
-  .flow.msg.lit .socket {
+  .flow.msg.lit :is(.socket, .arrow) {
     stroke-width: 2.5;
   }
   .ends {
