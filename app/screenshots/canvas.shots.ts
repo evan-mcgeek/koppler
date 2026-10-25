@@ -216,3 +216,59 @@ test.describe('databases', () => {
     await shot(page, 'databases', { x, y, width, height });
   });
 });
+
+test('Discover: the board and one step around it', async ({ page }) => {
+  await ready(page);
+  await page.reload();
+  await settle(page);
+  await page.getByRole('radio', { name: 'Discover' }).click();
+  await expect(page.locator('.svelte-flow__node-lean').first()).toBeVisible();
+  await card(page, 'orders').click();
+  await page.mouse.move(1430, 850);
+  await page.waitForTimeout(900);
+  await shot(page, 'discover');
+});
+
+test.describe('a feature board', () => {
+  const feature = {
+    request: 'A customer checks out in the app and pays for the order.',
+    cards: [],
+    phases: [
+      {
+        name: 'Place the order',
+        steps: [
+          { from: 'mobile', to: 'orders', kind: 'call', note: 'POST /orders' },
+          { from: 'orders', to: 'queue:order-events', kind: 'publish', note: 'OrderPlaced' },
+        ],
+      },
+      {
+        name: 'Pay',
+        steps: [
+          { from: 'queue:order-events', to: 'payments', kind: 'read' },
+          { from: 'payments', to: 'provider', kind: 'call', note: 'Charges the card' },
+          { from: 'payments', to: 'database:payments-db', kind: 'uses', proposed: true },
+        ],
+      },
+    ],
+  };
+  test.use({
+    board: {
+      env: 'qa',
+      mode: 'auto',
+      nodes: {},
+      edges: [],
+      preset: 'Checkout',
+      presets: [{ name: 'Checkout', version: 1, nodes: {}, edges: [], feature }],
+      feature,
+      discovering: true,
+    },
+  });
+  test('its steps in phases, and a proposal waiting', async ({ page }) => {
+    await ready(page);
+    await page.reload();
+    await expect(page.locator('.links .number text').first()).toBeVisible();
+    await page.mouse.move(1430, 850);
+    await page.waitForTimeout(900);
+    await shot(page, 'feature-board');
+  });
+});
