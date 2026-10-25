@@ -61,6 +61,8 @@
     variant?: string;
     children?: Snippet;
   } = $props();
+  const note = $derived(board.cardNotes[id] ?? '');
+  let noting = $state(false);
 </script>
 
 <div class="infra {kind} {variant}" class:selected class:dimmed={board.dimmed(id)} {title}>
@@ -88,29 +90,41 @@
     </span>
   </span>
   {#if children}<div class="body">{@render children()}</div>{/if}
-  <!-- Edit only: in Live the cards are for reading. The run hands the note to the agent. -->
-  {#if !board.live}<div class="noted">
+  <!-- A written note reads as text above the foot; the run hands it to the agent. -->
+  {#if note || noting}<div class="noted">
       <CardNote
-        value={board.cardNotes[id] ?? ''}
+        card
+        reading={board.live}
+        editing={noting}
+        onediting={(open: boolean) => (noting = open)}
+        value={note}
         placeholder="e.g. purge it before the run"
-        onchange={(note: string) => {
-          board.noteCard(id, note);
+        onchange={(text: string) => {
+          board.noteCard(id, text);
         }}
       />
     </div>{/if}
-  {#if foot}<div class="foot stack">{@render foot()}</div>
-  {:else if status}<p class="foot">
-      <span>{status}</span>
-      {#if act}<button
-          class="link nodrag"
+  {#if foot || status || (!board.live && !note)}
+    <div class="foot" class:stack={!!foot} class:bare={!foot && !status}>
+      {#if foot}{@render foot()}
+      {:else if status}<span>{status}</span>
+        {#if act}<button
+            class="link nodrag"
+            type="button"
+            aria-label={act.label}
+            title={act.title}
+            onclick={() => {
+              act.run();
+            }}>{act.word}</button
+          >{/if}
+      {/if}
+      {#if !board.live && !note && !noting}<button
+          class="link add-note nodrag"
           type="button"
-          aria-label={act.label}
-          title={act.title}
-          onclick={() => {
-            act.run();
-          }}>{act.word}</button
+          onclick={() => (noting = true)}>Add note</button
         >{/if}
-    </p>{/if}
+    </div>
+  {/if}
 </div>
 
 <style>
@@ -204,9 +218,31 @@
     padding: 10px 12px 12px;
     overflow-wrap: anywhere;
   }
+  /* A note wraps inside the card's width: it never widens the card. */
   .noted {
     display: grid;
     padding: 0 12px 10px;
+    contain: inline-size;
+  }
+  /* Offered only while the card is picked or has the keyboard: most of these cards never get a note. */
+  /* Kept in its place while hidden, so picking the card moves nothing in its foot. */
+  .add-note {
+    margin-left: auto;
+    color: var(--ink);
+    visibility: hidden;
+  }
+  .infra.selected .add-note,
+  .infra:focus-within .add-note,
+  :global(.svelte-flow__node:focus-visible) .add-note {
+    visibility: visible;
+  }
+  .foot.bare {
+    display: none;
+  }
+  .infra.selected .foot.bare,
+  .infra:focus-within .foot.bare,
+  :global(.svelte-flow__node:focus-visible) .foot.bare {
+    display: flex;
   }
   .foot {
     display: flex;
@@ -219,5 +255,8 @@
   .foot.stack {
     display: grid;
     gap: 3px;
+  }
+  .foot.stack .add-note {
+    justify-self: end;
   }
 </style>
