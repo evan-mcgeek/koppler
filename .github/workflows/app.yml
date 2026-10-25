@@ -118,6 +118,10 @@ jobs:
     if: always()
     needs: [checks, commands, canvas]
     runs-on: ubuntu-latest
+    # Nothing is checked out here, so there is no app folder to run in.
+    defaults:
+      run:
+        working-directory: .
     steps:
       - name: Every part passed
         run: |
