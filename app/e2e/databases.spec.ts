@@ -192,7 +192,7 @@ const goLocal = async (page: Page, name: string, port: string) => {
 };
 
 test("each database's line leaves the tunnel card from its own row", async ({ page }) => {
-  const plugs = page.locator('.links .flow.db.row .plug');
+  const plugs = page.locator('.links .flow.db.row circle.dot:first-of-type');
   await expect(plugs).toHaveCount(2);
   const rows = tunnel(page).getByRole('listitem');
   for (const [at, row] of [0, 1].entries()) {
@@ -223,7 +223,7 @@ test('a right click on a line to the tunnel hides the tunnel for that app, and o
   await menu.getByRole('menuitem').click();
   await expect(menu).toBeHidden();
   await expect(page.locator('.links .flow.db .via')).toHaveCount(1);
-  await rightClick(page, page.locator('.links .flow.db path.hit'));
+  await rightClick(page, page.locator('.links .flow.db path.hit[data-tunnel]'));
   await expect(menu.getByRole('menuitem')).toHaveText(/Show tunnel for/);
   await page.screenshot({ path: 'test-results/databases-menu.png' });
   await page.keyboard.press('Escape');

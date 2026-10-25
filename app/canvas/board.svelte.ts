@@ -737,19 +737,20 @@ class Board {
    * One card picked (an app, a tunnel, a queue or an outside system), or one cable: it and what it joins stay bright,
    * the rest of the board is dimmed. `id` is the picked card; a picked cable has `cable` and its two ends instead.
    */
-  focus = $derived.by((): { id: string | null; cable?: [string, string]; near: string[] } | null => {
+  /** What is picked, to trace on a busy board: the picked cards and what their links reach, or one picked cable. */
+  focus = $derived.by((): { ids: string[]; cable?: [string, string]; near: string[] } | null => {
     const cards = [...this.nodes, ...this.infra].filter(node => node.selected);
     const cables = this.edges.filter(edge => edge.selected);
-    const [one] = cards;
     const [wire] = cables;
-    if (cards.length === 1 && !cables.length && one) {
-      const near = [one.id];
+    if (cards.length && !cables.length) {
+      const ids = cards.map(card => card.id);
+      const near = [...ids];
       for (const { from, to } of [...this.cables, ...this.links, ...this.flows])
-        if (from === one.id || to === one.id) near.push(from, to);
-      return { id: one.id, near };
+        if (ids.includes(from) || ids.includes(to)) near.push(from, to);
+      return { ids, near };
     }
     if (!cards.length && cables.length === 1 && wire)
-      return { id: null, cable: [wire.source, wire.target], near: [wire.source, wire.target] };
+      return { ids: [], cable: [wire.source, wire.target], near: [wire.source, wire.target] };
     return null;
   });
   /** Whether a card is dimmed while another is picked. */
@@ -759,7 +760,7 @@ class Board {
     const focus = this.focus;
     if (!focus) return false;
     if (focus.cable) return focus.cable[0] === from && focus.cable[1] === to;
-    return from === focus.id || to === focus.id;
+    return focus.ids.includes(from) || focus.ids.includes(to);
   };
   /** Whether a cable or link is dimmed while something else is picked. */
   dimmedLink = (from: string, to: string): boolean => !!this.focus && !this.lit(from, to);

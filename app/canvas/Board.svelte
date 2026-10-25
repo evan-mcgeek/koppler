@@ -231,6 +231,13 @@
     }),
   );
   const name = board.nameOf;
+  /** Any card's name: an app's, or a queue's, a database's or an outside system's by its card key. */
+  const cardName = (key: string) =>
+    key.startsWith('queue:')
+      ? board.queueName(key.slice(6))
+      : key.startsWith('database:')
+        ? board.databaseName(key.slice(9))
+        : name(key.replace(/^outside:/, ''));
   /** The menu a right click on a line to a tunnel or a database opens: show or hide the tunnel for that app. */
   let lineMenu = $state<{ x: number; y: number; app: string; host: string; show: boolean } | null>(null);
   const openLineMenu = (ev: MouseEvent, app: string, host: string, show: boolean) => {
@@ -311,19 +318,33 @@
           y: (start.y + end.y) / 2,
         };
       }
-      // Which way it goes: a chevron at the end it arrives at, pointing into that card. A database is read and written.
+      // Which way it goes: a chevron 6px clear of the ring it lands in, pointing in. A database is read and written.
       const [nx, ny] = SIDES[sides[1]];
-      const tip = { x: end.x + nx * 9, y: end.y + ny * 9 };
-      const back = { x: end.x + nx * 15, y: end.y + ny * 15 };
+      const tip = { x: end.x + nx * 13, y: end.y + ny * 13 };
+      const back = { x: end.x + nx * 18, y: end.y + ny * 18 };
       const arrow = database
         ? undefined
-        : `M${String(back.x - ny * 4)} ${String(back.y + nx * 4)}L${String(tip.x)} ${String(tip.y)}L${String(back.x + ny * 4)} ${String(back.y - nx * 4)}`;
+        : `M${String(back.x - ny * 5)} ${String(back.y + nx * 5)}L${String(tip.x)} ${String(tip.y)}L${String(back.x + ny * 5)} ${String(back.y - nx * 5)}`;
+      const verb = database
+        ? 'reads and writes'
+        : queue
+          ? to.startsWith('queue:')
+            ? 'publishes to'
+            : 'reads'
+          : 'calls';
+      // Said by whoever acts: the app that reads a queue, not the queue. A tunnel's row carries its database.
+      const [who, what] = queue && from.startsWith('queue:') ? [to, from] : [from, to];
+      const host = from.startsWith('tunnel:') ? from.split(':')[1] : undefined;
+      const middle = detour ?? { x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 };
       return [
         {
           key: `${from}>${to}`,
           from,
           to,
           arrow,
+          verb: verb.split(' ')[0] ?? verb,
+          says: host ? `${cardName(to)}, through the tunnel to ${host}` : `${cardName(who)} ${verb} ${cardName(what)}`,
+          middle,
           // A line straight from an app to a deployed database: its tunnel can be shown again from it.
           tunnel:
             database && !board.databases[database] && board.boxes.has(from) ? board.tunnelOf(database) : undefined,
@@ -549,6 +570,7 @@
     deleteKey={board.live ? null : ['Backspace', 'Delete']}
     nodesDraggable={!board.live && !panning}
     elementsSelectable={!panning}
+    multiSelectionKey={['Shift', 'Meta', 'Control']}
     nodeDragThreshold={4}
     nodeClickDistance={4}
     panOnScroll
@@ -735,20 +757,29 @@
           >
             <path class="under" d={flow.d} />
             <path class="wire" d={flow.d} />
-            {#if flow.tunnel}
-              {@const host = flow.tunnel}
-              <path
-                class="hit"
-                role="presentation"
-                d={flow.d}
-                oncontextmenu={ev => {
-                  openLineMenu(ev, flow.from, host, true);
-                }}
-              />
+            <!-- Pointed at, it thickens and says who does what. -->
+            <path
+              class="hit"
+              role="presentation"
+              d={flow.d}
+              data-tunnel={flow.tunnel}
+              oncontextmenu={ev => {
+                if (flow.tunnel) openLineMenu(ev, flow.from, flow.tunnel, true);
+              }}><title>{flow.says}</title></path
+            >
+            <circle class="dot" cx={flow.start.x} cy={flow.start.y} r="3.5" />
+            {#if flow.arrow}
+              <circle class="ring" cx={flow.end.x} cy={flow.end.y} r="6" />
+              <path class="arrow" d={flow.arrow} />
+            {:else}
+              <circle class="dot" cx={flow.end.x} cy={flow.end.y} r="3.5" />
             {/if}
-            <circle class="socket" cx={flow.end.x} cy={flow.end.y} r="5" />
-            {#if flow.arrow}<path class="arrow" d={flow.arrow} />{/if}
-            <circle class="plug" cx={flow.start.x} cy={flow.start.y} r="5" />
+            {#if board.lit(flow.from, flow.to) && board.focus?.ids.length}
+              <g class="verb" transform="translate({flow.middle.x} {flow.middle.y})">
+                <rect x={-(flow.verb.length * 3.4 + 7)} y="-9" width={flow.verb.length * 6.8 + 14} height="18" />
+                <text>{flow.verb}</text>
+              </g>
+            {/if}
             {#if flow.via}<text class="via" x={flow.label.x} y={flow.label.y} text-anchor={flow.label.anchor}
                 >{flow.via}</text
               >{/if}
@@ -781,7 +812,7 @@
                 class:grabbed={wiring.grabbed?.id === edge.id && wiring.grabbed.end === 'from'}
                 cx={a.x}
                 cy={a.y}
-                r="5"
+                r="3.5"
                 onpointerdown={ev => {
                   wiring.grabEnd(ev, edge.id, 'from');
                 }}
@@ -1075,23 +1106,40 @@
     stroke-width: 7;
     opacity: 0.75;
   }
+  /* Each kind of link in one tone: its line, the dot where it leaves, the ring and chevron where it lands. */
+  .flow {
+    --tone: var(--socket-rim);
+  }
   .flow .wire {
+    stroke: var(--tone);
     stroke-width: 2;
   }
-  .flow .socket {
-    stroke-width: 1.5;
+  .flow .dot {
+    fill: var(--tone);
+  }
+  .flow .ring {
+    fill: var(--desk);
+    stroke: var(--tone);
+    stroke-width: 2;
   }
   .flow .arrow {
     fill: none;
-    stroke-width: 1.5;
+    stroke: var(--tone);
+    stroke-width: 2;
     stroke-linecap: round;
     stroke-linejoin: round;
   }
-  .flow.msg :is(.wire, .socket, .arrow) {
-    stroke: var(--msg);
+  .flow .hit {
+    stroke: transparent;
+    stroke-width: 12;
+    pointer-events: stroke;
   }
-  .flow.msg .socket {
-    fill: var(--msg);
+  .flow:hover .wire {
+    stroke-width: 3;
+  }
+  /* Message links are teal, dashed while the queue is the deployed one; calls to an outside system are dotted grey. */
+  .flow.msg {
+    --tone: var(--msg);
   }
   .flow.msg .wire {
     stroke-dasharray: 7 5;
@@ -1101,84 +1149,60 @@
     stroke-dasharray: none;
     stroke-linecap: round;
   }
-  .flow.msg .plug {
-    fill: var(--msg);
-    stroke: var(--surface);
-    stroke-width: 2;
-  }
   /* A line to a deployed database is dotted in the deployed colour; to one on this Mac, solid in the local colour. */
-  .flow.db :is(.wire, .socket) {
-    stroke: var(--deployed);
-  }
-  .flow.db .socket {
-    fill: var(--deployed);
+  .flow.db {
+    --tone: var(--deployed);
   }
   .flow.db .wire {
     stroke-dasharray: 2 4;
   }
-  .flow.db.local :is(.wire, .socket) {
-    stroke: var(--local);
-  }
-  .flow.db.local .socket {
-    fill: var(--local);
+  .flow.db.local {
+    --tone: var(--local);
   }
   .flow.db.local .wire {
     stroke-dasharray: none;
   }
-  .flow.db .plug {
-    display: none;
-  }
-  /* The out-socket on a tunnel card's row: a ring on its edge. */
-  .flow.db.row .plug {
-    display: initial;
-    fill: var(--desk);
-    stroke: var(--deployed);
-    stroke-width: 2;
-  }
   .flow.db.lit .wire {
     stroke-width: 3;
   }
-  .flow.ext :is(.wire, .socket, .arrow) {
-    stroke: var(--socket-rim);
-    stroke-width: 1.5;
-  }
-  .flow.ext .socket {
-    fill: var(--socket-rim);
-  }
   .flow.ext .wire {
+    stroke-width: 1.5;
     stroke-dasharray: 2 5;
   }
-  .flow.ext .plug {
-    display: none;
-  }
-  /* The picked card's own links stand out like its cables. */
   /* Snapped straight while a card is dragged: the line goes a shade darker, nothing more. */
   .link.snapped,
-  .flow.ext.snapped :is(.wire, .socket, .arrow) {
+  .flow.ext.snapped {
     stroke: var(--ink);
+    --tone: var(--ink);
   }
-  .flow.ext.snapped .socket {
-    fill: var(--ink);
+  .flow.msg.snapped {
+    --tone: color-mix(in oklab, var(--msg) 60%, var(--ink));
   }
-  .flow.msg.snapped :is(.wire, .socket, .arrow) {
-    stroke: color-mix(in oklab, var(--msg) 60%, var(--ink));
-  }
-  .flow.msg.snapped .socket {
-    fill: color-mix(in oklab, var(--msg) 60%, var(--ink));
-  }
-  .link.lit,
-  .flow.ext.lit :is(.wire, .socket, .arrow) {
+  /* The picked card's own links stand out like its cables. */
+  .link.lit {
     stroke: var(--ink);
     stroke-width: 2.5;
   }
-  .flow.ext.lit .socket {
-    fill: var(--ink);
+  .flow.ext.lit {
+    --tone: var(--ink);
+  }
+  .flow.ext.lit .wire {
+    stroke-width: 2.5;
   }
   .flow.msg.lit .wire {
     stroke-width: 3.5;
   }
-  .flow.msg.lit :is(.socket, .arrow) {
-    stroke-width: 2.5;
+  /* What the link does, beside it, while one of its cards is picked. */
+  .flow .verb rect {
+    fill: var(--desk);
+    stroke: var(--line-strong);
+  }
+  .flow .verb text {
+    fill: var(--ink);
+    font: 600 11px var(--sans);
+    dominant-baseline: middle;
+    text-anchor: middle;
+    stroke: none;
   }
   .ends {
     position: absolute;
@@ -1200,14 +1224,15 @@
   .drawing :is(.plug, .socket) {
     cursor: inherit;
   }
-  /* Where a cable leaves: a small ring. Where it plugs in: a larger ring whose hole holds the last connection test. */
+  /* Where a cable leaves: a small dot, grabbed by a wider clear edge. Where it plugs in: a ring whose hole holds the last
+     connection test. */
   .plug {
-    fill: var(--desk);
-    stroke: var(--cable);
-    stroke-width: 2;
+    fill: var(--cable);
+    stroke: transparent;
+    stroke-width: 6;
   }
   .plug.idle {
-    stroke: color-mix(in oklab, var(--cable) 45%, var(--line-strong));
+    fill: color-mix(in oklab, var(--cable) 45%, var(--line-strong));
   }
   .plug.cut {
     fill: var(--bad);
