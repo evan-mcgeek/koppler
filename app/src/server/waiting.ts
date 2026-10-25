@@ -51,6 +51,8 @@ function describe(tag: string, data: Loose): string {
       return `Fix ${failures.map(one => text(one.connection)).join(', ') || 'what the Flow check found'}`;
     case 'koppler-facts':
       return data['app'] ? `Fill in ${name(data['app'])}'s settings` : `Find the ${env} facts the stack misses`;
+    case 'koppler-feature':
+      return `Propose the steps of ${text(data['board']) || 'a feature board'}`;
     case 'koppler-reply':
       return 'Your answer to a question';
     case 'koppler-review':

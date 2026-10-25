@@ -13,7 +13,14 @@
   });
 </script>
 
-<div class="lean" class:ring={!data.onBoard} class:picked={selected} title={data.name} bind:offsetHeight={height}>
+<div
+  class="lean"
+  class:ring={!data.onBoard}
+  class:proposed={data.proposed}
+  class:picked={selected}
+  title={data.name}
+  bind:offsetHeight={height}
+>
   <span class="top">
     <span class="name">{data.name}</span>
     <span class="tag">{data.tag}</span>
@@ -21,6 +28,31 @@
   <span class="meta">
     {#if data.cloned}<Laptop size={12} aria-hidden="true" /><span class="here">Cloned here</span>{:else}{data.meta}{/if}
   </span>
+  {#if data.proposed}
+    <span class="proposal">
+      <strong>Proposed</strong>
+      <span class="answers">
+        <button
+          class="nodrag"
+          type="button"
+          aria-label="Accept {data.name}"
+          onclick={ev => {
+            ev.stopPropagation();
+            void discovered.accept(discovered.proposalsOf(id));
+          }}>Accept</button
+        >
+        <button
+          class="nodrag"
+          type="button"
+          aria-label="Drop {data.name}"
+          onclick={ev => {
+            ev.stopPropagation();
+            discovered.drop(discovered.proposalsOf(id));
+          }}>Drop</button
+        >
+      </span>
+    </span>
+  {/if}
   {#if data.hidden}
     <button
       class="more nodrag"
@@ -54,6 +86,31 @@
   .lean.ring {
     border-color: var(--line);
     background: var(--desk);
+  }
+  /* The agent's, not accepted yet: dashed, with its answers on it. */
+  .lean.proposed {
+    border-style: dashed;
+    background: var(--desk);
+  }
+  .proposal {
+    display: grid;
+    gap: 4px;
+    color: var(--ink);
+    font: 600 12px var(--sans);
+  }
+  .answers {
+    display: flex;
+    gap: 10px;
+  }
+  .answers button {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--ink);
+    font: 400 12px var(--sans);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    cursor: pointer;
   }
   .lean.picked {
     outline: 2px solid var(--ink);

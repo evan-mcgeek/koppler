@@ -50,3 +50,13 @@ describe('mapOf', () => {
     expect(cards.find(one => one.card === 'payments')?.hidden).toBe(0);
   });
 });
+
+describe('mapOf on a feature board', () => {
+  it('shows only its own cards until one is opened', () => {
+    expect(mapOf(facts, ['web', 'orders'], [], false).cards).toEqual([
+      { card: 'web', onBoard: true, hidden: 0 },
+      { card: 'orders', onBoard: true, hidden: 3 },
+    ]);
+    expect(mapOf(facts, ['web', 'orders'], ['orders'], false).cards).toHaveLength(5);
+  });
+});

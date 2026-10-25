@@ -34,7 +34,9 @@
   import { stacks } from './stacks.svelte.ts';
   import Setup from './Setup.svelte';
   import Side from './Side.svelte';
+  import { discovered } from './discover.svelte.ts';
   import StackPicker from './StackPicker.svelte';
+  import BoardPicker from './BoardPicker.svelte';
   import Toast from './Toast.svelte';
   import { board } from './board.svelte.ts';
   import { undo } from './undo.svelte.ts';
@@ -172,7 +174,8 @@
     untrack(() => {
       for (const one of edits.filter(one => !made[one.id])) {
         made[one.id] = true;
-        const name = board.nameOf;
+        // A queue or database a feature step names is said by its name too.
+        const name = (id: string) => (id.includes(':') ? discovered.data(id, false, 0).name : board.nameOf(id));
         if (one.preset) {
           const out = board.importBoards(
             one.preset,
@@ -349,6 +352,10 @@
   {#if board.stack}
     <span class="slash" aria-hidden="true">/</span>
     <StackPicker />
+    {#if board.discovering}
+      <span class="slash" aria-hidden="true">/</span>
+      <span class="boards"><BoardPicker /></span>
+    {/if}
     <button
       class="side-toggle gear"
       type="button"
@@ -461,7 +468,8 @@
         ]}
       />
     </span>
-    <span class="split" inert={!!loading}>
+    <!-- Discover runs nothing: Run is in Plan and Live. -->
+    <span class="split" inert={!!loading} hidden={board.discovering}>
       <button
         class="run"
         type="button"
@@ -605,6 +613,12 @@
     font: 600 20px var(--display);
     letter-spacing: -0.005em;
   }
+  /* Discover has no side panel: the board picker sits in the header, as wide as its name. */
+  .boards {
+    display: flex;
+    min-width: 0;
+    max-width: 320px;
+  }
   .slash {
     margin: 0 -8px;
     color: var(--line-strong);
@@ -695,6 +709,9 @@
   .split {
     display: inline-flex;
     align-items: stretch;
+  }
+  .split[hidden] {
+    display: none;
   }
   .split > :is(.stop, .run):has(+ :global(.more)) {
     border-radius: 8px 0 0 8px;

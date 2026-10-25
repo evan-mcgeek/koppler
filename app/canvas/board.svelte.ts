@@ -2,6 +2,7 @@
 // waypoints, sliding an end along its side). The geometry is core/cables and core/arrange, unchanged.
 import type { Edge, Node } from '@xyflow/svelte';
 import { resolveExpressions } from '../src/core/expressions.ts';
+import { editFeature, featureOf, type Feature } from '../src/core/feature.ts';
 import { databasesOf, withDatabases } from '../src/core/databases.ts';
 import { BOARD_FORMAT } from '../src/core/migrations/board/index.ts';
 import { BOARD_FILE_FORMAT, migrateBoardFile } from '../src/core/migrations/board-file/index.ts';
@@ -295,6 +296,8 @@ class Board {
   cardNotes = $state.raw<Record<string, string>>({});
   /** Discover, per board: the cards whose hidden links were brought in, and where its cards sit. */
   discover = $state.raw<DiscoverState>({ open: [], at: {} });
+  /** A feature board's request, phases and steps; null on any other board. */
+  feature = $state.raw<Feature | null>(null);
   /** The outside systems put on the board by hand: shown even when none of their apps is. */
   pinned = $state.raw<string[]>([]);
   pin(id: string): void {
@@ -1496,6 +1499,7 @@ class Board {
       hiddenQueues: this.hiddenQueues,
       hiddenOutside: this.hiddenOutside,
       pinned: this.pinned,
+      feature: this.feature,
       edges: this.edges.map(({ id, source, target, type, data }) => ({ id, source, target, type, data })),
     });
   }
@@ -1580,6 +1584,7 @@ class Board {
       ...(Object.keys(this.hiddenOutside).length && { hiddenOutside: Object.keys(this.hiddenOutside) }),
       ...(Object.keys(this.cardNotes).length && { cardNotes: this.cardNotes }),
       ...((this.discover.open.length || Object.keys(this.discover.at).length) && { discover: this.discover }),
+      ...(this.feature && { feature: this.feature }),
     };
   }
   /** Where the cards sit and which sides the cables use, kept with a board so it opens as it was left. */
@@ -1626,7 +1631,7 @@ class Board {
       put(this.name ?? '');
       return;
     }
-    if (!this.nodes.length) return;
+    if (!this.nodes.length && !this.feature) return;
     // A board for one app alone is not kept; a second app makes it a board of the user's.
     if (this.scratch && this.nodes.length < 2) return;
     this.scratch = false;
@@ -1751,6 +1756,13 @@ class Board {
     this.opened = 'fit';
     return back;
   }
+  /** A feature board: named at once, empty until its request or first app, and shown in Discover. */
+  newFeature(): void {
+    this.newBoard();
+    this.name = this.uniqueName('New feature');
+    this.feature = { request: '', cards: [], phases: [] };
+    this.goDiscover();
+  }
   /** A board to start from: empty, and named once it holds an app. */
   newBoard(): void {
     this.scratch = false;
@@ -1766,6 +1778,7 @@ class Board {
     this.logAliases = {};
     this.cardNotes = {};
     this.discover = { open: [], at: {} };
+    this.feature = null;
     this.pinned = [];
   }
   /**
@@ -1776,6 +1789,8 @@ class Board {
     if (!Object.keys(given.nodes).length) {
       this.newBoard();
       this.name = given.name;
+      this.discover = discoverOf(given['discover']);
+      this.feature = featureOf(given['feature']);
       return { notes: [] };
     }
     const checked = check(given, this.#facts());
@@ -1811,6 +1826,7 @@ class Board {
     this.logAliases = {};
     this.cardNotes = notesOf(given['cardNotes']);
     this.discover = discoverOf(given['discover']);
+    this.feature = featureOf(given['feature']);
     this.pinned = Array.isArray(given['outside'])
       ? (given['outside'] as unknown[]).filter((id): id is string => typeof id === 'string')
       : [];
@@ -1971,6 +1987,7 @@ class Board {
     this.own = (Array.isArray(saved?.['presets']) ? saved['presets'] : []) as StoredPreset[];
     this.#seen = this.own.map(one => one.name);
     this.scratch = saved?.['scratch'] === true;
+    this.discovering = saved?.['discovering'] === true;
     this.dismissed = (Array.isArray(saved?.['dismissed']) ? saved['dismissed'] : []) as string[];
     this.trash = (Array.isArray(saved?.['trash']) ? saved['trash'] : []) as Deleted[];
     this.recent = (Array.isArray(saved?.['recent']) ? saved['recent'] : []) as Opened[];
@@ -1983,6 +2000,7 @@ class Board {
     this.logAliases = (saved?.['logAliases'] ?? {}) as Record<string, string>;
     this.cardNotes = notesOf(saved?.['cardNotes']);
     this.discover = discoverOf(saved?.['discover']);
+    this.feature = featureOf(saved?.['feature']);
     this.pinned = (Array.isArray(saved?.['outside']) ? saved['outside'] : []) as string[];
     const { zoom, pan } = saved ?? {};
     this.view = zoom && pan ? { x: pan.x, y: pan.y, zoom } : undefined;
@@ -2003,6 +2021,7 @@ class Board {
       this.env,
       this.name,
       this.scratch,
+      this.discovering,
       this.view,
       this.nodes,
       this.edges,
@@ -2020,6 +2039,7 @@ class Board {
       this.logAliases,
       this.cardNotes,
       this.discover,
+      this.feature,
       this.pinned,
     ];
   }
@@ -2045,6 +2065,7 @@ class Board {
       trash: this.trash,
       recent: this.recent,
       scratch: this.scratch || undefined,
+      discovering: this.discovering || undefined,
       dismissed: this.dismissed.length ? this.dismissed : undefined,
       env: this.env,
       ...(this.view && { zoom: this.view.zoom, pan: { x: this.view.x, y: this.view.y } }),
@@ -2084,6 +2105,7 @@ class Board {
       logAliases: Object.keys(this.logAliases).length ? this.logAliases : undefined,
       cardNotes: Object.keys(this.cardNotes).length ? this.cardNotes : undefined,
       discover: this.discover.open.length || Object.keys(this.discover.at).length ? this.discover : undefined,
+      feature: this.feature ?? undefined,
       outside: this.pinned.length ? this.pinned : undefined,
       infra: Object.fromEntries(
         this.infra.map(({ id, position }) => [id, { x: Math.round(position.x), y: Math.round(position.y) }]),
@@ -2257,6 +2279,7 @@ class Board {
       if (on(from) && on(to) && !this.edges.some(edge => edge.id === `${from}>${to}`)) this.connect(from, to);
     // Laid out once the cards have their sizes, as a board opened with no places is.
     if (change.arrange) this.opened = 'arrange';
+    if (change.feature) this.feature = editFeature(this.feature, change.feature);
     return this.content() !== before || !!change.arrange;
   }
 

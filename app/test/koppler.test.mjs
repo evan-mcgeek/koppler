@@ -464,6 +464,41 @@ test('A board is changed from the terminal: kept at once, queued for an open can
   fs.rmSync(dir, { recursive: true });
 });
 
+test('A feature board from the terminal: its request, phases and steps; the agent proposes steps, and a card the stack lacks is refused.', async () => {
+  const { spawnSync } = await import('node:child_process');
+  const fs = await import('node:fs'), os = await import('node:os'), path = await import('node:path'), { fileURLToPath } = await import('node:url');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-feature-'));
+  const env = { ...process.env, KOPPLER_STATE: dir, KOPPLER_TEMP: dir, KOPPLER_CONFIG_DIR: dir };
+  const entry = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'dist', 'koppler.mjs');
+  const koppler = (...args) => { const r = spawnSync('node', [entry, ...args], { encoding: 'utf8', env }); return { out: (r.stdout + r.stderr).trim(), code: r.status }; };
+  const write = (name, value) => fs.writeFileSync(path.join(dir, `${name}.json`), JSON.stringify(value));
+  const read = name => JSON.parse(fs.readFileSync(path.join(dir, `${name}.json`), 'utf8'));
+  write('registry', { name: 'Acme', envs: ['qa'], apps: { web: { name: 'Web', consumes: { orders: {} } }, orders: { name: 'Orders', publishes: { events: {} } } }, queues: { events: { name: 'Events', type: 'sqs' } } });
+  write('local', { apps: {} });
+  write('state', {});
+
+  const made = koppler('board', 'new', 'Pay', '--request', 'Customers pay', '--phase', 'Order', '--step', 'web:orders=Sends it', '--step', 'orders:queue:events');
+  assert.equal(made.code, 0, made.out);
+  assert.match(made.out, /MADE Pay: set the request; added the phase Order; added the steps Web to Orders, Orders to Events/);
+  const pay = () => read('state').presets.find(one => one.name === 'Pay');
+  assert.deepEqual(pay().nodes, {});
+  assert.deepEqual(pay().feature, {
+    request: 'Customers pay',
+    cards: [],
+    phases: [{ name: 'Order', steps: [{ from: 'web', to: 'orders', kind: 'call', note: 'Sends it' }, { from: 'orders', to: 'queue:events', kind: 'publish' }] }],
+  });
+
+  const proposed = koppler('board', 'edit', 'Pay', '--phase', 'Settle', '--propose-step', 'queue:events:web=Reads it', '--unstep', 'web:orders');
+  assert.equal(proposed.code, 0, proposed.out);
+  assert.deepEqual(pay().feature.phases.map(phase => phase.steps), [
+    [{ from: 'orders', to: 'queue:events', kind: 'publish' }],
+    [{ from: 'queue:events', to: 'web', kind: 'read', note: 'Reads it', proposed: true }],
+  ]);
+  assert.match(koppler('board', 'edit', 'Pay', '--step', 'web:ghost').out, /ghost is not in the stack/);
+  assert.match(koppler('board', 'edit', 'Pay', '--step', 'web').out, /expected <from>:<to>/);
+  fs.rmSync(dir, { recursive: true });
+});
+
 test('A request that was no run (filling in settings, an answer) is finished with history done: the agent is no longer at it.', async () => {
   const { spawnSync } = await import('node:child_process');
   const fs = await import('node:fs'), os = await import('node:os'), path = await import('node:path'), { fileURLToPath } = await import('node:url');

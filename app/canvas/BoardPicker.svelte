@@ -154,6 +154,7 @@
   popovertarget={id}
 >
   <span class="name">{label}</span>
+  {#if board.feature}<span class="kind">Feature board</span>{/if}
 </button>
 <div
   bind:this={list}
@@ -229,6 +230,14 @@
       >
       <button
         type="button"
+        title="A board for one feature: its request, and the steps it takes through the stack, read in Discover"
+        onclick={() => {
+          close();
+          board.newFeature();
+        }}>New feature board</button
+      >
+      <button
+        type="button"
         disabled={!board.nodes.length}
         onclick={() => {
           close();
@@ -293,6 +302,7 @@
     position: relative;
     display: flex;
     align-items: center;
+    gap: 8px;
     width: 100%;
     height: 32px;
     padding: 0 30px 0 10px;
@@ -327,6 +337,11 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+  .kind {
+    flex: none;
+    color: var(--ink-muted);
+    font: 400 12px var(--sans);
   }
   .menu {
     position: fixed;
