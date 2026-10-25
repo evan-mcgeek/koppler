@@ -93,7 +93,7 @@ These appear next to the app that uses them, and show or hide with it.
 - **Outside systems** (for example a payment provider) are dashed cards: things the apps call, or that call them, and that never run locally. Add one with **Add outside system…** under the Apps list; click it in the list to keep its card on the board even when none of its callers is there.
 - Each link to a queue or an outside system ends in an arrow at the card it goes to: an app's arrow into a queue publishes, a queue's arrow into an app is read, an arrow into an outside system is a call to it.
 - What a board hides stays hidden with that board: a board for one flow can leave out the queues and outside cards of the others.
-- Every card, not only an app's, takes a note for the agent: on a queue, a database, a tunnel or an outside system it is kept with the board and goes to the agent with the run.
+- Every card, not only an app's, takes a note for the agent, kept with the board and handed to the agent with the run. On a queue, a database, a tunnel or an outside system, pick the card and choose **Add note** in its foot; a written note reads as text, and a click opens it to edit.
 
 ## Environment
 
