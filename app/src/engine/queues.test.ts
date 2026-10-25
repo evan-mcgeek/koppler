@@ -1,6 +1,16 @@
 import { expect, test } from 'vitest';
 import type { Stack } from '../core/stack.ts';
-import { BROKER, EMULATOR, ENDPOINT, KAFKA, localQueues, queueEnv, STOP_BROKER, STOP_EMULATOR } from './queues.ts';
+import {
+  BROKER,
+  EMULATOR,
+  ENDPOINT,
+  KAFKA,
+  localQueues,
+  queueEnv,
+  REGION,
+  STOP_BROKER,
+  STOP_EMULATOR,
+} from './queues.ts';
 
 const stack = {
   queues: {
@@ -45,7 +55,8 @@ test('apps Koppler starts get the SDK endpoint and their queue settings; a Lambd
   const url = 'http://127.0.0.1:4566/000000000000/thumbs-prod';
   const env = queueEnv(stack, board.queues, { thumbs: url });
   expect(env.set).toEqual({
-    api: { AWS_ENDPOINT_URL_SQS: ENDPOINT, Queues__Thumbs: url },
+    // The AWS SDK for .NET signs for us-east-1 at an endpoint of its own: it is told the queue's region.
+    api: { AWS_ENDPOINT_URL_SQS: ENDPOINT, AWS__AuthenticationRegion: REGION, Queues__Thumbs: url },
     worker: { AWS_ENDPOINT_URL_SQS: ENDPOINT },
   });
   expect(env.left[0]).toMatch(/^Fn: point it at the local Thumbnails queue/);
