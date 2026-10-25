@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { opens } from './bar.svelte.ts';
   import Icon from './Icon.svelte';
   import Settings from '@lucide/svelte/icons/settings';
   import { debug } from './debug.svelte.ts';
@@ -56,110 +57,135 @@
     ],
   ] as const);
   const custom = $derived(!!(appearance.now.local ?? appearance.now.deployed));
+  // Bare, the settings themselves, once on the page; otherwise the side pane's gear that opens them.
+  const { bare = false }: { bare?: boolean } = $props();
+  let pop = $state<HTMLDivElement>();
+  $effect(() => {
+    if (!bare) return;
+    opens.settings = from => {
+      if (!pop) return;
+      const at = from?.getBoundingClientRect();
+      pop.style.inset = at
+        ? `${String(at.bottom + 6)}px ${String(Math.max(12, innerWidth - at.right))}px auto auto`
+        : '';
+      pop.showPopover();
+    };
+  });
 </script>
 
-<button class="open" type="button" popovertarget="settings" aria-label="Settings" title="Settings">
-  <Icon of={Settings} size={16} />
-</button>
-<div class="pop" id="settings" popover aria-label="Settings">
-  <div class="row log">
-    <label
-      class="toggle"
-      title={debug.forced
-        ? 'Always on while Koppler runs from its source folder, so every problem can be traced.'
-        : 'Keeps every click, change and message on this canvas, so a problem can be traced. Nothing you type is kept.'}
-    >
-      <input type="checkbox" role="switch" bind:checked={debug.on} disabled={debug.forced} /><span
-        class="track"
-        aria-hidden="true"
-      ></span>Debug log
-    </label>
-    {#if debug.on}
-      <button class="text" type="button" onclick={copyLog}>Copy</button>
-      <button
-        class="text"
-        type="button"
-        onclick={() => {
-          debug.clear();
-          toasts.show('Debug log cleared');
-        }}>Clear</button
+{#if !bare}
+  <button
+    class="open"
+    type="button"
+    aria-label="Canvas settings"
+    title="Canvas settings: appearance, the debug log and this canvas's address"
+    onclick={() => {
+      opens.settings?.();
+    }}
+  >
+    <Icon of={Settings} size={16} />
+  </button>
+{:else}
+  <div class="pop" id="settings" popover aria-label="Settings" bind:this={pop}>
+    <div class="row log">
+      <label
+        class="toggle"
+        title={debug.forced
+          ? 'Always on while Koppler runs from its source folder, so every problem can be traced.'
+          : 'Keeps every click, change and message on this canvas, so a problem can be traced. Nothing you type is kept.'}
       >
-    {/if}
-  </div>
-  <div class="row address">
-    {#if renewing}
-      <span class="warn">Other open tabs and copied links stop working.</span>
-      <button class="text" type="button" onclick={() => (renewing = false)}>Cancel</button>
-      <button class="text go" type="button" onclick={() => void renew()}>Get it</button>
-    {:else}
-      <span>Address</span>
-      <button
-        class="text"
-        type="button"
-        title="Give the canvas a new address, so a link that was copied or shared no longer opens it"
-        onclick={() => (renewing = true)}>New address</button
-      >
-    {/if}
-  </div>
-  <section class="appearance" aria-label="Appearance">
-    <h2>Appearance</h2>
-    <div role="radiogroup" aria-label="Scheme">
-      {#each groups as [group, list] (group)}
-        <span class="group">{group}</span>
-        <div class="schemes">
-          {#each list as [id, scheme] (id)}
+        <input type="checkbox" role="switch" bind:checked={debug.on} disabled={debug.forced} /><span
+          class="track"
+          aria-hidden="true"
+        ></span>Debug log
+      </label>
+      {#if debug.on}
+        <button class="text" type="button" onclick={copyLog}>Copy</button>
+        <button
+          class="text"
+          type="button"
+          onclick={() => {
+            debug.clear();
+            toasts.show('Debug log cleared');
+          }}>Clear</button
+        >
+      {/if}
+    </div>
+    <div class="row address">
+      {#if renewing}
+        <span class="warn">Other open tabs and copied links stop working.</span>
+        <button class="text" type="button" onclick={() => (renewing = false)}>Cancel</button>
+        <button class="text go" type="button" onclick={() => void renew()}>Get it</button>
+      {:else}
+        <span>Address</span>
+        <button
+          class="text"
+          type="button"
+          title="Give the canvas a new address, so a link that was copied or shared no longer opens it"
+          onclick={() => (renewing = true)}>New address</button
+        >
+      {/if}
+    </div>
+    <section class="appearance" aria-label="Appearance">
+      <h2>Appearance</h2>
+      <div role="radiogroup" aria-label="Scheme">
+        {#each groups as [group, list] (group)}
+          <span class="group">{group}</span>
+          <div class="schemes">
+            {#each list as [id, scheme] (id)}
+              <button
+                type="button"
+                role="radio"
+                class="scheme"
+                aria-checked={appearance.now.scheme === id}
+                onclick={() => {
+                  appearance.pickScheme(id);
+                }}
+              >
+                <span class="mark" aria-hidden="true"></span>
+                <span class="swatch" aria-hidden="true"
+                  ><i style:background={scheme.desk}></i><i style:background={scheme.local}></i><i
+                    style:background={scheme.deployed}
+                  ></i></span
+                >
+                <span class="words"><b>{scheme.name}</b><small>{scheme.note}</small></span>
+              </button>
+            {/each}
+          </div>
+        {/each}
+      </div>
+      {#each picks as [label, hexes, now, pick] (label)}
+        <div class="picks-head">
+          <h2>{label}</h2>
+          {#if label === 'Local' && custom}
+            <button
+              class="link"
+              type="button"
+              onclick={() => {
+                appearance.schemeDefault();
+              }}>Scheme default</button
+            >
+          {/if}
+        </div>
+        <div class="picks" role="radiogroup" aria-label="{label} colour">
+          {#each hexes as hex (hex)}
             <button
               type="button"
               role="radio"
-              class="scheme"
-              aria-checked={appearance.now.scheme === id}
+              aria-checked={now === hex}
+              aria-label="{label} {hex}"
+              style:--hex={hex}
               onclick={() => {
-                appearance.pickScheme(id);
+                pick(hex);
               }}
-            >
-              <span class="mark" aria-hidden="true"></span>
-              <span class="swatch" aria-hidden="true"
-                ><i style:background={scheme.desk}></i><i style:background={scheme.local}></i><i
-                  style:background={scheme.deployed}
-                ></i></span
-              >
-              <span class="words"><b>{scheme.name}</b><small>{scheme.note}</small></span>
-            </button>
+            ></button>
           {/each}
         </div>
       {/each}
-    </div>
-    {#each picks as [label, hexes, now, pick] (label)}
-      <div class="picks-head">
-        <h2>{label}</h2>
-        {#if label === 'Local' && custom}
-          <button
-            class="link"
-            type="button"
-            onclick={() => {
-              appearance.schemeDefault();
-            }}>Scheme default</button
-          >
-        {/if}
-      </div>
-      <div class="picks" role="radiogroup" aria-label="{label} colour">
-        {#each hexes as hex (hex)}
-          <button
-            type="button"
-            role="radio"
-            aria-checked={now === hex}
-            aria-label="{label} {hex}"
-            style:--hex={hex}
-            onclick={() => {
-              pick(hex);
-            }}
-          ></button>
-        {/each}
-      </div>
-    {/each}
-    <p>Warning and PROD colours are left out of both rows, so a custom pick can never be mistaken for either.</p>
-  </section>
-</div>
+      <p>Warning and PROD colours are left out of both rows, so a custom pick can never be mistaken for either.</p>
+    </section>
+  </div>
+{/if}
 
 <style>
   .open {

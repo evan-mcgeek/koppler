@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { opens } from './bar.svelte.ts';
   import Icon from './Icon.svelte';
   import X from '@lucide/svelte/icons/x';
   // The agent's messages, beside the board: questions to answer, and what it finished or failed at.
@@ -53,6 +54,10 @@
     <header>
       <h2>Agent</h2>
       <span class="sub">{inbox.question ? 'Waiting for your answer' : ''}</span>
+      <!-- With none listening, or one gone quiet, how to connect one is offered here, a click from the chip. -->
+      {#if live.status?.agent?.state !== 'listening' && !busy}
+        <button type="button" onclick={() => opens.connect?.()}>Connect an agent</button>
+      {/if}
       {#if list.some(one => !waits(one))}
         <button type="button" onclick={() => void inbox.clear()}>Clear</button>
       {/if}

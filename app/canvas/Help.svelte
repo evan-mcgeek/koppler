@@ -1,5 +1,7 @@
 <script lang="ts">
+  import { opens } from './bar.svelte.ts';
   let sheet: HTMLElement | undefined = $state();
+  opens.help = () => sheet?.showPopover();
   const shortcut = (ev: KeyboardEvent) => {
     if (ev.key !== '?' || (ev.target as Element).closest('input, select, textarea')) return;
     sheet?.togglePopover();
@@ -8,15 +10,6 @@
 
 <svelte:window onkeydown={shortcut} />
 
-<button
-  class="open"
-  type="button"
-  popovertarget="help"
-  aria-label="Shortcuts and legend"
-  title="Shortcuts and legend (?)"
->
-  ?
-</button>
 <div class="sheet" id="help" popover bind:this={sheet} aria-label="Shortcuts and legend">
   <h2>Shortcuts</h2>
   <dl>
@@ -24,8 +17,8 @@
     <dd>Fit the whole board in view</dd>
     <dt><kbd>P</kbd>, <kbd>Esc</kbd> to stop</dt>
     <dd>Present: the board alone, full screen</dd>
-    <dt><kbd>E</kbd> / <kbd>L</kbd></dt>
-    <dd>Edit view / Live view</dd>
+    <dt><kbd>D</kbd> / <kbd>E</kbd> / <kbd>L</kbd></dt>
+    <dd>Discover / Plan / Live</dd>
     <dt><kbd>V</kbd> / <kbd>H</kbd>, hold <kbd>Space</kbd></dt>
     <dd>Select / move around the board</dd>
     <dt><kbd>Cmd</kbd> or <kbd>Ctrl</kbd> + <kbd>Z</kbd></dt>
@@ -65,21 +58,6 @@
 </div>
 
 <style>
-  .open {
-    display: grid;
-    place-items: center;
-    width: 32px;
-    height: 32px;
-    padding: 0;
-    border: 0;
-    border-radius: 8px;
-    background: none;
-    color: var(--muted);
-    cursor: pointer;
-  }
-  .open:hover {
-    background: color-mix(in oklab, var(--ink) 7%, transparent);
-  }
   .sheet {
     inset: 60px 16px auto auto;
     width: 440px;

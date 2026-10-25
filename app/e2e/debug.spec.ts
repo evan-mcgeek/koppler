@@ -1,7 +1,7 @@
 // The new canvas's debug log: what happens on the page is kept for tracing a problem, never what is typed.
 import fs from 'node:fs';
 import path from 'node:path';
-import { test, expect } from './canvas.ts';
+import { test, expect, fromMenu } from './canvas.ts';
 
 test.use({
   board: { env: 'qa', mode: 'auto', nodes: { orders: { x: 0, y: 0, run: 'cli', branch: 'main' } }, edges: [] },
@@ -15,7 +15,7 @@ test('the log keeps clicks, choices and messages with the board, and no typed te
   };
   const card = page.locator('.svelte-flow__node[data-id="orders"]');
   // The test server runs from the source folder, where the log is always on.
-  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await fromMenu(page, 'Settings', 'Appearance');
   const log = page.getByRole('switch', { name: 'Debug log' });
   await expect(log).toBeChecked();
   await expect(log).toBeDisabled();
@@ -38,7 +38,7 @@ test('the log keeps clicks, choices and messages with the board, and no typed te
   expect(entries.at(-1)?.board).toMatchObject({ apps: 1, cables: 0, view: 'edit', env: 'qa' });
 
   // Clearing empties it, and says so.
-  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await fromMenu(page, 'Settings', 'Appearance');
   await page.locator('#settings').getByRole('button', { name: 'Clear' }).click();
   await expect(page.getByRole('status')).toContainText('Debug log cleared');
 });
