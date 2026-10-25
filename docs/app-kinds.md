@@ -56,8 +56,10 @@ Koppler works out that address per device for Flutter and React Native; for a na
 
 | Stack | Kind | Started with | Needs | |
 |---|---|---|---|---|
-| AWS Lambda, queue-triggered | `lambda` | the function in its real runtime image, its queue in a local AWS emulator, and a local address callers post to | Docker, the AWS CLI | Run for real (.NET) |
+| AWS Lambda, queue-triggered | `lambda` | the function in its real runtime image, in the local AWS emulator that holds the board's local queues: triggered by the one it reads, or, with none, by a local address callers post to | Docker, the AWS CLI | Run for real (.NET) |
 | AWS SAM | `sam` | `sam build`, then `sam local start-api`, with the environment's deploy parameters from `samconfig.toml` | Docker, the SAM CLI | Run for real |
+
+A Lambda gets the settings its stack entry names (`lambda.env`), from a cable to a local app or a stored secret, and Parameter Store values from stored secrets (`lambda.parameters`); it can live in another app's repo, with that app's `slug` and its folder as `lambda.project`.
 
 A SAM app serves its API functions; functions triggered by queues, schedules or streams are listed in its log, not run.
 

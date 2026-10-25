@@ -20,21 +20,26 @@
         ? throughPath(a, data.fromSide, b, data.toSide, data.points)
         : cablePath(a, data.fromSide, b, data.toSide),
   );
-  /** The arrow's tip touches the socket's rim, pointing into the card. */
+  /** Which way it goes: a chevron 6px clear of the socket's ring, pointing into the card that answers. */
   const head = $derived.by(() => {
     if (!b || !data) return '';
     const [x, y] = SIDES[data.toSide];
-    return `translate(${String(b.x + x * 10)} ${String(b.y + y * 10)}) rotate(${String((Math.atan2(-y, -x) * 180) / Math.PI)})`;
+    return `translate(${String(b.x + x * 14)} ${String(b.y + y * 14)}) rotate(${String((Math.atan2(-y, -x) * 180) / Math.PI)})`;
   });
   const name = board.nameOf;
   /** The middle of the cable, where the mark to unplug it shows while it is pointed at or picked: measured only then. */
   const middle = $derived.by(() => {
     if (!path || (board.hovered !== id && !selected) || board.live) return '';
+    return `${halfway()} scale(${String(markScale)})`;
+  });
+  const halfway = () => {
     const probe = document.createElementNS('http://www.w3.org/2000/svg', 'path');
     probe.setAttribute('d', path);
     const at = probe.getPointAtLength(probe.getTotalLength() / 2);
-    return `translate(${String(at.x)} ${String(at.y)}) scale(${String(markScale)})`;
-  });
+    return `translate(${String(at.x)} ${String(at.y)})`;
+  };
+  /** While one of its cards is picked, it says what it does. */
+  const verb = $derived(path && board.focus?.ids.length && board.lit(source, target) ? halfway() : '');
 </script>
 
 {#if path}
@@ -53,7 +58,13 @@
     <path class="svelte-flow__edge-interaction hit" d={path} style:stroke-width="{16 * markScale}px" />
     <path class="under" d={path} />
     <path class="wire" d={path} />
-    <path class="head" d="M-10,-5 L0,0 L-10,5 L-7.5,0 Z" transform={head} />
+    <path class="head" d="M-5,-5 L0,0 L-5,5" transform={head} />
+    {#if verb && !middle}
+      <g class="verb" transform={verb}>
+        <rect x="-19" y="-9" width="38" height="18" />
+        <text>calls</text>
+      </g>
+    {/if}
     {#if middle}
       <g
         class="cut nodrag"
@@ -112,9 +123,6 @@
   .idle :is(.wire, .head) {
     stroke: color-mix(in oklab, var(--cable) 45%, var(--line-strong));
   }
-  .idle .head {
-    fill: color-mix(in oklab, var(--cable) 45%, var(--line-strong));
-  }
   .idle .wire {
     stroke-dasharray: 6 6;
     stroke-linecap: butt;
@@ -132,12 +140,27 @@
     stroke: var(--cable);
     stroke-width: 2;
   }
-  /* No head: the solid socket at its end says where it plugs in. */
+  /* The chevron by the socket says which app answers: the cable's weight, in its colour. */
   .head {
-    display: none;
-    fill: var(--cable);
+    fill: none;
     stroke: var(--cable);
-    stroke-width: 1.5;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .verb rect {
+    fill: var(--desk);
+    stroke: var(--line-strong);
+  }
+  .verb text {
+    fill: var(--ink);
+    font: 600 11px var(--sans);
+    dominant-baseline: middle;
+    text-anchor: middle;
+  }
+  /* Pointed at, it thickens. */
+  :global(.svelte-flow__edge:hover) .wire {
+    stroke-width: 3;
   }
   :global(.svelte-flow__edge.selected) .wire,
   :global(.svelte-flow__edge:focus-visible) .wire,
@@ -150,14 +173,12 @@
     stroke: var(--cable-ink);
   }
   .snapped .head {
-    fill: var(--cable-ink);
     stroke: var(--cable-ink);
   }
   :global(.svelte-flow__edge.selected) .head,
   :global(.svelte-flow__edge:focus-visible) .head,
   .lit .head {
-    fill: var(--cable-ink);
     stroke: var(--cable-ink);
-    stroke-width: 3;
+    stroke-width: 2.5;
   }
 </style>

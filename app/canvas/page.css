@@ -233,9 +233,9 @@ details[open] > summary:not(:has(.chev))::before {
   border-style: dashed;
 }
 
-/* While one app card is picked, what it does not touch fades back. */
+/* While cards are picked, what they do not touch fades back to a quarter. */
 .dimmed {
-  opacity: 0.28;
+  opacity: 0.25;
   transition: opacity 0.15s;
 }
 @media (prefers-reduced-motion: reduce) {

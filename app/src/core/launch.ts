@@ -171,12 +171,16 @@ function startLambda(app: App, ctx: StartContext): Start {
   if (!app.lambda?.handler || !app.lambda.runtime || !port)
     return { error: 'needs url and lambda { handler, runtime } in stack.json' };
   const engine = ctx.engine ?? '';
-  const overrides = ctx.lambdaOverrides ?? `${engine}/temp/lambda-${ctx.id ?? ''}.json`;
+  const id = ctx.id ?? '';
+  const overrides = ctx.lambdaOverrides ?? `${engine}/temp/lambda-${id}.json`;
   return {
     cwd: ctx.repo,
     port,
-    command: ['node', `${engine}/lambda-local.mjs`, JSON.stringify(app.lambda), String(port), overrides],
-    onStop: [['docker', 'rm', '-f', `koppler-lambda-${String(port)}`]],
+    command: ['node', `${engine}/lambda-local.mjs`, JSON.stringify(app.lambda), String(port), overrides, id],
+    // The function's containers, when its runner could not remove them itself.
+    onStop: [
+      ['sh', '-c', `docker ps -aq --filter 'name=^koppler-fn-${id}-[0-9a-f]+$' | xargs docker rm -f >/dev/null 2>&1`],
+    ],
   };
 }
 

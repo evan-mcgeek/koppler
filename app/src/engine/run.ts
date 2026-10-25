@@ -2,7 +2,8 @@
 // secrets; anything else is a command of the caller's own, which never gets them.
 import { fail } from '../failure.ts';
 import { appStart } from './app-start.ts';
-import { parseRun, startProcess, type RunOptions } from './processes.ts';
+import { alive, parseRun, readRecord, startProcess, type RunOptions } from './processes.ts';
+import { EMULATOR, PORT, STOP_EMULATOR } from './queues.ts';
 import { noTraces, traceEnv, traceView, tracing } from './traces.ts';
 import { showBrowserConsole } from './browser-console.ts';
 import { readClones, readStack } from '../data.ts';
@@ -47,5 +48,9 @@ export async function run(args: string[], extra: Partial<RunOptions> = {}): Prom
     for (const command of options.onStop ?? []) console.log(`on stop: ${command.join(' ')}`);
     return;
   }
+  // A Lambda runs in the AWS emulator that holds the local queues: it is started first when it is not running.
+  const record = readRecord('queues');
+  if (readStack()?.apps[options.name]?.kind === 'lambda' && !(record && alive(record)))
+    await run(['queues', '--port', String(PORT), '--', ...EMULATOR], { onStop: [STOP_EMULATOR] });
   await startProcess(options);
 }
