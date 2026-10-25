@@ -10,6 +10,8 @@ import type { Stack } from '../core/stack.ts';
 
 export const PORT = 4566;
 export const ENDPOINT = `http://127.0.0.1:${String(PORT)}`;
+// Where the local queues are made, and what every app on one signs for.
+export const REGION = 'eu-west-1';
 // Stopping the Docker client does not stop its container: it is removed on stop, and a leftover one before starting.
 const RM = 'docker rm -f koppler-queues >/dev/null 2>&1';
 // Run by Stop as well: the shell's own cleanup never happens when it has to be killed.
@@ -112,6 +114,9 @@ export function queueEnv(
       Object.assign(
         (set[id] ??= {}),
         kafka ? {} : { AWS_ENDPOINT_URL_SQS: ENDPOINT },
+        // At an endpoint of its own, the AWS SDK for .NET signs for us-east-1 whatever its region; the emulator
+        // keeps queues by the region a request is signed for.
+        !kafka && app.kind === 'dotnet' ? { AWS__AuthenticationRegion: REGION } : {},
         Object.fromEntries(env.map(name => [name, kafka ? KAFKA : url])),
       );
     }
@@ -132,7 +137,7 @@ export function createTopic(name: string): string {
 export function createQueue(name: string): string {
   const attrs = name.endsWith('.fifo') ? ['--attributes', 'FifoQueue=true,ContentBasedDeduplication=true'] : [];
   const create = ['sqs', 'create-queue', '--queue-name', name, ...attrs, '--query', 'QueueUrl'];
-  return execFileSync('aws', ['--endpoint-url', ENDPOINT, '--region', 'eu-west-1', '--output', 'text', ...create], {
+  return execFileSync('aws', ['--endpoint-url', ENDPOINT, '--region', REGION, '--output', 'text', ...create], {
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'pipe'],
     // The emulator takes any key; the user's own profile and session must not reach it.
