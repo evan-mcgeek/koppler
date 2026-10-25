@@ -1,6 +1,6 @@
-// Queues switched to local on the board.
-//   SQS: one AWS emulator in Docker (the image the Lambda kind uses) holds them all; every app on one starts with the AWS
-//   SDK's SQS endpoint pointed at it and its queue settings set to the local queue.
+// Queues switched to local on the board, and the Lambdas that read them.
+//   SQS: one AWS emulator in Docker holds them all; every app on one starts with the AWS SDK's SQS endpoint pointed at
+//   it and its queue settings set to the local queue. A Lambda on one runs in the same emulator, triggered by it.
 //   Kafka: one local broker in Docker (apache/kafka); the topic is created on it and every app on one starts with its
 //   broker settings pointed at it.
 import { execFileSync } from 'node:child_process';
@@ -12,15 +12,28 @@ export const PORT = 4566;
 export const ENDPOINT = `http://127.0.0.1:${String(PORT)}`;
 // Where the local queues are made, and what every app on one signs for.
 export const REGION = 'eu-west-1';
-// Stopping the Docker client does not stop its container: it is removed on stop, and a leftover one before starting.
-const RM = 'docker rm -f koppler-queues >/dev/null 2>&1';
+// By version and digest, so a new upstream push never changes what runs here unseen. To update: read the digest of the
+// new version tag on Docker Hub, then change both together.
+export const EMULATOR_IMAGE =
+  'floci/floci:2.2.0@sha256:e97cd0c1dc2aa14e7697fb5ef5018404c4d6345169dbd276315f0bed2c7b0520';
+// Each Lambda runs in a container of its own, with a code volume, named from this so only Koppler's are removed.
+export const FUNCTIONS = 'koppler-fn';
+// Stopping the Docker client does not stop its container: it is removed on stop, and a leftover one before starting;
+// with it go the functions it started.
+const RM = [
+  'docker rm -f koppler-queues',
+  `docker ps -aq --filter name=${FUNCTIONS}- | xargs docker rm -f`,
+  `docker volume ls -q --filter name=${FUNCTIONS}-code- | xargs docker volume rm`,
+]
+  .map(command => `${command} >/dev/null 2>&1`)
+  .join('; ');
 // Run by Stop as well: the shell's own cleanup never happens when it has to be killed.
-export const STOP_EMULATOR = ['docker', 'rm', '-f', 'koppler-queues'];
+export const STOP_EMULATOR = ['sh', '-c', RM];
 export const STOP_BROKER = ['docker', 'rm', '-f', 'koppler-kafka'];
 export const EMULATOR = [
   'sh',
   '-c',
-  `${RM}; trap '${RM}; exit 0' TERM INT HUP; docker run --rm --name koppler-queues -p 127.0.0.1:${String(PORT)}:4566 floci/floci:latest & wait`,
+  `${RM}; trap '${RM}; exit 0' TERM INT HUP; docker run --rm --name koppler-queues -p 127.0.0.1:${String(PORT)}:4566 -v /var/run/docker.sock:/var/run/docker.sock -e FLOCI_DEFAULT_REGION=${REGION} -e FLOCI_SERVICES_LAMBDA_CONTAINER_NAME_PREFIX=${FUNCTIONS} ${EMULATOR_IMAGE} & wait`,
 ];
 export const KAFKA_PORT = 9092;
 export const KAFKA = `localhost:${String(KAFKA_PORT)}`;
@@ -30,6 +43,9 @@ export const BROKER = [
   '-c',
   `${RM_KAFKA}; trap '${RM_KAFKA}; exit 0' TERM INT HUP; docker run --rm --name koppler-kafka -p 127.0.0.1:${String(KAFKA_PORT)}:9092 apache/kafka:latest & wait`,
 ];
+
+/** The local queues a Lambda reads, by URL, comma between them: the queues it is triggered by. */
+export const LAMBDA_QUEUES = 'KOPPLER_LAMBDA_QUEUES';
 
 /** A queue of the board that runs locally, and the apps on it with the settings that name it. */
 export interface LocalQueue {
@@ -86,12 +102,18 @@ export function queueEnv(
       const app = stack.apps[id];
       const url = urls[queue.id];
       if (!app || url === undefined) continue;
+      const kafka = queue.type === 'kafka';
+      // A Lambda that reads an SQS queue is triggered by it in the emulator, as its event source mapping does deployed.
+      if (app.kind === 'lambda' && !kafka && app.reads?.[queue.id]) {
+        const all = set[id]?.[LAMBDA_QUEUES];
+        (set[id] ??= {})[LAMBDA_QUEUES] = all ? `${all},${url}` : url;
+        continue;
+      }
       if (kindOf(app).platforms || app.kind === 'lambda') {
         left.push(`${app.name}: point it at the local ${queue.name} queue (${url}); Koppler cannot pass it at start`);
         continue;
       }
       // A Kafka app's settings name its brokers; an SQS app's name the queue, with the SDK's endpoint beside them.
-      const kafka = queue.type === 'kafka';
       Object.assign(
         (set[id] ??= {}),
         kafka ? {} : { AWS_ENDPOINT_URL_SQS: ENDPOINT },

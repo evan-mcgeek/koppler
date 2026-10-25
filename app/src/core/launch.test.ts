@@ -195,8 +195,8 @@ test('a Lambda and a SAM app start through their local runners', () => {
   const fn = startCommand(lambda, { repo: '/r', engine: '/e', id: 'fn' });
   expect(fn.port).toBe(5080);
   expect(command(fn).slice(0, 2)).toEqual(['node', '/e/lambda-local.mjs']);
-  expect(command(fn).slice(3)).toEqual(['5080', '/e/temp/lambda-fn.json']);
-  expect(fn.onStop).toEqual([['docker', 'rm', '-f', 'koppler-lambda-5080']]);
+  expect(command(fn).slice(3)).toEqual(['5080', '/e/temp/lambda-fn.json', 'fn']);
+  expect(fn.onStop?.[0]?.at(-1)).toContain("--filter 'name=^koppler-fn-fn-[0-9a-f]+$'");
   expect(startCommand({ kind: 'lambda', lambda: { handler: 'A::B' } }).error).toMatch(/needs url and lambda/);
 
   const sam = startCommand(
