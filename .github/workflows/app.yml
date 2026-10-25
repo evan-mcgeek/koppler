@@ -19,9 +19,9 @@ defaults:
     working-directory: app
 
 jobs:
-  # One job: each job is billed by the started minute and installs everything again.
-  app:
-    name: App
+  # In parallel: the repo is public, so jobs cost nothing, and the slowest part sets how long a check takes.
+  checks:
+    name: Checks
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -41,20 +41,6 @@ jobs:
         run: npm run build
       - name: Unit tests
         run: npx vitest run
-      - name: End-to-end tests
-        run: node --test --test-concurrency=1 test/*.test.mjs
-        # A run reads each app's first seconds of log: one second in the tests.
-        env:
-          KOPPLER_EARLY_LOG: '1'
-      - run: npx playwright install --with-deps chromium
-      - name: Canvas in a browser
-        run: npx playwright test
-      - uses: actions/upload-artifact@v4
-        if: failure()
-        with:
-          name: canvas-traces
-          path: app/test-results
-          retention-days: 7
       - name: Script syntax
         run: |
           for f in dist/*.mjs dist/*.js dist/core/*.js; do node --check "$f"; done
@@ -76,3 +62,70 @@ jobs:
                   print(f"::error::{f} should not be in the package"); failed = True
           print(f"{len(files)} files in the package")
           sys.exit(failed)
+
+  commands:
+    name: End-to-end tests (${{ matrix.shard }}/3)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - run: npm ci
+      - run: npm run build
+      - name: End-to-end tests
+        # Every third file, one file at a time: the files of one job share this machine's ports and folders.
+        run: node --test --test-concurrency=1 $(ls test/*.test.mjs | awk 'NR % 3 == ${{ matrix.shard }} - 1')
+        # A run reads each app's first seconds of log: one second in the tests.
+        env:
+          KOPPLER_EARLY_LOG: '1'
+
+  canvas:
+    name: Canvas in a browser (${{ matrix.shard }}/3)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - run: npm ci
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - name: Canvas in a browser
+        run: npx playwright test --shard=${{ matrix.shard }}/3
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: canvas-traces-${{ matrix.shard }}
+          path: app/test-results
+          retention-days: 7
+
+  # One result for the pull request, as before: it passes when every part does.
+  app:
+    name: App
+    if: always()
+    needs: [checks, commands, canvas]
+    runs-on: ubuntu-latest
+    # Nothing is checked out here, so there is no app folder to run in.
+    defaults:
+      run:
+        working-directory: .
+    steps:
+      - name: Every part passed
+        run: |
+          echo 'checks: ${{ needs.checks.result }}, end-to-end: ${{ needs.commands.result }}, canvas: ${{ needs.canvas.result }}'
+          test '${{ needs.checks.result }}' = success
+          test '${{ needs.commands.result }}' = success
+          test '${{ needs.canvas.result }}' = success
