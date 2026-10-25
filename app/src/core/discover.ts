@@ -72,6 +72,8 @@ export function mapOf(
   facts: Facts,
   board: readonly Card[],
   open: readonly Card[] = [],
+  /** The cards one step from the board too; a feature board shows only its own until one is opened. */
+  around = true,
 ): { cards: MapCard[]; links: Link[] } {
   const all = linksOf(facts);
   const near = (card: Card) =>
@@ -84,7 +86,7 @@ export function mapOf(
         : !!facts.apps[card];
   const onBoard = board.filter(exists);
   const shown = new Set<Card>(onBoard);
-  for (const card of [...onBoard, ...open.filter(exists)]) {
+  for (const card of [...(around ? onBoard : []), ...open.filter(exists)]) {
     shown.add(card);
     for (const other of near(card)) shown.add(other);
   }

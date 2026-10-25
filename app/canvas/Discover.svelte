@@ -1,17 +1,20 @@
 <script lang="ts">
   // The Discover view: how the stack fits together around the board, read from its facts. Picking traces; the panel
   // lists a card's links; Plan a run with these takes the picked apps to Plan. Nothing here runs or changes the board.
+  import Sparkle from '@lucide/svelte/icons/sparkle';
   import X from '@lucide/svelte/icons/x';
   import Laptop from '@lucide/svelte/icons/laptop';
   import Maximize from '@lucide/svelte/icons/scan';
   import LayoutGrid from '@lucide/svelte/icons/layout-grid';
   import { SvelteFlow, Background, BackgroundVariant, ViewportPortal, useSvelteFlow, type Node } from '@xyflow/svelte';
   import type { Side } from '../src/core/arrange.ts';
-  import { cablePath, SIDES, sidePoint, type Box } from '../src/core/cables.ts';
+  import { cablePath, SIDES, sidePoint, throughPath, type Box } from '../src/core/cables.ts';
   import type { Card, Link } from '../src/core/discover.ts';
   import { isLight, appearance } from './appearance.svelte.ts';
   import { board } from './board.svelte.ts';
   import { CARD, discovered, type LeanData } from './discover.svelte.ts';
+  import FeaturePanel from './FeaturePanel.svelte';
+  import FeatureStart from './FeatureStart.svelte';
   import LeanCard from './LeanCard.svelte';
 
   const flow = useSvelteFlow();
@@ -47,13 +50,14 @@
   };
   const onBoard = $derived(new Set(map.cards.filter(one => one.onBoard).map(one => one.card)));
   /** Each link from the side of one card that faces the other: a dot where it leaves, a ring and chevron where it lands. */
-  const drawn = $derived(
-    map.links.flatMap(link => {
+  const drawn = $derived.by(() => {
+    let detours = 0;
+    return map.links.flatMap(link => {
       const [a, b] = [box(link.from), box(link.to)];
       if (!a || !b) return [];
       const dx = b.x + b.w / 2 - (a.x + a.w / 2);
       const dy = b.y + b.h / 2 - (a.y + a.h / 2);
-      const sides: [Side, Side] =
+      let sides: [Side, Side] =
         Math.abs(dx) * 0.6 > Math.abs(dy)
           ? dx > 0
             ? ['right', 'left']
@@ -61,27 +65,71 @@
           : dy > 0
             ? ['bottom', 'top']
             : ['top', 'bottom'];
-      const [start, end] = [sidePoint(a, sides[0]), sidePoint(b, sides[1])];
+      let [start, end] = [sidePoint(a, sides[0]), sidePoint(b, sides[1])];
+      // A link never runs behind another card: across a row it goes over the top, down a column round the left.
+      const blocking = map.cards.flatMap(({ card }) => {
+        const other = card !== link.from && card !== link.to && box(card);
+        const under =
+          other &&
+          [0.2, 0.35, 0.5, 0.65, 0.8].some(t => {
+            const x = start.x + (end.x - start.x) * t;
+            const y = start.y + (end.y - start.y) * t;
+            return x > other.x && x < other.x + other.w && y > other.y && y < other.y + other.h;
+          });
+        return under ? [other] : [];
+      });
+      let d = cablePath(start, sides[0], end, sides[1]);
+      let middle = { x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 };
+      if (blocking.length) {
+        const all = [a, b, ...blocking];
+        const out = 60 + 28 * detours++;
+        const side: Side = sides[0] === 'left' || sides[0] === 'right' ? 'top' : 'left';
+        sides = [side, side];
+        [start, end] = [sidePoint(a, side), sidePoint(b, side)];
+        middle =
+          side === 'top'
+            ? { x: (start.x + end.x) / 2, y: Math.min(...all.map(one => one.y)) - out }
+            : { x: Math.min(...all.map(one => one.x)) - out, y: (start.y + end.y) / 2 };
+        d = throughPath(start, side, end, side, [middle]);
+      }
       const [nx, ny] = SIDES[sides[1]];
       const both = link.kind === 'uses';
       const arrow = both
         ? ''
         : `M${String(end.x + nx * 18 - ny * 5)} ${String(end.y + ny * 18 + nx * 5)}L${String(end.x + nx * 13)} ${String(end.y + ny * 13)}L${String(end.x + nx * 18 + ny * 5)} ${String(end.y + ny * 18 - nx * 5)}`;
+      const step = discovered.stepOf(link);
+      const phase = discovered.phase;
       return [
         {
           key: `${link.from}>${link.to}>${link.kind}`,
           link,
-          d: cablePath(start, sides[0], end, sides[1]),
+          d,
           start,
           end,
           arrow,
           both,
-          board: onBoard.has(link.from) && onBoard.has(link.to),
-          faded: !!near && !(discovered.picked.includes(link.from) || discovered.picked.includes(link.to)),
+          step,
+          middle,
+          // On a feature board its steps are drawn in ink and every other link drawn back.
+          board: board.feature ? !!step : onBoard.has(link.from) && onBoard.has(link.to),
+          found: link.sure === 'found' || !!step?.step.proposed,
+          faded:
+            (!!near && !(discovered.picked.includes(link.from) || discovered.picked.includes(link.to))) ||
+            (phase !== null && step?.phase !== phase),
         },
       ];
+    });
+  });
+  /** Each phase's name, above the card its first step leaves. */
+  const phases = $derived(
+    (board.feature?.phases ?? []).flatMap((phase, at) => {
+      const first = phase.steps[0];
+      const where = first && box(first.from);
+      return where ? [{ at, name: phase.name, x: where.x, y: where.y - 34 }] : [];
     }),
   );
+  const proposals = $derived(discovered.proposals);
+  const proposedCards = $derived(map.cards.filter(({ card }) => discovered.data(card, false, 0).proposed).length);
   const name = (card: Card) => discovered.data(card, false, 0).name;
   const tag = (card: Card) => discovered.data(card, false, 0).tag;
   /** The picked card's links, by what they do, as the panel lists them. */
@@ -147,7 +195,9 @@
 
 <div class="discover">
   <div class="map" aria-label="Discover map">
-    {#if !board.nodes.length}
+    {#if board.feature && !map.cards.length}
+      <FeatureStart />
+    {:else if !board.nodes.length && !board.feature}
       <div class="empty" role="status">
         <h2>No apps on this board</h2>
         <p>Discover starts from a board's apps and shows what is one step away. Add an app in Plan.</p>
@@ -208,7 +258,7 @@
               <g
                 class="link"
                 class:board={one.board}
-                class:found={one.link.sure === 'found'}
+                class:found={one.found}
                 class:faded={one.faded}
                 data-link={one.key}
               >
@@ -222,18 +272,72 @@
                 {/if}
               </g>
             {/each}
+            {#each drawn.filter(one => one.step) as one (one.key)}
+              {#if one.step}
+                <g class="mark" class:board={one.board} class:faded={one.faded}>
+                  <g class="number" transform="translate({one.middle.x} {one.middle.y})">
+                    <rect
+                      x={-one.step.number.length * 3.6 - 6}
+                      y="-9"
+                      width={one.step.number.length * 7.2 + 12}
+                      height="18"
+                    />
+                    <text text-anchor="middle" dy="4">{one.step.number}</text>
+                  </g>
+                </g>
+              {/if}
+            {/each}
+            {#each phases as phase (phase.at)}
+              <g
+                class="phase"
+                class:faded={discovered.phase !== null && discovered.phase !== phase.at}
+                transform="translate({phase.x} {phase.y})"
+              >
+                <rect width="18" height="18" />
+                <text class="at" x="9" y="13" text-anchor="middle">{phase.at + 1}</text>
+                <text class="name" x="26" y="14">{phase.name}</text>
+              </g>
+            {/each}
           </svg>
         </ViewportPortal>
       </SvelteFlow>
 
+      {#if proposals.length}
+        <div class="proposed" role="status">
+          <Sparkle size={16} aria-hidden="true" />
+          <span
+            ><strong
+              >The agent proposed {proposedCards
+                ? `${String(proposedCards)} ${proposedCards === 1 ? 'card' : 'cards'} and `
+                : ''}{proposals.length}
+              {proposals.length === 1 ? 'link' : 'links'}.</strong
+            > Each stays dashed until you accept it.</span
+          >
+          <button
+            type="button"
+            onclick={() => {
+              discovered.drop(proposals);
+            }}>Drop all</button
+          >
+          <button class="primary" type="button" onclick={() => void discovered.accept(proposals)}>Accept all</button>
+        </div>
+      {/if}
+
       <div class="legend" aria-label="Legend">
+        {#if board.feature}
+          <span class="lit"
+            ><svg width="28" height="8" aria-hidden="true"><path d="M0 4H28" /></svg>Used by {board.name}</span
+          >
+        {/if}
         <span><svg width="28" height="8" aria-hidden="true"><path d="M0 4H28" /></svg>Confirmed</span>
         <span
           ><svg width="28" height="8" aria-hidden="true"><path d="M0 4H28" class="dash" /></svg>Found in code, not
           confirmed</span
         >
         <span class="dim"
-          ><svg width="28" height="8" aria-hidden="true"><path d="M0 4H28" /></svg>One step from the board, dimmed</span
+          ><svg width="28" height="8" aria-hidden="true"><path d="M0 4H28" /></svg>{board.feature
+            ? 'Other links'
+            : 'One step from the board, dimmed'}</span
         >
       </div>
 
@@ -331,7 +435,22 @@
                   >
                   <span class="source">{link.sure === 'found' ? 'Code' : 'Stack'}</span>
                 </span>
-                {#if link.sure === 'found'}
+                {#if board.feature}
+                  {@const step = discovered.stepOf(link)}
+                  <span class="detail">
+                    {#if step}<span>Step {step.number}{step.step.proposed ? ', proposed' : ''}</span>{:else}<span
+                        >Not in this feature</span
+                      >
+                      <button
+                        class="text"
+                        type="button"
+                        onclick={() => {
+                          discovered.addStep(link);
+                        }}>Add as a step</button
+                      >{/if}
+                  </span>
+                {/if}
+                {#if link.sure === 'found' && !discovered.stepOf(link)?.step.proposed}
                   <span class="detail">
                     <span>Found in code, not confirmed</span>
                     <button class="text" type="button" onclick={() => void discovered.confirm(link)}>Confirm</button>
@@ -345,6 +464,8 @@
         </section>
       {/each}
     </aside>
+  {:else if board.feature && map.cards.length}
+    <FeaturePanel feature={board.feature} />
   {/if}
 </div>
 
@@ -377,10 +498,12 @@
     pointer-events: none;
   }
   /* Between two of the board's apps a link is ink; out to the ring it is drawn back. Dashed: found, not confirmed. */
-  .link {
+  .link,
+  .mark {
     --tone: var(--line-strong);
   }
-  .link.board {
+  .link.board,
+  .mark.board {
     --tone: var(--ink);
   }
   .link .wire {
@@ -406,8 +529,65 @@
     stroke-linecap: round;
     stroke-linejoin: round;
   }
-  .link.faded {
+  .link.faded,
+  .mark.faded,
+  .phase.faded {
     opacity: 0.25;
+  }
+  /* A step's number on its link, in mono, on the desk so the line breaks around it. */
+  .number rect {
+    fill: var(--desk);
+    stroke: var(--tone);
+  }
+  .number text {
+    fill: var(--ink);
+    font: 600 11px var(--mono);
+  }
+  .phase rect {
+    fill: var(--ink);
+  }
+  .phase .at {
+    fill: var(--desk);
+    font: 600 11px var(--mono);
+  }
+  .phase .name {
+    fill: var(--ink);
+    font: 600 15px var(--sans);
+  }
+  .proposed {
+    position: absolute;
+    top: 16px;
+    left: 16px;
+    right: 16px;
+    z-index: 5;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 10px 12px 10px 16px;
+    border: 1px dashed var(--ink);
+    background: var(--desk);
+    color: var(--ink-muted);
+    font: 400 13px var(--sans);
+  }
+  .proposed > span {
+    flex: 1;
+    min-width: 0;
+  }
+  .proposed strong {
+    color: var(--ink);
+    font-weight: 600;
+  }
+  .proposed button:not(.primary) {
+    padding: 8px 14px;
+    border: 1px solid var(--line-strong);
+    background: none;
+    color: var(--ink);
+    font: 600 13px var(--sans);
+    cursor: pointer;
+  }
+  .legend .lit path {
+    stroke: var(--ink);
+    stroke-width: 2;
   }
   :global(.svelte-flow__node.dimmed) {
     opacity: 0.25;

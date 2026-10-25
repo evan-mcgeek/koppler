@@ -1,5 +1,6 @@
 // Presets (saved boards): bringing one saved in an older format up to date, and checking it against the stack before
 // it opens.
+import { editFeature, featureOf, type FeatureEdit } from './feature.ts';
 import { BOARD_FORMAT, migrateBoard } from './migrations/board/index.ts';
 import type { Edge } from './plan.ts';
 
@@ -26,7 +27,9 @@ export function migrate(input: unknown): Migrated {
   if (!isObject(input)) return { error: 'It is not a preset.' };
   const { name, nodes, edges, version } = input;
   if (typeof name !== 'string' || !name.trim()) return { error: 'It has no name.' };
-  if (!isObject(nodes) || Object.keys(nodes).length === 0) return { error: 'It has no apps.' };
+  // A feature board can hold no app that runs here: it is read in Discover.
+  if (!isObject(nodes) || (Object.keys(nodes).length === 0 && !featureOf(input['feature'])))
+    return { error: 'It has no apps.' };
   if (typeof version === 'number' && version > VERSION)
     return { error: `It was saved by a newer Koppler (preset format ${String(version)}). Update Koppler.` };
   // Whatever wrote it: every app is an object and the cables are a list.
@@ -178,6 +181,8 @@ export interface BoardEdit {
   note?: Record<string, string>;
   /** Laid out afresh, as Arrange does: the saved places go. */
   arrange?: boolean;
+  /** Its request, phases and steps: a board with them is a feature board. */
+  feature?: FeatureEdit;
 }
 
 const isPoint = (value: unknown): value is { x: number; y: number } =>
@@ -185,7 +190,8 @@ const isPoint = (value: unknown): value is { x: number; y: number } =>
 const same = (a: Edge) => (b: Edge) => a.from === b.from && a.to === b.to;
 
 /** The board with the edit made. What it does not touch stays as it was, card places too; new cards go in a column to the right. */
-export function editPreset(preset: StoredPreset, edit: BoardEdit): StoredPreset {
+export function editPreset(given: StoredPreset, edit: BoardEdit): StoredPreset {
+  const preset = edit.feature ? { ...given, feature: editFeature(featureOf(given['feature']), edit.feature) } : given;
   const gone = new Set(edit.remove ?? []);
   const kept = <T>(all: Record<string, T>) => Object.fromEntries(Object.entries(all).filter(([id]) => !gone.has(id)));
   const nodes = kept(preset.nodes);
@@ -241,6 +247,11 @@ export function describeEdit(
         : `${proposed ? 'take the ' : 'no '}note${proposed ? ' off ' : ' on '}${name(id)}`,
     ),
     edit.arrange && (proposed ? 'lay it out afresh' : 'arranged'),
+    edit.feature?.request !== undefined && 'set the request',
+    ...(edit.feature?.phase ?? []).map(phase => `${proposed ? 'add' : 'added'} the phase ${phase}`),
+    edit.feature?.step?.length &&
+      `${proposed ? 'add' : 'added'} the step${edit.feature.step.length > 1 ? 's' : ''} ${cables(edit.feature.step)}`,
+    edit.feature?.unstep?.length && `${proposed ? 'take off' : 'took off'} the step ${cables(edit.feature.unstep)}`,
   ]
     .filter(Boolean)
     .join('; ');
