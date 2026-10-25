@@ -31,7 +31,7 @@ test.use({
     env: 'qa',
     mode: 'auto',
     zoom: 0.7,
-    pan: { x: 60, y: 420 },
+    pan: { x: 60, y: 560 },
     nodes: { orders: { x: 0, y: 0, run: 'cli', branch: 'main', showQueues: true } },
     edges: [],
   },

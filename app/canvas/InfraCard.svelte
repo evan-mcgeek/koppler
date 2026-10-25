@@ -66,11 +66,15 @@
 <div class="infra {kind} {variant}" class:selected class:dimmed={board.dimmed(id)} {title}>
   {@render band?.()}
   <span class="head">
-    {#if hasDot}<span class="led" data-state={dot ? 'running' : dot === false ? 'failed' : undefined} title={dotTitle}
-      ></span>{/if}
-    <span class="name">{name}</span>
-    {@render flag?.()}
-    <span class="tag">{tag}</span>
+    {#if hasDot}<span class="lit"
+        ><span class="led" data-state={dot ? 'running' : dot === false ? 'failed' : undefined} title={dotTitle}
+        ></span></span
+      >{/if}
+    <!-- The name gets the whole row up to the buttons, two lines at most; its kind sits under it. -->
+    <span class="title">
+      <span class="name">{name}</span>
+      <span class="tags"><span class="tag">{tag}</span>{@render flag?.()}</span>
+    </span>
     <span class="acts">
       {#each actions as action (action.label)}
         <button
@@ -156,22 +160,43 @@
   }
   .head {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     gap: 8px;
-    min-height: 40px;
-    padding: 4px 4px 4px 12px;
+    padding: 10px 8px 10px 12px;
     border-bottom: 1px solid var(--line);
   }
-  /* A long name is cut short: the tag and the buttons stay on the card. The card's title holds it whole. */
-  .name {
+  /* The light lines up with the name's first line. */
+  .lit {
+    display: flex;
+    padding-top: 6px;
+  }
+  .title {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
     min-width: 0;
+  }
+  /* Two lines, then an ellipsis; a name with no spaces breaks anywhere. The card's title holds it whole. */
+  .name {
+    display: -webkit-box;
+    max-width: 100%;
     overflow: hidden;
-    font: 600 15px var(--sans);
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    font: 600 15px/19px var(--sans);
+    overflow-wrap: anywhere;
+    text-wrap: pretty;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+  }
+  .tags {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
   }
   .tag {
-    margin-left: auto;
     padding: 2px 5px;
     border: 1px solid var(--line-strong);
     color: var(--ink-muted);
@@ -180,8 +205,10 @@
     text-transform: uppercase;
     white-space: nowrap;
   }
+  /* Centred on the name's first line. */
   .acts {
     display: flex;
+    margin: -6px 0 -6px;
   }
   .acts button {
     display: grid;
