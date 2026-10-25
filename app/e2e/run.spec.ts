@@ -338,7 +338,7 @@ test('shortcuts leave the board alone while the review is open', async ({ page }
   await page.keyboard.press('l');
   await review(page).getByRole('button', { name: 'Cancel' }).click();
   await expect(cards).toHaveCount(1);
-  await expect(page.getByRole('radio', { name: 'Edit' })).toBeChecked();
+  await expect(page.getByRole('radio', { name: 'Plan' })).toBeChecked();
   // Once it is closed, undo works again.
   await expect(review(page)).toBeHidden();
   await page.keyboard.press('ControlOrMeta+z');

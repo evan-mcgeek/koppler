@@ -38,6 +38,7 @@ export interface Preset {
   hiddenQueues?: string[];
   hiddenOutside?: string[];
   cardNotes?: Record<string, string>;
+  discover?: { open: string[]; at: Record<string, Point> };
 }
 /** A prompt from the page, on its way to Koppler or the agent. */
 export interface Prompt {
@@ -61,6 +62,20 @@ const note = (value: unknown) => (typeof value === 'string' && value ? { note: t
 /** A card that is not an app: a tunnel, a queue or an outside system. */
 const CARD = /^(tunnel:[\w.-]{1,253}:\d{1,5}|(queue|outside):[a-z0-9-]{1,64})$/;
 /** Notes on the board's other cards, by card, for the agent: a run carries them. */
+/** Discover's part of a board: the cards opened with +N, and where its cards sit. */
+const discoverOf = (given: unknown): { open: string[]; at: Record<string, Point> } | undefined => {
+  const kept = fieldsOf(given);
+  const card = (key: unknown): key is string =>
+    isId(key) || (typeof key === 'string' && (CARD.test(key) || /^database:[a-z0-9-]{1,64}$/.test(key)));
+  const open = listOf(kept['open']).filter(card).slice(0, 200);
+  const at = Object.fromEntries(
+    Object.entries(isMap(kept['at']) ? kept['at'] : {})
+      .filter(([key, point]) => card(key) && isObject(point))
+      .slice(0, 500)
+      .map(([key, point]) => [key, xy(point)]),
+  );
+  return open.length || Object.keys(at).length ? { open, at } : undefined;
+};
 const cardNotes = (given: unknown): Record<string, string> =>
   Object.fromEntries(
     Object.entries(isMap(given) ? given : {})
@@ -140,6 +155,7 @@ export function sanitizePresets(list: unknown): Preset[] {
     .map(preset => {
       const { version, source } = preset;
       const layout = boardLayout(preset['layout']);
+      const discover = discoverOf(preset['discover']);
       const nodes = Object.entries(preset['nodes'] as Loose).filter(([key]) => isId(key));
       return {
         name: text(preset['name'], 80),
@@ -168,6 +184,7 @@ export function sanitizePresets(list: unknown): Preset[] {
         ...(ids(preset['hiddenQueues']).length && { hiddenQueues: ids(preset['hiddenQueues']) }),
         ...(ids(preset['hiddenOutside']).length && { hiddenOutside: ids(preset['hiddenOutside']) }),
         ...(Object.keys(cardNotes(preset['cardNotes'])).length && { cardNotes: cardNotes(preset['cardNotes']) }),
+        ...(discover && { discover }),
       };
     });
 }
@@ -287,6 +304,7 @@ export function sanitizeLayout(input: unknown): Loose | null {
   const hiddenQueues = chosen(input['hiddenQueues'], true);
   const hiddenOutside = chosen(input['hiddenOutside'], true);
   const notes = cardNotes(input['cardNotes']);
+  const discover = discoverOf(input['discover']);
   const hiddenLogs = chosen(input['hiddenLogs'], true);
   const logAliases = Object.fromEntries(
     Object.entries(isMap(input['logAliases']) ? input['logAliases'] : {})
@@ -318,6 +336,7 @@ export function sanitizeLayout(input: unknown): Loose | null {
     ...(Object.keys(hiddenQueues).length && { hiddenQueues }),
     ...(Object.keys(hiddenOutside).length && { hiddenOutside }),
     ...(Object.keys(notes).length && { cardNotes: notes }),
+    ...(discover && { discover }),
     ...(Object.keys(hiddenLogs).length && { hiddenLogs }),
     ...(Object.keys(logAliases).length && { logAliases }),
     ...(ids(input['outside']).length && { outside: ids(input['outside']) }),

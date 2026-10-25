@@ -25,6 +25,8 @@
   import Rail from './Rail.svelte';
   import AddOutside from './AddOutside.svelte';
   import CardPanel from './CardPanel.svelte';
+  import Discover from './Discover.svelte';
+  import LeftOut from './LeftOut.svelte';
   import SettingsPanel from './SettingsPanel.svelte';
   import Repos from './Repos.svelte';
   import Review from './Review.svelte';
@@ -356,6 +358,43 @@
     >
       <Cog size={16} /><span class="words">Settings</span>
     </button>
+    <div
+      class="seg views"
+      role="radiogroup"
+      aria-label="Board view"
+      title="Discover (D): how the stack fits together. Plan (E): what runs and how it is wired. Live (L): what is running."
+    >
+      <label
+        ><input
+          type="radio"
+          name="view"
+          checked={board.discovering}
+          onchange={() => {
+            board.goDiscover();
+          }}
+        />Discover</label
+      >
+      <label
+        ><input
+          type="radio"
+          name="view"
+          checked={!board.discovering && !board.live}
+          onchange={() => {
+            board.goEdit();
+          }}
+        />Plan</label
+      >
+      <label
+        ><input
+          type="radio"
+          name="view"
+          checked={board.live && !board.discovering}
+          onchange={() => {
+            board.goLive();
+          }}
+        />Live</label
+      >
+    </div>
     <div class="seg env" role="radiogroup" aria-label="Environment">
       {#each board.envs as env (env)}
         <label class:prod={board.protected}
@@ -504,16 +543,19 @@
   <main inert={!!loading}>
     {#await opened then found}
       {#if found}
-        {#if board.present}{:else if side}<Side />{:else}<Rail open={openSide} />{/if}
+        {#if board.present || board.discovering}{:else if side}<Side />{:else}<Rail open={openSide} />{/if}
         <div class="stage">
           <div class="work">
             <div class="board">
-              <SvelteFlowProvider>
-                <Board />
-              </SvelteFlowProvider>
+              {#if board.discovering}
+                <SvelteFlowProvider><Discover /></SvelteFlowProvider>
+              {:else}
+                <SvelteFlowProvider><Board /></SvelteFlowProvider>
+              {/if}
               <Toast />
             </div>
-            {#if !board.present}<CardPanel />{/if}
+            {#if !board.present && !board.discovering}<CardPanel />{/if}
+            {#if board.fromDiscover && !board.discovering && !board.live}<LeftOut />{/if}
           </div>
           {#if !board.present}<Logs />{/if}
         </div>
@@ -567,7 +609,8 @@
     margin: 0 -8px;
     color: var(--line-strong);
   }
-  .env label {
+  .env label,
+  .views label {
     padding: 6px 12px;
   }
   .env label.prod:has(input:checked) {

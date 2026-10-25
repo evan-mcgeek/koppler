@@ -127,11 +127,16 @@ The agent chip in the toolbar says where the agent is:
 
 ## Views and shortcuts
 
-**Edit** shows every field of a card; **Live** shows what runs, with short cards.
+**Discover** shows how the stack fits together around the board: its apps, and every app, queue, database and outside system one step from them, read from the stack.
+Nothing on it runs or changes the board.
+A card's **+N** brings in the links it leaves out; a dashed link was found in the code and is not in the stack yet, and **Confirm** in the panel keeps it there.
+Pick several cards (Shift-click) and **Plan a run with these** puts the cloned ones on the board; the rest stay deployed and are listed in **Left out**, with a clone command for each app.
+
+**Plan** shows every field of a card; **Live** shows what runs, with short cards.
 
 <img alt="The Live view: short cards with their state, every app running" src="images/live.png">
 
-Zoomed out below 60%, cards are short in Edit too: pick one and its fields open in a panel on the right of the board, where they change the card as they would on it. The × or a click on the empty board closes it.
+Zoomed out below 60%, cards are short in Plan too: pick one and its fields open in a panel on the right of the board, where they change the card as they would on it. The × or a click on the empty board closes it.
 
 <img alt="Zoomed out: short cards, and the picked Orders API's branch, who starts it and its cables in the panel on the right" src="images/zoomed-out.png">
 
@@ -139,7 +144,7 @@ Zoomed out below 60%, cards are short in Edit too: pick one and its fields open 
 
 | Key                                        | What it does                                                                                                     |
 | ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------- |
-| `E` / `L`                                  | Edit view, Live view                                                                                             |
+| `D` / `E` / `L`                            | Discover, Plan, Live                                                                                             |
 | `P`, then `Esc`                            | Present, and back                                                                                                |
 | `F`                                        | Fit the board in the window                                                                                      |
 | `V` / `H`, or hold `Space`                 | Select by dragging, or move around: while moving around, a click or drag never picks, lets go of or moves a card |

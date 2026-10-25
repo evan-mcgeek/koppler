@@ -167,6 +167,7 @@
     } else if (key === 'f') void fit();
     else if (key === 'p') void present();
     else if (key === 'escape' && board.present) void present();
+    else if (key === 'd') board.goDiscover();
     else if (key === 'e') board.goEdit();
     else if (key === 'l') board.goLive();
     else if (ev.key === 'v' || ev.key === 'V') tool = 'select';
@@ -567,35 +568,6 @@
     }}
   >
     <Background variant={BackgroundVariant.Dots} gap={20} size={1.4} bgColor="var(--desk)" patternColor="var(--line)" />
-    <Panel position="top-left">
-      <div
-        class="views"
-        role="radiogroup"
-        aria-label="Board view"
-        title="Edit (E): set up apps and cables. Live (L): what is running, large enough to read at a glance."
-      >
-        <label>
-          <input
-            type="radio"
-            name="view"
-            checked={!board.live}
-            onchange={() => {
-              board.goEdit();
-            }}
-          />Edit
-        </label>
-        <label>
-          <input
-            type="radio"
-            name="view"
-            checked={board.live}
-            onchange={() => {
-              board.goLive();
-            }}
-          />Live
-        </label>
-      </div>
-    </Panel>
     <Panel position="bottom-center">
       <div class="tools" role="toolbar" aria-label="Board">
         <div class="switch" role="radiogroup" aria-label="Dragging on the board">
@@ -1284,39 +1256,6 @@
     stroke-width: 2.5;
     stroke-linecap: round;
     stroke-dasharray: 6 6;
-  }
-  .views {
-    display: inline-flex;
-    gap: 2px;
-    padding: 2px;
-    border: 1px solid var(--line);
-    border-radius: 8px;
-    background: var(--panel);
-  }
-  .views label {
-    position: relative;
-    padding: 3px 12px;
-    border-radius: 6px;
-    color: var(--muted);
-    font: 600 13px var(--sans);
-  }
-  .views input {
-    position: absolute;
-    inset: 0;
-    margin: 0;
-    opacity: 0;
-    cursor: pointer;
-  }
-  .views label:has(input:checked) {
-    background: var(--surface);
-    color: var(--ink);
-    box-shadow:
-      0 0 0 1px var(--line),
-      0 1px 2px rgb(0 0 0 / 0.12);
-  }
-  .views label:has(input:focus-visible) {
-    outline: 2px solid var(--ink);
-    outline-offset: -2px;
   }
   /* In Live nothing on the board is pulled or unplugged. */
   .ends.still :is(.plug, .socket) {
