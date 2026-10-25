@@ -1,7 +1,7 @@
 // The new canvas's logs pane, and asking the agent about a start that failed.
 import fs from 'node:fs';
 import path from 'node:path';
-import { actions, at, card, expect, test } from './canvas.ts';
+import { actions, at, card, expect, test, fromMenu } from './canvas.ts';
 
 test.use({
   board: {
@@ -159,18 +159,17 @@ test('All apps shows every app on the board in one stream by time, and an app le
   await page.screenshot({ path: 'test-results/next-logs-all.png' });
 });
 
-test('the All apps log opens from the top bar, and closes from there too', async ({ page }) => {
-  const button = page.getByRole('button', { name: 'Logs', exact: true });
-  await button.click();
+test('the All apps log opens from the Activity menu, and closes from there too', async ({ page }) => {
+  await fromMenu(page, 'Activity', 'Logs');
   const pane = page.getByRole('region', { name: 'App log' });
   await expect(pane.getByRole('tab', { name: 'All apps' })).toHaveAttribute('aria-selected', 'true');
-  await expect(button).toHaveAttribute('aria-pressed', 'true');
-  await button.click();
+  await fromMenu(page, 'Activity', 'Logs');
   await expect(pane).toHaveCount(0);
 });
 
-test('a hint shows soon after pointing at a button, and goes when the pointer leaves', async ({ page }) => {
-  const button = page.getByRole('button', { name: 'Logs', exact: true });
+test('a hint shows soon after pointing at a menu item, and goes when the pointer leaves', async ({ page }) => {
+  await page.locator('header').getByRole('button', { name: 'Activity', exact: true }).click();
+  const button = page.getByRole('menuitem', { name: 'Logs' });
   await button.hover();
   const tip = page.getByRole('tooltip');
   await expect(tip).toHaveText('The log of every app on the board, in one stream', { timeout: 800 });

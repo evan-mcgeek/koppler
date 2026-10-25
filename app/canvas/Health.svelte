@@ -158,7 +158,7 @@
     align-items: center;
     gap: 7px;
     height: 30px;
-    padding: 0 10px;
+    padding: 0 9px;
     border: 1px solid var(--line-strong);
     background: none;
     color: var(--ink);

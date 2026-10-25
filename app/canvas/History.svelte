@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { opens } from './bar.svelte.ts';
   // Every run and Stop, and how it ended; what stopped outside a run is told among them. Newest first, this session's
   // on top and older ones folded under "Earlier".
   import { VERSION } from '../src/core/presets.ts';
@@ -7,11 +8,10 @@
   import { live, type Run } from './live.svelte.ts';
 
   const id = $props.id();
-  let opener = $state<HTMLButtonElement>();
+  let opener = $state<HTMLElement>();
   let pop = $state<HTMLDivElement>();
   let open = $state(false);
   let shown = $state<string | null>(null);
-  const waiting = $derived(!!live.status?.runs?.some(run => run.state === 'waiting'));
   const all = $derived(
     [...(live.status?.runs ?? []), ...(live.status?.notes ?? [])].sort((a, b) =>
       (b.at ?? '').localeCompare(a.at ?? ''),
@@ -34,6 +34,10 @@
         : { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' },
     );
   };
+  opens.history = from => {
+    opener = from;
+    pop?.showPopover();
+  };
   const place = () => {
     const at = opener?.getBoundingClientRect();
     if (!at || !pop) return;
@@ -46,19 +50,6 @@
   };
 </script>
 
-<button
-  bind:this={opener}
-  class="open"
-  class:waiting
-  type="button"
-  aria-label="History"
-  aria-haspopup="dialog"
-  aria-expanded={open}
-  title={waiting ? 'A run is waiting for the agent' : 'Every run and Stop, and how it ended'}
-  popovertarget={id}
->
-  History
-</button>
 <div
   bind:this={pop}
   {id}
@@ -106,34 +97,6 @@
 </div>
 
 <style>
-  .open {
-    position: relative;
-    display: grid;
-    place-items: center;
-    width: 32px;
-    height: 32px;
-    padding: 0;
-    border: 1px solid transparent;
-    border-radius: 8px;
-    background: none;
-    color: var(--muted);
-    cursor: pointer;
-  }
-  .open:hover,
-  .open[aria-expanded='true'] {
-    border-color: var(--line);
-    color: var(--ink);
-  }
-  .open.waiting::after {
-    content: '';
-    position: absolute;
-    top: 5px;
-    right: 5px;
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-    background: var(--warn);
-  }
   .pop {
     position: fixed;
     inset: auto;

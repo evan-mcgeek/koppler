@@ -194,8 +194,7 @@ class Health {
         label: `Running on ${otherEnv}`,
         title: `What runs now is your ${otherEnv} board. This board is set to ${board.env.toUpperCase()} and has not been run; Run switches over.`,
       };
-    if (!apps)
-      return { state: 'idle', label: 'Nothing running', title: 'Nothing on the board is running. Run starts it.' };
+    if (!apps) return { state: 'idle', label: '0 running', title: 'Nothing on the board is running. Run starts it.' };
     // After a Flow check the light says what its report says; before one, what the cards and tunnels show.
     const bad = this.flow
       ? this.flow.filter(job => this.result(job).state === 'bad').length
@@ -211,7 +210,7 @@ class Health {
         title: `${several(unsent, 'app on this board was', 'apps on this board were')} not started yet. Run starts ${unsent === 1 ? 'it' : 'them'}.`,
       };
     if (waiting) return { state: 'warn', label: `${String(waiting)} waiting on you`, title: check };
-    return { state: 'ok', label: 'All running', title: check };
+    return { state: 'ok', label: `${String(apps)} running`, title: check };
   });
 }
 export const health = new Health();

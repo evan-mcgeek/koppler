@@ -5,12 +5,16 @@ test.use({
   board: { env: 'qa', mode: 'auto', nodes: { web: { x: 0, y: 0, run: 'cli', branch: 'main' } }, edges: [] },
 });
 
-test('with no agent the bar says so and shows how to connect one; a connected agent shows as such', async ({
+test('with no agent the bar says so and its messages show how to connect one; a connected agent shows as such', async ({
   page,
 }) => {
   const chip = page.locator('header .agent');
-  const how = page.getByRole('button', { name: 'How to connect an agent' });
+  // The chip opens its messages, which offer how to connect one while none listens.
+  const how = page
+    .getByRole('dialog', { name: 'Messages from the agent' })
+    .getByRole('button', { name: 'Connect an agent' });
   await expect(chip).toHaveText('No agent');
+  await chip.click();
   await how.click();
   const steps = page.getByRole('dialog', { name: 'Connect an agent' });
   await expect(steps.locator('code')).toHaveText('/koppler-run connect');

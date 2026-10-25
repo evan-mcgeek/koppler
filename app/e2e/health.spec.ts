@@ -23,7 +23,7 @@ test('the light sums up the board, and the Flow check tests every connection and
   canvas,
 }) => {
   const chip = page.locator('header .chip');
-  await expect(chip).toHaveText('Nothing running');
+  await expect(chip).toHaveText('0 running');
   await chip.click();
   const check = page.getByRole('dialog', { name: 'Flow check' });
   await expect(check).toContainText('Press Run to start the apps on your board.');
