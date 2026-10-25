@@ -78,7 +78,10 @@ test('The cases a connection must survive, each in its own folder.', async () =>
   // A session that was replaced without noticing takes no prompts and leaves the new registration alone.
   { const t = fresh(); const a = await begin(t, 'take');
     const theirs = { pid: null, since: 't', busy: new Date().toISOString(), session: 'other001' };
+    // Under the lock, waited for as a real takeover waits: the listener never sees half of it between its check and its take.
+    for (;;) { try { fs.mkdirSync(t.file('listener.json.lock')); break; } catch { await wait(10); } }
     fs.writeFileSync(t.file('listener.json'), JSON.stringify(theirs)); fs.writeFileSync(t.file('prompts.jsonl'), prompt(3));
+    fs.rmdirSync(t.file('listener.json.lock'));
     await ended(a); assert.equal(a.code, 3); assert.doesNotMatch(a.out, /run 3/);
     assert.equal(fs.readFileSync(t.file('prompts.jsonl'), 'utf8'), prompt(3));
     assert.deepEqual(JSON.parse(fs.readFileSync(t.file('listener.json'), 'utf8')), theirs); }

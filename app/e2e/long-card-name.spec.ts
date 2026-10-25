@@ -1,4 +1,4 @@
-// A long name is cut short on a card: its tag and buttons stay inside the card's edge.
+// A long name wraps to two lines, then is cut; its kind tag sits under it and the buttons stay inside the card.
 import { at, expect, STACK, test } from './canvas.ts';
 
 test.use({
@@ -17,7 +17,9 @@ test.use({
   board: { env: 'qa', mode: 'auto', zoom: 1, pan: { x: 60, y: 40 }, nodes: { orders: at(0, 0) }, edges: [] },
 });
 
-test('a database with a long name keeps its tag and settings button inside the card', async ({ page }) => {
+test('a database with a long name wraps to two lines, its tag under it, its buttons inside the card', async ({
+  page,
+}) => {
   const card = page.locator('.svelte-flow__node-database .infra');
   const button = page.getByRole('button', { name: 'Settings for Acme Shop Notifications DB (local)' });
   const tag = card.locator('.tag');
@@ -29,5 +31,10 @@ test('a database with a long name keeps its tag and settings button inside the c
     expect(inner.x + inner.width).toBeLessThanOrEqual(box.x + box.width);
   }
   await expect(card).toHaveAttribute('title', 'Acme Shop Notifications DB (local)');
+  const name = await card.locator('.name').boundingBox();
+  if (!name) throw new Error('not drawn');
+  // Two lines of 19px, and the kind tag below them, not beside.
+  expect(Math.round(name.height)).toBe(38);
+  expect(label.y).toBeGreaterThan(name.y + name.height);
   await card.screenshot({ path: 'test-results/long-card-name.png' });
 });

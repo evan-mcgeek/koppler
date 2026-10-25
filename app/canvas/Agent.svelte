@@ -1,6 +1,5 @@
 <script lang="ts">
-  import Icon from './Icon.svelte';
-  import Plug from '@lucide/svelte/icons/plug';
+  import { opens } from './bar.svelte.ts';
   // Whether an agent session takes what the canvas sends, and how to connect one.
   import Command from './Command.svelte';
   import { inbox } from './inbox.svelte.ts';
@@ -15,16 +14,16 @@
     question: ['Agent needs you', 'The agent asked something about your run. Click to answer.'],
     quiet: [
       'Agent quiet',
-      'It took a request and has neither finished it nor listened again since. If its session is done, run /koppler-run connect there; press ↻ for the steps.',
+      'It took a request and has neither finished it nor listened again since. If its session is done, run /koppler-run connect there; click for the steps.',
     ],
     none: [
       'No agent listening',
-      'Runs work without one. Notes, checklists and fix requests wait until an agent connects; press ↻ to see how.',
+      'Runs work without one. Notes, checklists and fix requests wait until an agent connects; click to see how.',
     ],
   };
   const COMMAND = '/koppler-run connect';
   const id = $props.id();
-  let how = $state<HTMLButtonElement>();
+  let chip = $state<HTMLButtonElement>();
   let pop = $state<HTMLDivElement>();
   let open = $state(false);
   const QUIET_AFTER = 10 * 60 * 1000;
@@ -60,8 +59,9 @@
   const title = $derived(
     `${name}${who?.name ? `: ${who.name}` : ''}.${session} ${about}${waiting ? ` ${String(queued)} ${queued === 1 ? 'request waits' : 'requests wait'} for it; only the newest run or Stop is handed over.` : ''}`,
   );
+  opens.connect = () => pop?.showPopover();
   const place = () => {
-    const at = how?.getBoundingClientRect();
+    const at = chip?.getBoundingClientRect();
     if (!at || !pop) return;
     pop.style.top = `${String(at.bottom + 6)}px`;
     pop.style.right = `${String(Math.max(12, innerWidth - at.right))}px`;
@@ -74,6 +74,7 @@
 
 {#if live.status}
   <button
+    bind:this={chip}
     class="agent"
     type="button"
     data-state={tone}
@@ -83,20 +84,6 @@
   >
     <span class="dot round" aria-hidden="true"></span><span class="words">{label}</span>
   </button>
-  {#if listening === 'none' || listening === 'quiet'}
-    <button
-      bind:this={how}
-      class="how"
-      type="button"
-      aria-label="How to connect an agent"
-      title="How to connect an agent"
-      aria-haspopup="dialog"
-      aria-expanded={open}
-      popovertarget={id}
-    >
-      <Icon of={Plug} size={15} />
-    </button>
-  {/if}
   <div
     bind:this={pop}
     {id}
@@ -137,7 +124,7 @@
     align-items: center;
     gap: 7px;
     height: 30px;
-    padding: 0 10px;
+    padding: 0 9px;
     border: 1px solid var(--line-strong);
     background: none;
     color: var(--ink);
@@ -185,24 +172,6 @@
     [data-state='busy'] .dot {
       animation: none;
     }
-  }
-  .how {
-    display: grid;
-    place-items: center;
-    width: 32px;
-    height: 32px;
-    margin-left: -8px;
-    padding: 0;
-    border: 1px solid transparent;
-    border-radius: 8px;
-    background: none;
-    color: var(--muted);
-    cursor: pointer;
-  }
-  .how:hover,
-  .how[aria-expanded='true'] {
-    border-color: var(--line);
-    color: var(--ink);
   }
   .connect {
     position: fixed;

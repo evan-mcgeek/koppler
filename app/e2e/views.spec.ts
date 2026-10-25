@@ -62,7 +62,7 @@ test('Live shows the same board in the same places as cards to read, and nothing
   await expect(page.locator('.svelte-flow__edge')).toHaveCount(1);
 
   await page.keyboard.press('e');
-  await expect(page.getByRole('radio', { name: 'Edit' })).toBeChecked();
+  await expect(page.getByRole('radio', { name: 'Plan' })).toBeChecked();
   await expect(card(page, 'web').locator('.body')).toBeVisible();
   expect([await corner(page, 'web'), await corner(page, 'orders')]).toEqual(before);
   await expect(page.getByRole('button', { name: 'Undo' })).toBeDisabled();

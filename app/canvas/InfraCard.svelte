@@ -61,16 +61,22 @@
     variant?: string;
     children?: Snippet;
   } = $props();
+  const note = $derived(board.cardNotes[id] ?? '');
+  let noting = $state(false);
 </script>
 
 <div class="infra {kind} {variant}" class:selected class:dimmed={board.dimmed(id)} {title}>
   {@render band?.()}
   <span class="head">
-    {#if hasDot}<span class="led" data-state={dot ? 'running' : dot === false ? 'failed' : undefined} title={dotTitle}
-      ></span>{/if}
-    <span class="name">{name}</span>
-    {@render flag?.()}
-    <span class="tag">{tag}</span>
+    {#if hasDot}<span class="lit"
+        ><span class="led" data-state={dot ? 'running' : dot === false ? 'failed' : undefined} title={dotTitle}
+        ></span></span
+      >{/if}
+    <!-- The name gets the whole row up to the buttons, two lines at most; its kind sits under it. -->
+    <span class="title">
+      <span class="name">{name}</span>
+      <span class="tags"><span class="tag">{tag}</span>{@render flag?.()}</span>
+    </span>
     <span class="acts">
       {#each actions as action (action.label)}
         <button
@@ -88,29 +94,41 @@
     </span>
   </span>
   {#if children}<div class="body">{@render children()}</div>{/if}
-  <!-- Edit only: in Live the cards are for reading. The run hands the note to the agent. -->
-  {#if !board.live}<div class="noted">
+  <!-- A written note reads as text above the foot; the run hands it to the agent. -->
+  {#if note || noting}<div class="noted">
       <CardNote
-        value={board.cardNotes[id] ?? ''}
+        card
+        reading={board.live}
+        editing={noting}
+        onediting={(open: boolean) => (noting = open)}
+        value={note}
         placeholder="e.g. purge it before the run"
-        onchange={(note: string) => {
-          board.noteCard(id, note);
+        onchange={(text: string) => {
+          board.noteCard(id, text);
         }}
       />
     </div>{/if}
-  {#if foot}<div class="foot stack">{@render foot()}</div>
-  {:else if status}<p class="foot">
-      <span>{status}</span>
-      {#if act}<button
-          class="link nodrag"
+  {#if foot || status || (!board.live && !note)}
+    <div class="foot" class:stack={!!foot} class:bare={!foot && !status}>
+      {#if foot}{@render foot()}
+      {:else if status}<span>{status}</span>
+        {#if act}<button
+            class="link nodrag"
+            type="button"
+            aria-label={act.label}
+            title={act.title}
+            onclick={() => {
+              act.run();
+            }}>{act.word}</button
+          >{/if}
+      {/if}
+      {#if !board.live && !note && !noting}<button
+          class="link add-note nodrag"
           type="button"
-          aria-label={act.label}
-          title={act.title}
-          onclick={() => {
-            act.run();
-          }}>{act.word}</button
+          onclick={() => (noting = true)}>Add note</button
         >{/if}
-    </p>{/if}
+    </div>
+  {/if}
 </div>
 
 <style>
@@ -156,22 +174,43 @@
   }
   .head {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     gap: 8px;
-    min-height: 40px;
-    padding: 4px 4px 4px 12px;
+    padding: 10px 8px 10px 12px;
     border-bottom: 1px solid var(--line);
   }
-  /* A long name is cut short: the tag and the buttons stay on the card. The card's title holds it whole. */
-  .name {
+  /* The light lines up with the name's first line. */
+  .lit {
+    display: flex;
+    padding-top: 6px;
+  }
+  .title {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
     min-width: 0;
+  }
+  /* Two lines, then an ellipsis; a name with no spaces breaks anywhere. The card's title holds it whole. */
+  .name {
+    display: -webkit-box;
+    max-width: 100%;
     overflow: hidden;
-    font: 600 15px var(--sans);
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    font: 600 15px/19px var(--sans);
+    overflow-wrap: anywhere;
+    text-wrap: pretty;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+  }
+  .tags {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
   }
   .tag {
-    margin-left: auto;
     padding: 2px 5px;
     border: 1px solid var(--line-strong);
     color: var(--ink-muted);
@@ -180,8 +219,10 @@
     text-transform: uppercase;
     white-space: nowrap;
   }
+  /* Centred on the name's first line. */
   .acts {
     display: flex;
+    margin: -6px 0 -6px;
   }
   .acts button {
     display: grid;
@@ -204,9 +245,31 @@
     padding: 10px 12px 12px;
     overflow-wrap: anywhere;
   }
+  /* A note wraps inside the card's width: it never widens the card. */
   .noted {
     display: grid;
     padding: 0 12px 10px;
+    contain: inline-size;
+  }
+  /* Offered only while the card is picked or has the keyboard: most of these cards never get a note. */
+  /* Kept in its place while hidden, so picking the card moves nothing in its foot. */
+  .add-note {
+    margin-left: auto;
+    color: var(--ink);
+    visibility: hidden;
+  }
+  .infra.selected .add-note,
+  .infra:focus-within .add-note,
+  :global(.svelte-flow__node:focus-visible) .add-note {
+    visibility: visible;
+  }
+  .foot.bare {
+    display: none;
+  }
+  .infra.selected .foot.bare,
+  .infra:focus-within .foot.bare,
+  :global(.svelte-flow__node:focus-visible) .foot.bare {
+    display: flex;
   }
   .foot {
     display: flex;
@@ -219,5 +282,8 @@
   .foot.stack {
     display: grid;
     gap: 3px;
+  }
+  .foot.stack .add-note {
+    justify-self: end;
   }
 </style>

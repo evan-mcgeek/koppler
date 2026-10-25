@@ -1,10 +1,12 @@
 // The new canvas's History: every run and Stop with how it ended, and a way to put a run's board back.
-import { test, expect } from './canvas.ts';
+import { test, expect, fromMenu } from './canvas.ts';
 
 test('runs are listed newest first with their plan and code changes, and a board is put back from one', async ({
   page,
 }) => {
-  const history = page.getByRole('button', { name: 'History' });
+  const history = { click: () => fromMenu(page, 'Activity', 'History') };
+  // A run waiting for the agent shows on the menu that holds History.
+  const activity = page.locator('header').getByRole('button', { name: 'Activity', exact: true });
   await history.click();
   const list = page.getByRole('dialog', { name: 'History' });
   await expect(list).toContainText('No runs yet.');
@@ -43,7 +45,7 @@ test('runs are listed newest first with their plan and code changes, and a board
     route.fulfill({ json: { apps: {}, runs, notes, startedAt: started } }),
   );
   // A run that waits for the agent marks the button.
-  await expect(history).toHaveAttribute('title', 'A run is waiting for the agent');
+  await expect(activity).toHaveAttribute('title', 'A run is waiting for the agent');
   await history.click();
   await expect(list.locator(':scope > .run .what')).toHaveText([
     /Stop and revert/,

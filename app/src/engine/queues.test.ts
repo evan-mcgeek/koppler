@@ -5,6 +5,7 @@ import {
   EMULATOR,
   ENDPOINT,
   KAFKA,
+  LAMBDA_QUEUES,
   localQueues,
   queueEnv,
   REGION,
@@ -22,6 +23,7 @@ const stack = {
     api: { name: 'API', kind: 'dotnet', publishes: { thumbs: { env: 'Queues__Thumbs' } } },
     worker: { name: 'Worker', kind: 'node', reads: { thumbs: {} } },
     fn: { name: 'Fn', kind: 'lambda', reads: { thumbs: {} } },
+    emit: { name: 'Emit', kind: 'lambda', publishes: { thumbs: {} } },
     web: { name: 'Web', kind: 'web' },
     listener: { name: 'Listener', kind: 'dotnet', reads: { feed: { env: ['Kafka__BootstrapServers'] } } },
   },
@@ -29,7 +31,7 @@ const stack = {
 const board = localQueues(
   stack,
   { thumbs: 'local', alerts: 'local', ghost: 'local' },
-  ['api', 'worker', 'fn', 'web'],
+  ['api', 'worker', 'fn', 'emit', 'web'],
   'prod',
 );
 
@@ -38,6 +40,7 @@ test('only queues switched to local, of a type Koppler runs, with the board apps
     { id: 'api', env: ['Queues__Thumbs'] },
     { id: 'worker', env: [] },
     { id: 'fn', env: [] },
+    { id: 'emit', env: [] },
   ];
   expect(board.queues).toEqual([{ id: 'thumbs', name: 'Thumbnails', type: 'sqs', queue: 'thumbs-prod', apps }]);
   expect(board.left).toEqual(['Alerts: Koppler cannot run a sns queue locally yet; it stays the deployed one']);
@@ -51,15 +54,16 @@ test('a Kafka topic runs on the local broker, with no AWS endpoint', () => {
   });
 });
 
-test('apps Koppler starts get the SDK endpoint and their queue settings; a Lambda is left for the agent', () => {
+test('apps Koppler starts get the SDK endpoint and their queue settings; a Lambda that reads one is triggered by it', () => {
   const url = 'http://127.0.0.1:4566/000000000000/thumbs-prod';
   const env = queueEnv(stack, board.queues, { thumbs: url });
   expect(env.set).toEqual({
     // The AWS SDK for .NET signs for us-east-1 at an endpoint of its own: it is told the queue's region.
     api: { AWS_ENDPOINT_URL_SQS: ENDPOINT, AWS__AuthenticationRegion: REGION, Queues__Thumbs: url },
     worker: { AWS_ENDPOINT_URL_SQS: ENDPOINT },
+    fn: { [LAMBDA_QUEUES]: url },
   });
-  expect(env.left[0]).toMatch(/^Fn: point it at the local Thumbnails queue/);
+  expect(env.left).toEqual([expect.stringMatching(/^Emit: point it at the local Thumbnails queue/)]);
 });
 
 test('the broker is reached and advertised on IPv4, where it is published, never as localhost', () => {
@@ -68,7 +72,12 @@ test('the broker is reached and advertised on IPv4, where it is published, never
   expect(BROKER.at(-1)).toContain('-e KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://127.0.0.1:9092');
 });
 
-test('Stop removes the very containers the emulator and the broker start', () => {
-  expect(EMULATOR.at(-1)).toContain(`--name ${STOP_EMULATOR.at(-1) ?? ''} `);
+test('Stop removes the very containers the emulator and the broker start, and the functions the emulator ran', () => {
+  expect(EMULATOR.at(-1)).toContain('--name koppler-queues ');
+  expect(STOP_EMULATOR.at(-1)).toContain('docker rm -f koppler-queues');
+  expect(EMULATOR.at(-1)).toContain('-e FLOCI_SERVICES_LAMBDA_CONTAINER_NAME_PREFIX=koppler-fn ');
+  expect(STOP_EMULATOR.at(-1)).toContain('--filter name=koppler-fn- ');
+  // The emulator starts each function's container through Docker.
+  expect(EMULATOR.at(-1)).toContain('-v /var/run/docker.sock:/var/run/docker.sock');
   expect(BROKER.at(-1)).toContain(`--name ${STOP_BROKER.at(-1) ?? ''} `);
 });

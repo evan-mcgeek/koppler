@@ -3,7 +3,7 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Page } from '@playwright/test';
-import { actions, at, expect, STACK, test } from './canvas.ts';
+import { actions, at, expect, STACK, test, fromMenu } from './canvas.ts';
 
 test.use({
   board: { env: 'qa', mode: 'auto', zoom: 1, pan: { x: 60, y: 60 }, nodes: { orders: at(0, 0) }, edges: [] },
@@ -243,9 +243,9 @@ test("the agent is asked to fill in an app's empty settings, leaving locked ones
   expect(sent[0]?.text).toContain('LOCKED apps.orders.deployedUrl');
 });
 
-test('the stack has its own settings, beside its name, with its apps a click away', async ({ page, canvas }) => {
+test('the stack has its own settings, in the Settings menu, with its apps a click away', async ({ page, canvas }) => {
   const read = stackFile(canvas.dir);
-  await page.getByRole('button', { name: 'Stack settings' }).click();
+  await fromMenu(page, 'Settings', 'Stack settings');
   const panel = page.getByRole('dialog', { name: 'Acme Shop settings' });
   await tabOf(page, 'Identity').click();
   const name = panel.getByLabel('Name', { exact: true });
@@ -273,7 +273,7 @@ test('the stack has its own settings, beside its name, with its apps a click awa
 
 test('environments are chips in their order, and the protected ones are ticked', async ({ page, canvas }) => {
   const read = stackFile(canvas.dir);
-  await page.getByRole('button', { name: 'Stack settings' }).click();
+  await fromMenu(page, 'Settings', 'Stack settings');
   const panel = page.getByRole('dialog', { name: 'Acme Shop settings' });
   const envs = panel.getByRole('list', { name: 'Environments' });
   await expect(envs.getByRole('listitem')).toHaveText([/qa\s+runs by default/, /prod/, '']);

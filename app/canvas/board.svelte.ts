@@ -222,6 +222,27 @@ const notesOf = (given: unknown): Record<string, string> =>
     ),
   );
 
+export interface DiscoverState {
+  open: string[];
+  at: Record<string, Point>;
+}
+/** Discover's part of a saved board, or of one opened: the cards opened and where they sit. */
+const discoverOf = (given: unknown): DiscoverState => {
+  const kept = (given && typeof given === 'object' ? given : {}) as { open?: unknown; at?: unknown };
+  const open = Array.isArray(kept.open) ? kept.open.filter((id): id is string => typeof id === 'string') : [];
+  const at = Object.fromEntries(
+    Object.entries(kept.at && typeof kept.at === 'object' ? (kept.at as Record<string, unknown>) : {}).flatMap(
+      ([id, point]) => {
+        const { x, y } = (point ?? {}) as { x?: unknown; y?: unknown };
+        return typeof x === 'number' && typeof y === 'number' && Number.isFinite(x) && Number.isFinite(y)
+          ? [[id, { x, y }] as const]
+          : [];
+      },
+    ),
+  );
+  return { open, at };
+};
+
 class Board {
   /** The stack's name and the environment the board runs against; empty until the board is opened. */
   stack = $state('');
@@ -272,6 +293,8 @@ class Board {
   logAliases = $state.raw<Record<string, string>>({});
   /** Notes for the agent on the board's other cards, by card: a queue, a database, a tunnel, an outside system. */
   cardNotes = $state.raw<Record<string, string>>({});
+  /** Discover, per board: the cards whose hidden links were brought in, and where its cards sit. */
+  discover = $state.raw<DiscoverState>({ open: [], at: {} });
   /** The outside systems put on the board by hand: shown even when none of their apps is. */
   pinned = $state.raw<string[]>([]);
   pin(id: string): void {
@@ -339,6 +362,10 @@ class Board {
   /** The stack as written, with its expressions resolved; the board reads it with each database folded into its apps. */
   #resolved = $state.raw<Registry | undefined>();
   // A database on this Mac brings no tunnel or hosts entry.
+  /** The stack's facts, as Discover reads them. */
+  get facts() {
+    return this.#registry;
+  }
   #registry = $derived(this.#resolved && withDatabases(this.#resolved, new Set(Object.keys(this.databases))));
   /** The apps whose new tunnel cards still wait for their real place. */
   unplaced = $state.raw<string[]>([]);
@@ -737,19 +764,20 @@ class Board {
    * One card picked (an app, a tunnel, a queue or an outside system), or one cable: it and what it joins stay bright,
    * the rest of the board is dimmed. `id` is the picked card; a picked cable has `cable` and its two ends instead.
    */
-  focus = $derived.by((): { id: string | null; cable?: [string, string]; near: string[] } | null => {
+  /** What is picked, to trace on a busy board: the picked cards and what their links reach, or one picked cable. */
+  focus = $derived.by((): { ids: string[]; cable?: [string, string]; near: string[] } | null => {
     const cards = [...this.nodes, ...this.infra].filter(node => node.selected);
     const cables = this.edges.filter(edge => edge.selected);
-    const [one] = cards;
     const [wire] = cables;
-    if (cards.length === 1 && !cables.length && one) {
-      const near = [one.id];
+    if (cards.length && !cables.length) {
+      const ids = cards.map(card => card.id);
+      const near = [...ids];
       for (const { from, to } of [...this.cables, ...this.links, ...this.flows])
-        if (from === one.id || to === one.id) near.push(from, to);
-      return { id: one.id, near };
+        if (ids.includes(from) || ids.includes(to)) near.push(from, to);
+      return { ids, near };
     }
     if (!cards.length && cables.length === 1 && wire)
-      return { id: null, cable: [wire.source, wire.target], near: [wire.source, wire.target] };
+      return { ids: [], cable: [wire.source, wire.target], near: [wire.source, wire.target] };
     return null;
   });
   /** Whether a card is dimmed while another is picked. */
@@ -759,7 +787,7 @@ class Board {
     const focus = this.focus;
     if (!focus) return false;
     if (focus.cable) return focus.cable[0] === from && focus.cable[1] === to;
-    return from === focus.id || to === focus.id;
+    return focus.ids.includes(from) || focus.ids.includes(to);
   };
   /** Whether a cable or link is dimmed while something else is picked. */
   dimmedLink = (from: string, to: string): boolean => !!this.focus && !this.lit(from, to);
@@ -1428,11 +1456,22 @@ class Board {
 
   /** The Live view: the same board, in the same places, as read-only cards with their state. */
   live = $state(false);
+  /** Discover: how the stack fits together around the board, read from its facts. Nothing runs from it. */
+  discovering = $state(false);
+  /** What Discover handed to Plan: how many were picked, the apps put on the board, and the cards that stay deployed. */
+  fromDiscover = $state.raw<{ picked: number; running: string[]; leftOut: string[] } | null>(null);
+  goDiscover(): void {
+    if (this.discovering) return;
+    this.goEdit();
+    this.commit();
+    this.discovering = true;
+  }
   #edit = '';
   #keptEdit: SavedBoard = {};
 
   /** Shows the board as it runs. What Edit holds (the cards beside a card that changes size, the undo history) is put aside untouched. */
   goLive(): void {
+    this.discovering = false;
     if (this.live) return;
     this.commit();
     this.#keptEdit = this.saved();
@@ -1441,6 +1480,7 @@ class Board {
   }
   /** Back to the board as it was left in Edit. */
   goEdit(): void {
+    this.discovering = false;
     if (!this.live) return;
     this.setContent(this.#edit);
     this.live = false;
@@ -1540,6 +1580,7 @@ class Board {
       ...(Object.keys(this.hiddenQueues).length && { hiddenQueues: Object.keys(this.hiddenQueues) }),
       ...(Object.keys(this.hiddenOutside).length && { hiddenOutside: Object.keys(this.hiddenOutside) }),
       ...(Object.keys(this.cardNotes).length && { cardNotes: this.cardNotes }),
+      ...((this.discover.open.length || Object.keys(this.discover.at).length) && { discover: this.discover }),
     };
   }
   /** Where the cards sit and which sides the cables use, kept with a board so it opens as it was left. */
@@ -1725,6 +1766,7 @@ class Board {
     this.hiddenLogs = {};
     this.logAliases = {};
     this.cardNotes = {};
+    this.discover = { open: [], at: {} };
     this.pinned = [];
   }
   /**
@@ -1769,6 +1811,7 @@ class Board {
     this.hiddenLogs = {};
     this.logAliases = {};
     this.cardNotes = notesOf(given['cardNotes']);
+    this.discover = discoverOf(given['discover']);
     this.pinned = Array.isArray(given['outside'])
       ? (given['outside'] as unknown[]).filter((id): id is string => typeof id === 'string')
       : [];
@@ -1940,6 +1983,7 @@ class Board {
     this.hiddenLogs = (saved?.['hiddenLogs'] ?? {}) as Record<string, true>;
     this.logAliases = (saved?.['logAliases'] ?? {}) as Record<string, string>;
     this.cardNotes = notesOf(saved?.['cardNotes']);
+    this.discover = discoverOf(saved?.['discover']);
     this.pinned = (Array.isArray(saved?.['outside']) ? saved['outside'] : []) as string[];
     const { zoom, pan } = saved ?? {};
     this.view = zoom && pan ? { x: pan.x, y: pan.y, zoom } : undefined;
@@ -1976,6 +2020,7 @@ class Board {
       this.hiddenLogs,
       this.logAliases,
       this.cardNotes,
+      this.discover,
       this.pinned,
     ];
   }
@@ -2039,6 +2084,7 @@ class Board {
       hiddenLogs: Object.keys(this.hiddenLogs).length ? this.hiddenLogs : undefined,
       logAliases: Object.keys(this.logAliases).length ? this.logAliases : undefined,
       cardNotes: Object.keys(this.cardNotes).length ? this.cardNotes : undefined,
+      discover: this.discover.open.length || Object.keys(this.discover.at).length ? this.discover : undefined,
       outside: this.pinned.length ? this.pinned : undefined,
       infra: Object.fromEntries(
         this.infra.map(({ id, position }) => [id, { x: Math.round(position.x), y: Math.round(position.y) }]),

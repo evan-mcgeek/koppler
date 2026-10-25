@@ -37,7 +37,7 @@ Pointing at a card shows its actions above it: run it alone, stop or restart it 
 
 ## Settings
 
-**Settings** in a card's tools, the gear on a queue or outside system, and the gear beside the stack's name open settings: every fact the stack holds about that thing, in tabs.
+**Settings** in a card's tools, the gear on a queue or outside system, and **Stack settings** in the top bar's Settings menu open settings: every fact the stack holds about that thing, in tabs.
 
 <img alt="An app's settings: its name, kind and slug, then tabs; Runs here shows its start command, local address, readiness check and more, each with a lock" src="images/settings.png" width="480">
 
@@ -53,7 +53,7 @@ The same fields can be read and changed with `koppler stack get`, `set` and `uns
 ## Appearance
 
 The canvas is dark, with square corners and hairlines, and colour only as a signal: one colour for what runs on your machine, one for what still calls the deployed environment, amber when something needs you, and red for PROD and failures.
-The gear at the bottom of the side pane opens **Appearance**: eight schemes, five dark (Mono, the default, then Patch bay, Signal, Scope and Sodium) and three light (Paper, Blueprint and Workshop), and the local and deployed colours picked by hand over the scheme.
+**Appearance**, in the top bar's Settings menu or behind the gear at the bottom of the side pane, has eight schemes, five dark (Mono, the default, then Patch bay, Signal, Scope and Sodium) and three light (Paper, Blueprint and Workshop), and the local and deployed colours picked by hand over the scheme.
 Warning and PROD colours are never among the picks, so a custom colour can never be mistaken for either.
 PROD stays red and striped in every scheme.
 Your choice is kept in this browser.
@@ -91,9 +91,10 @@ These appear next to the app that uses them, and show or hide with it.
   What feeds a queue an app reads stacks above it, however far up: a Kafka topic piped onto an event bus, a rule forwarding to another bus, an SNS topic's subscription. Each link says how (`pipe`, `rule`, `subscription`, `rule to Lambda`); those upstream cards stay deployed.
   A queue between two cards of the board shows too, even when both are outside systems: a CRM's event read by a handler Lambda.
 - **Outside systems** (for example a payment provider) are dashed cards: things the apps call, or that call them, and that never run locally. Add one with **Add outside system…** under the Apps list; click it in the list to keep its card on the board even when none of its callers is there.
-- Each link to a queue or an outside system ends in an arrow at the card it goes to: an app's arrow into a queue publishes, a queue's arrow into an app is read, an arrow into an outside system is a call to it.
+- Every link with a direction leaves its sender as a small dot and lands in the receiver's ring, with a chevron pointing in: into a queue publishes, into an app from a queue reads, into another app or an outside system calls. Database and tunnel links go both ways: a dot at each end.
+- Pick a card, or Shift-click several, to trace them: their links stay lit and say what they do, everything else fades back. Point at a link and it says who does what.
 - What a board hides stays hidden with that board: a board for one flow can leave out the queues and outside cards of the others.
-- Every card, not only an app's, takes a note for the agent: on a queue, a database, a tunnel or an outside system it is kept with the board and goes to the agent with the run.
+- Every card, not only an app's, takes a note for the agent, kept with the board and handed to the agent with the run. On a queue, a database, a tunnel or an outside system, pick the card and choose **Add note** in its foot; a written note reads as text, and a click opens it to edit.
 
 ## Environment
 
@@ -119,7 +120,9 @@ The agent chip in the toolbar says where the agent is:
 - **Agent working, N min:** it took a request and has not finished it.
 - **Agent needs you:** it asked something; the question is in the inbox.
 - **Agent quiet, N min:** it has been working for over ten minutes without a word.
-- **No agent listening, N waiting:** requests wait until one connects; the plug beside it says how.
+- **No agent listening, N waiting:** requests wait until one connects.
+
+The chip opens the agent's messages; with no agent listening, or one gone quiet, they offer **Connect an agent** with the steps.
 
 **Stop** stops what Koppler started and undoes the run: changed settings, linked libraries, switched branches.
 **Stop apps, keep changes** stops the processes and leaves the changes in place.
@@ -127,11 +130,16 @@ The agent chip in the toolbar says where the agent is:
 
 ## Views and shortcuts
 
-**Edit** shows every field of a card; **Live** shows what runs, with short cards.
+**Discover** shows how the stack fits together around the board: its apps, and every app, queue, database and outside system one step from them, read from the stack.
+Nothing on it runs or changes the board.
+A card's **+N** brings in the links it leaves out; a dashed link was found in the code and is not in the stack yet, and **Confirm** in the panel keeps it there.
+Pick several cards (Shift-click) and **Plan a run with these** puts the cloned ones on the board; the rest stay deployed and are listed in **Left out**, with a clone command for each app.
+
+**Plan** shows every field of a card; **Live** shows what runs, with short cards.
 
 <img alt="The Live view: short cards with their state, every app running" src="images/live.png">
 
-Zoomed out below 60%, cards are short in Edit too: pick one and its fields open in a panel on the right of the board, where they change the card as they would on it. The × or a click on the empty board closes it.
+Zoomed out below 60%, cards are short in Plan too: pick one and its fields open in a panel on the right of the board, where they change the card as they would on it. The × or a click on the empty board closes it.
 
 <img alt="Zoomed out: short cards, and the picked Orders API's branch, who starts it and its cables in the panel on the right" src="images/zoomed-out.png">
 
@@ -139,7 +147,7 @@ Zoomed out below 60%, cards are short in Edit too: pick one and its fields open 
 
 | Key                                        | What it does                                                                                                     |
 | ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------- |
-| `E` / `L`                                  | Edit view, Live view                                                                                             |
+| `D` / `E` / `L`                            | Discover, Plan, Live                                                                                             |
 | `P`, then `Esc`                            | Present, and back                                                                                                |
 | `F`                                        | Fit the board in the window                                                                                      |
 | `V` / `H`, or hold `Space`                 | Select by dragging, or move around: while moving around, a click or drag never picks, lets go of or moves a card |
@@ -149,7 +157,17 @@ Zoomed out below 60%, cards are short in Edit too: pick one and its fields open 
 | `Ctrl+Enter` (`Cmd` on a Mac)              | Run                                                                                                              |
 | `?`                                        | All shortcuts                                                                                                    |
 
+## The top bar
+
+It keeps its words at 1280 pixels and wider.
+As the window narrows it gives them up one step at a time: Settings drops its word, then the wordmark, then the two chips join into one, then Activity drops its word, then the stack's name is cut short.
+Run, Stop, the view switch and the environment keep their words at every width.
+The mark opens the shortcuts and legend, as `?` does.
+Discover runs nothing, so its bar has no status, Activity, Stop or Run, and it shows the board's name, since Discover has no side pane.
+
 ## Side panels
+
+**Activity** in the top bar holds Logs, History and Traces; **Settings** holds Stack settings, Credentials and Appearance.
 
 - **Credentials:** the secrets the apps on the board need for this environment. Set, test or remove a value; a value is never shown.
 - **Flow check:** tests every connection of the running board; with the agent add-on, it can hand failures to the agent to explain.

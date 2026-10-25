@@ -133,12 +133,17 @@ Koppler reads it through the user's `gh` login and keeps a copy in `~/.config/ko
 | `ruby` | `Gemfile` | Rails: `bin/rails server` | 3000 |
 | `php` | `artisan`, `composer.json` | Laravel: `php artisan serve` | 8000 |
 | `compose` | a Compose file, when nothing above matches | `docker compose up`, and `docker compose down` on stop | the first published port |
-| `lambda` | chosen by hand: a queue-triggered AWS Lambda | `lambda-local.mjs`: an AWS emulator in Docker (Floci) with the queue, the function and its secret; needs Docker and the AWS CLI | from `url` (the next port up is the emulator's) |
+| `lambda` | chosen by hand: a queue-triggered AWS Lambda | `lambda-local.mjs`: the function in the AWS emulator in Docker (Floci) that holds the board's local queues, with its settings and secrets; needs Docker and the AWS CLI | from `url`, where it answers its health check (and its routes, with no local queue) |
 | `sam` | `template.yaml` with `AWS::Serverless` and no `dev` / `start` script | `sam-local.mjs`: `sam build`, then `sam local start-api` for the API-triggered functions, any runtime; deploy parameters from `samconfig.toml` for the env (or `sam.envs.<env>`), the template's declared settings from stored secrets and cable addresses (`localhost` becomes `host.docker.internal`); functions with other triggers are listed, not run. Built under `~/.local/state/koppler/sam`, never in the repo. Needs Docker and the SAM CLI | from `url`, default 3000 |
 | `other` | chosen by hand | the app's `start` | from `url` |
 
 A `lambda` app says how to build and trigger it: `"lambda": { "project", "handler", "runtime", "timeout", "routes": ["retry_request"], "secret": { "id": "<the Secrets Manager name the function asks for>", "from": "<the stored secret holding its JSON>" } }`.
 Callers post to `url` plus a route, as they post to API Gateway when deployed.
+A Lambda that `reads` an SQS queue switched to local on the board is triggered by that queue, as its event source mapping is deployed; with none, a POST on one of its `routes` becomes a message on a queue of its own.
+It gets the settings it reads, named in `"env": ["MESSAGES_API_BASE_URL", "MESSAGES_API_KEY"]`, from what Koppler sets: a cable to a local app (with `localhost` made reachable from Docker) or a stored secret; fixed ones go in `"environment": { "PUSH_NOTIFICATION_BATCH_SIZE": "400" }`.
+A Parameter Store value it reads goes in `"parameters": [{ "name": "/Api/Firebase/Credentials", "from": "<the stored secret holding it>" }]`.
+A Lambda that lives in another app's repo has that app's `slug`, and `project` names its folder.
+
 A callee whose address lives inside that secret is a call with `how: secret` and `key`, the secret's key that holds the address: `koppler stack set apps.<lambda>.consumes.<callee> '{"how":"secret","key":"WalletApiUrl"}'`. A cable to the local callee then sets that key over the secret when the Lambda starts; Stop takes it back.
 
 When a recipe cannot tell how the app starts (several Go commands, a Python repo with no known framework, plain Maven), `koppler run` says so and asks for `start`.

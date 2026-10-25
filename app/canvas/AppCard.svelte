@@ -247,23 +247,30 @@
       <Icon of={GripVertical} size={14} />
     </span>
     {#if up !== null || now}
-      <span
-        class="live"
-        data-on={up}
-        data-state={now?.state}
-        role="img"
-        aria-label={now ? STATE_NAMES[now.state] : up ? 'Running' : 'Not answering'}
-        title={stateSaid || live.about(id)}
-      ></span>
+      <span class="lit"
+        ><span
+          class="live"
+          data-on={up}
+          data-state={now?.state}
+          role="img"
+          aria-label={now ? STATE_NAMES[now.state] : up ? 'Running' : 'Not answering'}
+          title={stateSaid || live.about(id)}
+        ></span></span
+      >
     {/if}
-    <span class="name" title={data.name}>{data.name}</span>
-    {#if data.watch && data.run === 'cli'}<span
-        class="watch"
-        role="img"
-        aria-label="Auto-restart"
-        title="Restarts when its files change"><Icon of={RefreshCw} size={12} /></span
-      >{/if}
-    <span class="kind">{data.kindLabel}</span>
+    <!-- The name gets the whole row, two lines at most; its kind sits under it. -->
+    <span class="title">
+      <span class="name" title={data.name}>{data.name}</span>
+      <span class="tags">
+        <span class="kind">{data.kindLabel}</span>
+        {#if data.watch && data.run === 'cli'}<span
+            class="watch"
+            role="img"
+            aria-label="Auto-restart"
+            title="Restarts when its files change"><Icon of={RefreshCw} size={12} /></span
+          >{/if}
+      </span>
+    </span>
   </header>
   {#if brief}
     <p class="glance">
@@ -394,10 +401,10 @@
   }
   header {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     gap: 8px;
     min-height: 40px;
-    padding: 8px 12px;
+    padding: 10px 12px;
     border-bottom: 1px solid var(--line);
     cursor: grab;
   }
@@ -406,12 +413,11 @@
   }
   .grip {
     display: grid;
-    margin: 0 -4px 0 -6px;
+    margin: 2px -4px 0 -6px;
     color: var(--line-strong);
   }
   .kind {
     flex: none;
-    margin-left: 10px;
     padding: 2px 5px;
     border: 1px solid var(--line-strong);
     color: var(--ink-muted);
@@ -420,22 +426,44 @@
     text-transform: uppercase;
     white-space: nowrap;
   }
-  .name {
+  /* The light lines up with the name's first line. */
+  .lit {
+    display: flex;
+    padding-top: 6px;
+  }
+  .title {
+    display: flex;
     flex: 1;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
     min-width: 0;
+  }
+  .tags {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  /* Two lines, then an ellipsis; a name with no spaces breaks anywhere. Its title holds it whole. */
+  .name {
+    display: -webkit-box;
+    max-width: 100%;
+    overflow: hidden;
     font-weight: 600;
     font-size: 15px;
-    line-height: 1.2;
-    text-wrap: balance;
-    overflow-wrap: break-word;
-  }
-  /* A word is never broken: what follows the name goes to the next line instead. */
-  .short header {
-    flex-wrap: wrap;
+    line-height: 19px;
+    overflow-wrap: anywhere;
+    text-wrap: pretty;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
   }
   .short .name {
-    min-width: min-content;
     font-size: 22px;
+    line-height: 26px;
+  }
+  .short .lit {
+    padding-top: 9px;
   }
   /* Its tools: words printed on one strip above it. */
   .tools {

@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 // Databases on the board: a card for each, hung from its tunnel, switched between the deployed one and the user's own.
 import type { Locator, Page } from '@playwright/test';
-import { at, card, expect, saved, sent, STACK, test } from './canvas.ts';
+import { at, card, expect, saved, sent, STACK, test, fromMenu } from './canvas.ts';
 
 const database = (page: Page, name: string) => page.locator('.svelte-flow__node-database').filter({ hasText: name });
 const tunnel = (page: Page) => page.locator('.svelte-flow__node-tunnel');
@@ -175,7 +175,7 @@ test.describe('on PROD', () => {
 });
 
 test('the cards read on a light scheme', async ({ page }) => {
-  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await fromMenu(page, 'Settings', 'Appearance');
   await page.getByRole('radio', { name: /^Paper/ }).click();
   await page.keyboard.press('Escape');
   await expect(database(page, 'Orders')).toBeVisible();
@@ -192,7 +192,7 @@ const goLocal = async (page: Page, name: string, port: string) => {
 };
 
 test("each database's line leaves the tunnel card from its own row", async ({ page }) => {
-  const plugs = page.locator('.links .flow.db.row .plug');
+  const plugs = page.locator('.links .flow.db.row circle.dot:first-of-type');
   await expect(plugs).toHaveCount(2);
   const rows = tunnel(page).getByRole('listitem');
   for (const [at, row] of [0, 1].entries()) {
@@ -223,7 +223,7 @@ test('a right click on a line to the tunnel hides the tunnel for that app, and o
   await menu.getByRole('menuitem').click();
   await expect(menu).toBeHidden();
   await expect(page.locator('.links .flow.db .via')).toHaveCount(1);
-  await rightClick(page, page.locator('.links .flow.db path.hit'));
+  await rightClick(page, page.locator('.links .flow.db path.hit[data-tunnel]'));
   await expect(menu.getByRole('menuitem')).toHaveText(/Show tunnel for/);
   await page.screenshot({ path: 'test-results/databases-menu.png' });
   await page.keyboard.press('Escape');

@@ -1,6 +1,6 @@
 // The new canvas's Credentials: what the apps on the board need stored, set and tested without ever being shown.
 // The server's side is stood in for here: no real store is touched.
-import { at, expect, test } from './canvas.ts';
+import { at, expect, test, fromMenu } from './canvas.ts';
 
 test.use({
   board: { env: 'qa', mode: 'auto', nodes: { web: at(0, 0), orders: at(420, 0) }, edges: [] },
@@ -36,9 +36,10 @@ test('a missing credential is set, tested and removed, and its value never reach
       await route.fulfill({ json: answer });
     });
 
-  const open = page.getByRole('button', { name: 'Credentials' });
-  await expect(open).toHaveAttribute('title', '1 credential is missing for the apps on the board (QA)');
-  await open.click();
+  // Missing ones show on the menu that holds Credentials.
+  const settings = page.locator('header').getByRole('button', { name: 'Settings', exact: true });
+  await expect(settings).toHaveAttribute('title', '1 credential is missing for the apps on the board (QA)');
+  await fromMenu(page, 'Settings', 'Credentials');
   const panel = page.getByRole('dialog', { name: 'Credentials' });
   await expect(panel.getByRole('heading')).toHaveText('Orders API on QA');
   await expect(panel.locator('.state')).toHaveText(['Missing', 'Stored']);

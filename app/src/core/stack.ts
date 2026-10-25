@@ -343,6 +343,15 @@ const App = z.looseObject(
         project: z.string().optional().describe('The folder to build, when not the repo itself'),
         timeout: z.number().positive().optional().describe('Seconds a call may take'),
         routes: z.array(z.string()).optional().describe('The paths it answers on'),
+        env: z
+          .array(z.string())
+          .optional()
+          .describe('The settings it reads, given what Koppler sets for them: a cable, a stored secret'),
+        environment: z.record(z.string(), z.string()).optional().describe('Settings it always gets, by name'),
+        parameters: z
+          .array(z.looseObject({ name: z.string(), from: z.string() }))
+          .optional()
+          .describe('Parameter Store values it reads: the name, and the stored value that holds it'),
         secret: z
           .looseObject({ id: z.string().optional(), from: z.string().optional() })
           .optional()

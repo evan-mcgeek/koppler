@@ -72,6 +72,7 @@ type Stack = {
   apps: Record<string, Record<string, unknown>>;
   queues?: Record<string, Record<string, unknown>>;
   databases?: Record<string, Record<string, unknown>>;
+  found?: Record<string, Record<string, string>>;
   presets?: unknown[];
 };
 type Canvas = { url: string; dir: string; temp: string };
@@ -208,6 +209,11 @@ export const sent = (temp: string) => {
   return lines.map(line => JSON.parse(line) as { tag: string; text: string; data: Record<string, unknown> });
 };
 export { expect };
+/** Picks an item from one of the top bar's menus: Activity or Settings. */
+export const fromMenu = async (page: Page, menu: string, item: string | RegExp) => {
+  await page.locator('header').getByRole('button', { name: menu, exact: true }).click();
+  await page.getByRole('menu', { name: menu }).getByRole('menuitem', { name: item }).click();
+};
 /** A card's action bar, shown while the card is pointed at. */
 export const actions = async (page: Page, id: string) => {
   await page.locator(`.svelte-flow__node[data-id="${id}"] header`).hover();
