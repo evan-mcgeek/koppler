@@ -36,12 +36,31 @@ export const EMULATOR = [
   `${RM}; trap '${RM}; exit 0' TERM INT HUP; docker run --rm --name koppler-queues -p 127.0.0.1:${String(PORT)}:4566 -v /var/run/docker.sock:/var/run/docker.sock -e FLOCI_DEFAULT_REGION=${REGION} -e FLOCI_SERVICES_LAMBDA_CONTAINER_NAME_PREFIX=${FUNCTIONS} ${EMULATOR_IMAGE} & wait`,
 ];
 export const KAFKA_PORT = 9092;
-export const KAFKA = `localhost:${String(KAFKA_PORT)}`;
+// IPv4, as published: `localhost` is IPv6 first on a Mac, where nothing listens, and a client follows the broker's
+// advertised address after it first connects.
+export const KAFKA = `127.0.0.1:${String(KAFKA_PORT)}`;
 const RM_KAFKA = 'docker rm -f koppler-kafka >/dev/null 2>&1';
+// Given any setting, the image drops all its defaults: the whole single-node setup is given.
+const BROKER_SETTINGS = {
+  KAFKA_NODE_ID: '1',
+  KAFKA_PROCESS_ROLES: 'broker,controller',
+  KAFKA_LISTENERS: 'PLAINTEXT://:9092,CONTROLLER://:9093',
+  KAFKA_ADVERTISED_LISTENERS: `PLAINTEXT://${KAFKA}`,
+  KAFKA_CONTROLLER_LISTENER_NAMES: 'CONTROLLER',
+  KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: 'CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT',
+  KAFKA_CONTROLLER_QUORUM_VOTERS: '1@localhost:9093',
+  KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: '1',
+  KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: '1',
+  KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: '1',
+  KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: '0',
+};
+const settings = Object.entries(BROKER_SETTINGS)
+  .map(([key, value]) => `-e ${key}=${value}`)
+  .join(' ');
 export const BROKER = [
   'sh',
   '-c',
-  `${RM_KAFKA}; trap '${RM_KAFKA}; exit 0' TERM INT HUP; docker run --rm --name koppler-kafka -p 127.0.0.1:${String(KAFKA_PORT)}:9092 apache/kafka:latest & wait`,
+  `${RM_KAFKA}; trap '${RM_KAFKA}; exit 0' TERM INT HUP; docker run --rm --name koppler-kafka -p 127.0.0.1:${String(KAFKA_PORT)}:9092 ${settings} apache/kafka:latest & wait`,
 ];
 
 /** The local queues a Lambda reads, by URL, comma between them: the queues it is triggered by. */
@@ -128,7 +147,7 @@ export function queueEnv(
 
 /** Creates the topic on the local broker; returns its name. */
 export function createTopic(name: string): string {
-  const create = ['--bootstrap-server', 'localhost:9092', '--create', '--if-not-exists', '--topic', name];
+  const create = ['--bootstrap-server', KAFKA, '--create', '--if-not-exists', '--topic', name];
   execFileSync('docker', ['exec', 'koppler-kafka', '/opt/kafka/bin/kafka-topics.sh', ...create], {
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'pipe'],
