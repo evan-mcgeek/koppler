@@ -712,7 +712,7 @@ const COMMANDS: Command[] = [
   {
     name: 'board',
     who: 'agent',
-    args: 'new|edit "<name>" [--add <app,...>] [--remove <app,...>] [--cable <caller>:<callee>]... [--uncable <caller>:<callee>]... [--branch <app>=<branch>]... [--note <app>="<note>"]... [--arrange] [--propose]',
+    args: 'new|edit "<name>" [--add <app,...>] [--remove <app,...>] [--cable <caller>:<callee>]... [--uncable <caller>:<callee>]... [--branch <app>=<branch>]... [--note <app>="<note>"]... [--arrange] [--propose] [--request "<words>"] [--phase "<name>"] [--step|--propose-step <from>:<to>[="<note>"]]... [--unstep <from>:<to>]...',
     forms: [
       [
         'new "<name>" [--add <app,...>] [--cable <caller>:<callee>]...',
@@ -725,6 +725,14 @@ const COMMANDS: Command[] = [
       ['edit "<name>" [--cable <caller>:<callee>]... [--uncable <caller>:<callee>]...', 'add or take off cables'],
       ['edit "<name>" [--branch <app>=<branch>]... [--note <app>="<note>"]...', "set an app's branch or note"],
       ['new|edit "<name>" ... --arrange', 'lay the board out afresh, as Arrange on the canvas does'],
+      [
+        'new|edit "<name>" [--request "<words>"] [--phase "<name>"] [--step <from>:<to>[="<note>"]]...',
+        "make it a feature board: the request it came from, and the stack's links it uses as numbered steps, each in the phase named before it",
+      ],
+      [
+        'edit "<name>" [--propose-step <from>:<to>[="<why>"]]... [--unstep <from>:<to>]...',
+        'propose a step, dashed on the map until the user accepts it there, or take one off; a card is an app, queue:<id> or database:<id>',
+      ],
       [
         'new|edit "<name>" ... --propose',
         'ask the user first, in the canvas inbox; nothing changes until they say yes',

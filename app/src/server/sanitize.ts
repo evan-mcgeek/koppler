@@ -4,6 +4,7 @@ import { isVersion } from '../core/migrations/run.ts';
 import fs from 'node:fs';
 import path from 'node:path';
 import { githubFile, readFile } from '../github.ts';
+import { featureOf, type Feature } from '../core/feature.ts';
 import { APP_ID, RUN_ID } from '../ids.ts';
 
 type Loose = Record<string, unknown>;
@@ -39,6 +40,7 @@ export interface Preset {
   hiddenOutside?: string[];
   cardNotes?: Record<string, string>;
   discover?: { open: string[]; at: Record<string, Point> };
+  feature?: Feature;
 }
 /** A prompt from the page, on its way to Koppler or the agent. */
 export interface Prompt {
@@ -156,6 +158,7 @@ export function sanitizePresets(list: unknown): Preset[] {
       const { version, source } = preset;
       const layout = boardLayout(preset['layout']);
       const discover = discoverOf(preset['discover']);
+      const feature = featureOf(preset['feature']);
       const nodes = Object.entries(preset['nodes'] as Loose).filter(([key]) => isId(key));
       return {
         name: text(preset['name'], 80),
@@ -185,6 +188,7 @@ export function sanitizePresets(list: unknown): Preset[] {
         ...(ids(preset['hiddenOutside']).length && { hiddenOutside: ids(preset['hiddenOutside']) }),
         ...(Object.keys(cardNotes(preset['cardNotes'])).length && { cardNotes: cardNotes(preset['cardNotes']) }),
         ...(discover && { discover }),
+        ...(feature && { feature }),
       };
     });
 }
@@ -305,6 +309,7 @@ export function sanitizeLayout(input: unknown): Loose | null {
   const hiddenOutside = chosen(input['hiddenOutside'], true);
   const notes = cardNotes(input['cardNotes']);
   const discover = discoverOf(input['discover']);
+  const feature = featureOf(input['feature']);
   const hiddenLogs = chosen(input['hiddenLogs'], true);
   const logAliases = Object.fromEntries(
     Object.entries(isMap(input['logAliases']) ? input['logAliases'] : {})
@@ -337,11 +342,13 @@ export function sanitizeLayout(input: unknown): Loose | null {
     ...(Object.keys(hiddenOutside).length && { hiddenOutside }),
     ...(Object.keys(notes).length && { cardNotes: notes }),
     ...(discover && { discover }),
+    ...(feature && { feature }),
     ...(Object.keys(hiddenLogs).length && { hiddenLogs }),
     ...(Object.keys(logAliases).length && { logAliases }),
     ...(ids(input['outside']).length && { outside: ids(input['outside']) }),
     ...(TIDY.includes(tidy as string) && { tidy }),
     ...(input['scratch'] === true && { scratch: true }),
+    ...(input['discovering'] === true && { discovering: true }),
     ...(presets.length && { presets }),
     ...(trash.length && { trash }),
     ...(recent.length && { recent }),
@@ -354,7 +361,14 @@ export function sanitizeLayout(input: unknown): Loose | null {
   };
 }
 
-const PROMPT_TAGS = new Set(['koppler', 'koppler-stop', 'koppler-reply', 'koppler-fix', 'koppler-facts']);
+const PROMPT_TAGS = new Set([
+  'koppler',
+  'koppler-stop',
+  'koppler-reply',
+  'koppler-fix',
+  'koppler-facts',
+  'koppler-feature',
+]);
 /** A prompt from the standalone page: only the canvas's own kinds, with a bounded text and data object. */
 export function sanitizePrompt(input: unknown): Prompt | null {
   const { tag, text: said, data } = fieldsOf(input);

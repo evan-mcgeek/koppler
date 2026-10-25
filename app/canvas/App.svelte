@@ -39,6 +39,7 @@
   import { stacks } from './stacks.svelte.ts';
   import Setup from './Setup.svelte';
   import Side from './Side.svelte';
+  import { discovered } from './discover.svelte.ts';
   import StackPicker from './StackPicker.svelte';
   import Toast from './Toast.svelte';
   import { board } from './board.svelte.ts';
@@ -177,7 +178,8 @@
     untrack(() => {
       for (const one of edits.filter(one => !made[one.id])) {
         made[one.id] = true;
-        const name = board.nameOf;
+        // A queue or database a feature step names is said by its name too.
+        const name = (id: string) => (id.includes(':') ? discovered.data(id, false, 0).name : board.nameOf(id));
         if (one.preset) {
           const out = board.importBoards(
             one.preset,

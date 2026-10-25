@@ -513,6 +513,22 @@ class Runs {
     );
   }
 
+  /** Hands a feature's request to the agent, which proposes its steps on the board for the user to accept. */
+  askFeature(name: string, request: string): Promise<boolean> {
+    const text = [
+      'Propose the steps of this feature board from its request, using the koppler-run skill.',
+      `BOARD ${name}`,
+      `REQUEST ${request}`,
+      `Find which apps, queues and databases it goes through, in order and in phases, from the stack and its repos. Propose each with koppler board edit "${name}" --phase "<phase>" --propose-step <from>:<to>="<why>"; the user accepts each on the board. Never change the stack yourself.`,
+    ].join('\n');
+    const waiting = (live.status?.agent?.state ?? 'none') === 'none';
+    return this.deliver(
+      text,
+      { tag: 'koppler-feature', data: { board: name, request } },
+      waiting ? 'Saved. The agent gets it when one connects.' : 'Sent to the agent',
+    );
+  }
+
   /** Asks the agent to fill in an app's settings from its repo: it proposes, waits for a yes, and leaves locked ones alone. */
   askFill(id: string, empty: string[], locked: string[]): Promise<boolean> {
     const text = [
