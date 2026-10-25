@@ -51,6 +51,12 @@ test('apps Koppler starts get the SDK endpoint and their queue settings; a Lambd
   expect(env.left[0]).toMatch(/^Fn: point it at the local Thumbnails queue/);
 });
 
+test('the broker is reached and advertised on IPv4, where it is published, never as localhost', () => {
+  expect(KAFKA).toBe('127.0.0.1:9092');
+  expect(BROKER.at(-1)).toContain('-p 127.0.0.1:9092:9092');
+  expect(BROKER.at(-1)).toContain('-e KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://127.0.0.1:9092');
+});
+
 test('Stop removes the very containers the emulator and the broker start', () => {
   expect(EMULATOR.at(-1)).toContain(`--name ${STOP_EMULATOR.at(-1) ?? ''} `);
   expect(BROKER.at(-1)).toContain(`--name ${STOP_BROKER.at(-1) ?? ''} `);
