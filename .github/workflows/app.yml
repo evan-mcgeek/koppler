@@ -89,6 +89,11 @@ jobs:
   canvas:
     name: Canvas in a browser (${{ matrix.shard }}/3)
     runs-on: ubuntu-latest
+    # The browser and the system packages it needs come in the image: installing them took from 16 s to over 5 min.
+    # Its version is @playwright/test's in package-lock.json; change both together.
+    container:
+      image: mcr.microsoft.com/playwright:v1.64.0-noble
+      options: --user 1001
     strategy:
       fail-fast: false
       matrix:
@@ -102,7 +107,6 @@ jobs:
           cache-dependency-path: app/package-lock.json
       - run: npm ci
       - run: npm run build
-      - run: npx playwright install --with-deps chromium
       - name: Canvas in a browser
         run: npx playwright test --shard=${{ matrix.shard }}/3
       - uses: actions/upload-artifact@v4
