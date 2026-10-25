@@ -102,7 +102,14 @@ jobs:
           cache-dependency-path: app/package-lock.json
       - run: npm ci
       - run: npm run build
-      - run: npx playwright install --with-deps chromium
+      # The runner image has Chrome and the system packages it needs, so only the browser is fetched, and kept between
+      # runs: installing the packages too took from 16 s to over 5 min. The Playwright image would bring both, but not
+      # lsof, which tells Koppler an app answers on its port.
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('app/package-lock.json') }}
+      - run: npx playwright install chromium
       - name: Canvas in a browser
         run: npx playwright test --shard=${{ matrix.shard }}/3
       - uses: actions/upload-artifact@v4
