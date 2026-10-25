@@ -10,6 +10,8 @@ import type { Stack } from '../core/stack.ts';
 
 export const PORT = 4566;
 export const ENDPOINT = `http://127.0.0.1:${String(PORT)}`;
+// Where the local queues are made, and what every app on one signs for.
+export const REGION = 'eu-west-1';
 // Stopping the Docker client does not stop its container: it is removed on stop, and a leftover one before starting.
 const RM = 'docker rm -f koppler-queues >/dev/null 2>&1';
 // Run by Stop as well: the shell's own cleanup never happens when it has to be killed.
@@ -21,12 +23,31 @@ export const EMULATOR = [
   `${RM}; trap '${RM}; exit 0' TERM INT HUP; docker run --rm --name koppler-queues -p 127.0.0.1:${String(PORT)}:4566 floci/floci:latest & wait`,
 ];
 export const KAFKA_PORT = 9092;
-export const KAFKA = `localhost:${String(KAFKA_PORT)}`;
+// IPv4, as published: `localhost` is IPv6 first on a Mac, where nothing listens, and a client follows the broker's
+// advertised address after it first connects.
+export const KAFKA = `127.0.0.1:${String(KAFKA_PORT)}`;
 const RM_KAFKA = 'docker rm -f koppler-kafka >/dev/null 2>&1';
+// Given any setting, the image drops all its defaults: the whole single-node setup is given.
+const BROKER_SETTINGS = {
+  KAFKA_NODE_ID: '1',
+  KAFKA_PROCESS_ROLES: 'broker,controller',
+  KAFKA_LISTENERS: 'PLAINTEXT://:9092,CONTROLLER://:9093',
+  KAFKA_ADVERTISED_LISTENERS: `PLAINTEXT://${KAFKA}`,
+  KAFKA_CONTROLLER_LISTENER_NAMES: 'CONTROLLER',
+  KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: 'CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT',
+  KAFKA_CONTROLLER_QUORUM_VOTERS: '1@localhost:9093',
+  KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: '1',
+  KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: '1',
+  KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: '1',
+  KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: '0',
+};
+const settings = Object.entries(BROKER_SETTINGS)
+  .map(([key, value]) => `-e ${key}=${value}`)
+  .join(' ');
 export const BROKER = [
   'sh',
   '-c',
-  `${RM_KAFKA}; trap '${RM_KAFKA}; exit 0' TERM INT HUP; docker run --rm --name koppler-kafka -p 127.0.0.1:${String(KAFKA_PORT)}:9092 apache/kafka:latest & wait`,
+  `${RM_KAFKA}; trap '${RM_KAFKA}; exit 0' TERM INT HUP; docker run --rm --name koppler-kafka -p 127.0.0.1:${String(KAFKA_PORT)}:9092 ${settings} apache/kafka:latest & wait`,
 ];
 
 /** A queue of the board that runs locally, and the apps on it with the settings that name it. */
@@ -93,6 +114,9 @@ export function queueEnv(
       Object.assign(
         (set[id] ??= {}),
         kafka ? {} : { AWS_ENDPOINT_URL_SQS: ENDPOINT },
+        // At an endpoint of its own, the AWS SDK for .NET signs for us-east-1 whatever its region; the emulator
+        // keeps queues by the region a request is signed for.
+        !kafka && app.kind === 'dotnet' ? { AWS__AuthenticationRegion: REGION } : {},
         Object.fromEntries(env.map(name => [name, kafka ? KAFKA : url])),
       );
     }
@@ -101,7 +125,7 @@ export function queueEnv(
 
 /** Creates the topic on the local broker; returns its name. */
 export function createTopic(name: string): string {
-  const create = ['--bootstrap-server', 'localhost:9092', '--create', '--if-not-exists', '--topic', name];
+  const create = ['--bootstrap-server', KAFKA, '--create', '--if-not-exists', '--topic', name];
   execFileSync('docker', ['exec', 'koppler-kafka', '/opt/kafka/bin/kafka-topics.sh', ...create], {
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'pipe'],
@@ -113,7 +137,7 @@ export function createTopic(name: string): string {
 export function createQueue(name: string): string {
   const attrs = name.endsWith('.fifo') ? ['--attributes', 'FifoQueue=true,ContentBasedDeduplication=true'] : [];
   const create = ['sqs', 'create-queue', '--queue-name', name, ...attrs, '--query', 'QueueUrl'];
-  return execFileSync('aws', ['--endpoint-url', ENDPOINT, '--region', 'eu-west-1', '--output', 'text', ...create], {
+  return execFileSync('aws', ['--endpoint-url', ENDPOINT, '--region', REGION, '--output', 'text', ...create], {
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'pipe'],
     // The emulator takes any key; the user's own profile and session must not reach it.
