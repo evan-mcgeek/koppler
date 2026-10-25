@@ -1,6 +1,6 @@
 // The new canvas's frame and messages: refused cables, the protected environment, the empty board, the sheets.
 import type { Page } from '@playwright/test';
-import { at, card, expect, STACK, test } from './canvas.ts';
+import { at, card, expect, STACK, test, fromMenu } from './canvas.ts';
 
 const cable = (page: Page, id: string) => page.locator(`.svelte-flow__edge[data-id="${id}"]`);
 const middle = async (page: Page, id: string) => {
@@ -85,7 +85,9 @@ test('a protected environment marks the frame, and an emptied board says how to 
   await expect(page.getByText('Click the apps you want to run together.')).toBeVisible();
 });
 
-test('the shortcuts sheet opens with ?, and the appearance is picked in Settings and kept', async ({ page }) => {
+test('the shortcuts sheet opens with ? and from the mark, and the appearance is picked in Settings and kept', async ({
+  page,
+}) => {
   const sheet = page.locator('#help');
   await expect(sheet).toBeHidden();
   await page.keyboard.press('?');
@@ -93,11 +95,11 @@ test('the shortcuts sheet opens with ?, and the appearance is picked in Settings
   await expect(sheet).toContainText('Fit the whole board in view');
   await page.keyboard.press('Escape');
   await expect(sheet).toBeHidden();
-  await page.getByRole('button', { name: 'Shortcuts and legend' }).click();
+  await page.getByRole('button', { name: 'Help: shortcuts and legend' }).click();
   await expect(sheet).toBeVisible();
   await page.keyboard.press('Escape');
 
-  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await fromMenu(page, 'Settings', 'Appearance');
   await page.getByRole('radio', { name: /^Scope/ }).click();
   await expect(page.locator('html')).toHaveAttribute('data-scheme', 'scope');
   // A local colour picked by hand stays over the scheme; a scheme picked again drops it.
@@ -108,7 +110,7 @@ test('the shortcuts sheet opens with ?, and the appearance is picked in Settings
   await page.reload();
   await expect(page.locator('html')).toHaveAttribute('data-scheme', 'scope');
   expect(await local()).toBe('#ffd43b');
-  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await fromMenu(page, 'Settings', 'Appearance');
   await expect(page.getByRole('radio', { name: /^Scope/ })).toBeChecked();
   await expect(page.getByRole('radio', { name: 'Local #ffd43b' })).toBeChecked();
   await page.screenshot({ path: 'test-results/next-appearance.png' });
@@ -149,13 +151,30 @@ test('the keyboard: Space presses the focused button, and shortcuts stay off und
   await expect(live).toBeChecked();
 });
 
-test('a narrow window drops the words from the top bar, and a wide one brings them back', async ({ page }) => {
+test('the top bar keeps its words at 1280, gives them up one step at a time as it narrows, and takes them back', async ({
+  page,
+}) => {
   const bar = page.locator('header').first();
-  const logs = bar.getByRole('button', { name: 'Logs' });
+  const word = (menu: string) => bar.getByRole('button', { name: menu, exact: true }).locator('.words');
+  const fits = () => bar.evaluate(el => el.scrollWidth <= el.clientWidth + 1);
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await expect(word('Settings')).toBeVisible();
+  await expect(word('Activity')).toBeVisible();
+  expect(await fits()).toBe(true);
+  // Settings gives up its word first, Activity later; Run, Stop and the views keep theirs.
+  await page.setViewportSize({ width: 1140, height: 800 });
+  await expect(word('Settings')).toBeHidden();
+  await expect(word('Activity')).toBeVisible();
+  await page.setViewportSize({ width: 960, height: 800 });
+  await expect(word('Activity')).toBeHidden();
+  await expect(bar.getByRole('button', { name: 'Run', exact: true })).toHaveText('Run');
+  await expect(bar.getByRole('radio', { name: 'Discover' })).toBeVisible();
+  expect(await fits()).toBe(true);
   await expect(bar).not.toHaveClass(/compact/);
+  // Below the bar's narrowest it drops every word and takes a second row.
   await page.setViewportSize({ width: 760, height: 800 });
   await expect(bar).toHaveClass(/compact/);
   await page.setViewportSize({ width: 1600, height: 800 });
   await expect(bar).not.toHaveClass(/compact/);
-  await expect(logs).toBeVisible();
+  await expect(word('Settings')).toBeVisible();
 });

@@ -37,7 +37,7 @@ Pointing at a card shows its actions above it: run it alone, stop or restart it 
 
 ## Settings
 
-**Settings** in a card's tools, the gear on a queue or outside system, and the gear beside the stack's name open settings: every fact the stack holds about that thing, in tabs.
+**Settings** in a card's tools, the gear on a queue or outside system, and **Stack settings** in the top bar's Settings menu open settings: every fact the stack holds about that thing, in tabs.
 
 <img alt="An app's settings: its name, kind and slug, then tabs; Runs here shows its start command, local address, readiness check and more, each with a lock" src="images/settings.png" width="480">
 
@@ -53,7 +53,7 @@ The same fields can be read and changed with `koppler stack get`, `set` and `uns
 ## Appearance
 
 The canvas is dark, with square corners and hairlines, and colour only as a signal: one colour for what runs on your machine, one for what still calls the deployed environment, amber when something needs you, and red for PROD and failures.
-The gear at the bottom of the side pane opens **Appearance**: eight schemes, five dark (Mono, the default, then Patch bay, Signal, Scope and Sodium) and three light (Paper, Blueprint and Workshop), and the local and deployed colours picked by hand over the scheme.
+**Appearance**, in the top bar's Settings menu or behind the gear at the bottom of the side pane, has eight schemes, five dark (Mono, the default, then Patch bay, Signal, Scope and Sodium) and three light (Paper, Blueprint and Workshop), and the local and deployed colours picked by hand over the scheme.
 Warning and PROD colours are never among the picks, so a custom colour can never be mistaken for either.
 PROD stays red and striped in every scheme.
 Your choice is kept in this browser.
@@ -119,7 +119,9 @@ The agent chip in the toolbar says where the agent is:
 - **Agent working, N min:** it took a request and has not finished it.
 - **Agent needs you:** it asked something; the question is in the inbox.
 - **Agent quiet, N min:** it has been working for over ten minutes without a word.
-- **No agent listening, N waiting:** requests wait until one connects; the plug beside it says how.
+- **No agent listening, N waiting:** requests wait until one connects.
+
+The chip opens the agent's messages; with no agent listening, or one gone quiet, they offer **Connect an agent** with the steps.
 
 **Stop** stops what Koppler started and undoes the run: changed settings, linked libraries, switched branches.
 **Stop apps, keep changes** stops the processes and leaves the changes in place.
@@ -154,7 +156,17 @@ Zoomed out below 60%, cards are short in Plan too: pick one and its fields open 
 | `Ctrl+Enter` (`Cmd` on a Mac)              | Run                                                                                                              |
 | `?`                                        | All shortcuts                                                                                                    |
 
+## The top bar
+
+It keeps its words at 1280 pixels and wider.
+As the window narrows it gives them up one step at a time: Settings drops its word, then the wordmark, then the two chips join into one, then Activity drops its word, then the stack's name is cut short.
+Run, Stop, the view switch and the environment keep their words at every width.
+The mark opens the shortcuts and legend, as `?` does.
+Discover runs nothing, so its bar has no status, Activity, Stop or Run, and it shows the board's name, since Discover has no side pane.
+
 ## Side panels
+
+**Activity** in the top bar holds Logs, History and Traces; **Settings** holds Stack settings, Credentials and Appearance.
 
 - **Credentials:** the secrets the apps on the board need for this environment. Set, test or remove a value; a value is never shown.
 - **Flow check:** tests every connection of the running board; with the agent add-on, it can hand failures to the agent to explain.

@@ -1,7 +1,7 @@
 // A past run in History opens the app logs it kept, and is pinned so they stay.
 import fs from 'node:fs';
 import path from 'node:path';
-import { expect, test } from './canvas.ts';
+import { expect, test, fromMenu } from './canvas.ts';
 
 test("a run's kept logs open from History in a tab of their own, and the run can be pinned", async ({
   page,
@@ -29,7 +29,7 @@ test("a run's kept logs open from History in a tab of their own, and the run can
   await page.reload();
   await loaded;
   const list = page.getByRole('dialog', { name: 'History' });
-  await page.getByRole('button', { name: 'History' }).click();
+  await fromMenu(page, 'Activity', 'History');
   await expect(list).toBeVisible();
   await list.getByRole('button', { name: /QA, auto/ }).click();
   await list.getByRole('button', { name: 'Orders API', exact: true }).click();

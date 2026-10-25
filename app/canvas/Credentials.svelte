@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { credentials, opens } from './bar.svelte.ts';
   import Info from '@lucide/svelte/icons/info';
   import Icon from './Icon.svelte';
   import Lock from '@lucide/svelte/icons/lock';
@@ -27,7 +28,7 @@
   }
   const WORDS = { missing: 'Missing', stored: 'Stored', ok: 'Works', failed: 'Does not work' } as const;
   const id = $props.id();
-  let opener = $state<HTMLButtonElement>();
+  let opener = $state<HTMLElement>();
   let pop = $state<HTMLDivElement>();
   let open = $state(false);
   const rows = new SvelteMap<string, Row>();
@@ -47,6 +48,9 @@
   );
   const always = (one: Credential) => !one.when || /^always\b/i.test(one.when.trim());
   const missing = $derived(apps.flatMap(app => app.list.filter(one => !stored(app.id, one) && always(one))).length);
+  $effect(() => {
+    credentials.missing = missing;
+  });
   const standing = (app: string, one: Credential) => {
     const mine = row(app, one.name);
     return !stored(app, one) ? 'missing' : mine.tested ? (mine.ok ? 'ok' : 'failed') : 'stored';
@@ -57,6 +61,10 @@
       .split(/\s*(?:→|->|=>)\s*/)
       .map(step => step.trim())
       .filter(Boolean);
+  opens.credentials = from => {
+    opener = from;
+    pop?.showPopover();
+  };
   const place = () => {
     const at = opener?.getBoundingClientRect();
     if (!at || !pop) return;
@@ -96,21 +104,6 @@
   };
 </script>
 
-<button
-  bind:this={opener}
-  class="open"
-  class:missing={missing > 0}
-  type="button"
-  aria-label="Credentials"
-  aria-haspopup="dialog"
-  aria-expanded={open}
-  title={missing
-    ? `${String(missing)} ${missing === 1 ? 'credential is' : 'credentials are'} missing for the apps on the board (${env})`
-    : 'What the apps on the board need stored'}
-  popovertarget={id}
->
-  Credentials
-</button>
 <div
   bind:this={pop}
   {id}
@@ -235,34 +228,6 @@
 </div>
 
 <style>
-  .open {
-    position: relative;
-    display: grid;
-    place-items: center;
-    width: 32px;
-    height: 32px;
-    padding: 0;
-    border: 1px solid transparent;
-    border-radius: 8px;
-    background: none;
-    color: var(--muted);
-    cursor: pointer;
-  }
-  .open:hover,
-  .open[aria-expanded='true'] {
-    border-color: var(--line);
-    color: var(--ink);
-  }
-  .open.missing::after {
-    content: '';
-    position: absolute;
-    top: 5px;
-    right: 5px;
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-    background: var(--warn);
-  }
   .pop {
     position: fixed;
     inset: auto;

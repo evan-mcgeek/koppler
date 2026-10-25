@@ -1,5 +1,5 @@
 // Traces across local apps: started from the bar, then opened there, or for one app from its card.
-import { actions, at, card, expect, test } from './canvas.ts';
+import { actions, at, card, expect, test, fromMenu } from './canvas.ts';
 
 test.use({
   board: { env: 'qa', mode: 'auto', zoom: 1, pan: { x: 60, y: 60 }, nodes: { orders: at(0, 0) }, edges: [] },
@@ -17,13 +17,15 @@ test('the bar starts collecting traces; once they run, it and each running card 
     await route.fulfill({ json: { asked: true } });
   });
   await page.reload();
-  await page.getByRole('button', { name: 'Collect traces' }).click();
+  await fromMenu(page, 'Activity', 'Collect traces');
   expect(asked).toEqual([{ on: true }]);
   await expect(page.getByRole('status').filter({ hasText: 'Collecting traces.' })).toBeVisible();
   await expect((await actions(page, 'orders')).getByRole('link', { name: 'Traces of Orders API' })).toHaveCount(0);
 
   traces = { state: 'on', view: 'http://localhost:16686/search' };
-  await expect(page.getByRole('button', { name: 'Open traces' })).toBeVisible();
+  await page.locator('header').getByRole('button', { name: 'Activity', exact: true }).click();
+  await expect(page.getByRole('menuitem', { name: 'Open traces' })).toBeVisible();
+  await page.keyboard.press('Escape');
   await card(page, 'orders').hover();
   await expect((await actions(page, 'orders')).getByRole('link', { name: 'Traces of Orders API' })).toHaveAttribute(
     'href',

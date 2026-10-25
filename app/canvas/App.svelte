@@ -16,10 +16,15 @@
   import Inbox from './Inbox.svelte';
   import { inbox } from './inbox.svelte.ts';
   import History from './History.svelte';
-  import Traces from './Traces.svelte';
+  import { credentials, opens } from './bar.svelte.ts';
+  import HistoryIcon from '@lucide/svelte/icons/history';
+  import BarMenu from './BarMenu.svelte';
+  import BoardPicker from './BoardPicker.svelte';
+  import Settings from './Settings.svelte';
+  import { ALL, logs } from './logs.svelte.ts';
+  import { traces, tracesAbout, tracesLabel } from './traces.ts';
   import Logs from './Logs.svelte';
   import Mark from './Mark.svelte';
-  import LogsButton from './LogsButton.svelte';
   import Tip from './Tip.svelte';
   import Menu from './Menu.svelte';
   import Rail from './Rail.svelte';
@@ -248,12 +253,19 @@
       tight.removeEventListener('change', follow);
     };
   });
+  const runWaits = $derived(!!live.status?.runs?.some(run => run.state === 'waiting'));
   // A full top bar drops its words: nothing moves out of it.
   let bar: HTMLElement | undefined = $state();
+  const STEPS = ['l1', 'l2', 'l3', 'l4', 'l5', 'compact'];
   const fitBar = () => {
     if (!bar) return;
-    bar.classList.remove('compact');
-    bar.classList.toggle('compact', bar.scrollWidth > bar.clientWidth + 1);
+    const el = bar;
+    const full = () => el.scrollWidth > el.clientWidth + 1;
+    el.classList.remove(...STEPS);
+    for (const step of STEPS) {
+      if (!full()) break;
+      el.classList.add(step);
+    }
   };
   $effect(() => {
     if (!bar) return;
@@ -335,29 +347,33 @@
 />
 
 <header class:protected={board.protected} bind:this={bar} hidden={board.present}>
-  <button
-    class="side-toggle"
-    type="button"
-    aria-expanded={side}
-    aria-label={side ? 'Hide the side pane' : 'Show the side pane'}
-    title={side ? 'Hide the side pane' : 'Show the side pane'}
-    onclick={toggleSide}
-  >
-    <Icon of={PanelLeft} size={16} />
-  </button>
-  <span class="brand"><Mark size={22} /><span class="word">koppler</span></span>
-  {#if board.stack}
-    <span class="slash" aria-hidden="true">/</span>
-    <StackPicker />
+  {#if !board.discovering}
     <button
-      class="side-toggle gear"
+      class="side-toggle"
       type="button"
-      aria-label="Stack settings"
-      title="Stack settings: its environments, apps, queues, sign-ins and team boards"
-      onclick={() => void dialogs.settings?.open({ title: `${board.stack} settings`, path: '' })}
+      aria-expanded={side}
+      aria-label={side ? 'Hide the side pane' : 'Show the side pane'}
+      title={side ? 'Hide the side pane' : 'Show the side pane'}
+      onclick={toggleSide}
     >
-      <Cog size={16} /><span class="words">Settings</span>
+      <Icon of={PanelLeft} size={16} />
     </button>
+  {/if}
+  <button
+    class="brand"
+    type="button"
+    aria-label="Help: shortcuts and legend"
+    title="Shortcuts and legend (?)"
+    onclick={() => {
+      opens.help?.();
+    }}><Mark size={22} /><span class="word">koppler</span></button
+  >
+  {#if board.stack}
+    <span class="names"><StackPicker /></span>
+    {#if board.discovering}
+      <span class="slash" aria-hidden="true">/</span>
+      <span class="boards"><BoardPicker /></span>
+    {/if}
     <div
       class="seg views"
       role="radiogroup"
@@ -404,100 +420,160 @@
     </div>
   {/if}
   <span class="spacer"></span>
-  {#if board.stack}<Health /><Agent />{/if}
-  <span class="strip">
-    {#if board.stack}<LogsButton /><History /><Traces /><Credentials />{/if}
-    <Help />
-  </span>
   {#if board.stack}
-    <span class="split" inert={!!loading}>
-      <button
-        class="stop"
-        type="button"
-        aria-label="Stop"
-        disabled={!runs.started.length}
-        title={runs.started.length
-          ? 'Stop what the agent started and revert all temporary code changes'
-          : 'Nothing is running'}
-        onclick={() => {
-          runs.stop();
-        }}
-      >
-        <span class="stop-mark" aria-hidden="true"></span>
-        <span class="words">Stop</span>
-      </button>
-      <Menu
-        label="More ways to stop"
-        tone="stop"
+    {#if !board.discovering}
+      <span class="chips"><Health /><Agent /></span>
+      <BarMenu
+        label="Activity"
+        name="activity"
+        title={runWaits ? 'A run is waiting for the agent' : 'Logs, history and traces'}
         items={[
           {
-            label: 'Stop apps, keep changes',
-            about: runs.started.length
-              ? 'Stops every app, API and tunnel; branches and code changes stay until you revert'
-              : 'Nothing is running',
-            off: !runs.started.length,
+            label: 'Logs',
+            about: 'The log of every app on the board, in one stream',
             run: () => {
-              runs.stopApps();
+              logs.active = logs.active === ALL ? null : ALL;
             },
           },
           {
-            label: 'Revert temporary changes',
-            about: runs.left.length
-              ? 'Undoes what the last run left: branches back, temporary edits gone'
-              : 'Nothing to revert',
-            off: !runs.left.length,
-            run: () => {
-              runs.stop();
-            },
+            label: 'History',
+            about: 'Every run and Stop, and how it ended',
+            run: (from: HTMLElement) => opens.history?.(from),
           },
-          {
-            label: 'Shut down Koppler',
-            about: 'Stops the agent listener and this canvas server; apps and tunnels keep running',
-            danger: true,
-            run: () => {
-              runs.shutDown();
-            },
-          },
+          { label: tracesLabel(), about: tracesAbout(), run: () => void traces() },
         ]}
-      />
-    </span>
-    <span class="split" inert={!!loading}>
-      <button
-        class="run"
-        type="button"
-        disabled={!board.nodes.length}
-        title={board.nodes.length
-          ? 'Review what will run, then send it (Cmd or Ctrl + Enter)'
-          : 'Add an app to the board first'}
-        onclick={() => {
-          runs.start();
-        }}><span class="play" aria-hidden="true"></span>Run</button
       >
-      {#if board.nodes.length}
+        <span class="glyph" class:mark={runWaits}><Icon of={HistoryIcon} size={15} /></span><span class="words"
+          >Activity</span
+        >
+      </BarMenu>
+    {/if}
+    <BarMenu
+      label="Settings"
+      name="settings"
+      title={credentials.missing
+        ? `${String(credentials.missing)} ${credentials.missing === 1 ? 'credential is' : 'credentials are'} missing for the apps on the board (${board.env.toUpperCase()})`
+        : 'Stack settings, credentials and appearance'}
+      chevron={false}
+      items={[
+        {
+          label: 'Stack settings',
+          about: 'Its environments, apps, queues, sign-ins and team boards',
+          run: () => void dialogs.settings?.open({ title: `${board.stack} settings`, path: '' }),
+        },
+        {
+          label: 'Credentials',
+          about: 'What the apps on the board need stored',
+          run: (from: HTMLElement) => opens.credentials?.(from),
+        },
+        {
+          label: 'Appearance',
+          about: 'Colours, the debug log and this canvas address',
+          run: (from: HTMLElement) => opens.settings?.(from),
+        },
+      ]}
+    >
+      <span class="glyph" class:mark={credentials.missing > 0}><Cog size={15} /></span><span class="words"
+        >Settings</span
+      >
+    </BarMenu>
+    {#if !board.discovering}
+      <span class="split" inert={!!loading}>
+        <button
+          class="stop"
+          type="button"
+          aria-label="Stop"
+          disabled={!runs.started.length}
+          title={runs.started.length
+            ? 'Stop what the agent started and revert all temporary code changes'
+            : 'Nothing is running'}
+          onclick={() => {
+            runs.stop();
+          }}
+        >
+          <span class="stop-mark" aria-hidden="true"></span>
+          <span class="words">Stop</span>
+        </button>
         <Menu
-          label="More ways to run"
-          tone="run"
+          label="More ways to stop"
+          tone="stop"
           items={[
             {
-              label: 'Run with a note for the agent…',
-              about: 'Tell the agent something for this run, like a test account or a flag',
+              label: 'Stop apps, keep changes',
+              about: runs.started.length
+                ? 'Stops every app, API and tunnel; branches and code changes stay until you revert'
+                : 'Nothing is running',
+              off: !runs.started.length,
               run: () => {
-                noting?.showModal();
+                runs.stopApps();
               },
             },
             {
-              label: 'Get a checklist instead',
-              about: 'The agent changes nothing and lists the steps for you to do yourself',
+              label: 'Revert temporary changes',
+              about: runs.left.length
+                ? 'Undoes what the last run left: branches back, temporary edits gone'
+                : 'Nothing to revert',
+              off: !runs.left.length,
               run: () => {
-                runs.start({ manual: true });
+                runs.stop();
+              },
+            },
+            {
+              label: 'Shut down Koppler',
+              about: 'Stops the agent listener and this canvas server; apps and tunnels keep running',
+              danger: true,
+              run: () => {
+                runs.shutDown();
               },
             },
           ]}
         />
+      </span>
+      <!-- Live shows what runs, and Discover runs nothing: Run is in Plan. -->
+      {#if !board.live}
+        <span class="split" inert={!!loading}>
+          <button
+            class="run"
+            type="button"
+            disabled={!board.nodes.length}
+            title={board.nodes.length
+              ? 'Review what will run, then send it (Cmd or Ctrl + Enter)'
+              : 'Add an app to the board first'}
+            onclick={() => {
+              runs.start();
+            }}><span class="play" aria-hidden="true"></span>Run</button
+          >
+          {#if board.nodes.length}
+            <Menu
+              label="More ways to run"
+              tone="run"
+              items={[
+                {
+                  label: 'Run with a note for the agent…',
+                  about: 'Tell the agent something for this run, like a test account or a flag',
+                  run: () => {
+                    noting?.showModal();
+                  },
+                },
+                {
+                  label: 'Get a checklist instead',
+                  about: 'The agent changes nothing and lists the steps for you to do yourself',
+                  run: () => {
+                    runs.start({ manual: true });
+                  },
+                },
+              ]}
+            />
+          {/if}
+        </span>
       {/if}
-    </span>
+    {/if}
   {/if}
 </header>
+<History />
+<Credentials />
+<Help />
+<Settings bare />
 {#if dropping}<div class="dropping">Drop to open this board</div>{/if}
 <Review />
 <Setup bind:this={dialogs.setup} />
@@ -579,9 +655,9 @@
   header {
     display: flex;
     align-items: center;
-    gap: 16px;
+    gap: 10px;
     min-height: 56px;
-    padding: 8px 16px;
+    padding: 8px 14px;
     border-bottom: 1px solid var(--line);
     background: var(--panel);
     color: var(--ink);
@@ -596,13 +672,91 @@
   header.protected {
     border-bottom-color: var(--prod);
   }
+  /* The mark opens the shortcuts and legend. */
   .brand {
     display: flex;
     align-items: center;
     gap: 10px;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--ink);
+    cursor: pointer;
+  }
+  .brand:focus-visible {
+    outline: 2px solid var(--ink);
+    outline-offset: 4px;
+  }
+  /* The stack picker brings its own slash: it sits on the line, a gap from the name, as the bar's other parts. */
+  .names,
+  .boards {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: 10px;
+  }
+  /* The board's name reads as the stack's does: a name in the bar, not a field. */
+  .boards {
+    max-width: 360px;
+  }
+  .boards :global(.picker) {
+    width: auto;
+    max-width: 360px;
+    margin-left: -8px;
+    border-color: transparent;
+    border-radius: 7px;
+    background: none;
+    color: var(--ink);
+    font: 600 14px var(--sans);
+  }
+  .boards :global(.picker:hover),
+  .boards :global(.picker[aria-expanded='true']) {
+    border-color: var(--line);
+  }
+  .chips {
+    display: flex;
+    gap: 10px;
+  }
+  .glyph {
+    position: relative;
+    display: inline-flex;
+  }
+  /* Something in the menu waits on you: a run for the agent, a credential to store. */
+  .glyph.mark::after {
+    content: '';
+    position: absolute;
+    top: -3px;
+    right: -4px;
+    width: 6px;
+    height: 6px;
+    background: var(--warn, var(--ink));
+  }
+  /* As the bar runs short of room it gives way one step at a time, in this order; Run, Stop, the view switch and the
+     environment keep their words at every width. */
+  header:global(.l1) :global(.settings .words),
+  header:global(.l2) .word,
+  header:global(.l4) :global(.activity :is(.words, .chev)),
+  header:global(.l4) :global(.picker .kind) {
+    display: none;
+  }
+  /* A menu without its word is its icon in a square, as the side pane's toggle is. */
+  header:global(.l1) :global(.settings),
+  header:global(.l4) :global(.activity) {
+    justify-content: center;
+    width: 32px;
+    padding: 0;
+  }
+  header:global(.l3) .chips {
+    gap: 0;
+  }
+  header:global(.l3) .chips > :global(*:first-child) {
+    border-right-width: 0;
+  }
+  header:global(.l5) :global(:is(.names, .boards) .picker) {
+    max-width: 130px;
   }
   .word {
-    font: 600 20px var(--display);
+    font: 600 17px var(--display);
     letter-spacing: -0.005em;
   }
   .slash {
@@ -611,7 +765,7 @@
   }
   .env label,
   .views label {
-    padding: 6px 12px;
+    padding: 6px 11px;
   }
   .env label.prod:has(input:checked) {
     background: var(--prod-stripes);
@@ -620,33 +774,6 @@
   }
   .env:has(.prod) {
     border-color: var(--prod);
-  }
-  /* The board's tools, as one strip of words printed on the panel. */
-  .strip {
-    display: flex;
-    gap: 1px;
-    border: 1px solid var(--line);
-    background: var(--line);
-  }
-  .strip > :global(button) {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    width: auto;
-    height: auto;
-    margin: 0;
-    padding: 8px 10px;
-    border: 0;
-    background: var(--panel);
-    color: var(--ink);
-    font: 600 12px var(--sans);
-    cursor: pointer;
-  }
-  .strip > :global(button:hover),
-  .strip > :global(button[aria-expanded='true']),
-  .strip > :global(button[aria-pressed='true']) {
-    background: var(--line-strong);
-    color: var(--ink);
   }
   .stop-mark {
     width: 8px;
@@ -685,8 +812,8 @@
   .run {
     display: inline-flex;
     align-items: center;
-    gap: 8px;
-    padding: 7px 14px;
+    gap: 7px;
+    padding: 7px 11px;
     border: 1px solid transparent;
     font: 600 13px var(--sans);
     cursor: pointer;
@@ -762,6 +889,7 @@
     background: color-mix(in oklab, var(--ink) 8%, transparent);
   }
   .run {
+    padding-inline: 12px;
     background: var(--local);
     color: var(--desk);
   }
@@ -786,28 +914,18 @@
   }
   .side-toggle {
     display: grid;
+    flex: none;
     place-items: center;
     width: 32px;
     height: 32px;
-    margin-right: -4px;
     padding: 0;
-    border: 0;
-    border-radius: 8px;
+    border: 1px solid var(--line-strong);
     background: none;
-    color: var(--muted);
+    color: var(--ink);
     cursor: pointer;
   }
   .side-toggle:hover {
     background: color-mix(in oklab, var(--ink) 7%, transparent);
-  }
-  .gear {
-    display: inline-flex;
-    gap: 6px;
-    width: auto;
-    margin: 0 0 0 -8px;
-    padding: 0 8px;
-    color: var(--ink);
-    font: 600 12px var(--sans);
   }
   .dropping {
     position: fixed;
