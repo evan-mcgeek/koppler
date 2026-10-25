@@ -91,7 +91,8 @@ These appear next to the app that uses them, and show or hide with it.
   What feeds a queue an app reads stacks above it, however far up: a Kafka topic piped onto an event bus, a rule forwarding to another bus, an SNS topic's subscription. Each link says how (`pipe`, `rule`, `subscription`, `rule to Lambda`); those upstream cards stay deployed.
   A queue between two cards of the board shows too, even when both are outside systems: a CRM's event read by a handler Lambda.
 - **Outside systems** (for example a payment provider) are dashed cards: things the apps call, or that call them, and that never run locally. Add one with **Add outside system…** under the Apps list; click it in the list to keep its card on the board even when none of its callers is there.
-- Each link to a queue or an outside system ends in an arrow at the card it goes to: an app's arrow into a queue publishes, a queue's arrow into an app is read, an arrow into an outside system is a call to it.
+- Every link with a direction leaves its sender as a small dot and lands in the receiver's ring, with a chevron pointing in: into a queue publishes, into an app from a queue reads, into another app or an outside system calls. Database and tunnel links go both ways: a dot at each end.
+- Pick a card, or Shift-click several, to trace them: their links stay lit and say what they do, everything else fades back. Point at a link and it says who does what.
 - What a board hides stays hidden with that board: a board for one flow can leave out the queues and outside cards of the others.
 - Every card, not only an app's, takes a note for the agent, kept with the board and handed to the agent with the run. On a queue, a database, a tunnel or an outside system, pick the card and choose **Add note** in its foot; a written note reads as text, and a click opens it to edit.
 
