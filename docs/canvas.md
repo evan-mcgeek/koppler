@@ -135,10 +135,14 @@ Nothing on it runs or changes the board.
 A card's **+N** brings in the links it leaves out; a dashed link was found in the code and is not in the stack yet, and **Confirm** in the panel keeps it there.
 Pick several cards (Shift-click) and **Plan a run with these** puts the cloned ones on the board; the rest stay deployed and are listed in **Left out**, with a clone command for each app.
 
+<img alt="Discover on QA: the board's apps with what they touch one step away, Orders API picked and its links listed in the panel" src="images/discover.png">
+
 A **feature board** (New feature board in the boards menu) is for one feature: the request it came from, and which of the stack's links it uses, as numbered steps in phases.
 Describe the feature and **Hand it to the agent**: its proposals show dashed, each with Accept and Drop, until you accept them; accepting a link the stack does not have yet records it there.
 Or start from an app, and add a picked card's links with **Add as a step**.
 The panel on the right holds the request and the steps: pick a phase to dim the others, rename it, or take a step off.
+
+<img alt="A feature board, Checkout: its steps numbered in two phases on the map and in the panel, and one step the agent proposed, dashed, with Accept and Drop" src="images/feature-board.png">
 
 **Plan** shows every field of a card; **Live** shows what runs, with short cards.
 
