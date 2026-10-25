@@ -34,7 +34,7 @@ export interface EnvFileAction {
   /** Koppler made the file. */
   created?: boolean;
 }
-/** A file was written whole: a local library's overrides file. */
+/** A file was written whole: a local library's overrides file, or a code change without a unique reverse edit. */
 export interface FileAction {
   kind: 'file';
   app?: string;
@@ -43,6 +43,8 @@ export interface FileAction {
   before?: string | null;
   /** The text Koppler wrote last. */
   after?: string;
+  /** Set when a remembered change of the stack made the edit. */
+  recipe?: string;
 }
 /** Local libraries were installed over the published ones. */
 export interface NpmLocalAction {

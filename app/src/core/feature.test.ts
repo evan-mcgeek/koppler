@@ -46,6 +46,17 @@ describe('editFeature', () => {
     expect(feature.phases.map(phase => phase.name)).toEqual(['Pay in the app']);
     expect(featureCards(feature)).toEqual(['web']);
   });
+
+  it('keeps both phases when a rename would reuse an existing name', () => {
+    const feature = editFeature(null, { phase: ['Pay', 'Ship'] });
+    const renamed = editFeature(feature, { rename: { from: 'Ship', to: '  Pay  ' } });
+    expect(renamed).toEqual(feature);
+    const changed = editFeature(renamed, { step: [{ from: 'web', to: 'orders', kind: 'call', phase: 'Pay' }] });
+    expect(changed.phases.map(phase => phase.steps.length)).toEqual([1, 0]);
+    const long = 'A'.repeat(120);
+    const truncated = editFeature(null, { phase: [long, 'Ship'] });
+    expect(editFeature(truncated, { rename: { from: 'Ship', to: `${long}B` } })).toEqual(truncated);
+  });
 });
 
 describe('featureOf', () => {

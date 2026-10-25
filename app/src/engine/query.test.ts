@@ -18,6 +18,9 @@ test("only one reading statement gets through, in each database's quoting rules"
   ok('explain select * from t');
   ok('show search_path');
   ok("select 'a;b', `delete` from t", 'mysql');
+  ok('select "sleep", "a;b", "a""b", "update" from t');
+  ok('select "sleep(100)", `a;b`, `a``b` from t', 'mysql');
+  ok('select "sleep" + (1) from t');
   ok('select 1 -- why', 'postgres');
 
   // The bypasses from the review: strings that hide a second statement, in each database's own quoting.
@@ -26,9 +29,14 @@ test("only one reading statement gets through, in each database's quoting rules"
     'postgres',
     /one statement/,
   );
-  no("SELECT '\\''; DROP TABLE t; -- '", 'mysql', /one statement/);
+  no("SELECT '\\''; DROP TABLE t; -- '", 'mysql', /backslash escapes/);
+  no("SELECT '\\'; COMMIT; START TRANSACTION READ WRITE; DELETE FROM t; COMMIT -- '", 'mysql', /backslash escapes/);
   no("select E'\\''; delete from t; --'", 'postgres', /one statement/);
   no('select 1; delete from t', 'postgres', /one statement/);
+  no('SELECT 1--1; COMMIT; START TRANSACTION READ WRITE; DELETE FROM t; COMMIT', 'mysql', /one statement/);
+  no('SELECT 1--\u00a0; COMMIT; DELETE FROM t', 'mysql', /one statement/);
+  no('SELECT 1 -- comment\r; COMMIT; BEGIN READ WRITE; DELETE FROM t; COMMIT', 'postgres', /one statement/);
+  no('SELECT 1 # comment\r; COMMIT; DELETE FROM t', 'mysql', /one statement/);
   // This one deleted every row through the old check: a read-write transaction opened after the hidden COMMIT.
   no("SELECT $$'$$; COMMIT; BEGIN READ WRITE; DELETE FROM t; COMMIT; SELECT $$'$$ --", 'postgres', /one statement/);
   // Client commands and executable comments.
@@ -47,6 +55,11 @@ test("only one reading statement gets through, in each database's quoting rules"
   no("select dblink_exec('db', 'delete from t')", 'postgres', /dblink_exec/);
   no("select load_file('/etc/passwd')", 'mysql', /load_file/);
   no('select sleep(100)', 'mysql', /sleep/);
+  no('select "pg_terminate_backend"(42)', 'postgres', /pg_terminate_backend/);
+  no('select pg_catalog."pg_read_file"(\'/etc/passwd\')', 'postgres', /pg_read_file/);
+  no('select `sleep` /* wait */ (100)', 'mysql', /sleep/);
+  no('select U&"pg_terminate_\\0062ackend"(42)', 'postgres', /Unicode-escaped identifiers/);
+  no('select U&"pg_terminate_backend" UESCAPE \'!\'(42)', 'postgres', /Unicode-escaped identifiers/);
   // Unclosed strings and comments.
   no("select 'abc", 'postgres', /not closed/);
   no('select $$abc', 'postgres', /not closed/);

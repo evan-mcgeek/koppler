@@ -7,18 +7,21 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { test } from 'node:test';
 
+const hasXxd = spawnSync('sh', ['-c', 'command -v xxd']).status === 0;
+
 test('How the store creates a Keychain item decides who may read it: `-T ""` means every read asks the user, `-T /usr/bin/security` means anything running as the user reads it silently. A stand-in for the `security` program records what the store asks for; no real Keychain is touched.', async () => {
   const store = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'bin', ['secret', 'store'].join('-'));
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-protected-')), asked = path.join(dir, 'asked.txt');
   fs.writeFileSync(path.join(dir, 'security'), `#!/bin/sh\nif [ "$1" = "-i" ]; then cat >> "${asked}"; fi\nexit 0\n`, { mode: 0o755 });
-  const hasXxd = spawnSync('sh', ['-c', 'command -v xxd']).status === 0;
 
   const trustFor = (name, mark) => {
     fs.rmSync(asked, { force: true });
     const env = { ...process.env, PATH: `${dir}:${process.env.PATH}`, KOPPLER_SECRET_BACKEND: 'keychain', ...(mark !== undefined && { KOPPLER_SECRET_PROTECTED: mark }) };
     const r = spawnSync(store, ['set', name, 'DB_URL'], { input: 'value', env, encoding: 'utf8' });
     assert.equal(r.status, 0, r.stderr);
-    return fs.readFileSync(asked, 'utf8').includes('-T ""') ? 'asks every read' : 'readable silently';
+    const command = fs.readFileSync(asked, 'utf8');
+    assert.match(command, /^add-generic-password -U /);
+    return command.includes('-T ""') ? 'asks every read' : 'readable silently';
   };
 
   if (hasXxd) {
@@ -32,4 +35,44 @@ test('How the store creates a Keychain item decides who may read it: `-T ""` mea
     assert.equal(trustFor('orders-api'), 'readable silently');
   }
   console.log(hasXxd ? 'protected store tests ok' : 'protected store tests skipped: no xxd here');
+});
+
+test('failed Keychain updates keep the old value, and failed migration keeps its source even when an older target exists', { skip: !hasXxd }, () => {
+  const store = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'bin', 'secret-store');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-keychain-failure-'));
+  const kept = path.join(dir, 'kept'), asked = path.join(dir, 'asked');
+  fs.writeFileSync(path.join(dir, 'security'), `#!/bin/sh
+case "$1" in
+  delete-generic-password)
+    echo delete >> "$KOPPLER_FAKE_ASKED"
+    [ "$KOPPLER_FAKE_DELETE_FAIL" = 1 ] && exit 1
+    rm -f "$KOPPLER_FAKE_KEPT" ;;
+  -i) cat >> "$KOPPLER_FAKE_ASKED"; exit 1 ;;
+  find-generic-password) test -f "$KOPPLER_FAKE_KEPT" ;;
+esac
+`, { mode: 0o755 });
+  const env = {
+    ...process.env, PATH: `${dir}:${process.env.PATH}`, KOPPLER_SECRET_BACKEND: 'keychain',
+    KOPPLER_SECRETS: dir, KOPPLER_FAKE_KEPT: kept, KOPPLER_FAKE_ASKED: asked,
+  };
+  try {
+    fs.writeFileSync(kept, 'old-synthetic-value');
+    const updated = spawnSync(store, ['set', 'orders-api', 'DB_URL'], { input: 'new-synthetic-value', env, encoding: 'utf8' });
+    assert.notEqual(updated.status, 0);
+    assert.equal(fs.readFileSync(kept, 'utf8'), 'old-synthetic-value');
+    const command = fs.readFileSync(asked, 'utf8');
+    assert.match(command, /^add-generic-password -U /);
+    assert.doesNotMatch(command, /^delete$/m);
+
+    const source = path.join(dir, 'orders-api.env');
+    const value = 'export DB_URL=new-synthetic-value\n';
+    fs.writeFileSync(source, value);
+    const migrated = spawnSync(store, ['migrate'], { env: { ...env, KOPPLER_FAKE_DELETE_FAIL: '1' }, encoding: 'utf8' });
+    assert.notEqual(migrated.status, 0);
+    assert.equal(fs.readFileSync(source, 'utf8'), value);
+    assert.equal(fs.readFileSync(kept, 'utf8'), 'old-synthetic-value');
+    assert.match(migrated.stderr, /could not be moved; its file is kept/);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 });

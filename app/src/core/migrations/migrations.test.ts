@@ -147,6 +147,25 @@ test('0.2.0: a name every app of a database dials goes with the database', () =>
   expect(reached(stack)).toEqual(reached(both));
 });
 
+test('a database endpoint with its own facts stays on the app during migration', () => {
+  const endpoint = { hosts: 'orders.cluster.qa.acme.example', note: 'Use the read replica only.' };
+  const raw = {
+    envs: ['qa'],
+    apps: {
+      orders: {
+        name: 'Orders API',
+        prereqs: [{ tunnel: 'orders-db.qa.acme.example', port: 5432, what: 'Orders (Postgres)' }, endpoint],
+      },
+    },
+  };
+  const done = migrateStack(raw);
+  expect(done.value).toMatchObject({
+    apps: { orders: { prereqs: [endpoint], uses: { orders: {} } } },
+    databases: { orders: { tunnel: 'orders-db.qa.acme.example', port: 5432 } },
+  });
+  expect(migrateStack(done.value as never).value).toEqual(done.value);
+});
+
 test("0.2.1: a stack 0.2.0 left alone gets its databases, each tunnel's command kept and each app's note on its use", () => {
   const stamped = structuredClone(old) as OldStack & { koppler: string };
   stamped.koppler = '0.2.0';

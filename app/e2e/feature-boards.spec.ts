@@ -5,7 +5,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import type { Page } from '@playwright/test';
-import { at, card, expect, sent, STACK, test } from './canvas.ts';
+import { at, card, expect, nextEdit, sent, STACK, test } from './canvas.ts';
 
 const stack = {
   ...STACK,
@@ -142,4 +142,26 @@ test('steps are added from a card, taken off, and kept in phases the panel names
   await panel.locator('.step').hover();
   await panel.getByRole('button', { name: 'Take step 1.1 off' }).click();
   await expect(page.locator('.links .number text')).toHaveCount(0);
+});
+
+test('feature requests and board switches are restored by undo and redo', async ({ page, canvas }) => {
+  await newFeature(page);
+  await nextEdit(page);
+  await page.getByLabel('Describe the feature').fill('Customers pay for an order.');
+  await page.getByRole('button', { name: 'Hand it to the agent' }).click();
+  await expect.poll(() => kept(canvas.temp)?.feature?.request).toBe('Customers pay for an order.');
+  await page.getByRole('radio', { name: 'Plan', exact: true }).check();
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect.poll(() => kept(canvas.temp)?.feature?.request).toBe('');
+  await page.getByRole('button', { name: 'Redo', exact: true }).click();
+  await expect.poll(() => kept(canvas.temp)?.feature?.request).toBe('Customers pay for an order.');
+
+  await nextEdit(page);
+  await page.getByRole('button', { name: /^Board:/ }).click();
+  await page.getByRole('dialog', { name: 'Boards' }).getByRole('button', { name: 'New board', exact: true }).click();
+  await expect(page.getByRole('button', { name: /^Board:/ })).toHaveText('New board');
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect(page.getByRole('button', { name: /^Board:/ })).toHaveAccessibleName('Board: New feature');
+  await page.getByRole('radio', { name: 'Discover', exact: true }).check();
+  await expect(page.getByLabel('Describe the feature')).toHaveValue('Customers pay for an order.');
 });

@@ -191,7 +191,7 @@ export const appendEvent = (id: string, event: string, reason?: string): void =>
   append({ id, event, at: stamp(), ...(reason && { reason: text(reason, 500) }) });
 };
 
-const CODE_KINDS = ['edit', 'profile', 'env-file', 'checkout'];
+const CODE_KINDS = ['edit', 'file', 'profile', 'env-file', 'checkout'];
 /**
  * The code changes in the action log, as removed and added lines per app and file, for the History's diffs.
  * Kept with the run, so a past run still shows them after a revert. Bounded, and passed through `clean` (secret redaction).
@@ -218,7 +218,7 @@ export function codeChanges(
     .map(action => {
       const kind = action['kind'] as string;
       const base = { app: text(action['app'] ?? action['repo'], 64), kind, file: text(action['file'], 300) };
-      if (kind === 'edit')
+      if (kind === 'edit' || kind === 'file')
         return { ...base, title: 'Temporary edit', removed: lines(action['before']), added: lines(action['after']) };
       if (kind === 'env-file') {
         const added = Array.isArray(action['lines']) ? (action['lines'] as unknown[]) : lines(action['lines']);

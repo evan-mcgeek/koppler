@@ -21,7 +21,7 @@ export interface Entry {
  */
 export function pairTimes(lines: string[], times: number[], ended: boolean): number[] {
   const done = ended ? lines.length : Math.max(0, lines.length - 1);
-  const known = times.slice(-done);
+  const known = done ? times.slice(-done) : [];
   const oldest = known[0] ?? times.at(-1) ?? 0;
   const paired = [...Array<number>(done - known.length).fill(oldest), ...known];
   return ended || !lines.length ? paired : [...paired, times.at(-1) ?? oldest];

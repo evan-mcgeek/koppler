@@ -25,3 +25,15 @@ test('a tail that starts mid-line drops that piece, so a value never shows witho
   expect(tail(file, 20)).toBe('ready');
   expect(tail(file)).toBe('Db__Password=***\nready');
 });
+
+test('a tail containing only part of an unfinished line never shows its value', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-tail-'));
+  const file = path.join(dir, 'app.log');
+  try {
+    fs.writeFileSync(file, 'Db__Password=hunter2-and-more');
+    expect(tail(file, 10)).toBe('');
+    expect(tail(file)).toBe('Db__Password=***');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});

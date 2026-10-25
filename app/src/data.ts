@@ -38,6 +38,7 @@ export function readData(name: DataName): Data | null {
   // The stack's copy and the board file are brought up to this Koppler's format as they are read.
   const upgrade = UPGRADES[name];
   const upgraded = upgrade ? readUpgraded(dataFile(name), upgrade) : undefined;
+  if (upgraded?.error !== undefined) fail(`${name}: ${upgraded.error}`);
   const value = upgraded?.value ?? readJson(dataFile(name)) ?? readOldForm(name);
   return isData(value) ? value : null;
 }

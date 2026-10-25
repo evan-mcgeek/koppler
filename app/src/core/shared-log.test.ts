@@ -10,6 +10,13 @@ test('a log pairs with its times from the end; a line still being written takes 
   expect(pairTimes(['a', 'b', 'c'], [30], true)).toEqual([30, 30, 30]);
 });
 
+test('a log with no completed lines keeps only the time of its unfinished line', () => {
+  expect(pairTimes(['partial'], [10, 20], false)).toEqual([20]);
+  expect(pairTimes(['partial'], [], false)).toEqual([0]);
+  expect(pairTimes([], [10, 20], true)).toEqual([]);
+  expect(pairTimes([], [10, 20], false)).toEqual([]);
+});
+
 test('every app in arrival order, from a time on, the last so many', () => {
   const sources = [
     { app: 'orders', lines: ['created', 'charging'], times: [100, 200] },
