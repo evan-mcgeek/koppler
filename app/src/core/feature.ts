@@ -103,12 +103,11 @@ export function editFeature(given: Feature | null, edit: FeatureEdit): Feature {
       feature = { ...feature, phases: [...feature.phases, { name, steps: [] }] };
   };
   for (const name of edit.phase ?? []) phase(name.trim().slice(0, 120) || 'Steps');
-  if (edit.rename && edit.rename.to.trim())
+  const renamed = edit.rename?.to.trim().slice(0, 120);
+  if (edit.rename && renamed && !feature.phases.some(one => one.name === renamed))
     feature = {
       ...feature,
-      phases: feature.phases.map(one =>
-        one.name === edit.rename?.from ? { ...one, name: edit.rename.to.trim().slice(0, 120) } : one,
-      ),
+      phases: feature.phases.map(one => (one.name === edit.rename?.from ? { ...one, name: renamed } : one)),
     };
   for (const { phase: into, ...step } of edit.step ?? []) {
     if (feature.phases.some(one => one.steps.some(same(step)))) continue;

@@ -1216,25 +1216,31 @@ class Board {
       hiddenOutside: this.hiddenOutside,
       pinned: this.pinned,
       feature: this.feature,
+      cardNotes: this.cardNotes,
       edges: this.edges.map(({ id, source, target, type, data }) => ({ id, source, target, type, data })),
     });
   }
 
   /** Puts back a board held as text: its cards, cables and the cards beside them. */
   setContent(back: string): void {
-    const { name, nodes, edges, infra, queues, databases, hiddenQueues, hiddenOutside, pinned } = JSON.parse(back) as {
-      name: string | null;
-      nodes: CardNode[];
-      edges: CableEdge[];
-      infra: { id: string; position: Point }[];
-      queues: Record<string, 'local'>;
-      databases?: Record<string, 'local'>;
-      hiddenQueues: Record<string, true>;
-      hiddenOutside: Record<string, true>;
-      pinned: string[];
-    };
+    const { name, nodes, edges, infra, queues, databases, hiddenQueues, hiddenOutside, pinned, feature, cardNotes } =
+      JSON.parse(back) as {
+        name: string | null;
+        nodes: CardNode[];
+        edges: CableEdge[];
+        infra: { id: string; position: Point }[];
+        queues: Record<string, 'local'>;
+        databases?: Record<string, 'local'>;
+        hiddenQueues: Record<string, true>;
+        hiddenOutside: Record<string, true>;
+        pinned: string[];
+        feature?: Feature | null;
+        cardNotes?: Record<string, string>;
+      };
     this.name = name;
     this.pinned = pinned;
+    this.feature = featureOf(feature);
+    this.cardNotes = notesOf(cardNotes);
     this.nodes = nodes;
     this.edges = edges;
     this.queues = queues;

@@ -355,7 +355,8 @@ function pointsAt(up: Up, app: string, address: string, file: string | undefined
   const logged = readActions(up.logFile).some(
     action =>
       action.app === app &&
-      ((action.kind === 'edit' && has(action.after)) || (action.kind === 'env-file' && has(action.lines))),
+      (((action.kind === 'edit' || action.kind === 'file') && has(action.after)) ||
+        (action.kind === 'env-file' && has(action.lines))),
   );
   const repo = up.clones[app]?.path;
   if (logged || !repo || !file) return logged;

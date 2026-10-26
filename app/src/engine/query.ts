@@ -40,7 +40,7 @@ const WRITES = new Set(
 const SIDE_EFFECTS =
   /^(dblink\w*|pg_terminate_backend|pg_cancel_backend|pg_reload_conf|pg_rotate_logfile|pg_advisory\w*|pg_try_advisory\w*|lo_\w+|set_config|nextval|setval|pg_read\w*file|pg_ls_dir|pg_stat_reset\w*|pg_switch_wal|pg_create_\w+|pg_drop_\w+|pg_sleep\w*|txid_current|sleep|benchmark|load_file|get_lock|release_lock|release_all_locks|sys_exec|sys_eval)$/i;
 
-/** The statement's own text, with strings, quoted names and comments taken out, in the database's own quoting rules. */
+/** The statement without strings or comments; quoted identifiers stay quoted for the function check. */
 export function bareSql(sql: string, type?: string): Checked<{ bare: string }> {
   const mysql = type === 'mysql';
   let out = '';
@@ -48,9 +48,12 @@ export function bareSql(sql: string, type?: string): Checked<{ bare: string }> {
   const here = (text: string) => sql.startsWith(text, at);
   while (at < sql.length) {
     const char = sql[at] ?? '';
-    if (here('--') || (mysql && char === '#')) {
-      const newline = sql.indexOf('\n', at);
-      at = newline < 0 ? sql.length : newline;
+    if (
+      (here('--') && (!mysql || !sql[at + 2] || /[\x00-\x20\x7f]/.test(sql[at + 2] ?? ''))) ||
+      (mysql && char === '#')
+    ) {
+      const newline = sql.slice(at).search(/[\r\n]/);
+      at = newline < 0 ? sql.length : at + newline;
       out += ' ';
       continue;
     }
@@ -80,21 +83,29 @@ export function bareSql(sql: string, type?: string): Checked<{ bare: string }> {
       out += " '' ";
       continue;
     }
+    if (!mysql && /^u&"/i.test(sql.slice(at, at + 3)))
+      return { error: 'Unicode-escaped identifiers (U&"...") are not allowed here; use a plain quoted name' };
     if (char === "'" || char === '"' || (mysql && char === '`')) {
       // MySQL strings take backslash escapes; Postgres only in E'...' strings.
       const before = sql.slice(0, at);
       const escapes = mysql ? char !== '`' : char === "'" && /[eE]$/.test(before) && !/\w[eE]$/.test(before);
       let end = at + 1;
       for (; end < sql.length; end++) {
-        if (escapes && sql[end] === '\\') end++;
-        else if (sql[end] === char) {
+        if (escapes && sql[end] === '\\') {
+          if (mysql) return { error: 'MySQL backslash escapes depend on SQL mode; use doubled quotes instead' };
+          end++;
+        } else if (sql[end] === char) {
           if (sql[end + 1] !== char) break;
           end++;
         }
       }
       if (end >= sql.length) return { error: 'a quoted string or name is not closed' };
+      const name = sql
+        .slice(at + 1, end)
+        .replaceAll(char + char, char)
+        .replaceAll('"', '""');
       at = end + 1;
-      out += char === "'" ? " '' " : ' "q" ';
+      out += char === "'" ? " '' " : ` "${name}" `;
       continue;
     }
     out += char;
@@ -110,9 +121,11 @@ export function readOnlySql(sql: string | null | undefined, type?: string): Chec
   const stripped = bareSql(statement, type);
   if (stripped.error !== undefined) return { error: stripped.error };
   const { bare } = stripped;
-  if (bare.includes(';')) return { error: 'one statement at a time' };
-  if (bare.includes('\\')) return { error: 'database client commands (a backslash) are not allowed' };
-  const words = bare.toLowerCase().match(/[a-z_][a-z0-9_$]*/g) ?? [];
+  const tokens = [...bare.matchAll(/"((?:[^"]|"")*)"|([a-z_][\w$]*)|(\S)/gi)];
+  if (tokens.some(token => token[3] === ';')) return { error: 'one statement at a time' };
+  if (tokens.some(token => token[3] === '\\'))
+    return { error: 'database client commands (a backslash) are not allowed' };
+  const words = tokens.flatMap(token => (token[2] ? [token[2].toLowerCase()] : []));
   if (!READS.has(words[0] ?? ''))
     return { error: 'only reading statements: SELECT, WITH, EXPLAIN, SHOW, VALUES, TABLE or DESCRIBE' };
   const writes = words.find(word => WRITES.has(word));
@@ -120,8 +133,9 @@ export function readOnlySql(sql: string | null | undefined, type?: string): Chec
     return {
       error: `"${writes.toUpperCase()}" can change data or the session, so it is not allowed here (quote a column with that name)`,
     };
-  const calls = [...bare.matchAll(/([a-z_][\w$]*)\s*\(/gi)]
-    .map(match => match[1] ?? '')
+  const calls = tokens
+    .filter((_, at) => tokens[at + 1]?.[3] === '(')
+    .map(token => (token[1] ?? token[2] ?? '').replaceAll('""', '"'))
     .find(called => SIDE_EFFECTS.test(called));
   if (calls) return { error: `${calls}() changes the server or reaches outside it, so it is not allowed here` };
   return { sql: statement };

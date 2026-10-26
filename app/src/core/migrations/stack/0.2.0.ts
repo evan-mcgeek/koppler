@@ -38,8 +38,8 @@ const kindOf = (need: Need) =>
   /redis/i.test(need.tunnel ?? '')
     ? 'redis'
     : (PORTS[need.port ?? 0] ?? (/mysql/i.test(need.what ?? '') ? 'mysql' : 'postgres'));
-/** A hosts entry for a database endpoint, not for an app. */
-const isEndpoint = (need: Need) => !!need.hosts && !need.tunnel && ENGINE.test(need.hosts);
+/** A hosts entry for a database endpoint, with no other facts to lose by moving it. */
+const isEndpoint = (need: Need) => !!need.hosts && Object.keys(need).length === 1 && ENGINE.test(need.hosts);
 const ENVIRONMENTS = new Set(['dev', 'qa', 'test', 'uat', 'stg', 'staging', 'prod', 'production', 'internal']);
 /**
  * A database's name: what its tunnel said it reaches ("Orders (Postgres)" is Orders), or, when that says only "Database"

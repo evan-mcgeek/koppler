@@ -18,6 +18,7 @@ export function tail(file: string, bytes = TAIL_BYTES, lines = TAIL_LINES): stri
     // Color codes, as terminals send them or as `flutter logs` spells them out, are noise on a card.
     // A read that starts mid-file starts mid-line: that piece goes, so a secret never shows without the name that masks it.
     const text = buffer.toString('utf8');
+    if (size > length && !text.includes('\n')) return '';
     const whole = size > length ? text.slice(text.indexOf('\n') + 1) : text;
     const plain = whole.replace(/(?:\x1b|\\\^\[)\[[0-9;]*m/g, '');
     const last = redact(plain).trimEnd().split('\n').slice(-lines);

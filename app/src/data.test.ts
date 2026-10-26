@@ -54,6 +54,15 @@ test('a run file from before its version is read in this format and written back
   expect(JSON.parse(fs.readFileSync(dataFile('state'), 'utf8'))).toEqual(read);
 });
 
+test('a run file from a newer Koppler is refused without changing it', () => {
+  for (const name of ['state', 'registry'] as const) {
+    writeData(name, { koppler: '99.0.0', env: 'qa' });
+    const before = fs.readFileSync(dataFile(name), 'utf8');
+    expect(() => readData(name)).toThrow(/update Koppler/);
+    expect(fs.readFileSync(dataFile(name), 'utf8')).toBe(before);
+  }
+});
+
 test('what is not an object is not a run file', () => {
   for (const text of ['[1, 2]', '"text"', 'not json', '']) {
     fs.writeFileSync(dataFile('local'), text);

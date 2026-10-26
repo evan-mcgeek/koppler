@@ -2,8 +2,12 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { test } from 'vitest';
+import { test, vi } from 'vitest';
 import { ok } from '../core/testing/ok.ts';
+import { readActions } from './actions.ts';
+import { down } from './down.ts';
+import { codeChanges } from './history.ts';
+import { prepare } from './recipes.ts';
 
 test('remembered changes are kept, applied once inside the clone, and scored privately', async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-recipes-'));
@@ -171,5 +175,52 @@ test('remembered changes are kept, applied once inside the clone, and scored pri
     });
     assert.equal(r!.state, 'refused');
     assert.equal(fs.readFileSync(path.join(d, 'outside.rc'), 'utf8'), 'export SAFE=1\n');
+  }
+});
+
+test.each([
+  { body: 'flag = true;\n', find: 'true', replace: 'false', kind: 'edit' },
+  { body: 'flag = true;\n', find: 'true', replace: 'rue', kind: 'file' },
+  { body: 'flag = true;\nother = false;\n', find: 'true', replace: 'false', kind: 'file' },
+  { body: 'flag = true;\nkeep\n', find: 'flag = true;\n', replace: '', kind: 'file' },
+  { body: 'remove all', find: 'remove all', replace: '', kind: 'file' },
+])('recipes apply and Stop safely restores $kind changes ($find → $replace)', async ({ body, find, replace, kind }) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-recipe-undo-'));
+  vi.stubEnv('KOPPLER_TEMP', dir);
+  vi.stubEnv('KOPPLER_CONFIG_DIR', path.join(dir, 'config'));
+  vi.stubEnv('KOPPLER_STATE', path.join(dir, 'state'));
+  const file = path.join(dir, 'code.txt');
+  const logFile = path.join(dir, 'actions.json');
+  const registry = { apps: { api: { localChanges: [{ file: 'code.txt', find, replace, when: { always: true } }] } } };
+  const apply = () => prepare({ registry, apps: ['api'], env: 'qa', calls: {}, repoOf: () => dir, logFile });
+  try {
+    fs.writeFileSync(file, body);
+    assert.equal(apply()[0]?.state, 'applied');
+    const after = body.replace(find, () => replace);
+    assert.equal(fs.readFileSync(file, 'utf8'), after);
+    assert.equal(apply()[0]?.state, 'already');
+    const actions = readActions(logFile);
+    assert.equal(actions.length, 1);
+    assert.equal(actions[0]?.kind, kind);
+    assert.equal(codeChanges(actions)[0]?.title, 'Temporary edit');
+    if (kind === 'file') {
+      const mine = `${after}\nMy own change\n`;
+      fs.writeFileSync(file, mine);
+      await assert.rejects(down([]));
+      assert.equal(fs.readFileSync(file, 'utf8'), mine);
+      assert.deepEqual(readActions(logFile), actions);
+      fs.writeFileSync(file, after);
+    }
+    await down([]);
+    assert.equal(fs.readFileSync(file, 'utf8'), body);
+    assert.deepEqual(readActions(logFile), []);
+    assert.equal(apply()[0]?.state, 'applied');
+    fs.writeFileSync(file, body);
+    await down([]);
+    assert.equal(fs.readFileSync(file, 'utf8'), body);
+    assert.deepEqual(readActions(logFile), []);
+  } finally {
+    vi.unstubAllEnvs();
+    fs.rmSync(dir, { recursive: true, force: true });
   }
 });

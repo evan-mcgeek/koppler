@@ -2,7 +2,7 @@
 // the board and handed to the agent with the run.
 import fs from 'node:fs';
 import path from 'node:path';
-import { expect, sent, STACK, test } from './canvas.ts';
+import { expect, nextEdit, sent, STACK, test } from './canvas.ts';
 
 const at = (x: number, y: number) => ({ x, y, run: 'cli', branch: 'main', showQueues: true });
 test.use({
@@ -28,6 +28,7 @@ test('a queue card offers a note only while picked; written, it reads as text, i
   await expect(add).toBeHidden();
   await queue.click({ position: { x: 40, y: 12 } });
   await add.click();
+  await nextEdit(page);
   await queue.getByLabel('Note for the agent').fill('Purge it before the run');
   await queue.getByRole('button', { name: 'Done' }).click();
   const written = queue.getByRole('button', { name: /Note for the agent\s*Purge it before the run/ });
@@ -35,6 +36,12 @@ test('a queue card offers a note only while picked; written, it reads as text, i
   await expect(add).toBeHidden();
   const kept = () =>
     (JSON.parse(fs.readFileSync(path.join(canvas.temp, 'state.json'), 'utf8')) as { cardNotes?: object }).cardNotes;
+  await expect.poll(kept).toEqual({ 'queue:order-events': 'Purge it before the run' });
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect(written).toHaveCount(0);
+  await expect.poll(kept).toBeUndefined();
+  await page.getByRole('button', { name: 'Redo', exact: true }).click();
+  await expect(written).toBeVisible();
   await expect.poll(kept).toEqual({ 'queue:order-events': 'Purge it before the run' });
   await page.screenshot({ path: 'test-results/card-notes.png' });
 

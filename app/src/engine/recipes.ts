@@ -13,7 +13,7 @@ import { flagValue } from '../cli/output.ts';
 import { fail } from '../failure.ts';
 import { readClones, readStack } from '../data.ts';
 import { configDir, tempDir } from '../paths.ts';
-import { readActions, updateActions, type Action, type EditAction } from './actions.ts';
+import { readActions, updateActions, type Action, type EditAction, type FileAction } from './actions.ts';
 import { APPROVE, approved } from './checks.ts';
 import { runs } from './history.ts';
 import { saveStack } from './stack-file.ts';
@@ -207,7 +207,7 @@ export function prepare({
         out.push({ app, id, state, why, ...(detail && { detail }) });
       const repo = repoOf(app);
       const file = repo ? insideClone(repo, recipe.file) : undefined;
-      if (log.some(action => action.kind === 'edit' && action.recipe === id)) {
+      if (log.some(action => (action.kind === 'edit' || action.kind === 'file') && action.recipe === id)) {
         say('already');
         continue;
       }
@@ -227,7 +227,7 @@ export function prepare({
       const find = recipe.find.replace(/\n/g, eol);
       const replace = recipe.replace.replace(/\n/g, eol);
       const count = body.split(find).length - 1;
-      if (body.includes(replace)) {
+      if (count === 0 && replace && body.includes(replace)) {
         say('already');
         continue;
       }
@@ -235,16 +235,22 @@ export function prepare({
         say('moved', `${recipe.file}: the original text is ${count ? 'there more than once' : 'no longer there'}`);
         continue;
       }
+      const changed = body.replace(find, () => replace);
+      const whole = !replace || find.includes(replace) || changed.split(replace).length - 1 > 1;
       // Logged before the file changes, so a crash part-way still leaves Stop an entry to undo.
-      const entry: EditAction = { kind: 'edit', app, file: file as string, before: find, after: replace, recipe: id };
+      const entry: EditAction | FileAction = {
+        kind: whole ? 'file' : 'edit',
+        app,
+        file: file as string,
+        before: whole ? body : find,
+        after: whole ? changed : replace,
+        recipe: id,
+      };
       updateActions(logFile, list => {
         list.push(entry);
       });
       log.push(entry);
-      fs.writeFileSync(
-        file as string,
-        body.replace(find, () => replace),
-      );
+      fs.writeFileSync(file as string, changed);
       out.push({ app, id, state: 'applied', why, scope: recipe.scope });
     }
   return out;

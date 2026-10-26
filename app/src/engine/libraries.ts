@@ -64,17 +64,24 @@ export function librariesFor(appDir: string, clones: Library[]): Library[] {
 
 const OVERRIDES = 'pubspec_overrides.yaml';
 const MARK = '# Written by Koppler for a local run; Stop removes it.';
-const SECTION = /^dependency_overrides:\s*$/m;
+const SECTION = /^dependency_overrides:[ \t]*\r?$/m;
 
 /** The overrides file with the local libraries in it, keeping what the user had there. */
 function withOverrides(before: string | null, libraries: Library[]): string {
-  const lines = libraries.map(library => `  ${library.name}:\n    path: ${library.path}`).join('\n');
-  // A file Koppler wrote on an earlier run is replaced; the user's own is added to.
-  const own = before && !before.includes(MARK) ? before : null;
-  if (!own) return `${MARK}\ndependency_overrides:\n${lines}\n`;
-  return SECTION.test(own)
-    ? own.replace(SECTION, () => `dependency_overrides:\n${lines}`)
-    : `${own.trimEnd()}\n\ndependency_overrides:\n${lines}\n`;
+  const block = before?.split(SECTION)[1]?.split(/^[^\s#]/m)[0] ?? '';
+  const keys = [...block.matchAll(/^([ \t]+)["']?(\w+)["']?[ \t]*:/gm)];
+  const indent = keys.length ? Math.min(...keys.map(match => match[1]?.length ?? 2)) : 2;
+  const pad = ' '.repeat(indent);
+  const lines = libraries.map(library => `${pad}${library.name}:\n${pad}  path: ${library.path}`).join('\n');
+  if (!before) return `${MARK}\ndependency_overrides:\n${lines}\n`;
+  if (/^["']?dependency_overrides["']?[ \t]*:/m.test(before) && !SECTION.test(before))
+    throw new Error(`${OVERRIDES} needs a block-form dependency_overrides section to add local libraries`);
+  const names = new Set(keys.filter(match => match[1]?.length === indent).map(match => match[2]));
+  const conflict = libraries.find(library => names.has(library.name));
+  if (conflict) throw new Error(`${OVERRIDES} already overrides ${conflict.name}; remove that override first`);
+  return SECTION.test(before)
+    ? before.replace(SECTION, () => `dependency_overrides:\n${lines}`)
+    : `${before.trimEnd()}\n\ndependency_overrides:\n${lines}\n`;
 }
 
 /** Points the app at the local libraries; returns the action-log entries that undo it. */
@@ -90,12 +97,16 @@ export function link(appId: string, appDir: string, libraries: Library[], logFil
   const npm = libraries.filter(library => library.ecosystem === 'npm');
   if (dart.length > 0) {
     const file = path.join(appDir, OVERRIDES);
-    const before = read(file);
-    const text = withOverrides(before, dart);
     const logged = (action: Action): action is FileAction => action.kind === 'file' && action.file === file;
+    const entry = log.find(logged);
+    const now = read(file);
+    if (entry && now !== entry.after && now !== (entry.before ?? null))
+      throw new Error(`${OVERRIDES} changed since Koppler wrote it; take Koppler's lines out by hand`);
+    const before = entry ? (entry.before ?? null) : now;
+    const text = withOverrides(before, dart);
     // Stop puts back the file as it was before the first change of this run, if it still holds what Koppler wrote
     // last.
-    if (!log.some(logged)) record({ kind: 'file', app: appId, file, before, after: text });
+    if (!entry) record({ kind: 'file', app: appId, file, before, after: text });
     else
       updateActions(logFile, list => {
         const entry = list.find(logged);
