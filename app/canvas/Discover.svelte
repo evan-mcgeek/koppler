@@ -15,6 +15,7 @@
   import { CARD, discovered, type LeanData } from './discover.svelte.ts';
   import FeaturePanel from './FeaturePanel.svelte';
   import FeatureStart from './FeatureStart.svelte';
+  import { heldKeys } from './held-keys.ts';
   import LeanCard from './LeanCard.svelte';
 
   const flow = useSvelteFlow();
@@ -32,20 +33,21 @@
   });
   // What the flow measured and where a card is while it is dragged: kept across redraws so fitting sees every card.
   let flowState = $state.raw<Record<Card, Node>>({});
+  /** Where a card is: where it is being dragged, else where it was put. */
+  const placeOf = (card: Card) => (flowState[card]?.dragging && flowState[card].position) || discovered.positions[card];
   const nodes = $derived(
     map.cards.map(({ card, onBoard, hidden }): Node<LeanData> => ({
       id: card,
       type: 'lean',
       ...(flowState[card]?.measured && { measured: flowState[card].measured }),
-      position:
-        (flowState[card]?.dragging && flowState[card].position) || (discovered.positions[card] ?? { x: 0, y: 0 }),
+      position: placeOf(card) ?? { x: 0, y: 0 },
       data: discovered.data(card, onBoard, hidden),
       selected: discovered.picked.includes(card),
       class: near && !near.has(card) ? 'dimmed' : '',
     })),
   );
   const box = (card: Card): Box | undefined => {
-    const at = discovered.positions[card];
+    const at = placeOf(card);
     return at && { x: at.x, y: at.y, w: CARD.w, h: discovered.heights[card] ?? CARD.h };
   };
   const onBoard = $derived(new Set(map.cards.filter(one => one.onBoard).map(one => one.card)));
@@ -171,6 +173,7 @@
     discovered.last = card;
     void flow.fitView({ nodes: [{ id: card }], duration: 200, maxZoom: flow.getZoom(), minZoom: flow.getZoom() });
   };
+  const { hold, release } = heldKeys();
   const keys = (ev: KeyboardEvent) => {
     if (ev.metaKey || ev.ctrlKey || ev.altKey) return;
     if ((ev.target as Element | null)?.closest('input, textarea, select, [contenteditable]')) return;
@@ -191,7 +194,14 @@
   );
 </script>
 
-<svelte:window onkeydown={keys} />
+<svelte:window
+  onkeydown={(ev: KeyboardEvent) => {
+    hold(ev);
+    keys(ev);
+  }}
+  onkeyup={hold}
+  onpointermovecapture={release}
+/>
 
 <div class="discover">
   <div class="map" aria-label="Discover map">
@@ -263,13 +273,7 @@
                 data-link={one.key}
               >
                 <path class="wire" d={one.d} />
-                <circle class="dot" cx={one.start.x} cy={one.start.y} r="3.5" />
-                {#if one.both}
-                  <circle class="dot" cx={one.end.x} cy={one.end.y} r="3.5" />
-                {:else}
-                  <circle class="ring" cx={one.end.x} cy={one.end.y} r="6" />
-                  <path class="arrow" d={one.arrow} />
-                {/if}
+                {#if !one.both}<path class="arrow" d={one.arrow} />{/if}
               </g>
             {/each}
             {#each drawn.filter(one => one.step) as one (one.key)}
@@ -296,6 +300,21 @@
                 <rect width="18" height="18" />
                 <text class="at" x="9" y="13" text-anchor="middle">{phase.at + 1}</text>
                 <text class="name" x="26" y="14">{phase.name}</text>
+              </g>
+            {/each}
+          </svg>
+        </ViewportPortal>
+        <!-- Each link's ends over the cards, so a ring on a card's edge shows whole. -->
+        <ViewportPortal target="front" style="position: absolute; z-index: 1001">
+          <svg class="ends" aria-hidden="true">
+            {#each drawn as one (one.key)}
+              <g class="end" class:board={one.board} class:faded={one.faded}>
+                <circle class="dot" cx={one.start.x} cy={one.start.y} r="3.5" />
+                {#if one.both}
+                  <circle class="dot" cx={one.end.x} cy={one.end.y} r="3.5" />
+                {:else}
+                  <circle class="ring" cx={one.end.x} cy={one.end.y} r="6" />
+                {/if}
               </g>
             {/each}
           </svg>
@@ -490,7 +509,8 @@
       bottom: auto;
     }
   }
-  .links {
+  .links,
+  .ends {
     position: absolute;
     overflow: visible;
     width: 1px;
@@ -499,10 +519,12 @@
   }
   /* Between two of the board's apps a link is ink; out to the ring it is drawn back. Dashed: found, not confirmed. */
   .link,
+  .end,
   .mark {
     --tone: var(--line-strong);
   }
   .link.board,
+  .end.board,
   .mark.board {
     --tone: var(--ink);
   }
@@ -514,10 +536,10 @@
   .link.found .wire {
     stroke-dasharray: 5 4;
   }
-  .link .dot {
+  .end .dot {
     fill: var(--tone);
   }
-  .link .ring {
+  .end .ring {
     fill: var(--desk);
     stroke: var(--tone);
     stroke-width: 1.5;
@@ -530,6 +552,7 @@
     stroke-linejoin: round;
   }
   .link.faded,
+  .end.faded,
   .mark.faded,
   .phase.faded {
     opacity: 0.25;
