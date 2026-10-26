@@ -206,9 +206,15 @@
     fitWhenLaid = false;
     requestAnimationFrame(() => void fit());
   });
+  // The panel shows the card clicked, or the only one picked; an area picked opens nothing, as on a board.
   const pick = (cards: Card[]) => {
     discovered.picked = cards;
-    discovered.last = discovered.last && cards.includes(discovered.last) ? discovered.last : (cards.at(-1) ?? null);
+    discovered.last =
+      discovered.last && cards.includes(discovered.last)
+        ? discovered.last
+        : cards.length === 1
+          ? (cards[0] ?? null)
+          : null;
   };
   // The same keys as on a board: F fits, P presents, Cmd+Z undoes, Cmd+A picks every card.
   const keys = (ev: KeyboardEvent) => {

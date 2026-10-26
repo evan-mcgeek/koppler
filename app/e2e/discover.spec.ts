@@ -185,6 +185,8 @@ test.describe('a board with an app', () => {
     await page.mouse.move(pane.x + pane.width - 4, pane.y + pane.height - 4, { steps: 10 });
     await page.mouse.up();
     await expect(page.locator('.lean.picked')).toHaveCount(await lean.count());
+    // An area picked opens no card's panel.
+    await expect(page.locator('aside.panel')).toHaveCount(0);
     await page.mouse.click(pane.x + pane.width / 2, pane.y + 20);
     await expect(page.locator('.lean.picked')).toHaveCount(0);
     await page.keyboard.press('ControlOrMeta+a');
