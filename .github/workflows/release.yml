@@ -1,11 +1,13 @@
 name: Release
 
-# A version tag (v0.0.2, made by `npm version` in app/) publishes that version to npm as `latest`, with provenance,
-# and to GitHub Packages as @evan-mcgeek/koppler, and makes its GitHub Release linking both. npm trusts this workflow (trusted publishing); until it is set up for the package, an
-# NPM_TOKEN secret (a granular token) is used instead.
+# Merging a version bump (a "Koppler x.y.z" pull request, from `npm run release` in app/) releases it: this tags the
+# merge commit v<version>, publishes that version to npm as `latest`, with provenance, and to GitHub Packages as
+# @evan-mcgeek/koppler, and makes its GitHub Release linking both. npm trusts this workflow (trusted publishing); until
+# it is set up for the package, an NPM_TOKEN secret (a granular token) is used instead.
 on:
   push:
-    tags: ['v*']
+    branches: [main]
+    paths: [app/package.json]
 
 permissions:
   contents: read
@@ -14,11 +16,28 @@ concurrency:
   group: release
   cancel-in-progress: false
 
-# The tag is on main, whose changes passed the App workflow in their pull requests (the release commit only bumps the
-# version): the tests are not run again here.
 jobs:
+  # Any other change to package.json keeps its version, whose tag is there already: nothing to release, nothing to approve.
+  version:
+    name: New version?
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v5
+      - id: tag
+        run: |
+          tag="v$(node -p "require('./app/package.json').version")"
+          if git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null; then
+            echo "$tag is released already"
+          else
+            echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          fi
+
   publish:
     name: Publish
+    needs: version
+    if: needs.version.outputs.tag
     runs-on: ubuntu-latest
     environment: npm
     permissions:
@@ -38,13 +57,16 @@ jobs:
           cache: npm
           cache-dependency-path: app/package-lock.json
       - run: npm ci
-      - name: The tag is the package's version
+      # Pushed with the workflow's own token, so it starts no other workflow; a re-run finds it there.
+      - name: Tag the release
         run: |
-          version="v$(node -p "require('./package.json').version")"
-          if [ "$version" != "$GITHUB_REF_NAME" ]; then
-            echo "::error::tag $GITHUB_REF_NAME, but package.json says $version"
-            exit 1
-          fi
+          git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null && exit 0
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG" -m "Koppler ${TAG#v}"
+          git push origin "$TAG"
+        env:
+          TAG: ${{ needs.version.outputs.tag }}
       - name: Publish to npm
         run: npm publish --provenance --access public --tag latest
         env:
@@ -59,11 +81,12 @@ jobs:
           NODE_AUTH_TOKEN: ${{ github.token }}
       - name: GitHub Release
         run: |
-          version="${GITHUB_REF_NAME#v}"
+          version="${TAG#v}"
           notes="Install with \`npm i -g koppler@$version\`.
 
           - npm: https://www.npmjs.com/package/koppler/v/$version
           - GitHub Packages: https://github.com/${GITHUB_REPOSITORY}/pkgs/npm/koppler"
-          gh release create "$GITHUB_REF_NAME" --verify-tag --generate-notes --title "Koppler $version" --notes "$notes"
+          gh release create "$TAG" --verify-tag --generate-notes --title "Koppler $version" --notes "$notes"
         env:
           GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.version.outputs.tag }}
