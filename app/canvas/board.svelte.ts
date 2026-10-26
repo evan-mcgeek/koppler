@@ -215,10 +215,12 @@ const notesOf = (given: unknown): Record<string, string> =>
 export interface DiscoverState {
   open: string[];
   at: Record<string, Point>;
+  /** Which of Arrange's layouts it was last laid out in. */
+  layout?: number;
 }
 /** Discover's part of a saved board, or of one opened: the cards opened and where they sit. */
 const discoverOf = (given: unknown): DiscoverState => {
-  const kept = (given && typeof given === 'object' ? given : {}) as { open?: unknown; at?: unknown };
+  const kept = (given && typeof given === 'object' ? given : {}) as { open?: unknown; at?: unknown; layout?: unknown };
   const open = Array.isArray(kept.open) ? kept.open.filter((id): id is string => typeof id === 'string') : [];
   const at = Object.fromEntries(
     Object.entries(kept.at && typeof kept.at === 'object' ? (kept.at as Record<string, unknown>) : {}).flatMap(
@@ -230,7 +232,8 @@ const discoverOf = (given: unknown): DiscoverState => {
       },
     ),
   );
-  return { open, at };
+  const layout = typeof kept.layout === 'number' && Number.isInteger(kept.layout) ? kept.layout : undefined;
+  return { open, at, ...(layout !== undefined && { layout }) };
 };
 
 class Board {
@@ -1217,27 +1220,42 @@ class Board {
       pinned: this.pinned,
       feature: this.feature,
       cardNotes: this.cardNotes,
+      discover: this.discover,
       edges: this.edges.map(({ id, source, target, type, data }) => ({ id, source, target, type, data })),
     });
   }
 
   /** Puts back a board held as text: its cards, cables and the cards beside them. */
   setContent(back: string): void {
-    const { name, nodes, edges, infra, queues, databases, hiddenQueues, hiddenOutside, pinned, feature, cardNotes } =
-      JSON.parse(back) as {
-        name: string | null;
-        nodes: CardNode[];
-        edges: CableEdge[];
-        infra: { id: string; position: Point }[];
-        queues: Record<string, 'local'>;
-        databases?: Record<string, 'local'>;
-        hiddenQueues: Record<string, true>;
-        hiddenOutside: Record<string, true>;
-        pinned: string[];
-        feature?: Feature | null;
-        cardNotes?: Record<string, string>;
-      };
+    const {
+      name,
+      nodes,
+      edges,
+      infra,
+      queues,
+      databases,
+      hiddenQueues,
+      hiddenOutside,
+      pinned,
+      feature,
+      cardNotes,
+      discover,
+    } = JSON.parse(back) as {
+      name: string | null;
+      nodes: CardNode[];
+      edges: CableEdge[];
+      infra: { id: string; position: Point }[];
+      queues: Record<string, 'local'>;
+      databases?: Record<string, 'local'>;
+      hiddenQueues: Record<string, true>;
+      hiddenOutside: Record<string, true>;
+      pinned: string[];
+      feature?: Feature | null;
+      cardNotes?: Record<string, string>;
+      discover?: DiscoverState;
+    };
     this.name = name;
+    this.discover = discoverOf(discover);
     this.pinned = pinned;
     this.feature = featureOf(feature);
     this.cardNotes = notesOf(cardNotes);

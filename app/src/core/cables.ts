@@ -186,3 +186,67 @@ export function endOffsets(cables: Cable[], { cardOf, coveredBelow }: Sides) {
   }
   return { offset, onPort };
 }
+
+/** The sides of two boxes that face each other: across when they sit more side by side than one above the other. */
+export function facing(a: Box, b: Box): { sides: [Side, Side]; level: [Side, Side] } {
+  const dx = b.x + b.w / 2 - (a.x + a.w / 2);
+  const dy = b.y + b.h / 2 - (a.y + a.h / 2);
+  const level: [Side, Side] = dx > 0 ? ['right', 'left'] : ['left', 'right'];
+  return { sides: Math.abs(dx) * 0.6 > Math.abs(dy) ? level : dy > 0 ? ['bottom', 'top'] : ['top', 'bottom'], level };
+}
+
+/** The boxes the curve drawn between two sides passes under. */
+const under = (p: Point, pSide: Side, q: Point, qSide: Side, boxes: Box[]) => {
+  const [a, b, c, d] = cableCurve(p, pSide, q, qSide);
+  const on = (t: number) => {
+    const u = 1 - t;
+    return {
+      x: u * u * u * a.x + 3 * u * u * t * b.x + 3 * u * t * t * c.x + t * t * t * d.x,
+      y: u * u * u * a.y + 3 * u * u * t * b.y + 3 * u * t * t * c.y + t * t * t * d.y,
+    };
+  };
+  const points = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9].map(on);
+  return boxes.filter(box =>
+    points.some(({ x, y }) => x > box.x && x < box.x + box.w && y > box.y && y < box.y + box.h),
+  );
+};
+
+/**
+ * A link that never runs behind another box: from its sides, else across on `level` when those sides are clear, else
+ * round the boxes in its way on the side its far end leans to, each end as near the other as its side allows.
+ */
+export function around(
+  a: Box,
+  b: Box,
+  {
+    sides,
+    start = sidePoint(a, sides[0]),
+    level,
+    others,
+  }: { sides: [Side, Side]; start?: Point; level?: [Side, Side]; others: Box[] },
+): { sides: [Side, Side]; start: Point; end: Point; detour?: Point; d: string } {
+  const drawn = (s: [Side, Side], p: Point, q: Point, detour?: Point) => ({
+    sides: s,
+    start: p,
+    end: q,
+    ...(detour && { detour }),
+    d: detour ? throughPath(p, s[0], q, s[1], [detour]) : cablePath(p, s[0], q, s[1]),
+  });
+  const end = sidePoint(b, sides[1]);
+  const blocking = under(start, sides[0], end, sides[1], others);
+  if (!blocking.length) return drawn(sides, start, end);
+  if (level && sides[0] !== level[0]) {
+    const [p, q] = [sidePoint(a, level[0]), sidePoint(b, level[1])];
+    if (!under(p, level[0], q, level[1], others).length) return drawn(level, p, q);
+  }
+  const side: Side = b.x + b.w / 2 <= a.x + a.w / 2 ? 'left' : 'right';
+  // Clear of the cables at the side's middle.
+  const near = (box: Box, y: number) => ({
+    ...sidePoint(box, side),
+    y: Math.min(Math.max(y, box.y + 24), box.y + box.h - 24),
+  });
+  const [p, q] = [near(a, b.y + b.h / 2), near(b, a.y + a.h / 2)];
+  const all = [a, b, ...blocking];
+  const x = side === 'left' ? Math.min(...all.map(box => box.x)) - 40 : Math.max(...all.map(box => box.x + box.w)) + 40;
+  return drawn([side, side], p, q, { x, y: (p.y + q.y) / 2 });
+}

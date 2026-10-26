@@ -72,6 +72,7 @@
   },
   "type": "module",
   "dependencies": {
+    "elkjs": "0.9.3",
     "zod": "^4.6.5"
   }
 }
