@@ -41,8 +41,9 @@ const middle = async (page: Page, id: string) => {
   if (!box) throw new Error('not drawn');
   return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
 };
-const near = (a: { x: number } | null, b: { x: number }, c: { x: number }) =>
-  !!a && Math.abs(a.x - b.x) < Math.abs(a.x - c.x);
+type Point = { x: number; y: number };
+const near = (a: Point | null, b: Point, c: Point) =>
+  !!a && Math.hypot(a.x - b.x, a.y - b.y) < Math.hypot(a.x - c.x, a.y - c.y);
 
 test('a publish lands in the queue and a read in the app, each with a chevron; a cable too', async ({ page }) => {
   const queue = page.locator('.svelte-flow__node-queue');
