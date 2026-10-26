@@ -59,3 +59,41 @@ test('after Arrange, a message link goes round the cards between its two ends', 
   await expect.poll(() => crossed(page)).toEqual([]);
   await page.screenshot({ path: 'test-results/links-around.png' });
 });
+
+test.describe('an app with its database and queue stacked under it', () => {
+  test.use({
+    stack: {
+      ...STACK,
+      queues: { events: { name: 'Order events', type: 'sqs' } },
+      databases: { 'orders-db': { name: 'Orders', kind: 'postgres', tunnel: 'aurora.qa.acme.example', port: 5432 } },
+      apps: {
+        ...STACK.apps,
+        orders: { ...STACK.apps.orders, prereqs: [], envs: {}, publishes: { events: {} }, uses: { 'orders-db': {} } },
+        payments: { ...STACK.apps.payments, reads: { events: {} } },
+      },
+    },
+    board: {
+      env: 'qa',
+      mode: 'auto',
+      nodes: { orders: { ...at(0, 0), showQueues: true }, payments: { ...at(600, 0), showQueues: true } },
+      queues: { events: 'local' },
+      edges: [{ from: 'orders', to: 'payments' }],
+    },
+  });
+
+  test('its publish link goes round the database, and the read link goes straight across', async ({ page }) => {
+    await expect(page.locator('.svelte-flow__node-queue')).toHaveCount(1);
+    await expect(page.locator('.svelte-flow__node-database')).toHaveCount(1);
+    await expect.poll(() => page.locator('.links .flow').count()).toBe(3);
+    await expect.poll(() => crossed(page)).toEqual([]);
+    // It lands on the reader's near side, the left, not round its far one.
+    const payments = await page.locator('.svelte-flow__node[data-id="payments"]').boundingBox();
+    const end = await page
+      .locator('.links .flow[data-link="queue:events>payments"] path.wire')
+      .evaluate((wire: SVGPathElement) => {
+        const p = wire.getPointAtLength(wire.getTotalLength());
+        return new DOMPoint(p.x, p.y).matrixTransform(wire.getScreenCTM() ?? undefined).x;
+      });
+    expect(Math.abs(end - (payments?.x ?? 0))).toBeLessThan(30);
+  });
+});

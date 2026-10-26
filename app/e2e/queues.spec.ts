@@ -145,7 +145,9 @@ test('a card lists the apps it still calls in the deployed environment, and a cl
   await expect(calls).toHaveCount(0);
 });
 
-test('a queue card is joined to its own app on whichever side of the app it is moved to', async ({ page }) => {
+test('a queue card is joined to its own app on whichever side of the app it is moved to, round any card between', async ({
+  page,
+}) => {
   const events = queue(page).filter({ hasText: 'Order events' });
   const link = page.locator('.links .flow.msg .wire').first();
   const app = await card(page, 'orders').boundingBox();
@@ -165,10 +167,10 @@ test('a queue card is joined to its own app on whichever side of the app it is m
     await page.mouse.move(x + 30, y + 12, { steps: 8 });
     await page.mouse.up();
   };
-  const [right, bottom] = [Math.round(app.x + app.width), Math.round(app.y + app.height)];
-  // Under the app: the link leaves the app's bottom edge.
+  const [left, right, bottom] = [Math.round(app.x), Math.round(app.x + app.width), app.y + app.height];
+  // Under the app, past its tunnel card: the link goes round the tunnel, from the app's side.
   await moveTo(app.x, bottom + 60);
-  expect(Math.abs(((await start())[1] ?? 0) - bottom)).toBeLessThanOrEqual(1);
+  expect(Math.abs(((await start())[0] ?? 0) - left)).toBeLessThanOrEqual(1);
   // To its right, level with it: the right edge.
   await moveTo(right + 80, app.y + 40);
   expect(Math.abs(((await start())[0] ?? 0) - right)).toBeLessThanOrEqual(1);

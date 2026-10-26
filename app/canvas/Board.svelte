@@ -301,14 +301,27 @@
             return x > box.x && x < box.x + box.w && y > box.y && y < box.y + box.h;
           }),
         );
-      // Except a card of the app's own stack, joined on whichever side it sits.
-      const routed = row === undefined && (database ? board.boxes.has(from) : !own);
-      const blocking = routed ? under(start, end) : [];
+      const routed = row === undefined && (!database || board.boxes.has(from));
+      let blocking = routed ? under(start, end) : [];
+      // Blocked, the sides that face each other across can still be clear.
+      if (blocking.length && sides[0] !== level[0] && !(taken(from, level[0]) || taken(to, level[1]))) {
+        const across = [sidePoint(a, level[0]), sidePoint(b, level[1])] as const;
+        if (!under(...across).length) {
+          sides = level;
+          [start, end] = across;
+          blocking = [];
+        }
+      }
       let detour: Point | undefined;
       if (blocking.length) {
         const side: Side = b.x + b.w / 2 <= a.x + a.w / 2 ? 'left' : 'right';
         sides = [side, side];
-        [start, end] = [sidePoint(a, side), sidePoint(b, side)];
+        // Each end as near the other as its side allows, clear of the cables at the side's middle.
+        const near = (box: Box, y: number) => ({
+          ...sidePoint(box, side),
+          y: Math.min(Math.max(y, box.y + 24), box.y + box.h - 24),
+        });
+        [start, end] = [near(a, b.y + b.h / 2), near(b, a.y + a.h / 2)];
         const edges = [a, b, ...blocking.map(([, box]) => box)];
         detour = {
           x:
