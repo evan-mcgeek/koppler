@@ -63,6 +63,91 @@ test.describe('a board with an app', () => {
     await page.screenshot({ path: 'test-results/discover.png' });
   });
 
+  test('a card being dragged keeps its links on it, before it is let go', async ({ page }) => {
+    await discover(page);
+    await page.getByRole('button', { name: 'Fit the map in the window' }).click();
+    const web = card(page, 'web');
+    const from = await web.boundingBox();
+    if (!from) throw new Error('no Web Shop card');
+    await page.mouse.move(from.x + 40, from.y + 20);
+    await page.mouse.down();
+    await page.mouse.move(from.x + 40, from.y + 160, { steps: 8 });
+    const now = await web.boundingBox();
+    if (!now) throw new Error('no Web Shop card');
+    expect(now.y).toBeGreaterThan(from.y + 100);
+    // Where its link leaves it, on the page: on the card's edge as it is now.
+    const start = await page
+      .locator('.links .link[data-link^="web>"] .wire')
+      .first()
+      .evaluate(el => {
+        const wire = el as SVGPathElement;
+        const p = wire.getPointAtLength(0).matrixTransform(wire.getScreenCTM() ?? new DOMMatrix());
+        return { x: p.x, y: p.y };
+      });
+    expect(start.y).toBeGreaterThanOrEqual(now.y - 2);
+    expect(start.y).toBeLessThanOrEqual(now.y + now.height + 2);
+    await page.mouse.up();
+  });
+
+  test('a link lands in a ring drawn whole over the card it reaches', async ({ page }) => {
+    await discover(page);
+    const rings = page.locator('.svelte-flow circle.ring');
+    await expect(rings.first()).toBeVisible();
+    // The topmost thing at each ring's centre is the ring, never the card under it.
+    const covered = await rings.evaluateAll(all => {
+      for (const layer of new Set(all.map(ring => ring.closest('svg')))) if (layer) layer.style.pointerEvents = 'auto';
+      return all.filter(ring => {
+        const box = ring.getBoundingClientRect();
+        const top = document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2);
+        return top !== ring;
+      }).length;
+    });
+    expect(covered).toBe(0);
+  });
+
+  test('dragging another card moves only that one, and a click on the map clears the pick', async ({ page }) => {
+    await discover(page);
+    await page.getByRole('button', { name: 'Fit the map in the window' }).click();
+    await card(page, 'orders').click();
+    await expect(card(page, 'orders').locator('.lean')).toHaveClass(/picked/);
+    const [web, orders] = [await card(page, 'web').boundingBox(), await card(page, 'orders').boundingBox()];
+    if (!web || !orders) throw new Error('no cards');
+    await page.mouse.move(web.x + 40, web.y + 20);
+    await page.mouse.down();
+    await page.mouse.move(web.x + 40, web.y + 140, { steps: 8 });
+    await page.mouse.up();
+    expect((await card(page, 'web').boundingBox())?.y).toBeGreaterThan(web.y + 60);
+    expect(Math.abs(((await card(page, 'orders').boundingBox())?.y ?? 0) - orders.y)).toBeLessThan(3);
+    const map = page.locator('.svelte-flow__pane');
+    const box = await map.boundingBox();
+    if (!box) throw new Error('no map');
+    await page.mouse.click(box.x + box.width / 2, box.y + 20);
+    await expect(page.locator('.lean.picked')).toHaveCount(0);
+  });
+
+  test('after a shortcut the system kept the key-up of (a screenshot), picking and dragging work as usual', async ({
+    page,
+  }) => {
+    await discover(page);
+    await page.getByRole('button', { name: 'Fit the map in the window' }).click();
+    // Cmd goes down and its key-up never comes, as when macOS takes Cmd+Shift+4 for a screenshot.
+    await page.evaluate(() =>
+      document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Meta', metaKey: true, bubbles: true })),
+    );
+    await card(page, 'orders').click();
+    const [web, orders] = [await card(page, 'web').boundingBox(), await card(page, 'orders').boundingBox()];
+    if (!web || !orders) throw new Error('no cards');
+    await page.mouse.move(web.x + 40, web.y + 20);
+    await page.mouse.down();
+    await page.mouse.move(web.x + 40, web.y + 140, { steps: 8 });
+    await page.mouse.up();
+    expect(Math.abs(((await card(page, 'orders').boundingBox())?.y ?? 0) - orders.y)).toBeLessThan(3);
+    const box = await page.locator('.svelte-flow__pane').boundingBox();
+    if (!box) throw new Error('no map');
+    await page.mouse.click(box.x + box.width / 2, box.y + 20);
+    await expect(page.locator('.lean.picked')).toHaveCount(0);
+  });
+
   test('a found call is dashed and listed with Confirm, which keeps it in the stack', async ({ page, canvas }) => {
     fs.mkdirSync(path.join(canvas.dir, 'stack'), { recursive: true });
     fs.mkdirSync(path.join(canvas.dir, 'config'), { recursive: true });
@@ -124,5 +209,32 @@ test.describe('an empty board', () => {
     await expect(page.getByRole('status').filter({ hasText: 'No apps on this board' })).toBeVisible();
     await page.getByRole('button', { name: 'Add apps' }).click();
     await expect(page.getByRole('radio', { name: 'Plan' })).toBeChecked();
+  });
+});
+
+test.describe('an outside system with a long description', () => {
+  test.use({
+    stack: {
+      ...STACK,
+      apps: {
+        ...STACK.apps,
+        web: { ...STACK.apps.web, consumes: { ...STACK.apps.web?.consumes, crm: {} } },
+        crm: {
+          name: 'CRM event handler',
+          kind: 'other',
+          outside:
+            'Lambda crm-event-handler in acme/orders-api (Orders.Events/infra); CRM OrderChanged__e; deployed only',
+        },
+      },
+    },
+    board: { env: 'qa', mode: 'auto', zoom: 1, pan: { x: 60, y: 60 }, nodes: { web: at(0, 0) }, edges: [] },
+  });
+
+  test('keeps it inside its card, whole on hover', async ({ page }) => {
+    await discover(page);
+    const crm = card(page, 'crm');
+    const row = crm.locator('.meta');
+    expect(await row.evaluate(el => el.scrollWidth - el.clientWidth)).toBeLessThanOrEqual(0);
+    await expect(crm.locator('[title$="deployed only"]')).toHaveCount(1);
   });
 });

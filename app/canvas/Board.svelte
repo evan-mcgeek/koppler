@@ -36,6 +36,7 @@
   import { undo } from './undo.svelte.ts';
   import { ago, openBoard } from './boards.ts';
   import { live } from './live.svelte.ts';
+  import { heldKeys } from './held-keys.ts';
   import { probes, type Job, type Probe } from './probes.svelte.ts';
   import { runs } from './run.svelte.ts';
 
@@ -133,21 +134,7 @@
     ['select', 'Select (V): drag on the board to select an area', MousePointer2],
     ['hand', 'Hand (H): drag to move around. Or hold Space while dragging', Hand],
   ] as const;
-  // A key the system takes over mid-press (a screenshot shortcut) never sends its key-up, and the board would keep
-  // selecting instead of moving cards: the mouse says which keys are really held.
-  const FLAGS = { Shift: 'shiftKey', Meta: 'metaKey', Control: 'ctrlKey', Alt: 'altKey' } as const;
-  const held = { Shift: false, Meta: false, Control: false, Alt: false };
-  const hold = (ev: KeyboardEvent) => {
-    if (!(ev.key in FLAGS)) return;
-    held[ev.key as keyof typeof FLAGS] = ev.type === 'keydown';
-  };
-  const release = (ev: PointerEvent) => {
-    const keys = Object.keys(FLAGS) as (keyof typeof FLAGS)[];
-    if (keys.every(key => !held[key] || ev[FLAGS[key]])) return;
-    for (const key of keys) held[key] = false;
-    // What the library does when the window loses focus: every key it tracks is let go.
-    window.dispatchEvent(new Event('blur'));
-  };
+  const { hold, release } = heldKeys();
   const shortcut = (ev: KeyboardEvent) => {
     if (ev.altKey || (ev.target as Element).closest('input, select, textarea')) return;
     // A dialog or a menu over the board has the keyboard to itself.

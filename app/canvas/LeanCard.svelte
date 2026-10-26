@@ -26,7 +26,10 @@
     <span class="tag">{data.tag}</span>
   </span>
   <span class="meta">
-    {#if data.cloned}<Laptop size={12} aria-hidden="true" /><span class="here">Cloned here</span>{:else}{data.meta}{/if}
+    {#if data.cloned}<Laptop size={12} aria-hidden="true" /><span class="here">Cloned here</span>{:else}<span
+        class="what"
+        title={data.meta}>{data.meta}</span
+      >{/if}
   </span>
   {#if data.proposed}
     <span class="proposal">
@@ -148,6 +151,12 @@
     color: var(--ink-muted);
     font: 400 12px var(--sans);
     white-space: nowrap;
+  }
+  /* A long description stays inside its card. */
+  .what {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   .here {
     color: var(--ink);
