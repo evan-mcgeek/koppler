@@ -20,7 +20,7 @@
   kind="queue"
   name={data.name}
   tag={data.kind}
-  status={data.upstream ? 'Stays deployed' : data.local ? 'Runs on your Mac' : 'Uses the deployed queue'}
+  status={data.local ? 'Runs on your Mac' : 'Uses the deployed queue'}
   title={data.about.join('\n')}
   {selected}
   actions={[
@@ -48,46 +48,35 @@
         title={data.about.slice(1).join('\n')}><Icon of={TriangleAlert} size={13} /></span
       >{/if}
   {/snippet}
-  {#if !data.upstream}
-    <span class="label">Messages go to</span>
-    <span class="seg nodrag" class:local={data.local} role="radiogroup" aria-label="Which {data.name} its apps use">
-      <label title="The {env} queue">
-        <input
-          type="radio"
-          name="queue-{data.queue}"
-          checked={!data.local}
-          onchange={() => {
-            board.setQueue(data.queue, false);
-          }}
-        />Deployed
-      </label>
-      <label
-        aria-disabled={!data.can}
-        title={data.can
-          ? 'Koppler runs it on your Mac and points its apps at it'
-          : `Koppler cannot run a ${data.kind} queue locally yet`}
-      >
-        <input
-          type="radio"
-          name="queue-{data.queue}"
-          checked={data.local}
-          disabled={!data.can}
-          onchange={() => {
-            board.setQueue(data.queue, true);
-          }}
-        />Local
-      </label>
-    </span>
-  {/if}
+  <span class="label">Messages go to</span>
+  <span class="seg nodrag" class:local={data.local} role="radiogroup" aria-label="Which {data.name} its apps use">
+    <label title="The {env} queue">
+      <input
+        type="radio"
+        name="queue-{data.queue}"
+        checked={!data.local}
+        onchange={() => {
+          board.setQueue(data.queue, false);
+        }}
+      />Deployed
+    </label>
+    <label title="Koppler runs it on your Mac and points its apps at it">
+      <input
+        type="radio"
+        name="queue-{data.queue}"
+        checked={data.local}
+        onchange={() => {
+          board.setQueue(data.queue, true);
+        }}
+      />Local
+    </label>
+  </span>
 </InfraCard>
 
 <style>
   .seg label {
     flex: 1;
     padding: 6px 12px;
-  }
-  .seg label[aria-disabled='true'] input {
-    opacity: 0;
   }
   .warn {
     display: inline-grid;

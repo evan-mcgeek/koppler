@@ -28,7 +28,6 @@
   import { appearance, isLight } from './appearance.svelte.ts';
   import AppCard from './AppCard.svelte';
   import Cable from './Cable.svelte';
-  import Outside from './Outside.svelte';
   import Database from './Database.svelte';
   import Queue from './Queue.svelte';
   import Tunnel from './Tunnel.svelte';
@@ -232,13 +231,13 @@
     }),
   );
   const name = board.nameOf;
-  /** Any card's name: an app's, or a queue's, a database's or an outside system's by its card key. */
+  /** Any card's name: an app's, or a queue's or a database's by its card key. */
   const cardName = (key: string) =>
     key.startsWith('queue:')
       ? board.queueName(key.slice(6))
       : key.startsWith('database:')
         ? board.databaseName(key.slice(9))
-        : name(key.replace(/^outside:/, ''));
+        : name(key);
   /** The menu a right click on a line to a tunnel or a database opens: show or hide the tunnel for that app. */
   let lineMenu = $state<{ x: number; y: number; app: string; host: string; show: boolean } | null>(null);
   const openLineMenu = (ev: MouseEvent, app: string, host: string, show: boolean) => {
@@ -263,7 +262,7 @@
     })),
     ...links.map(({ key, from, payload }) => ({ key, apps: [from], payload })),
   ]);
-  /** A message link or a call to an outside system, between the sides of its two cards that face each other. */
+  /** A message link or a database line, between the sides of its two cards that face each other. */
   const flows = $derived(
     board.flows.flatMap(({ from, to, queue, database, via }) => {
       const box = (key: string) => board.boxes.get(key) ?? board.infraBoxes.get(key);
@@ -356,13 +355,11 @@
             ? board.queues[queue] === 'local'
               ? 'msg local'
               : 'msg'
-            : database
-              ? board.databases[database]
-                ? 'db local'
-                : row === undefined
-                  ? 'db'
-                  : 'db row'
-              : 'ext',
+            : database && board.databases[database]
+              ? 'db local'
+              : row === undefined
+                ? 'db'
+                : 'db row',
           via,
           // Beside the link, not on it: right of one running up or down, over one running across.
           label: detour
@@ -565,7 +562,7 @@
       }
     }
     bind:edges={board.edges}
-    nodeTypes={{ app: AppCard, tunnel: Tunnel, queue: Queue, outside: Outside, database: Database }}
+    nodeTypes={{ app: AppCard, tunnel: Tunnel, queue: Queue, database: Database }}
     edgeTypes={{ cable: Cable }}
     connectionMode={ConnectionMode.Loose}
     deleteKey={board.live ? null : ['Backspace', 'Delete']}
@@ -1063,7 +1060,7 @@
     stroke-dasharray: 5 5;
     stroke-linecap: butt;
   }
-  /* Message links are teal, dashed while the queue is the deployed one; calls to an outside system are dotted grey. */
+  /* Message links are teal, dashed while the queue is the deployed one. */
   .flow .via {
     fill: var(--muted);
     font: 600 11px var(--mono);
@@ -1109,7 +1106,7 @@
   .flow:hover .wire {
     stroke-width: 3;
   }
-  /* Message links are teal, dashed while the queue is the deployed one; calls to an outside system are dotted grey. */
+  /* Message links are teal, dashed while the queue is the deployed one. */
   .flow.msg {
     --tone: var(--msg);
   }
@@ -1137,13 +1134,8 @@
   .flow.db.lit .wire {
     stroke-width: 3;
   }
-  .flow.ext .wire {
-    stroke-width: 1.5;
-    stroke-dasharray: 2 5;
-  }
   /* Snapped straight while a card is dragged: the line goes a shade darker, nothing more. */
-  .link.snapped,
-  .flow.ext.snapped {
+  .link.snapped {
     stroke: var(--ink);
     --tone: var(--ink);
   }
@@ -1153,12 +1145,6 @@
   /* The picked card's own links stand out like its cables. */
   .link.lit {
     stroke: var(--ink);
-    stroke-width: 2.5;
-  }
-  .flow.ext.lit {
-    --tone: var(--ink);
-  }
-  .flow.ext.lit .wire {
     stroke-width: 2.5;
   }
   .flow.msg.lit .wire {

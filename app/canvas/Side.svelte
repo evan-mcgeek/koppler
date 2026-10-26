@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { discovered } from './discover.svelte.ts';
   import Icon from './Icon.svelte';
   import Play from '@lucide/svelte/icons/play';
   import Plus from '@lucide/svelte/icons/plus';
@@ -27,11 +28,7 @@
   let sort = $state(remembered());
   let search = $state('');
   let copied = $state('');
-  // Outside systems count by their card: put there by hand, or because an app on the board uses them.
-  const onBoard = $derived([
-    ...board.cards.map(node => node.id),
-    ...board.infra.filter(card => card.type === 'outside').map(card => card.id.slice(8)),
-  ]);
+  const onBoard = $derived(board.cards.map(node => node.id));
   /** An app matches by any part of its name, or by the start of its kind: "pay", ".net", "lam". */
   const matches = (app: StackApp) => {
     const asked = search.trim().toLowerCase();
@@ -152,7 +149,7 @@
               type="button"
               title="Show its card"
               onclick={() => {
-                board.show(app.outside ? `outside:${app.id}` : app.id);
+                board.show(app.id);
               }}
             >
               <span class="name">{app.name}</span>
@@ -172,8 +169,7 @@
               aria-label="Remove {app.name} from the board"
               title="Remove from the board"
               onclick={() => {
-                if (app.outside) board.showOutside(app.id, false);
-                else board.remove(app.id);
+                board.remove(app.id);
               }}
             >
               <Icon of={X} size={11} />
@@ -182,9 +178,11 @@
             <button
               class="main"
               type="button"
-              title="Does not run on this Mac: {app.outside}. Click to put its card on the board; it never runs."
+              title="Does not run on this Mac: {app.outside}. Click to see it in Discover, with what it talks to."
               onclick={() => {
-                board.showOutside(app.id, true);
+                board.goDiscover();
+                discovered.picked = [app.id];
+                discovered.last = app.id;
               }}><span class="name">{app.name}</span></button
             >
             <span class="state">outside</span>

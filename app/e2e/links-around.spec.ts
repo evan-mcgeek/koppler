@@ -9,17 +9,22 @@ test.use({
     apps: {
       ...STACK.apps,
       web: { ...STACK.apps.web, publishes: { pushes: {} } },
-      pusher: {
-        name: 'Acme Pusher',
-        kind: 'other',
-        outside: 'Lambda',
-        reads: { pushes: {} },
-        consumes: { 'push-service': {} },
-      },
-      'push-service': { name: 'Acme Push', kind: 'other', outside: 'SaaS', consumes: { web: {} } },
+      payments: { ...STACK.apps.payments, reads: { pushes: {} } },
     },
   },
-  board: { env: 'qa', mode: 'auto', nodes: { web: { ...at(0, 0), showQueues: true } }, edges: [] },
+  board: {
+    env: 'qa',
+    mode: 'auto',
+    nodes: {
+      web: { ...at(0, 0), showQueues: true },
+      orders: at(500, 0),
+      payments: { ...at(1000, 0), showQueues: true },
+    },
+    edges: [
+      { from: 'web', to: 'orders' },
+      { from: 'orders', to: 'payments' },
+    ],
+  },
 });
 
 /** For each link, the cards other than its own two that its drawn line passes through. */
@@ -44,13 +49,13 @@ const crossed = (page: Page) =>
     }),
   );
 
-test('after Arrange, the link back up a chain goes round the cards in between', async ({ page }) => {
-  await expect(page.locator('.svelte-flow__node-outside')).toHaveCount(2);
+test('after Arrange, a message link goes round the cards between its two ends', async ({ page }) => {
+  await expect(page.locator('.svelte-flow__node-queue')).toHaveCount(1);
   await page
     .getByRole('button', { name: /^Arrange/ })
     .first()
     .click();
-  await expect.poll(() => page.locator('.links .flow').count()).toBeGreaterThan(2);
+  await expect.poll(() => page.locator('.links .flow').count()).toBe(2);
   await expect.poll(() => crossed(page)).toEqual([]);
   await page.screenshot({ path: 'test-results/links-around.png' });
 });
