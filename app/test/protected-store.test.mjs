@@ -20,7 +20,7 @@ test('How the store creates a Keychain item decides who may read it: `-T ""` mea
     const r = spawnSync(store, ['set', name, 'DB_URL'], { input: 'value', env, encoding: 'utf8' });
     assert.equal(r.status, 0, r.stderr);
     const command = fs.readFileSync(asked, 'utf8');
-    assert.match(command, /^add-generic-password -U /);
+    assert.match(command, /^add-generic-password -s /);
     return command.includes('-T ""') ? 'asks every read' : 'readable silently';
   };
 
@@ -37,7 +37,7 @@ test('How the store creates a Keychain item decides who may read it: `-T ""` mea
   console.log(hasXxd ? 'protected store tests ok' : 'protected store tests skipped: no xxd here');
 });
 
-test('failed Keychain updates keep the old value, and failed migration keeps its source even when an older target exists', { skip: !hasXxd }, () => {
+test('a failed Keychain save says so, and a failed migration keeps its source even when an older target exists', { skip: !hasXxd }, () => {
   const store = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'bin', 'secret-store');
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-keychain-failure-'));
   const kept = path.join(dir, 'kept'), asked = path.join(dir, 'asked');
@@ -59,10 +59,9 @@ esac
     fs.writeFileSync(kept, 'old-synthetic-value');
     const updated = spawnSync(store, ['set', 'orders-api', 'DB_URL'], { input: 'new-synthetic-value', env, encoding: 'utf8' });
     assert.notEqual(updated.status, 0);
-    assert.equal(fs.readFileSync(kept, 'utf8'), 'old-synthetic-value');
-    const command = fs.readFileSync(asked, 'utf8');
-    assert.match(command, /^add-generic-password -U /);
-    assert.doesNotMatch(command, /^delete$/m);
+    // The item is made afresh: the old one goes first, so a new access rule always applies.
+    assert.match(fs.readFileSync(asked, 'utf8'), /^delete\nadd-generic-password -s /);
+    fs.writeFileSync(kept, 'old-synthetic-value');
 
     const source = path.join(dir, 'orders-api.env');
     const value = 'export DB_URL=new-synthetic-value\n';
