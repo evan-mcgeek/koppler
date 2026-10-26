@@ -12,12 +12,8 @@ const stack = {
   },
   found: { catalog: { search: 'src/search.ts:12' } },
 };
-const discover = async (page: Page) => {
-  await expect(card(page, 'web')).toBeVisible();
-  await page.keyboard.press('d');
-  await expect(page.getByRole('radio', { name: 'Discover' })).toBeChecked();
-  // Settled: every card placed, and the view no longer moving to fit them.
-  await expect(page.locator('.svelte-flow__node.unplaced')).toHaveCount(0);
+/** The view no longer moving: it refits when the map or the panel beside it changes. */
+const settled = async (page: Page) => {
   const view = () => page.locator('.svelte-flow__viewport').getAttribute('style');
   await expect
     .poll(async () => {
@@ -26,6 +22,14 @@ const discover = async (page: Page) => {
       return was === (await view());
     })
     .toBe(true);
+};
+const discover = async (page: Page) => {
+  await expect(card(page, 'web')).toBeVisible();
+  await page.keyboard.press('d');
+  await expect(page.getByRole('radio', { name: 'Discover' })).toBeChecked();
+  // Every card placed, then the view still.
+  await expect(page.locator('.svelte-flow__node.unplaced')).toHaveCount(0);
+  await settled(page);
 };
 
 test.describe('a board with an app', () => {
@@ -123,6 +127,8 @@ test.describe('a board with an app', () => {
     await page.getByRole('button', { name: 'Fit', exact: true }).click();
     await card(page, 'orders').click();
     await expect(card(page, 'orders').locator('.lean')).toHaveClass(/picked/);
+    // Its panel opens and the map refits beside it.
+    await settled(page);
     const [web, orders] = [await card(page, 'web').boundingBox(), await card(page, 'orders').boundingBox()];
     if (!web || !orders) throw new Error('no cards');
     await page.mouse.move(web.x + 40, web.y + 20);
@@ -134,6 +140,9 @@ test.describe('a board with an app', () => {
     const map = page.locator('.svelte-flow__pane');
     const box = await map.boundingBox();
     if (!box) throw new Error('no map');
+    // Pointed at first, as a person does: the map takes the click once it has caught up with the pointer.
+    await page.mouse.move(box.x + box.width / 2, box.y + 20, { steps: 4 });
+    await page.waitForTimeout(100);
     await page.mouse.click(box.x + box.width / 2, box.y + 20);
     await expect(page.locator('.lean.picked')).toHaveCount(0);
   });
@@ -148,6 +157,7 @@ test.describe('a board with an app', () => {
       document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Meta', metaKey: true, bubbles: true })),
     );
     await card(page, 'orders').click();
+    await settled(page);
     const [web, orders] = [await card(page, 'web').boundingBox(), await card(page, 'orders').boundingBox()];
     if (!web || !orders) throw new Error('no cards');
     await page.mouse.move(web.x + 40, web.y + 20);
@@ -157,6 +167,9 @@ test.describe('a board with an app', () => {
     expect(Math.abs(((await card(page, 'orders').boundingBox())?.y ?? 0) - orders.y)).toBeLessThan(3);
     const box = await page.locator('.svelte-flow__pane').boundingBox();
     if (!box) throw new Error('no map');
+    // Pointed at first, as a person does: the map takes the click once it has caught up with the pointer.
+    await page.mouse.move(box.x + box.width / 2, box.y + 20, { steps: 4 });
+    await page.waitForTimeout(100);
     await page.mouse.click(box.x + box.width / 2, box.y + 20);
     await expect(page.locator('.lean.picked')).toHaveCount(0);
   });
