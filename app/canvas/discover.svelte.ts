@@ -11,7 +11,7 @@ import {
   type FeatureEdit,
   type Numbered,
 } from '../src/core/feature.ts';
-import { board } from './board.svelte.ts';
+import { board, LAYOUTS } from './board.svelte.ts';
 import { post } from './data.ts';
 import { runs } from './run.svelte.ts';
 import { toasts } from './toast.svelte.ts';
@@ -110,24 +110,45 @@ class Discovered {
     };
   }
 
-  /** Where each card sits: where it was left, else laid out with the rest. */
+  /** Where each card sits: where it was left, else laid out with the rest, as Arrange lays out a board first. */
   positions = $derived.by((): Record<Card, Point> => {
-    const { cards, links } = this.map;
     const kept = board.discover.at;
-    const ids = cards.map(one => one.card);
+    const ids = this.map.cards.map(one => one.card);
     if (ids.every(id => kept[id])) return kept;
-    // A feature board is laid out in step order.
-    const ordered = board.feature ? numbered(board.feature).map(({ step }) => step) : [];
-    const laid = arrange(
-      ids,
-      [...ordered, ...links].map(({ from, to }) => ({ from, to })),
-      () => CARD,
-      'right',
-      false,
-      { pad: 80 },
-    );
+    const [dir, mirror] = LAYOUTS[0];
+    const laid = this.#lay(dir, mirror);
     return Object.fromEntries(ids.map(id => [id, kept[id] ?? laid[id] ?? { x: 0, y: 0 }]));
   });
+  #lay(dir: 'down' | 'right', mirror: boolean): Record<Card, Point> {
+    const { cards, links } = this.map;
+    // A feature board is laid out in step order.
+    const ordered = board.feature ? numbered(board.feature).map(({ step }) => step) : [];
+    return arrange(
+      cards.map(one => one.card),
+      [...ordered, ...links].map(({ from, to }) => ({ from, to })),
+      card => ({ w: CARD.w, h: this.heights[card] ?? CARD.h }),
+      dir,
+      mirror,
+      { pad: 80 },
+    );
+  }
+  #arranged = { key: '', version: 0 };
+  /** Arrange, as on a board: pressed again on the map as it left it, it gives the next of its layouts. */
+  arrange(): void {
+    const ids = this.map.cards.map(one => one.card);
+    const key = (at: Record<Card, Point>) => JSON.stringify(ids.map(id => [id, at[id]?.x, at[id]?.y]));
+    const was = key(this.positions);
+    let version = was === this.#arranged.key ? this.#arranged.version + 1 : 0;
+    let at = this.positions;
+    // A layout that leaves every card where it is goes on to the next one.
+    for (let tries = 0; tries < LAYOUTS.length; tries++, version++) {
+      const [dir, mirror] = LAYOUTS[version % LAYOUTS.length] ?? LAYOUTS[0];
+      at = this.#lay(dir, mirror);
+      if (key(at) !== was) break;
+    }
+    board.discover = { ...board.discover, at };
+    this.#arranged = { key: key(at), version };
+  }
 
   /** Brings in the links a card leaves out, beside it. */
   open(card: Card): void {
@@ -149,10 +170,6 @@ class Discovered {
   /** Moved by hand: kept with the board. */
   moved(card: Card, to: Point): void {
     board.discover = { ...board.discover, at: { ...this.positions, [card]: to } };
-  }
-  /** Laid out again from scratch. */
-  rearrange(): void {
-    board.discover = { ...board.discover, at: {} };
   }
 
   /** A call found in the code becomes one the stack records. */

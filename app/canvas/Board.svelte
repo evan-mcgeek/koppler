@@ -4,27 +4,18 @@
     BackgroundVariant,
     ConnectionMode,
     getViewportForBounds,
-    MiniMap,
-    SelectionMode,
     Panel,
     SvelteFlow,
     useSvelteFlow,
     useViewport,
     ViewportPortal,
   } from '@xyflow/svelte';
-  import type { Point, Side } from '../src/core/arrange.ts';
-  import { cablePath, sidePoint, SIDES, throughPath, type Box } from '../src/core/cables.ts';
+  import type { Side } from '../src/core/arrange.ts';
+  import { around, cablePath, facing, sidePoint, SIDES, throughPath, type Box } from '../src/core/cables.ts';
   import { untrack } from 'svelte';
-  import Hand from '@lucide/svelte/icons/hand';
-  import LayoutGrid from '@lucide/svelte/icons/layout-grid';
-  import Focus from '@lucide/svelte/icons/focus';
-  import Maximize from '@lucide/svelte/icons/maximize';
-  import Minus from '@lucide/svelte/icons/minus';
-  import MousePointer2 from '@lucide/svelte/icons/mouse-pointer-2';
-  import Plus from '@lucide/svelte/icons/plus';
-  import Redo2 from '@lucide/svelte/icons/redo-2';
-  import Undo2 from '@lucide/svelte/icons/undo-2';
-  import Icon from './Icon.svelte';
+  import BoardTools from './BoardTools.svelte';
+  import Overview from './Overview.svelte';
+  import { dragging, FIT, frame, present, toolState, type Tool } from './tools.svelte.ts';
   import { appearance, isLight } from './appearance.svelte.ts';
   import AppCard from './AppCard.svelte';
   import Cable from './Cable.svelte';
@@ -91,11 +82,7 @@
     const zoom = flow.getZoom();
     void flow.fitView({ nodes: [{ id }], minZoom: zoom, maxZoom: zoom, duration: 200 });
   };
-  // Fitting never blows a small board up past its real size.
-  const FIT = { padding: 0.15, duration: 200, maxZoom: 1 };
   const CARD = { w: 260, h: 160 };
-  // Not the library's zoomIn and zoomOut: taken here, before its board exists, they stay tied to an empty one.
-  const zoomBy = (factor: number) => () => void flow.setZoom(flow.getZoom() * factor, { duration: 150 });
 
   /** For an empty board: the six boards opened last, then the rest in the order they are kept. */
   const lately = $derived(
@@ -122,18 +109,9 @@
       : cablePath(drawn.a, drawn.side, drawn.b, drawn.bSide);
   });
   /** What a drag on the empty board does: select an area, or move the board. Space held moves it either way. */
-  let tool = $state<'select' | 'hand'>('select');
-  let spaceHeld = $state(false);
+  const tools = toolState();
   /** Moving the board: cards are neither picked, let go of nor moved, so the pick stays as it was. */
-  const panning = $derived(tool === 'hand' || spaceHeld);
-  const space = (ev: KeyboardEvent) => {
-    if (ev.code !== 'Space' || (ev.target as Element).closest('input, select, textarea, button')) return;
-    spaceHeld = ev.type === 'keydown';
-  };
-  const TOOLS = [
-    ['select', 'Select (V): drag on the board to select an area', MousePointer2],
-    ['hand', 'Hand (H): drag to move around. Or hold Space while dragging', Hand],
-  ] as const;
+  const panning = $derived(tools.panning);
   const { hold, release } = heldKeys();
   const shortcut = (ev: KeyboardEvent) => {
     if (ev.altKey || (ev.target as Element).closest('input, select, textarea')) return;
@@ -151,13 +129,11 @@
       if (ev.shiftKey) undo.redo();
       else undo.undo();
     } else if (key === 'f') void fit();
-    else if (key === 'p') void present();
-    else if (key === 'escape' && board.present) void present();
+    else if (key === 'p') void presentBoard();
+    else if (key === 'escape' && board.present) void presentBoard();
     else if (key === 'd') board.goDiscover();
     else if (key === 'e') board.goEdit();
     else if (key === 'l') board.goLive();
-    else if (ev.key === 'v' || ev.key === 'V') tool = 'select';
-    else if (ev.key === 'h' || ev.key === 'H') tool = 'hand';
   };
   // The board opens where it was left; one that was never placed is fitted to the window. An empty one is not: the
   // fit would wait for the first card added and then move the view under the next ones.
@@ -255,11 +231,9 @@
       const box = (key: string) => board.boxes.get(key) ?? board.infraBoxes.get(key);
       const [a, b] = [box(from), box(to)];
       if (!a || !b) return [];
-      const dx = b.x + b.w / 2 - (a.x + a.w / 2);
-      const dy = b.y + b.h / 2 - (a.y + a.h / 2);
-      const level: [Side, Side] = dx > 0 ? ['right', 'left'] : ['left', 'right'];
-      let sides: [Side, Side] =
-        Math.abs(dx) * 0.6 > Math.abs(dy) ? level : dy > 0 ? ['bottom', 'top'] : ['top', 'bottom'];
+      const facingSides = facing(a, b);
+      const { level } = facingSides;
+      let { sides } = facingSides;
       // An app's side with its tunnel and queue cards is left to them: a link from elsewhere leaves sideways
       // instead. A card of the app's own stack is joined on whichever side it sits, as it is moved around the app.
       const own = board.ledBy(from).includes(to) || board.ledBy(to).includes(from);
@@ -274,50 +248,22 @@
           // Stacked with the tunnel card, it comes round on the same side instead of back behind the card.
           b.x > a.x + a.w ? 'left' : b.x + b.w < a.x ? 'right' : 'right',
         ];
-      let [start, end] = [
-        row === undefined ? sidePoint(a, sides[0]) : { x: sides[0] === 'right' ? a.x + a.w : a.x, y: a.y + row },
-        sidePoint(b, sides[1]),
-      ];
-      // A line never runs behind another card: it goes round them, on the side its far end leans to.
+      // A line never runs behind another card: it goes round them (a tunnel's row line keeps to its row).
       const others = [...board.boxes, ...board.infraBoxes].filter(([key]) => key !== from && key !== to);
-      const under = (p: Point, q: Point) =>
-        others.filter(([, box]) =>
-          [0.2, 0.35, 0.5, 0.65, 0.8].some(t => {
-            const x = p.x + (q.x - p.x) * t;
-            const y = p.y + (q.y - p.y) * t;
-            return x > box.x && x < box.x + box.w && y > box.y && y < box.y + box.h;
-          }),
-        );
-      const routed = row === undefined && (!database || board.boxes.has(from));
-      let blocking = routed ? under(start, end) : [];
-      // Blocked, the sides that face each other across can still be clear.
-      if (blocking.length && sides[0] !== level[0] && !(taken(from, level[0]) || taken(to, level[1]))) {
-        const across = [sidePoint(a, level[0]), sidePoint(b, level[1])] as const;
-        if (!under(...across).length) {
-          sides = level;
-          [start, end] = across;
-          blocking = [];
-        }
-      }
-      let detour: Point | undefined;
-      if (blocking.length) {
-        const side: Side = b.x + b.w / 2 <= a.x + a.w / 2 ? 'left' : 'right';
-        sides = [side, side];
-        // Each end as near the other as its side allows, clear of the cables at the side's middle.
-        const near = (box: Box, y: number) => ({
-          ...sidePoint(box, side),
-          y: Math.min(Math.max(y, box.y + 24), box.y + box.h - 24),
-        });
-        [start, end] = [near(a, b.y + b.h / 2), near(b, a.y + a.h / 2)];
-        const edges = [a, b, ...blocking.map(([, box]) => box)];
-        detour = {
-          x:
-            side === 'left'
-              ? Math.min(...edges.map(box => box.x)) - 40
-              : Math.max(...edges.map(box => box.x + box.w)) + 40,
-          y: (start.y + end.y) / 2,
-        };
-      }
+      const path =
+        row === undefined && (!database || board.boxes.has(from))
+          ? around(a, b, {
+              sides,
+              others: others.map(([, box]) => box),
+              ...(!(taken(from, level[0]) || taken(to, level[1])) && { level }),
+            })
+          : (() => {
+              const p = { x: sides[0] === 'right' ? a.x + a.w : a.x, y: a.y + (row ?? a.h / 2) };
+              const q = sidePoint(b, sides[1]);
+              return { sides, start: p, end: q, detour: undefined, d: cablePath(p, sides[0], q, sides[1]) };
+            })();
+      sides = path.sides;
+      const { start, end, detour } = path;
       // Which way it goes: a chevron 6px clear of the ring it lands in, pointing in. A database is read and written.
       const [nx, ny] = SIDES[sides[1]];
       const tip = { x: end.x + nx * 13, y: end.y + ny * 13 };
@@ -348,7 +294,7 @@
           // A line straight from an app to a deployed database: its tunnel can be shown again from it.
           tunnel:
             database && !board.databases[database] && board.boxes.has(from) ? board.tunnelOf(database) : undefined,
-          d: detour ? throughPath(start, sides[0], end, sides[1], [detour]) : cablePath(start, sides[0], end, sides[1]),
+          d: path.d,
           start,
           end,
           kind: queue
@@ -392,31 +338,11 @@
         at.y < box.y + box.h - 1,
     );
   };
-  const frame = () => new Promise(requestAnimationFrame);
   $effect(() => {
     board.brief = viewport.current.zoom < FAR_ZOOM || board.live;
   });
   // The board alone, full screen where the browser allows it, fitted once the rest of the page has gone.
-  // Full screen follows the board, one change at a time; the browser's word about a change made here is not news.
-  let syncing = false;
-  const present = async () => {
-    board.present = !board.present;
-    if (!syncing) {
-      syncing = true;
-      board.entering = true;
-      while (board.present !== !!document.fullscreenElement) {
-        const want = board.present;
-        await (want ? document.documentElement.requestFullscreen() : document.exitFullscreen()).catch(() => undefined);
-        // No full screen here (or refused): the board is shown alone all the same.
-        if (want !== !!document.fullscreenElement) break;
-      }
-      board.entering = false;
-      syncing = false;
-    }
-    await frame();
-    await frame();
-    await fit();
-  };
+  const presentBoard = () => present(fit);
   // Fitted in full when the whole board fits that close; else zoomed out, where the cards are short.
   // The view is worked out here and set once: a fit the flow queues runs again each time the cards change form.
   const MAX_FRAMES = 40;
@@ -511,15 +437,15 @@
   onkeydown={(ev: KeyboardEvent) => {
     if (ev.key === 'Escape') lineMenu = null;
     hold(ev);
-    space(ev);
+    tools.key(ev);
     shortcut(ev);
   }}
   onkeyup={(ev: KeyboardEvent) => {
     hold(ev);
-    space(ev);
+    tools.key(ev);
   }}
   onblur={() => {
-    spaceHeld = false;
+    tools.blur();
     lineMenu = null;
   }}
   onpointermovecapture={release}
@@ -567,19 +493,10 @@
     connectionMode={ConnectionMode.Loose}
     deleteKey={board.live ? null : ['Backspace', 'Delete']}
     nodesDraggable={!board.live && !panning}
-    elementsSelectable={!panning}
-    multiSelectionKey={['Shift', 'Meta', 'Control']}
-    nodeDragThreshold={4}
-    nodeClickDistance={4}
-    panOnScroll
-    panOnScrollSpeed={1}
-    panOnDrag={panning ? true : [1, 2]}
-    selectionOnDrag={!panning}
+    {...dragging(panning)}
     onselectionstart={() => (board.selecting = true)}
     onselectionend={() => (board.selecting = false)}
-    selectionMode={SelectionMode.Partial}
     colorMode={isLight(appearance.now.scheme) ? 'light' : 'dark'}
-    minZoom={0.2}
     proOptions={{ hideAttribution: true }}
     {...start}
     onmoveend={(_event, viewport) => {
@@ -588,72 +505,16 @@
   >
     <Background variant={BackgroundVariant.Dots} gap={20} size={1.4} bgColor="var(--desk)" patternColor="var(--line)" />
     <Panel position="bottom-center">
-      <div class="tools" role="toolbar" aria-label="Board">
-        <div class="switch" role="radiogroup" aria-label="Dragging on the board">
-          {#each TOOLS as [name, title, icon] (name)}
-            <button
-              class="tool"
-              type="button"
-              role="radio"
-              aria-checked={tool === name}
-              aria-label={title}
-              {title}
-              onclick={() => (tool = name)}
-            >
-              <Icon of={icon} size={16} />
-            </button>
-          {/each}
-        </div>
-        <button
-          class="tool"
-          type="button"
-          aria-label="Undo"
-          title="Undo (Ctrl+Z or Cmd+Z)"
-          disabled={!undo.canUndo}
-          onclick={() => {
-            undo.undo();
-          }}
-        >
-          <Icon of={Undo2} size={16} />
-        </button>
-        <button
-          class="tool"
-          type="button"
-          aria-label="Redo"
-          title="Redo (Shift+Ctrl+Z or Shift+Cmd+Z)"
-          disabled={!undo.canRedo}
-          onclick={() => {
-            undo.redo();
-          }}
-        >
-          <Icon of={Redo2} size={16} />
-        </button>
-        <button
-          aria-label="Arrange"
-          title="Arrange cards by who calls whom, callers on top"
-          onclick={() => void arrange()}><Icon of={LayoutGrid} size={16} /></button
-        >
-        <button aria-label="Fit" title="Zoom to fit all apps (F)" onclick={() => void fit()}
-          ><Icon of={Focus} size={16} /></button
-        >
-        <div class="zoom" role="group" aria-label="Zoom">
-          <button aria-label="Zoom out" title="Zoom out" onclick={zoomBy(1 / 1.2)}><Icon of={Minus} size={16} /></button
-          >
-          <button class="percent" title="Reset to 100%" onclick={() => void flow.setZoom(1, { duration: 200 })}>
-            {Math.round(viewport.current.zoom * 100)}%
-          </button>
-          <button aria-label="Zoom in" title="Zoom in" onclick={zoomBy(1.2)}><Icon of={Plus} size={16} /></button>
-        </div>
-        <button
-          class="tool"
-          type="button"
-          aria-label={board.present ? 'Stop presenting' : 'Present'}
-          title={board.present ? 'Stop presenting (Esc)' : 'Present: the board alone, full screen (P)'}
-          aria-pressed={board.present}
-          onclick={() => void present()}
-        >
-          <Icon of={Maximize} size={16} />
-        </button>
+      <BoardTools
+        tool={tools.tool}
+        ontool={(tool: Tool) => {
+          tools.tool = tool;
+        }}
+        label="Board"
+        onarrange={() => void arrange()}
+        onfit={() => void fit()}
+        onpresent={() => void presentBoard()}
+      >
         {#if !board.present}
           <button
             class="clear"
@@ -676,24 +537,10 @@
             }}>Clear</button
           >
         {/if}
-      </div>
+      </BoardTools>
     </Panel>
     <!-- The whole board at a glance; dragging in it moves the view, scrolling on it zooms. -->
-    <MiniMap
-      position="bottom-right"
-      pannable
-      zoomable
-      width={168}
-      height={112}
-      ariaLabel="Overview of the board"
-      nodeBorderRadius={0}
-      nodeStrokeWidth={0}
-      nodeColor={node => (node.type === 'app' ? 'var(--ink-muted)' : 'var(--line-strong)')}
-      bgColor="var(--panel)"
-      maskColor="color-mix(in oklab, var(--desk) 72%, transparent)"
-      maskStrokeColor="var(--line)"
-      maskStrokeWidth={1}
-    />
+    <Overview label="Overview of the board" strong="app" />
     <!-- Under the cards: the links from each app to its tunnels. -->
     <ViewportPortal target="back">
       <svg class="links" aria-hidden="true">
@@ -1279,56 +1126,7 @@
   .area:has(.ends.still) :global(.svelte-flow__edge) {
     pointer-events: none;
   }
-  /* The board's tools: words printed on one strip, each with its key. */
-  /* Each word keeps its own edge, so a strip that wraps on a narrow board stays a clean grid. */
-  .tools {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: stretch;
-    padding: 1px 0 0 1px;
-  }
-  .zoom,
-  .switch {
-    display: flex;
-  }
-  /* Canvas tools as icons in square cells, as in other canvas tools; Clear stays a word. */
-  .tools button {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    min-width: 32px;
-    height: 32px;
-    margin: -1px 0 0 -1px;
-    padding: 0 8px;
-    border: 1px solid var(--line-strong);
-    background: var(--panel);
-    color: var(--ink);
-    font: 600 12px var(--sans);
-    white-space: nowrap;
-    cursor: pointer;
-  }
-  .tools button:hover:not(:disabled) {
-    background: color-mix(in oklab, var(--ink) 8%, var(--panel));
-  }
-  .tools button:focus-visible {
-    position: relative;
-    z-index: 1;
-  }
-  .tools .percent {
-    width: 56px;
-    font: 400 12px var(--mono);
-    font-variant-numeric: tabular-nums;
-  }
-  .tools .tool[aria-checked='true'],
-  .tools .tool[aria-pressed='true'] {
-    background: var(--line-strong);
-    color: var(--ink);
-  }
-  .tools button:disabled {
-    color: color-mix(in oklab, var(--ink-muted) 45%, transparent);
-    cursor: default;
-  }
-  .tools .clear:hover {
+  .clear:hover {
     color: var(--prod);
   }
   .line path {

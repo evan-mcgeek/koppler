@@ -70,7 +70,7 @@ export const FAR_ZOOM = 0.6;
 export const CARD_PANEL = 300;
 type Size = { w: number; h: number };
 /** Arrange's layouts, in the order it steps through them: callers on top or on the left, and each read the other way round. */
-const LAYOUTS = [
+export const LAYOUTS = [
   ['down', false],
   ['right', false],
   ['down', true],
@@ -1217,27 +1217,42 @@ class Board {
       pinned: this.pinned,
       feature: this.feature,
       cardNotes: this.cardNotes,
+      discover: this.discover,
       edges: this.edges.map(({ id, source, target, type, data }) => ({ id, source, target, type, data })),
     });
   }
 
   /** Puts back a board held as text: its cards, cables and the cards beside them. */
   setContent(back: string): void {
-    const { name, nodes, edges, infra, queues, databases, hiddenQueues, hiddenOutside, pinned, feature, cardNotes } =
-      JSON.parse(back) as {
-        name: string | null;
-        nodes: CardNode[];
-        edges: CableEdge[];
-        infra: { id: string; position: Point }[];
-        queues: Record<string, 'local'>;
-        databases?: Record<string, 'local'>;
-        hiddenQueues: Record<string, true>;
-        hiddenOutside: Record<string, true>;
-        pinned: string[];
-        feature?: Feature | null;
-        cardNotes?: Record<string, string>;
-      };
+    const {
+      name,
+      nodes,
+      edges,
+      infra,
+      queues,
+      databases,
+      hiddenQueues,
+      hiddenOutside,
+      pinned,
+      feature,
+      cardNotes,
+      discover,
+    } = JSON.parse(back) as {
+      name: string | null;
+      nodes: CardNode[];
+      edges: CableEdge[];
+      infra: { id: string; position: Point }[];
+      queues: Record<string, 'local'>;
+      databases?: Record<string, 'local'>;
+      hiddenQueues: Record<string, true>;
+      hiddenOutside: Record<string, true>;
+      pinned: string[];
+      feature?: Feature | null;
+      cardNotes?: Record<string, string>;
+      discover?: DiscoverState;
+    };
     this.name = name;
+    this.discover = discover ?? { open: [], at: {} };
     this.pinned = pinned;
     this.feature = featureOf(feature);
     this.cardNotes = notesOf(cardNotes);

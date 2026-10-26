@@ -4,11 +4,16 @@
   import Sparkle from '@lucide/svelte/icons/sparkle';
   import X from '@lucide/svelte/icons/x';
   import Laptop from '@lucide/svelte/icons/laptop';
-  import Maximize from '@lucide/svelte/icons/scan';
-  import LayoutGrid from '@lucide/svelte/icons/layout-grid';
-  import { SvelteFlow, Background, BackgroundVariant, ViewportPortal, useSvelteFlow, type Node } from '@xyflow/svelte';
-  import type { Side } from '../src/core/arrange.ts';
-  import { cablePath, SIDES, sidePoint, throughPath, type Box } from '../src/core/cables.ts';
+  import {
+    SvelteFlow,
+    Background,
+    BackgroundVariant,
+    Panel,
+    ViewportPortal,
+    useSvelteFlow,
+    type Node,
+  } from '@xyflow/svelte';
+  import { around, facing, SIDES, type Box } from '../src/core/cables.ts';
   import type { Card, Link } from '../src/core/discover.ts';
   import { isLight, appearance } from './appearance.svelte.ts';
   import { board } from './board.svelte.ts';
@@ -17,6 +22,10 @@
   import FeatureStart from './FeatureStart.svelte';
   import { heldKeys } from './held-keys.ts';
   import LeanCard from './LeanCard.svelte';
+  import BoardTools from './BoardTools.svelte';
+  import Overview from './Overview.svelte';
+  import { dragging, FIT, present, toolState, type Tool } from './tools.svelte.ts';
+  import { undo } from './undo.svelte.ts';
 
   const flow = useSvelteFlow();
   const map = $derived(discovered.map);
@@ -53,47 +62,17 @@
   const onBoard = $derived(new Set(map.cards.filter(one => one.onBoard).map(one => one.card)));
   /** Each link from the side of one card that faces the other: a dot where it leaves, a ring and chevron where it lands. */
   const drawn = $derived.by(() => {
-    let detours = 0;
     return map.links.flatMap(link => {
       const [a, b] = [box(link.from), box(link.to)];
       if (!a || !b) return [];
-      const dx = b.x + b.w / 2 - (a.x + a.w / 2);
-      const dy = b.y + b.h / 2 - (a.y + a.h / 2);
-      let sides: [Side, Side] =
-        Math.abs(dx) * 0.6 > Math.abs(dy)
-          ? dx > 0
-            ? ['right', 'left']
-            : ['left', 'right']
-          : dy > 0
-            ? ['bottom', 'top']
-            : ['top', 'bottom'];
-      let [start, end] = [sidePoint(a, sides[0]), sidePoint(b, sides[1])];
-      // A link never runs behind another card: across a row it goes over the top, down a column round the left.
-      const blocking = map.cards.flatMap(({ card }) => {
+      // Routed as on a board: from the sides that face each other, round any card in the way.
+      const { sides: facingSides, level } = facing(a, b);
+      const others = map.cards.flatMap(({ card }) => {
         const other = card !== link.from && card !== link.to && box(card);
-        const under =
-          other &&
-          [0.2, 0.35, 0.5, 0.65, 0.8].some(t => {
-            const x = start.x + (end.x - start.x) * t;
-            const y = start.y + (end.y - start.y) * t;
-            return x > other.x && x < other.x + other.w && y > other.y && y < other.y + other.h;
-          });
-        return under ? [other] : [];
+        return other ? [other] : [];
       });
-      let d = cablePath(start, sides[0], end, sides[1]);
-      let middle = { x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 };
-      if (blocking.length) {
-        const all = [a, b, ...blocking];
-        const out = 60 + 28 * detours++;
-        const side: Side = sides[0] === 'left' || sides[0] === 'right' ? 'top' : 'left';
-        sides = [side, side];
-        [start, end] = [sidePoint(a, side), sidePoint(b, side)];
-        middle =
-          side === 'top'
-            ? { x: (start.x + end.x) / 2, y: Math.min(...all.map(one => one.y)) - out }
-            : { x: Math.min(...all.map(one => one.x)) - out, y: (start.y + end.y) / 2 };
-        d = throughPath(start, side, end, side, [middle]);
-      }
+      const { sides, start, end, detour, d } = around(a, b, { sides: facingSides, level, others });
+      const middle = detour ?? { x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 };
       const [nx, ny] = SIDES[sides[1]];
       const both = link.kind === 'uses';
       const arrow = both
@@ -174,15 +153,46 @@
     void flow.fitView({ nodes: [{ id: card }], duration: 200, maxZoom: flow.getZoom(), minZoom: flow.getZoom() });
   };
   const { hold, release } = heldKeys();
+  /** What a drag on the empty map does, and Space held to move it, as on a board. */
+  const tools = toolState();
+  const panning = $derived(tools.panning);
+  const fit = async () => {
+    await flow.fitView(FIT);
+  };
+  const presentMap = () => present(fit);
+  const arrange = () => {
+    discovered.arrange();
+    // The cards move first; the view follows once they are placed.
+    requestAnimationFrame(() => void fit());
+  };
+  const pick = (cards: Card[]) => {
+    discovered.picked = cards;
+    discovered.last = discovered.last && cards.includes(discovered.last) ? discovered.last : (cards.at(-1) ?? null);
+  };
+  // The same keys as on a board: F fits, P presents, Cmd+Z undoes, Cmd+A picks every card.
   const keys = (ev: KeyboardEvent) => {
-    if (ev.metaKey || ev.ctrlKey || ev.altKey) return;
+    if (ev.altKey) return;
     if ((ev.target as Element | null)?.closest('input, textarea, select, [contenteditable]')) return;
-    if (ev.key === 'e' || ev.key === 'E') board.goEdit();
-    else if (ev.key === 'l' || ev.key === 'L') board.goLive();
-    else if (ev.key === 'f' || ev.key === 'F') void flow.fitView({ duration: 200, maxZoom: 1 });
-    else if (ev.key === 'Escape') {
-      discovered.picked = [];
-      discovered.last = null;
+    if (document.querySelector('dialog[open], :popover-open')) return;
+    const key = ev.key.toLowerCase();
+    if (ev.metaKey || ev.ctrlKey) {
+      if (key === 'a') {
+        ev.preventDefault();
+        pick(map.cards.map(one => one.card));
+      } else if (key === 'z') {
+        ev.preventDefault();
+        if (ev.shiftKey) undo.redo();
+        else undo.undo();
+      }
+      return;
+    }
+    if (key === 'e') board.goEdit();
+    else if (key === 'l') board.goLive();
+    else if (key === 'f') void fit();
+    else if (key === 'p') void presentMap();
+    else if (key === 'escape') {
+      if (board.present) void presentMap();
+      else pick([]);
     }
   };
   const pickedNames = $derived(discovered.picked.map(name));
@@ -197,9 +207,16 @@
 <svelte:window
   onkeydown={(ev: KeyboardEvent) => {
     hold(ev);
+    tools.key(ev);
     keys(ev);
   }}
-  onkeyup={hold}
+  onkeyup={(ev: KeyboardEvent) => {
+    hold(ev);
+    tools.key(ev);
+  }}
+  onblur={() => {
+    tools.blur();
+  }}
   onpointermovecapture={release}
 />
 
@@ -225,31 +242,26 @@
           () => nodes,
           (next: Node[]) => {
             flowState = Object.fromEntries(next.map(node => [node.id, node]));
+            // The pick is what the map has selected: a click, Shift-click or an area dragged over.
+            const selected = next.filter(node => node.selected).map(node => node.id);
+            if (selected.join() !== discovered.picked.join()) pick(selected);
           }
         }
         nodeTypes={{ lean: LeanCard }}
         edges={[]}
         fitView
         fitViewOptions={{ maxZoom: 1, padding: 0.15 }}
-        minZoom={0.2}
+        {...dragging(panning)}
+        nodesDraggable={!panning}
         nodesConnectable={false}
-        multiSelectionKey={['Shift', 'Meta', 'Control']}
         deleteKey={null}
         colorMode={isLight(appearance.now.scheme) ? 'light' : 'dark'}
         proOptions={{ hideAttribution: true }}
-        onnodeclick={({ node, event }) => {
-          const card = node.id;
-          const adding = event.shiftKey || event.metaKey || event.ctrlKey;
-          discovered.picked = adding
-            ? discovered.picked.includes(card)
-              ? discovered.picked.filter(one => one !== card)
-              : [...discovered.picked, card]
-            : [card];
-          discovered.last = discovered.picked.includes(card) ? card : (discovered.picked.at(-1) ?? null);
+        onnodeclick={({ node }) => {
+          if (discovered.picked.includes(node.id)) discovered.last = node.id;
         }}
         onpaneclick={() => {
-          discovered.picked = [];
-          discovered.last = null;
+          pick([]);
         }}
         onnodedragstop={({ targetNode }) => {
           if (targetNode) discovered.moved(targetNode.id, targetNode.position);
@@ -319,6 +331,19 @@
             {/each}
           </svg>
         </ViewportPortal>
+        <Panel position="bottom-center">
+          <BoardTools
+            tool={tools.tool}
+            ontool={(tool: Tool) => {
+              tools.tool = tool;
+            }}
+            label="Discover"
+            onarrange={arrange}
+            onfit={() => void fit()}
+            onpresent={() => void presentMap()}
+          />
+        </Panel>
+        <Overview label="Overview of the map" strong="lean" />
       </SvelteFlow>
 
       {#if proposals.length}
@@ -389,26 +414,6 @@
           {/if}
         </div>
       {/if}
-
-      <div class="tools" role="toolbar" aria-label="Discover">
-        <button
-          type="button"
-          title="Fit (F)"
-          aria-label="Fit the map in the window"
-          onclick={() => void flow.fitView({ duration: 200, maxZoom: 1 })}><Maximize size={16} /></button
-        >
-        <button
-          type="button"
-          title="Lay the map out again"
-          aria-label="Lay the map out again"
-          onclick={() => {
-            discovered.rearrange();
-          }}><LayoutGrid size={16} /></button
-        >
-        <button type="button" aria-label="Zoom out" onclick={() => void flow.zoomOut({ duration: 150 })}>−</button>
-        <span class="level">Who talks to whom</span>
-        <button type="button" aria-label="Zoom in" onclick={() => void flow.zoomIn({ duration: 150 })}>+</button>
-      </div>
     {/if}
   </div>
 
@@ -685,32 +690,6 @@
     font: 400 13px var(--sans);
     text-decoration: underline;
     text-underline-offset: 3px;
-    cursor: pointer;
-  }
-  .tools {
-    position: absolute;
-    left: 50%;
-    bottom: 16px;
-    z-index: 5;
-    display: flex;
-    gap: 1px;
-    border: 1px solid var(--line-strong);
-    background: var(--line-strong);
-    transform: translateX(-50%);
-  }
-  .tools button,
-  .tools .level {
-    display: grid;
-    place-items: center;
-    min-width: 32px;
-    height: 32px;
-    padding: 0 8px;
-    border: 0;
-    background: var(--panel);
-    color: var(--ink);
-    font: 600 12px var(--sans);
-  }
-  .tools button {
     cursor: pointer;
   }
   .empty {
