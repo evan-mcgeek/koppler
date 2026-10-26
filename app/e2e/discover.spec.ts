@@ -61,6 +61,7 @@ test.describe('a board with an app', () => {
     await expect(page.getByRole('button', { name: 'Show 1 more link of Orders API' })).toHaveCount(0);
     // A card moved by hand stays where it was put, after a reload too.
     await page.getByRole('button', { name: 'Fit', exact: true }).click();
+    await settled(page);
     const web = card(page, 'web');
     const from = await web.boundingBox();
     if (!from) throw new Error('no Web Shop card');
@@ -83,6 +84,7 @@ test.describe('a board with an app', () => {
   test('a card being dragged keeps its links on it, before it is let go', async ({ page }) => {
     await discover(page);
     await page.getByRole('button', { name: 'Fit', exact: true }).click();
+    await settled(page);
     const web = card(page, 'web');
     const from = await web.boundingBox();
     if (!from) throw new Error('no Web Shop card');
@@ -92,17 +94,22 @@ test.describe('a board with an app', () => {
     const now = await web.boundingBox();
     if (!now) throw new Error('no Web Shop card');
     expect(now.y).toBeGreaterThan(from.y + 100);
-    // Where its link leaves it, on the page: on the card's edge as it is now.
-    const start = await page
-      .locator('.links .link[data-link^="web>"] .wire')
-      .first()
-      .evaluate(el => {
-        const wire = el as SVGPathElement;
-        const p = wire.getPointAtLength(0).matrixTransform(wire.getScreenCTM() ?? new DOMMatrix());
-        return { x: p.x, y: p.y };
-      });
-    expect(start.y).toBeGreaterThanOrEqual(now.y - 2);
-    expect(start.y).toBeLessThanOrEqual(now.y + now.height + 2);
+    // Where its link leaves it, on the page: on the card's edge as it is now, still held. On a slow machine the link
+    // is drawn a frame after the card, so it is given those frames to catch up.
+    const leaves = () =>
+      page
+        .locator('.links .link[data-link^="web>"] .wire')
+        .first()
+        .evaluate(el => {
+          const wire = el as SVGPathElement;
+          return wire.getPointAtLength(0).matrixTransform(wire.getScreenCTM() ?? new DOMMatrix()).y;
+        });
+    await expect
+      .poll(async () => {
+        const [y, box] = [await leaves(), await web.boundingBox()];
+        return !!box && y >= box.y - 2 && y <= box.y + box.height + 2;
+      })
+      .toBe(true);
     await page.mouse.up();
   });
 
@@ -125,6 +132,7 @@ test.describe('a board with an app', () => {
   test('dragging another card moves only that one, and a click on the map clears the pick', async ({ page }) => {
     await discover(page);
     await page.getByRole('button', { name: 'Fit', exact: true }).click();
+    await settled(page);
     await card(page, 'orders').click();
     await expect(card(page, 'orders').locator('.lean')).toHaveClass(/picked/);
     // Its panel opens and the map refits beside it.
@@ -152,6 +160,7 @@ test.describe('a board with an app', () => {
   }) => {
     await discover(page);
     await page.getByRole('button', { name: 'Fit', exact: true }).click();
+    await settled(page);
     // Cmd goes down and its key-up never comes, as when macOS takes Cmd+Shift+4 for a screenshot.
     await page.evaluate(() =>
       document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Meta', metaKey: true, bubbles: true })),
@@ -189,6 +198,7 @@ test.describe('a board with an app', () => {
       page.getByRole('img', { name: 'Overview of the map' }).or(page.getByLabel('Overview of the map')),
     ).toHaveCount(1);
     await page.getByRole('button', { name: 'Fit', exact: true }).click();
+    await settled(page);
     const lean = page.locator('.lean');
     // An area dragged over the map picks the cards in it.
     const pane = await page.locator('.svelte-flow__pane').boundingBox();
