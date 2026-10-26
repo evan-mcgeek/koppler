@@ -1,6 +1,6 @@
 {
   "name": "koppler",
-  "version": "0.2.3",
+  "version": "0.3.0",
   "description": "Plug your local code into the real stack: the apps you change run locally, wired together, while the rest keeps calling a deployed environment.",
   "license": "MIT",
   "author": "Ivan Yanowsky",
