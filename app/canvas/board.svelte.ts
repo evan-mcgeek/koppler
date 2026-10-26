@@ -70,7 +70,7 @@ export const FAR_ZOOM = 0.6;
 export const CARD_PANEL = 300;
 type Size = { w: number; h: number };
 /** Arrange's layouts, in the order it steps through them: callers on top or on the left, and each read the other way round. */
-export const LAYOUTS = [
+const LAYOUTS = [
   ['down', false],
   ['right', false],
   ['down', true],
@@ -215,10 +215,12 @@ const notesOf = (given: unknown): Record<string, string> =>
 export interface DiscoverState {
   open: string[];
   at: Record<string, Point>;
+  /** Which of Arrange's layouts it was last laid out in. */
+  layout?: number;
 }
 /** Discover's part of a saved board, or of one opened: the cards opened and where they sit. */
 const discoverOf = (given: unknown): DiscoverState => {
-  const kept = (given && typeof given === 'object' ? given : {}) as { open?: unknown; at?: unknown };
+  const kept = (given && typeof given === 'object' ? given : {}) as { open?: unknown; at?: unknown; layout?: unknown };
   const open = Array.isArray(kept.open) ? kept.open.filter((id): id is string => typeof id === 'string') : [];
   const at = Object.fromEntries(
     Object.entries(kept.at && typeof kept.at === 'object' ? (kept.at as Record<string, unknown>) : {}).flatMap(
@@ -230,7 +232,8 @@ const discoverOf = (given: unknown): DiscoverState => {
       },
     ),
   );
-  return { open, at };
+  const layout = typeof kept.layout === 'number' && Number.isInteger(kept.layout) ? kept.layout : undefined;
+  return { open, at, ...(layout !== undefined && { layout }) };
 };
 
 class Board {
@@ -1252,7 +1255,7 @@ class Board {
       discover?: DiscoverState;
     };
     this.name = name;
-    this.discover = discover ?? { open: [], at: {} };
+    this.discover = discoverOf(discover);
     this.pinned = pinned;
     this.feature = featureOf(feature);
     this.cardNotes = notesOf(cardNotes);

@@ -1,6 +1,7 @@
 // Discover: the map of the board's apps and what they touch, from the stack's facts. Nothing on it runs or changes the
 // board; it keeps only which cards were opened and where its cards sit, per board.
-import { arrange, type Point } from '../src/core/arrange.ts';
+import type { Point } from '../src/core/arrange.ts';
+import { DIRECTIONS, type Direction, type Laid } from '../src/core/layout.ts';
 import { linksOf, mapOf, type Card, type Link } from '../src/core/discover.ts';
 import {
   editFeature,
@@ -11,7 +12,7 @@ import {
   type FeatureEdit,
   type Numbered,
 } from '../src/core/feature.ts';
-import { board, LAYOUTS } from './board.svelte.ts';
+import { board } from './board.svelte.ts';
 import { post } from './data.ts';
 import { runs } from './run.svelte.ts';
 import { toasts } from './toast.svelte.ts';
@@ -32,6 +33,8 @@ export interface LeanData extends Record<string, unknown> {
 }
 
 export const CARD = { w: 200, h: 64 };
+/** A link's name on the map: who, to whom, how. */
+export const linkKey = (link: Link) => `${link.from}>${link.to}>${link.kind}`;
 const QUEUE_TAGS: Record<string, [string, string]> = {
   sqs: ['SQS', 'Queue'],
   sns: ['SNS', 'Topic'],
@@ -110,44 +113,60 @@ class Discovered {
     };
   }
 
-  /** Where each card sits: where it was left, else laid out with the rest, as Arrange lays out a board first. */
+  /** The layout Arrange last chose. */
+  get direction(): Direction {
+    return DIRECTIONS[(board.discover.layout ?? 0) % DIRECTIONS.length] ?? 'RIGHT';
+  }
+  /** What the map's layout is worked out from: its cards as measured, its links, the layout chosen. */
+  layoutInput = $derived.by(() => {
+    const cards = this.map.cards.map(({ card }) => ({ id: card, w: CARD.w, h: this.heights[card] ?? CARD.h }));
+    const links = this.map.links.map(link => ({ id: linkKey(link), from: link.from, to: link.to }));
+    // Laid out once every card has its height, so the cards are placed once.
+    const measured = this.map.cards.every(({ card }) => this.heights[card]);
+    return { cards, links, measured, key: JSON.stringify([cards, links, this.direction]) };
+  });
+  /** That layout once worked out, for the input it was worked out from. */
+  laid = $state.raw<(Laid & { key: string }) | null>(null);
+  /** The layout for the map as it is now, if it is worked out yet. */
+  get layout(): Laid | null {
+    return this.laid?.key === this.layoutInput.key ? this.laid : null;
+  }
+
+  /** Where each card sits: where it was left, else where the layout puts it. */
   positions = $derived.by((): Record<Card, Point> => {
     const kept = board.discover.at;
     const ids = this.map.cards.map(one => one.card);
     if (ids.every(id => kept[id])) return kept;
-    const [dir, mirror] = LAYOUTS[0];
-    const laid = this.#lay(dir, mirror);
-    return Object.fromEntries(ids.map(id => [id, kept[id] ?? laid[id] ?? { x: 0, y: 0 }]));
-  });
-  #lay(dir: 'down' | 'right', mirror: boolean): Record<Card, Point> {
-    const { cards, links } = this.map;
-    // A feature board is laid out in step order.
-    const ordered = board.feature ? numbered(board.feature).map(({ step }) => step) : [];
-    return arrange(
-      cards.map(one => one.card),
-      [...ordered, ...links].map(({ from, to }) => ({ from, to })),
-      card => ({ w: CARD.w, h: this.heights[card] ?? CARD.h }),
-      dir,
-      mirror,
-      { pad: 80 },
+    const laid = this.layout?.at ?? {};
+    return Object.fromEntries(
+      ids.flatMap(id => {
+        const at = kept[id] ?? laid[id];
+        return at ? [[id, at] as const] : [];
+      }),
     );
+  });
+  /** A link's route from the layout, while both its cards are where the layout put them (`place`: where each is now). */
+  routeOf(link: Link, place: (card: Card) => Point | undefined): Point[] | undefined {
+    const layout = this.layout;
+    if (!layout) return undefined;
+    const still = (card: Card) => {
+      const [now, laid] = [place(card), layout.at[card]];
+      return !!now && !!laid && Math.abs(now.x - laid.x) < 0.5 && Math.abs(now.y - laid.y) < 0.5;
+    };
+    return still(link.from) && still(link.to) ? layout.routes[linkKey(link)] : undefined;
   }
-  #arranged = { key: '', version: 0 };
   /** Arrange, as on a board: pressed again on the map as it left it, it gives the next of its layouts. */
   arrange(): void {
-    const ids = this.map.cards.map(one => one.card);
-    const key = (at: Record<Card, Point>) => JSON.stringify(ids.map(id => [id, at[id]?.x, at[id]?.y]));
-    const was = key(this.positions);
-    let version = was === this.#arranged.key ? this.#arranged.version + 1 : 0;
-    let at = this.positions;
-    // A layout that leaves every card where it is goes on to the next one.
-    for (let tries = 0; tries < LAYOUTS.length; tries++, version++) {
-      const [dir, mirror] = LAYOUTS[version % LAYOUTS.length] ?? LAYOUTS[0];
-      at = this.#lay(dir, mirror);
-      if (key(at) !== was) break;
-    }
-    board.discover = { ...board.discover, at };
-    this.#arranged = { key: key(at), version };
+    const layout = this.layout;
+    const untouched =
+      !!layout &&
+      this.map.cards.every(({ card }) => {
+        const [now, laid] = [this.positions[card], layout.at[card]];
+        return !!now && !!laid && Math.abs(now.x - laid.x) < 0.5 && Math.abs(now.y - laid.y) < 0.5;
+      });
+    const next = (board.discover.layout ?? 0) + (untouched ? 1 : 0);
+    // The cards go where the layout puts them, once it is worked out.
+    board.discover = { ...board.discover, at: {}, layout: next % DIRECTIONS.length };
   }
 
   /** Brings in the links a card leaves out, beside it. */
@@ -155,6 +174,8 @@ class Discovered {
     const before = new Set(this.map.cards.map(one => one.card));
     const at = { ...this.positions };
     board.discover = { ...board.discover, open: [...new Set([...board.discover.open, card])] };
+    // Not placed yet: the layout places the new cards with the rest.
+    if (![...before].every(id => at[id])) return;
     const from = at[card] ?? { x: 0, y: 0 };
     const fresh = this.map.cards.map(one => one.card).filter(id => !before.has(id));
     const x = from.x + CARD.w + 120;

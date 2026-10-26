@@ -14,10 +14,12 @@
     type Node,
   } from '@xyflow/svelte';
   import { around, facing, SIDES, type Box } from '../src/core/cables.ts';
+  import { along, layOut, routePath } from '../src/core/layout.ts';
+  import { engine } from './elk.ts';
   import type { Card, Link } from '../src/core/discover.ts';
   import { isLight, appearance } from './appearance.svelte.ts';
   import { board } from './board.svelte.ts';
-  import { CARD, discovered, type LeanData } from './discover.svelte.ts';
+  import { CARD, discovered, linkKey, type LeanData } from './discover.svelte.ts';
   import FeaturePanel from './FeaturePanel.svelte';
   import FeatureStart from './FeatureStart.svelte';
   import { heldKeys } from './held-keys.ts';
@@ -45,6 +47,7 @@
   /** Where a card is: where it is being dragged, else where it was put. */
   const placeOf = (card: Card) => (flowState[card]?.dragging && flowState[card].position) || discovered.positions[card];
   const nodes = $derived(
+    // A card without its place yet is drawn hidden, so it is measured before the layout places it.
     map.cards.map(({ card, onBoard, hidden }): Node<LeanData> => ({
       id: card,
       type: 'lean',
@@ -52,7 +55,7 @@
       position: placeOf(card) ?? { x: 0, y: 0 },
       data: discovered.data(card, onBoard, hidden),
       selected: discovered.picked.includes(card),
-      class: near && !near.has(card) ? 'dimmed' : '',
+      class: [!placeOf(card) && 'unplaced', near && !near.has(card) && 'dimmed'].filter(Boolean).join(' '),
     })),
   );
   const box = (card: Card): Box | undefined => {
@@ -65,15 +68,37 @@
     return map.links.flatMap(link => {
       const [a, b] = [box(link.from), box(link.to)];
       if (!a || !b) return [];
-      // Routed as on a board: from the sides that face each other, round any card in the way.
-      const { sides: facingSides, level } = facing(a, b);
-      const others = map.cards.flatMap(({ card }) => {
-        const other = card !== link.from && card !== link.to && box(card);
-        return other ? [other] : [];
-      });
-      const { sides, start, end, detour, d } = around(a, b, { sides: facingSides, level, others });
-      const middle = detour ?? { x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 };
-      const [nx, ny] = SIDES[sides[1]];
+      // As Arrange laid it out, round every card; a card moved since takes its links round what is in the way.
+      const path = (() => {
+        const route = discovered.routeOf(link, placeOf);
+        const [first, last, before] = [route?.[0], route?.at(-1), route?.at(-2)];
+        if (route && first && last && before) {
+          const out = Math.hypot(before.x - last.x, before.y - last.y) || 1;
+          return {
+            start: first,
+            end: last,
+            d: routePath(route),
+            middle: along(route, 0.5),
+            normal: [(before.x - last.x) / out, (before.y - last.y) / out] as const,
+          };
+        }
+        const { sides: facingSides, level } = facing(a, b);
+        const others = map.cards.flatMap(({ card }) => {
+          const other = card !== link.from && card !== link.to && box(card);
+          return other ? [other] : [];
+        });
+        const routed = around(a, b, { sides: facingSides, level, others });
+        const { start, end } = routed;
+        return {
+          start,
+          end,
+          d: routed.d,
+          middle: routed.detour ?? { x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 },
+          normal: SIDES[routed.sides[1]],
+        };
+      })();
+      const { start, end, d, middle } = path;
+      const [nx, ny] = path.normal;
       const both = link.kind === 'uses';
       const arrow = both
         ? ''
@@ -82,7 +107,7 @@
       const phase = discovered.phase;
       return [
         {
-          key: `${link.from}>${link.to}>${link.kind}`,
+          key: linkKey(link),
           link,
           d,
           start,
@@ -152,6 +177,15 @@
     discovered.last = card;
     void flow.fitView({ nodes: [{ id: card }], duration: 200, maxZoom: flow.getZoom(), minZoom: flow.getZoom() });
   };
+  // The layout is worked out again whenever the map or the chosen layout changes; the same input, the same layout.
+  $effect(() => {
+    const { cards, links, key, measured } = discovered.layoutInput;
+    if (!measured) return;
+    const direction = discovered.direction;
+    void layOut(cards, links, direction, engine()).then(laid => {
+      if (discovered.layoutInput.key === key) discovered.laid = { ...laid, key };
+    });
+  });
   const { hold, release } = heldKeys();
   /** What a drag on the empty map does, and Space held to move it, as on a board. */
   const tools = toolState();
@@ -160,11 +194,18 @@
     await flow.fitView(FIT);
   };
   const presentMap = () => present(fit);
+  // A map first laid out here is brought into view once it is.
+  let fitWhenLaid = true;
   const arrange = () => {
     discovered.arrange();
-    // The cards move first; the view follows once they are placed.
-    requestAnimationFrame(() => void fit());
+    fitWhenLaid = true;
   };
+  // The cards move first, once their layout is worked out; the view follows.
+  $effect(() => {
+    if (!discovered.layout || !fitWhenLaid) return;
+    fitWhenLaid = false;
+    requestAnimationFrame(() => void fit());
+  });
   const pick = (cards: Card[]) => {
     discovered.picked = cards;
     discovered.last = discovered.last && cards.includes(discovered.last) ? discovered.last : (cards.at(-1) ?? null);
@@ -513,6 +554,9 @@
       top: 16px;
       bottom: auto;
     }
+  }
+  :global(.svelte-flow__node.unplaced) {
+    visibility: hidden;
   }
   .links,
   .ends {

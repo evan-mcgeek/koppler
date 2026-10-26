@@ -16,6 +16,16 @@ const discover = async (page: Page) => {
   await expect(card(page, 'web')).toBeVisible();
   await page.keyboard.press('d');
   await expect(page.getByRole('radio', { name: 'Discover' })).toBeChecked();
+  // Settled: every card placed, and the view no longer moving to fit them.
+  await expect(page.locator('.svelte-flow__node.unplaced')).toHaveCount(0);
+  const view = () => page.locator('.svelte-flow__viewport').getAttribute('style');
+  await expect
+    .poll(async () => {
+      const was = await view();
+      await page.waitForTimeout(120);
+      return was === (await view());
+    })
+    .toBe(true);
 };
 
 test.describe('a board with an app', () => {
