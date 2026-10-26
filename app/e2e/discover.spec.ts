@@ -16,6 +16,15 @@ const discover = async (page: Page) => {
   await expect(card(page, 'web')).toBeVisible();
   await page.keyboard.press('d');
   await expect(page.getByRole('radio', { name: 'Discover' })).toBeChecked();
+  // Settled: the view no longer moving to fit the map.
+  const view = () => page.locator('.svelte-flow__viewport').getAttribute('style');
+  await expect
+    .poll(async () => {
+      const was = await view();
+      await page.waitForTimeout(120);
+      return was === (await view());
+    })
+    .toBe(true);
 };
 
 test.describe('a board with an app', () => {
@@ -218,7 +227,7 @@ test.describe('an outside system with a long description', () => {
       ...STACK,
       apps: {
         ...STACK.apps,
-        web: { ...STACK.apps.web, consumes: { ...STACK.apps.web?.consumes, crm: {} } },
+        web: { ...STACK.apps.web, consumes: { ...(STACK.apps.web?.['consumes'] as object | undefined), crm: {} } },
         crm: {
           name: 'CRM event handler',
           kind: 'other',
