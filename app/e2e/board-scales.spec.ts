@@ -1,16 +1,9 @@
-// Zoomed across, the board only scales: no card moves, short ones sit in the middle of their full form's room, and a
-// card that came out wider than its place moves off the app card it would cover.
+// Zoomed across, the board only scales: no card moves, and short ones sit in the middle of their full form's room.
 import type { Page } from '@playwright/test';
 import { at, expect, STACK, test } from './canvas.ts';
 
 test.use({
-  stack: {
-    ...STACK,
-    apps: {
-      ...STACK.apps,
-      psp: { name: 'Pay Provider', kind: 'other', outside: 'sends webhooks', consumes: { orders: {} } },
-    },
-  },
+  stack: STACK,
   board: {
     env: 'qa',
     mode: 'auto',
@@ -22,8 +15,6 @@ test.use({
       payments: at(520, 700),
     },
     edges: [{ from: 'web', to: 'orders', fromSide: 'right', toSide: 'left' }],
-    // Laid out when the outside card was narrower: as drawn now it would lie on Orders API.
-    infra: { 'outside:psp': { x: 400, y: 0 } },
   },
 });
 
@@ -48,15 +39,8 @@ const middles = (page: Page) =>
   });
 
 test('zoomed out and back in, every card stays where it is, and none lies on another', async ({ page }) => {
-  await expect(page.locator('.svelte-flow__node')).toHaveCount(5);
-  const outside = page.locator('.svelte-flow__node[data-id="outside:psp"]');
-  const orders = page.locator('.svelte-flow__node[data-id="orders"]');
-  await expect
-    .poll(async () => {
-      const [a, b] = [await outside.boundingBox(), await orders.boundingBox()];
-      return !!a && !!b && a.x + a.width <= b.x;
-    }, 'the outside card moved off Orders API')
-    .toBe(true);
+  // The three apps and Orders API's tunnel.
+  await expect(page.locator('.svelte-flow__node')).toHaveCount(4);
   const close = await middles(page);
   const percent = page.getByTitle('Reset to 100%');
   // Each step waits for the one before it to land.

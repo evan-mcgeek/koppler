@@ -51,8 +51,8 @@ const at = (x: number, y: number) => ({ x, y, run: 'cli', branch: 'feature/check
 const board = {
   env: 'qa',
   mode: 'auto',
-  zoom: 0.72,
-  pan: { x: 48, y: 120 },
+  zoom: 0.6,
+  pan: { x: 60, y: 110 },
   nodes: {
     mobile: { ...at(0, 0), platform: 'ios' },
     web: at(0, 480),

@@ -14,27 +14,27 @@ Koppler then wires it the same way and watches its port, but leaves starting and
 
 ## Back ends and APIs
 
-| Stack | Kind | Recognised by | Started with | |
-|---|---|---|---|---|
-| .NET (ASP.NET Core, workers) | `dotnet` | a `.csproj` | its `-LOCAL` launch profile, derived from the base profile with local addresses swapped in | Run for real |
-| Node (Express, NestJS, Fastify, any npm script) | `node` | `package.json` without a front-end framework | `npm run` of its `script`, else `dev` or `start` | Run for real |
-| Go | `go` | `go.mod` | `go run .`, or `go run ./cmd/<name>` when there is one command | Recognised |
-| Rust | `rust` | `Cargo.toml` | `cargo run` | Recognised |
-| Java and Kotlin (Spring Boot, Gradle, Maven) | `java` | `pom.xml` or `build.gradle(.kts)` | `mvn spring-boot:run` or `gradle bootRun` (wrappers first), port 8080 | Recognised |
-| Python (Django, FastAPI, Flask) | `python` | `manage.py`, `pyproject.toml`, `requirements.txt` or `Pipfile` | `manage.py runserver`, `uvicorn <module>:app` or `flask run`, through uv, Poetry, Pipenv or the repo's `.venv` | Recognised |
-| Ruby on Rails | `ruby` | `Gemfile` with `config/application.rb` | `bin/rails server`, port 3000 | Recognised |
-| PHP (Laravel) | `php` | `artisan` or `composer.json` | `php artisan serve`, port 8000 | Recognised |
+| Stack                                           | Kind     | Recognised by                                                  | Started with                                                                                                   |              |
+| ----------------------------------------------- | -------- | -------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- | ------------ |
+| .NET (ASP.NET Core, workers)                    | `dotnet` | a `.csproj`                                                    | its `-LOCAL` launch profile, derived from the base profile with local addresses swapped in                     | Run for real |
+| Node (Express, NestJS, Fastify, any npm script) | `node`   | `package.json` without a front-end framework                   | `npm run` of its `script`, else `dev` or `start`                                                               | Run for real |
+| Go                                              | `go`     | `go.mod`                                                       | `go run .`, or `go run ./cmd/<name>` when there is one command                                                 | Recognised   |
+| Rust                                            | `rust`   | `Cargo.toml`                                                   | `cargo run`                                                                                                    | Recognised   |
+| Java and Kotlin (Spring Boot, Gradle, Maven)    | `java`   | `pom.xml` or `build.gradle(.kts)`                              | `mvn spring-boot:run` or `gradle bootRun` (wrappers first), port 8080                                          | Recognised   |
+| Python (Django, FastAPI, Flask)                 | `python` | `manage.py`, `pyproject.toml`, `requirements.txt` or `Pipfile` | `manage.py runserver`, `uvicorn <module>:app` or `flask run`, through uv, Poetry, Pipenv or the repo's `.venv` | Recognised   |
+| Ruby on Rails                                   | `ruby`   | `Gemfile` with `config/application.rb`                         | `bin/rails server`, port 3000                                                                                  | Recognised   |
+| PHP (Laravel)                                   | `php`    | `artisan` or `composer.json`                                   | `php artisan serve`, port 8000                                                                                 | Recognised   |
 
 Local addresses reach a back end as environment variables, named per cable in `stack.json`; for .NET they go into the `-LOCAL` launch profile.
 
 ## Web front ends
 
-| Framework | Kind | Dev server port | |
-|---|---|---|---|
-| Vite (React, Vue, Svelte, Solid, ...) | `web` | 5173 | Run for real |
-| Next.js | `web` | 3000 | Recognised |
-| Angular | `web` | 4200 | Recognised |
-| Create React App | `web` | 3000 | Recognised |
+| Framework                             | Kind  | Dev server port |              |
+| ------------------------------------- | ----- | --------------- | ------------ |
+| Vite (React, Vue, Svelte, Solid, ...) | `web` | 5173            | Run for real |
+| Next.js                               | `web` | 3000            | Recognised   |
+| Angular                               | `web` | 4200            | Recognised   |
+| Create React App                      | `web` | 3000            | Recognised   |
 
 A `web` app is started with `npm run` like a Node app and opened in the browser.
 A local address is passed with the prefix the framework needs for browser code (`VITE_`, `NEXT_PUBLIC_`, `REACT_APP_`), or written to the git-ignored `.env.local`.
@@ -43,21 +43,21 @@ Other front-end dev servers (Nuxt, Remix, Astro, ...) run as `node` apps through
 
 ## Mobile
 
-| Stack | Kind | Runs on | |
-|---|---|---|---|
-| Flutter | `flutter` | iOS simulator, Android emulator, or a phone on the same Wi-Fi (through `fvm`) | Run for real |
-| React Native and Expo | `reactnative` | iOS simulator or Android emulator (`npx expo start`, `npx react-native run-ios`) | Recognised |
-| Native iOS (Swift) and Android (Kotlin) | none yet | started by you from Xcode or Android Studio | Not covered |
+| Stack                                   | Kind          | Runs on                                                                          |              |
+| --------------------------------------- | ------------- | -------------------------------------------------------------------------------- | ------------ |
+| Flutter                                 | `flutter`     | iOS simulator, Android emulator, or a phone on the same Wi-Fi (through `fvm`)    | Run for real |
+| React Native and Expo                   | `reactnative` | iOS simulator or Android emulator (`npx expo start`, `npx react-native run-ios`) | Recognised   |
+| Native iOS (Swift) and Android (Kotlin) | none yet      | started by you from Xcode or Android Studio                                      | Not covered  |
 
 A simulator reaches your Mac's local apps at `localhost`, the Android emulator at `10.0.2.2`, and a phone at your Mac's address on the network, with the apps it calls opened to the network (`koppler run <app> --lan`).
 Koppler works out that address per device for Flutter and React Native; for a native app, set it in your project the same way.
 
 ## Serverless and cloud
 
-| Stack | Kind | Started with | Needs | |
-|---|---|---|---|---|
+| Stack                       | Kind     | Started with                                                                                                                                                                            | Needs               |                     |
+| --------------------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------- | ------------------- |
 | AWS Lambda, queue-triggered | `lambda` | the function in its real runtime image, in the local AWS emulator that holds the board's local queues: triggered by the one it reads, or, with none, by a local address callers post to | Docker, the AWS CLI | Run for real (.NET) |
-| AWS SAM | `sam` | `sam build`, then `sam local start-api`, with the environment's deploy parameters from `samconfig.toml` | Docker, the SAM CLI | Run for real |
+| AWS SAM                     | `sam`    | `sam build`, then `sam local start-api`, with the environment's deploy parameters from `samconfig.toml`                                                                                 | Docker, the SAM CLI | Run for real        |
 
 A Lambda gets the settings its stack entry names (`lambda.env`), from a cable to a local app or a stored secret, and Parameter Store values from stored secrets (`lambda.parameters`); it can live in another app's repo, with that app's `slug` and its folder as `lambda.project`.
 
@@ -65,8 +65,8 @@ A SAM app serves its API functions; functions triggered by queues, schedules or 
 
 ## Containers
 
-| Stack | Kind | Started with | |
-|---|---|---|---|
+| Stack          | Kind      | Started with                                            |            |
+| -------------- | --------- | ------------------------------------------------------- | ---------- |
 | Docker Compose | `compose` | `docker compose up`, stopped with `docker compose down` | Recognised |
 
 Compose is checked last: many repos have a compose file only for their database.
@@ -75,7 +75,7 @@ Compose is checked last: many repos have a compose file only for their database.
 
 - **`other`:** any app, started by the command in its `start` field.
 - **Your own kinds:** a stack can define kinds for a technology Koppler has no recipe for: the files that recognise it, its start command and its port. See `kinds` in the [stack format](../plugin/skills/koppler-run/references/stack.md).
-- **Outside systems** (`outside`): things the apps call that never run locally, such as Salesforce or a SaaS API. They show as dashed cards and always use the deployed environment.
+- **Outside systems** (`outside`): things the apps call that never run locally, such as Salesforce or a SaaS API. They show in Discover, not on a board, and always use the deployed environment.
 
 ## What every run gets
 

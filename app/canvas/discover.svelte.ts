@@ -41,22 +41,14 @@ const QUEUE_TAGS: Record<string, [string, string]> = {
 
 class Discovered {
   /** The map: the board's apps, what they touch, and what was brought in from each opened card. */
+  /** The board's own cards: its apps, and the outside systems put on it by hand. */
+  #own = $derived([...board.nodes.map(node => node.id), ...board.pinned]);
   map = $derived.by(() => {
     const facts = board.facts;
     if (!facts) return { cards: [], links: [] as Link[] };
     const feature = board.feature;
-    if (!feature)
-      return mapOf(
-        facts,
-        board.nodes.map(node => node.id),
-        board.discover.open,
-      );
-    const shown = mapOf(
-      facts,
-      [...featureCards(feature), ...board.nodes.map(node => node.id)],
-      board.discover.open,
-      false,
-    );
+    if (!feature) return mapOf(facts, this.#own, board.discover.open);
+    const shown = mapOf(facts, [...featureCards(feature), ...this.#own], board.discover.open, false);
     // A step the stack has no link for yet is drawn as found, until it is accepted and recorded.
     const missing = numbered(feature)
       .map(({ step }) => step)

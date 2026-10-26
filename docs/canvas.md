@@ -75,7 +75,7 @@ Every call without a cable goes to the deployed app of the chosen environment.
 Cables are always curves, so any board you see is one you could draw yourself.
 A cable leaves its caller from a hollow ring and plugs into the app it calls at a solid socket.
 
-## Databases, tunnels, queues and outside systems
+## Databases, tunnels and queues
 
 These appear next to the app that uses them, and show or hide with it.
 
@@ -87,14 +87,12 @@ These appear next to the app that uses them, and show or hide with it.
 - The tunnel card has a row per database behind it, and the line to each database leaves from its row. **Show tunnel** on an app's card draws its line through the tunnel card, or straight to the database; by default the tunnel shows when two or more apps on the board share it. A right click on a line does the same.
 
 - **Tunnels** carry an app to a deployed database or service. Koppler opens one per host and port, shared by the apps that need it, and moves a clashing one to a free port. Each can be left out of a run, and one that runs can be restarted from its card when calls through it hang.
-- **Queues** (SQS, SNS, EventBridge, Kafka) show which apps publish and read. A switch on the card picks **Deployed** (local apps use the environment's queue) or **Local** (Koppler starts an SQS emulator or a Kafka broker in Docker and points every app on that queue at it). A queue can be hidden and shown again from its app.
-  What feeds a queue an app reads stacks above it, however far up: a Kafka topic piped onto an event bus, a rule forwarding to another bus, an SNS topic's subscription. Each link says how (`pipe`, `rule`, `subscription`, `rule to Lambda`); those upstream cards stay deployed.
-  A queue between two cards of the board shows too, even when both are outside systems: a CRM's event read by a handler Lambda.
-- **Outside systems** (for example a payment provider) are dashed cards: things the apps call, or that call them, and that never run locally. Add one with **Add outside system…** under the Apps list; click it in the list to keep its card on the board even when none of its callers is there.
-- Every link with a direction leaves its sender as a small dot and lands in the receiver's ring, with a chevron pointing in: into a queue publishes, into an app from a queue reads, into another app or an outside system calls. Database and tunnel links go both ways: a dot at each end.
+- **Queues** an app on the board publishes to or reads from show which apps do: SQS queues and Kafka topics, the ones Koppler can run here. A switch on the card picks **Deployed** (local apps use the environment's queue) or **Local** (Koppler starts an SQS emulator or a Kafka broker in Docker and points every app on that queue at it). A queue can be hidden and shown again from its app.
+- Everything that never runs here is in Discover, not on the board: outside systems (a payment provider, a CRM), SNS topics and event buses, and what feeds a queue from further up. Click an outside system in the Apps list to open it there; add one with **Add outside system…** under the list.
+- Every link with a direction leaves its sender as a small dot and lands in the receiver's ring, with a chevron pointing in: into a queue publishes, into an app from a queue reads, into another app calls. Database and tunnel links go both ways: a dot at each end.
 - Pick a card, or Shift-click several, to trace them: their links stay lit and say what they do, everything else fades back. Point at a link and it says who does what.
-- What a board hides stays hidden with that board: a board for one flow can leave out the queues and outside cards of the others.
-- Every card, not only an app's, takes a note for the agent, kept with the board and handed to the agent with the run. On a queue, a database, a tunnel or an outside system, pick the card and choose **Add note** in its foot; a written note reads as text, and a click opens it to edit.
+- What a board hides stays hidden with that board: a board for one flow can leave out the queues of the others.
+- Every card, not only an app's, takes a note for the agent, kept with the board and handed to the agent with the run. On a queue, a database or a tunnel, pick the card and choose **Add note** in its foot; a written note reads as text, and a click opens it to edit.
 
 ## Environment
 

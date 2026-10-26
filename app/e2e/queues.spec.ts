@@ -1,20 +1,21 @@
-// The new canvas's queue cards, outside systems and the apps a card still calls in the deployed environment.
+// The queue cards Plan shows (the ones Koppler can run here) and the apps a card still calls in the deployed environment.
+// The rest of the stack's queues, and outside systems, are in Discover.
 import type { Page } from '@playwright/test';
 import { card, expect, saved, STACK, test } from './canvas.ts';
 
 const queue = (page: Page) => page.locator('.svelte-flow__node-queue');
-const outside = (page: Page) => page.locator('.svelte-flow__node-outside');
 const at = (x: number, y: number) => ({ x, y, run: 'cli', branch: 'main', showQueues: true });
 const { orders, payments } = STACK.apps;
 const stack = {
   ...STACK,
   queues: {
     'order-events': { name: 'Order events', type: 'sqs', queue: 'order-events-qa' },
-    receipts: { name: 'Receipts', type: 'sns', queue: 'receipts-qa' },
+    receipts: { name: 'Receipts', type: 'kafka', queue: 'receipts-qa' },
+    alerts: { name: 'Alerts', type: 'sns', queue: 'alerts-qa' },
   },
   apps: {
     ...STACK.apps,
-    orders: { ...orders, publishes: { 'order-events': {}, receipts: {} } },
+    orders: { ...orders, publishes: { 'order-events': {}, receipts: {}, alerts: {} } },
     payments: {
       ...payments,
       reads: { 'order-events': {} },
@@ -40,34 +41,36 @@ test.use({
   },
 });
 
-test('a queue between two apps shows as a card linked to both, and an outside system beside its caller', async ({
-  page,
-}) => {
+test('a queue between two apps shows as a card linked to both', async ({ page }) => {
   await expect(queue(page)).toHaveCount(2);
   const events = queue(page).filter({ hasText: 'Order events' });
   await expect(events).toContainText('SQS');
   await expect(events.getByRole('img', { name: 'Your local Payments API reads the QA queue' })).toBeVisible();
-  await expect(outside(page)).toHaveCount(1);
-  await expect(outside(page)).toContainText('Billing');
-  await expect(outside(page)).toContainText('QA: api.billing.example');
-  // Orders API to each of its queues, the queue to its reader, and the call to Billing.
+  // Orders API to each of its queues, and the queue to its reader.
   await expect(page.locator('.links .flow.msg')).toHaveCount(3);
-  await expect(page.locator('.links .flow.ext')).toHaveCount(1);
   await page.screenshot({ path: 'test-results/next-queues.png' });
 });
 
-test('a picked app lights its links to queues and outside systems, like its cables', async ({ page }) => {
+test("what cannot run here stays off Plan, and Discover shows it: an SNS topic as the board's own, an outside system one step away", async ({
+  page,
+}) => {
+  await expect(queue(page)).toHaveCount(2);
+  await expect(queue(page).filter({ hasText: 'Alerts' })).toHaveCount(0);
+  await expect(page.locator('.svelte-flow__node-outside')).toHaveCount(0);
+  await page.getByRole('radio', { name: 'Discover' }).check();
+  await expect(card(page, 'queue:alerts').locator('.lean')).not.toHaveClass(/ring/);
+  await expect(card(page, 'billing').locator('.lean')).toHaveClass(/ring/);
+});
+
+test('a picked app lights its links to queues, like its cables', async ({ page }) => {
   await card(page, 'payments').locator('h3, header').first().click();
-  await expect(page.locator('.links .flow.ext')).toHaveClass(/\blit\b/);
   await expect(page.locator('.links .flow.msg.lit')).toHaveCount(1);
   await expect(page.locator('.links .flow.msg.dimmed')).toHaveCount(2);
   await page.screenshot({ path: 'test-results/next-queues-lit.png' });
 });
 
-test('a queue is switched to a local copy where Koppler can run one, and the choice is kept', async ({ page }) => {
+test('a queue is switched to a local copy, and the choice is kept', async ({ page }) => {
   const events = queue(page).filter({ hasText: 'Order events' });
-  const receipts = queue(page).filter({ hasText: 'Receipts' });
-  await expect(receipts.getByRole('radio', { name: 'Local' })).toBeDisabled();
   const kept = saved(page);
   await events.getByRole('radio', { name: 'Local' }).check();
   await expect(events.getByRole('img', { name: /reads the QA queue/ })).toHaveCount(0);
@@ -171,62 +174,14 @@ test('a queue card is joined to its own app on whichever side of the app it is m
   expect(Math.abs(((await start())[0] ?? 0) - right)).toBeLessThanOrEqual(1);
 });
 
-test.describe('an outside system that calls an app on the board', () => {
-  test.use({
-    stack: {
-      ...STACK,
-      apps: {
-        ...STACK.apps,
-        psp: { name: 'Pay Provider', kind: 'other', outside: 'sends webhooks', consumes: { orders: {} } },
-      },
-    },
-  });
-
-  test('shows beside it, linked from the outside card, and says its calls go to the deployed app', async ({ page }) => {
-    await expect(outside(page)).toHaveCount(1);
-    await expect(outside(page)).toContainText('Pay Provider');
-    await expect(page.locator('.links .flow.ext')).toHaveCount(1);
-    await expect(outside(page).locator('.outside')).toHaveAttribute(
-      'title',
-      /It sends to the deployed Orders API, not to your local one\./,
-    );
-  });
-});
-
-test.describe('an outside system none of whose apps is on the board', () => {
-  test.use({
-    stack: {
-      ...STACK,
-      apps: {
-        ...STACK.apps,
-        psp: { name: 'Pay Provider', kind: 'other', outside: 'sends webhooks', consumes: { catalog: {} } },
-      },
-    },
-  });
-
-  test('is put on the board from the side panel, kept, and never run', async ({ page, canvas }) => {
-    await expect(outside(page)).toHaveCount(0);
-    await page.getByRole('complementary').getByRole('button', { name: 'Pay Provider', exact: true }).click();
-    await expect(outside(page)).toHaveCount(1);
-    await expect(outside(page)).toContainText('Pay Provider');
-    await expect
-      .poll(async () => {
-        const kept = (await (await page.request.get(`${canvas.url}data/state.json`)).json()) as { outside?: string[] };
-        return kept.outside;
-      })
-      .toEqual(['psp']);
-    await page.reload();
-    await expect(outside(page)).toHaveCount(1);
-
-    await page.getByRole('button', { name: 'Run', exact: true }).click();
-    const review = page.getByRole('dialog').filter({ hasText: 'Run on QA' });
-    await expect(review).toContainText('Orders API');
-    await expect(review).not.toContainText('Pay Provider');
-    await review.getByRole('button', { name: 'Cancel' }).click();
-
-    await page.getByRole('button', { name: 'Remove Pay Provider from the board' }).click();
-    await expect(outside(page)).toHaveCount(0);
-  });
+test('an outside system in the side panel opens in Discover, picked', async ({ page }) => {
+  await page
+    .getByRole('listitem')
+    .filter({ hasText: 'Billing' })
+    .getByRole('button', { name: 'Billing', exact: true })
+    .click();
+  await expect(page.getByRole('radio', { name: 'Discover' })).toBeChecked();
+  await expect(page.getByRole('complementary', { name: 'Billing' })).toBeVisible();
 });
 
 test('an app dragged takes its own cards along (tunnel, a queue only it uses), and leaves a shared queue', async ({
@@ -255,92 +210,10 @@ test('an app dragged takes its own cards along (tunnel, a queue only it uses), a
   expect(await shared.boundingBox()).toEqual(sharedBefore);
 });
 
-test.describe('an outside system that reads a queue one app on the board sends to', () => {
-  test.use({
-    stack: {
-      ...stack,
-      apps: {
-        ...stack.apps,
-        warehouse: { name: 'Warehouse Feed', kind: 'other', outside: 'a hosted connector', reads: { receipts: {} } },
-      },
-    },
-    board: {
-      env: 'qa',
-      mode: 'auto',
-      zoom: 0.6,
-      pan: { x: 40, y: 40 },
-      nodes: { web: at(0, 0), orders: at(500, 0), payments: at(1000, 0) },
-      edges: [{ from: 'web', to: 'orders', fromSide: 'right', toSide: 'left' }],
-      outside: ['warehouse'],
-    },
-  });
-
-  test('Arrange puts it after the queue it reads, not at the start of the flow', async ({ page }) => {
-    await expect(outside(page).filter({ hasText: 'Warehouse Feed' })).toBeVisible();
-    await page.getByRole('button', { name: /^Arrange/ }).click();
-    const at = async (locator: ReturnType<typeof outside>) => {
-      const box = await locator.boundingBox();
-      if (!box) throw new Error('not on the page');
-      return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
-    };
-    await expect
-      .poll(async () => {
-        const [web, orders, feed] = await Promise.all([
-          at(card(page, 'web')),
-          at(card(page, 'orders')),
-          at(outside(page).filter({ hasText: 'Warehouse Feed' })),
-        ]);
-        // Along the way the flow runs, Web Shop to Orders API: the feed comes after Orders API.
-        const across = Math.abs(orders.x - web.x) > Math.abs(orders.y - web.y);
-        const step = across ? orders.x - web.x : orders.y - web.y;
-        const feedStep = across ? feed.x - orders.x : feed.y - orders.y;
-        return Math.sign(step) === Math.sign(feedStep) && feedStep !== 0;
-      })
-      .toBe(true);
-    await page.screenshot({ path: 'test-results/next-queue-reader.png' });
-  });
-
-  test('it is hidden from its card although its queue is on the board, kept so, and brought back from the list', async ({
-    page,
-  }) => {
-    const feed = outside(page).filter({ hasText: 'Warehouse Feed' });
-    await expect(feed).toBeVisible();
-    await expect(page.locator('.links .flow.msg')).toHaveCount(4);
-    const kept = saved(page);
-    await feed.getByRole('button', { name: 'Hide Warehouse Feed' }).click();
-    await expect(feed).toHaveCount(0);
-    await expect(page.locator('.links .flow.msg')).toHaveCount(3);
-    await kept;
-    await page.reload();
-    await expect(card(page, 'orders')).toBeVisible();
-    await expect(outside(page).filter({ hasText: 'Warehouse Feed' })).toHaveCount(0);
-    await page.getByRole('complementary').getByRole('button', { name: 'Warehouse Feed', exact: true }).click();
-    await expect(outside(page).filter({ hasText: 'Warehouse Feed' })).toBeVisible();
-    await page.screenshot({ path: 'test-results/next-outside-hide.png' });
-  });
-
-  test('the queue is shared with it, so it stays put when the app is dragged', async ({ page }) => {
-    const receipts = queue(page).filter({ hasText: 'Receipts' });
-    await expect(receipts).toBeVisible();
-    const [before, app] = await Promise.all([receipts.boundingBox(), card(page, 'orders').boundingBox()]);
-    if (!before || !app) throw new Error('not on the page');
-    await page.mouse.move(app.x + 80, app.y + 14);
-    await page.mouse.down();
-    await page.mouse.move(app.x + 80, app.y + 114, { steps: 8 });
-    await page.mouse.up();
-    await expect
-      .poll(async () => Math.round(((await card(page, 'orders').boundingBox())?.y ?? 0) - app.y))
-      .toBeGreaterThan(40);
-    expect(await receipts.boundingBox()).toEqual(before);
-  });
-});
-
 test("the icons in a queue's and a tunnel's buttons sit in the middle of each button", async ({ page }) => {
   await expect(queue(page)).toHaveCount(2);
   const off = await page
-    .locator(
-      '.svelte-flow__node-queue .acts button, .svelte-flow__node-tunnel .acts button, .svelte-flow__node-outside .acts button',
-    )
+    .locator('.svelte-flow__node-queue .acts button, .svelte-flow__node-tunnel .acts button')
     .evaluateAll(buttons =>
       buttons.map(button => {
         const box = button.getBoundingClientRect();
@@ -382,52 +255,4 @@ test('in every layout Arrange gives, no card covers another, an app’s own queu
       })
       .toEqual([]);
   }
-});
-
-test.describe('an app whose only link is to an outside system', () => {
-  test.use({
-    stack: {
-      ...STACK,
-      apps: {
-        ...STACK.apps,
-        payments: { ...payments, consumes: { billing: { how: 'env', env: 'BILLING_URL' } } },
-        billing: {
-          name: 'Billing',
-          kind: 'other',
-          outside: 'a hosted service',
-          deployedUrl: 'https://api.billing.example',
-        },
-      },
-    },
-    // Room above the card: dragged near the window's edge, the board would pan by itself.
-    board: { env: 'qa', mode: 'auto', zoom: 0.8, pan: { x: 60, y: 300 }, nodes: { payments: at(0, 0) }, edges: [] },
-  });
-
-  test('an app dragged close to level with the outside system it calls snaps to it, from its own end', async ({
-    page,
-  }) => {
-    const billing = outside(page).filter({ hasText: 'Billing' });
-    await expect(billing).toBeVisible();
-    const off = async () => {
-      const [a, b] = await Promise.all([card(page, 'payments').boundingBox(), billing.boundingBox()]);
-      return Math.round((b?.y ?? 0) + (b?.height ?? 0) / 2 - ((a?.y ?? 0) + (a?.height ?? 0) / 2)) || 0;
-    };
-    const grab = await card(page, 'payments').locator('header').boundingBox();
-    if (!grab) throw new Error('not on the page');
-    const from = { x: grab.x + 60, y: grab.y + grab.height / 2 };
-    await page.mouse.move(from.x, from.y);
-    await page.mouse.down();
-    await page.mouse.move(from.x, from.y - 120, { steps: 8 });
-    let y = from.y - 120;
-    // Back up to within a few pixels of level, whatever the drag lost on the way.
-    for (let tries = 0; tries < 3 && Math.abs(await off()) > 6; tries++) {
-      const was = await off();
-      y += was - 4 * Math.sign(was);
-      await page.mouse.move(from.x, y, { steps: 3 });
-    }
-    await expect(page.locator('.links .flow.ext.snapped')).toHaveCount(1);
-    await page.mouse.up();
-    await expect.poll(async () => Math.abs(await off())).toBe(0);
-    await expect(page.locator('.links .flow.ext.snapped')).toHaveCount(0);
-  });
 });

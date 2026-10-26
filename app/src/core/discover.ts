@@ -58,7 +58,7 @@ const withVia = (use: unknown) => {
 
 export interface MapCard {
   card: Card;
-  /** One of the board's apps; the others are one step away, drawn dimmed. */
+  /** One of the board's cards, or a queue or database one of them uses; the rest are one step away, drawn dimmed. */
   onBoard: boolean;
   /** Links to cards not on the map: the +N chip that brings them in. */
   hidden: number;
@@ -91,9 +91,12 @@ export function mapOf(
     for (const other of near(card)) shown.add(other);
   }
   const links = all.filter(link => shown.has(link.from) && shown.has(link.to));
+  // A queue or database a board app uses is the board's own too: it is drawn with them, not drawn back.
+  const own = (card: Card) =>
+    onBoard.includes(card) || (card.includes(':') && near(card).some(other => onBoard.includes(other)));
   const cards = [...shown].map(card => ({
     card,
-    onBoard: onBoard.includes(card),
+    onBoard: own(card),
     hidden: new Set(near(card).filter(other => !shown.has(other))).size,
   }));
   return { cards, links };

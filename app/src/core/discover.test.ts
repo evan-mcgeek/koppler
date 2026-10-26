@@ -30,14 +30,14 @@ describe('linksOf', () => {
 });
 
 describe('mapOf', () => {
-  it('shows the board and one step around it, and counts what each card leaves out', () => {
+  it('shows the board and one step around it, its apps queues and databases as its own, and counts what each card leaves out', () => {
     const { cards, links } = mapOf(facts, ['orders']);
     expect(cards).toEqual([
       { card: 'orders', onBoard: true, hidden: 0 },
       { card: 'web', onBoard: false, hidden: 0 },
       { card: 'payments', onBoard: false, hidden: 2 },
-      { card: 'queue:events', onBoard: false, hidden: 0 },
-      { card: 'database:orders-db', onBoard: false, hidden: 0 },
+      { card: 'queue:events', onBoard: true, hidden: 0 },
+      { card: 'database:orders-db', onBoard: true, hidden: 0 },
     ]);
     expect(links).toHaveLength(5);
   });
