@@ -18,6 +18,21 @@ test('a stack that can be used has nothing wrong with it, and is typed', () => {
     kinds: { elixir: { label: 'Elixir', detect: ['mix.exs'], start: 'mix phx.server' } },
     queues: { thumbs: { name: 'Thumbnails', type: 'sqs', queue: 'thumbs-qa', envs: { prod: { queue: 'thumbs' } } } },
     checks: [{ name: 'vpn', run: 'pgrep -x vpnd' }],
+    resources: {
+      receipts: {
+        type: 's3',
+        name: 'Receipts',
+        bucket: 'acme-receipts-qa',
+        envs: { prod: { bucket: 'acme-receipts' } },
+      },
+      api: { type: 'apigw', name: 'Public API', routes: { 'POST /orders': 'orders', 'POST /thumbs': 'queue:thumbs' } },
+      refunds: {
+        type: 'sfn',
+        name: 'Refunds',
+        startedBy: ['orders'],
+        steps: [{ name: 'Check' }, { name: 'Pay', calls: 'web' }],
+      },
+    },
     presets: [{ name: 'Both', version: 1, nodes: { orders: {}, web: {} }, edges: [{ from: 'web', to: 'orders' }] }],
     apps: {
       orders: {
@@ -26,6 +41,7 @@ test('a stack that can be used has nothing wrong with it, and is typed', () => {
         prereqs: [{ sso: 'acme-qa' }, { tunnel: 'db.qa.acme.example', port: 5432, env: 'ConnectionStrings__Db' }],
         secrets: [{ env: 'ConnectionStrings__Db', type: 'postgres' }],
         publishes: { thumbs: {} },
+        buckets: { receipts: { access: 'write' } },
         envs: { prod: { prereqs: [{ tunnel: 'db.acme.example', port: 5432 }], start: 'dotnet run' } },
         localChanges: [{ file: 'src/Startup.cs', find: 'a', replace: 'b' }],
       },
@@ -89,6 +105,29 @@ test('each part is named where it is wrong', () => {
       'protected: a list of environments from envs (the ones that ask before every secret read and get the careful review)',
     ],
     [stack({ kinds: { go: { label: 'Mine' } } }), 'kinds.go: Koppler already has a kind with this id'],
+    [stack({ resources: { r: { type: 'blob', name: 'R' } } }), 'resources.r.type: one of s3, apigw, sfn'],
+    [
+      stack({ resources: { r: { type: 'apigw', name: 'R', routes: { orders: 'orders' } } } }),
+      'resources.r.routes.orders: an object keyed by route, such as POST /orders',
+    ],
+    [
+      stack({ resources: { r: { type: 'apigw', name: 'R', routes: { 'GET /': 'queue:ghost' } } } }),
+      'resources.r.routes.GET /: no such app, or queue:<id> under "queues"',
+    ],
+    [
+      stack({ resources: { r: { type: 'sfn', name: 'R', startedBy: ['ghost'] } } }),
+      'resources.r.startedBy[0]: no such app',
+    ],
+    [
+      stack({ resources: { r: { type: 'sfn', name: 'R', steps: [{ name: 'A', calls: 'ghost' }] } } }),
+      'resources.r.steps[0].calls: no such app',
+    ],
+    [
+      stack({ resources: { r: { type: 's3', name: 'R', envs: { live: {} } } } }),
+      'resources.r.envs.live: must be one of envs',
+    ],
+    [web({ buckets: { r: { access: 'read' } } }), 'apps.web.buckets.r: no such s3 resource under "resources"'],
+    [web({ buckets: { r: { access: 'all' } } }), 'apps.web.buckets.r.access: one of read, write, both'],
     [
       stack({ queues: { q: { name: 'Q', type: 'rabbit' } } }),
       'queues.q.type: one of sqs, sns, eventbridge, kafka, other',

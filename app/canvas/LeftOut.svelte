@@ -1,6 +1,6 @@
 <script lang="ts">
   // After Plan a run with these: what was picked in Discover, the apps put on the board, and what stays deployed. An app
-  // not cloned here can be cloned; a queue, database or outside system never runs here.
+  // not cloned here can be cloned; a queue, database, resource or outside system never runs here.
   import X from '@lucide/svelte/icons/x';
   import { board } from './board.svelte.ts';
   import { discovered } from './discover.svelte.ts';
