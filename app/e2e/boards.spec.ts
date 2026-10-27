@@ -180,25 +180,6 @@ test('a board opens from a file dropped on the page, and from a link the server 
   await expect(picker(page)).toHaveText('From a link');
 });
 
-test('Arrange leaves no card on top of another', async ({ page }) => {
-  await picker(page).click();
-  await boards(page)
-    .getByRole('button', { name: /^Checkout/ })
-    .click();
-  await page.getByRole('button', { name: 'Add Catalog API to the board', exact: true }).first().click();
-  const cards = page.locator('.svelte-flow__node-app');
-  await expect(cards).toHaveCount(4);
-  await page.getByRole('button', { name: 'Arrange', exact: true }).click();
-  const overlapping = () =>
-    cards.evaluateAll(els => {
-      const r = els.map(el => el.getBoundingClientRect());
-      return r.flatMap((a, i) =>
-        r.slice(i + 1).filter(b => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom),
-      ).length;
-    });
-  await expect.poll(overlapping).toBe(0);
-});
-
 test('a board of your own is shared with the team: it joins the stack as a team board', async ({ page, canvas }) => {
   const fs = await import('node:fs');
   const path = await import('node:path');

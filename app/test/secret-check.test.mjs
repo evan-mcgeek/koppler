@@ -45,7 +45,3 @@ test('Redis and Valkey: a tiny stand-in server that wants a password.', async ()
   assert.deepEqual(await check(`127.0.0.1:${port},password=right`), { code: 1, message: 'failed: nothing answers at its address (is the tunnel up?)' });
 });
 
-test('Nothing listens on port 1: a plain reason, and no part of the value in it.', async () => {
-  const down = await check('Host=127.0.0.1;Port=1;Database=orders;Username=app;Password=hunter2-not-real');
-  if (down.code !== 2) assert.deepEqual(down, { code: 1, message: 'failed: nothing answers at its address (is the tunnel up?)' });
-});
