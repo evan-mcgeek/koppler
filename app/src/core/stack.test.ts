@@ -72,6 +72,10 @@ test('each part is named where it is wrong', () => {
       'apps.web: "NODE_OPTIONS" cannot be a secret or a cable setting; it changes what code the app runs',
     ],
     [web({ consumes: { ghost: {} } }), 'apps.web.consumes.ghost: no such app'],
+    [
+      web({ consumes: { orders: { how: 'set in the admin panel' } } }),
+      'apps.web.consumes.orders.how: one of env, env-file, edit, secret, unknown; anything else in words goes in note',
+    ],
     [web({ consumes: { constructor: {} } }), 'apps.web.consumes.constructor: no such app'],
     [web({ envs: { staging: {} } }), 'apps.web.envs.staging: not one of envs (qa, prod)'],
     [web({ start: 'x'.repeat(2001) }), 'apps.web.start: a shell command (up to 2000 characters)'],

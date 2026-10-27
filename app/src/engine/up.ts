@@ -74,6 +74,8 @@ const running = (name: string) => {
   return !!record && alive(record);
 };
 const nameOf = (stack: Registry, id: string) => stack.apps[id]?.name ?? id;
+/** The ways of calling whose change is in a file the stack names. */
+const FROM_FILE = new Set(['edit', 'env-file']);
 const prereqsOf = (stack: Registry, id: string, env: string): Prereq[] => {
   return appOn(stack, id, env)?.prereqs ?? [];
 };
@@ -385,7 +387,12 @@ function wireCables(up: Up): void {
     if (wired.how === 'env' && !kindOf(stack.apps[from]).platforms)
       for (const name of [wired.call.env ?? []].flat()) settingsFor(up, from)[name] = wired.value;
     else if (wired.how === 'secret' && wired.call.key) (secretKeys[from] ??= {})[wired.call.key] = wired.value;
-    else if (!viaRecipe && !pointsAt(up, from, wired.value, wired.file ?? wired.call.file)) {
+    // Only a change the stack names a file for is taken as made from what the file says; otherwise a logged change is
+    // the proof, as the address in some other line of the file (another flavour's) is not what this run starts with.
+    else if (
+      !viaRecipe &&
+      !pointsAt(up, from, wired.value, FROM_FILE.has(String(wired.how)) ? (wired.file ?? wired.call.file) : undefined)
+    ) {
       const where = wired.call.file ? ` in ${wired.call.file}` : '';
       const how =
         wired.how === 'unknown' ? 'how it picks the address is not recorded yet' : `${String(wired.how)}${where}`;

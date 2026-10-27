@@ -78,10 +78,15 @@ const Secret = z.looseObject(
   },
   { error: 'an object' },
 );
+/** The ways of calling Koppler applies, to point a caller at a local copy. */
+export const CALL_HOWS = ['env', 'env-file', 'edit', 'secret', 'unknown'] as const;
 /** How one app calls another, and so what to change to point it at a local copy. */
 const Call = z.looseObject(
   {
-    how: z.string().optional().describe('How it picks the address: a setting, a settings file, an edit'),
+    how: z
+      .enum(CALL_HOWS, { error: `one of ${CALL_HOWS.join(', ')}; anything else in words goes in note` })
+      .optional()
+      .describe('How it picks the address: a setting, a settings file, an edit, a secret, or not known yet'),
     env: z
       .union([z.string(), z.array(z.string())], { error: 'a setting name, or a list of them' })
       .optional()
