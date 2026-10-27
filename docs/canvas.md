@@ -132,6 +132,7 @@ The chip opens the agent's messages; with no agent listening, or one gone quiet,
 Nothing on it runs or changes the board.
 Its tools are the board's: Select and Hand, Undo, Arrange (each press the next layout), Fit, zoom and Present, with the same keys; dragging over the map picks the cards in it, and the overview sits in the corner.
 A card's **+N** brings in the links it leaves out; a dashed link was found in the code and is not in the stack yet, and **Confirm** in the panel keeps it there.
+A queue or topic something sends to that nothing reads or passes on is flagged **Dead end · no readers**: its links stop at a bar.
 Pick several cards (Shift-click) and **Plan a run with these** puts the cloned ones on the board; the rest stay deployed and are listed in **Left out**, with a clone command for each app.
 
 <img alt="Discover on QA: the board's apps with what they touch one step away, Orders API picked and its links listed in the panel" src="images/discover.png">

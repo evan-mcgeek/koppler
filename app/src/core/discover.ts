@@ -51,6 +51,16 @@ export function linksOf(facts: Facts): Link[] {
         links.push({ from: `queue:${id}`, to: `queue:${to}`, kind: 'feeds', sure: 'confirmed', ...withVia(feed) });
   return links;
 }
+/** The queues something sends to that nothing reads or passes on: what goes in goes nowhere. */
+export function deadEnds(facts: Facts): Set<Card> {
+  const links = linksOf(facts);
+  return new Set(
+    links
+      .filter(link => link.to.startsWith('queue:') && (link.kind === 'publish' || link.kind === 'feeds'))
+      .map(link => link.to)
+      .filter(queue => !links.some(link => link.from === queue)),
+  );
+}
 const withVia = (use: unknown) => {
   const said = via(use);
   return said ? { via: said } : {};
