@@ -23,6 +23,8 @@ export interface QueuedEdit {
   create?: true;
   /** A board opened from a file or a link: an open canvas takes it whole. */
   preset?: StoredPreset;
+  /** A board deleted from the terminal: an open canvas moves it to Recently deleted too. */
+  delete?: true;
 }
 
 const queued = () => (readData('board-edits')?.['edits'] ?? []) as QueuedEdit[];
@@ -38,7 +40,19 @@ export function editDone(id: unknown): void {
 
 const CHANGES =
   '[--propose] [--add <app,...>] [--remove <app,...>] [--cable <caller>:<callee>]... [--uncable <caller>:<callee>]... [--branch <app>=<branch>]... [--note <app>="<note>"]... [--arrange] [--request "<words>"] [--phase "<name>"] [--step|--propose-step <from>:<to>[="<note>"]]... [--unstep <from>:<to>]...';
-const USAGE = `usage: koppler board new "<name>" ${CHANGES}\n       koppler board edit "<name>" ${CHANGES}\n       koppler board share "<name>"\n       koppler board open <file or link>`;
+const USAGE = `usage: koppler board new "<name>" ${CHANGES}\n       koppler board edit "<name>" ${CHANGES}\n       koppler board share "<name>"\n       koppler board open <file or link>\n       koppler board delete "<name>"`;
+
+/** Queues a change for an open canvas of the stack in use, dropping ones a day old that no canvas took. */
+function enqueue(change: Omit<QueuedEdit, 'id' | 'at' | 'stack'>): void {
+  const now = Date.now();
+  const entry: QueuedEdit = {
+    id: now.toString(36) + Math.random().toString(36).slice(2, 8),
+    at: new Date(now).toISOString(),
+    stack: currentStack(),
+    ...change,
+  };
+  writeData('board-edits', { edits: [...queued().filter(one => now - Date.parse(one.at) < DAY), entry] });
+}
 
 /** Your own board, by name, as kept for this stack. */
 const ownBoard = (name: string): StoredPreset | undefined => {
@@ -59,8 +73,31 @@ async function share(name: string): Promise<void> {
   else console.log(`PROPOSED ${board.name} to the team on ${shared.repo}: ${shared.url}`);
 }
 
+/** One of your boards goes to Recently deleted, where the board picker can bring it back. */
+function deleteBoard(name: string): void {
+  const board =
+    ownBoard(name) ??
+    fail(`${name} is not one of your boards; koppler use --boards lists them (a team board is kept in the stack)`);
+  const state = readData('state') ?? {};
+  const own = (state['presets'] ?? []) as StoredPreset[];
+  const trash = (state['trash'] ?? []) as unknown[];
+  const { preset: onScreen, ...rest } = state;
+  writeData('state', {
+    ...rest,
+    ...(onScreen !== board.name && { preset: onScreen }),
+    presets: own.filter(one => one.name !== board.name),
+    trash: [{ ...board, deleted: new Date().toISOString() }, ...trash].slice(0, 20),
+  });
+  enqueue({ board: board.name, edit: {}, delete: true });
+  console.log(`DELETED ${board.name}; Recently deleted in the board picker brings it back.`);
+}
+
 export function boardCommand(args: string[]): void | Promise<void> {
   const [what, name] = args;
+  if (what === 'delete' && name?.trim() && !name.startsWith('-')) {
+    deleteBoard(name);
+    return;
+  }
   if (what === 'share' && name && !name.startsWith('-')) return share(name);
   if (what === 'open' && name && !name.startsWith('-')) return openBoard(name, args.includes('--no-open'));
   if ((what !== 'edit' && what !== 'new') || !name?.trim() || name.startsWith('-')) fail(USAGE);
@@ -160,20 +197,7 @@ async function openBoard(where: string, quiet: boolean): Promise<void> {
   const state = readData('state') ?? {};
   const own = (state['presets'] ?? []) as StoredPreset[];
   writeData('state', { ...state, presets: [...own.filter(one => one.name !== board.name), board] });
-  const now = Date.now();
-  writeData('board-edits', {
-    edits: [
-      ...queued().filter(one => now - Date.parse(one.at) < DAY),
-      {
-        id: now.toString(36) + Math.random().toString(36).slice(2, 8),
-        at: new Date(now).toISOString(),
-        stack: currentStack(),
-        board: board.name,
-        edit: {},
-        preset: board,
-      },
-    ],
-  });
+  enqueue({ board: board.name, edit: {}, preset: board });
   console.log(`OPENED ${board.name} from ${source}`);
   if (quiet) console.log(`An open canvas shows it; or: koppler canvas --board "${board.name}"`);
   else await canvas(['--board', board.name]);
@@ -270,18 +294,7 @@ export function changeBoard(name: string, edit: BoardEdit, create: boolean, prop
     ...state,
     presets: mine ? own.map(one => (one.name === board.name ? changed : one)) : [...own, changed],
   });
-  const now = Date.now();
-  const entry: QueuedEdit = {
-    id: now.toString(36) + Math.random().toString(36).slice(2, 8),
-    at: new Date(now).toISOString(),
-    stack: currentStack(),
-    board: board.name,
-    edit,
-    ...(create && { create: true as const }),
-  };
-  writeData('board-edits', {
-    edits: [...queued().filter(one => now - Date.parse(one.at) < DAY), entry],
-  });
+  enqueue({ board: board.name, edit, ...(create && { create: true as const }) });
   const canvas = readRecord('canvas');
   const said = describeEdit(edit, named);
   return [

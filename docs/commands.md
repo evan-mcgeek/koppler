@@ -62,6 +62,7 @@ You can run these yourself too; the agent uses them to do its part.
 | `koppler board open <file or link> [--no-open]` | Open a board from a file or a GitHub link: it joins your boards and the canvas opens on it; the board picker's Reload reads it again from there |
 | `koppler board new\|edit "<name>" [--request "<words>"] [--phase "<name>"] [--step <from>:<to>[="<note>"]]...` | Make it a feature board: the request it came from, and the stack's links it uses as numbered steps, each in the phase named before it |
 | `koppler board edit "<name>" [--propose-step <from>:<to>[="<why>"]]... [--unstep <from>:<to>]...` | Propose a step, dashed on the map until the user accepts it there, or take one off; a card is an app's id, `queue:<id>` or `database:<id>` |
+| `koppler board delete "<name>"` | Move one of your boards to Recently deleted, as the board picker does; an open canvas does it too, and Recently deleted brings it back |
 | `koppler board new\|edit "<name>" ... --arrange` | Lay the board out afresh, as Arrange on the canvas does: at once when it is on screen, else when it is next opened |
 | `koppler board new\|edit "<name>" ... --propose` | Ask the user first: the change shows in the canvas inbox, and is made only when they say yes |
 | `koppler board edit "<name>" [--add <app,...>] [--remove <app,...>] [--cable <caller>:<callee>]... [--uncable <caller>:<callee>]... [--branch <app>=<branch>]... [--note <app>="<note>"]...` | Change a board, even one open on the canvas: the canvas shows the change and keeps it; cards it does not touch stay put |
