@@ -45,7 +45,7 @@ test('npm run release bumps app/ on a release branch from main and opens its pul
   assert.equal(git(origin, 'log', '-1', '--format=%s', 'release/0.0.2').stdout.trim(), 'Koppler 0.0.2');
   assert.equal(git(origin, 'rev-parse', 'release/0.0.2^').stdout.trim(), main);
   assert.equal(JSON.parse(git(origin, 'show', 'release/0.0.2:app/package.json').stdout).version, '0.0.2');
-  assert.deepEqual(fs.readFileSync(asked, 'utf8').split('\n').slice(0, 6), ['pr', 'create', '--base', 'main', '--title', 'Koppler 0.0.2']);
+  assert.deepEqual(fs.readFileSync(asked, 'utf8').split('\n').slice(0, 8), ['pr', 'create', '--base', 'main', '--head', 'release/0.0.2', '--title', 'Koppler 0.0.2']);
   assert.equal(git(repo, 'branch', '--show-current').stdout.trim(), 'side');
   assert.equal(git(repo, 'status', '--porcelain').stdout, '');
 });
