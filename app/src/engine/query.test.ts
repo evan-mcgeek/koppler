@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { clientCall, readOnlySql } from './query.ts';
+import { clientCall, readOnlySql, failure } from './query.ts';
 import { test } from 'vitest';
 
 test("only one reading statement gets through, in each database's quoting rules", async () => {
@@ -84,4 +84,47 @@ test("only one reading statement gets through, in each database's quoting rules"
   );
   assert.equal(my!.args.includes('p@ss'), false);
   assert.equal(clientCall({ type: 'redis' } as any, 'x'), null);
+});
+
+test('a failed statement says why from what the server said, never from its own echo of the statement', () => {
+  // Captured from psql 16 and the mysql 8.4 client, run as Koppler runs them.
+  const cases: [string, string][] = [
+    [
+      'ERROR:  column "nonexistent_col" does not exist\nLINE 1: BEGIN TRANSACTION READ ONLY; select nonexistent_col from pg_...\n                                            ^\n',
+      'column "nonexistent_col" does not exist',
+    ],
+    [
+      'ERROR:  column "timeout" does not exist\nLINE 1: BEGIN TRANSACTION READ ONLY; select timeout from pg_class\n                                            ^\n',
+      'column "timeout" does not exist',
+    ],
+    [
+      'ERROR:  cannot execute CREATE TABLE in a read-only transaction\n',
+      'that statement writes, and this connection is read-only',
+    ],
+    [
+      'psql: error: connection to server at "127.0.0.1", port 1 failed: Connection refused\n\tIs the server running on that host and accepting TCP/IP connections?\n',
+      'nothing answers at its address (is the tunnel up?)',
+    ],
+    [
+      'psql: error: connection to server at "127.0.0.1", port 5432 failed: FATAL:  password authentication failed for user "app"\n',
+      'it refused the user name or password',
+    ],
+    [
+      "ERROR 1054 (42S22) at line 1: Unknown column 'timeout' in 'field list'\n",
+      "Unknown column 'timeout' in 'field list'",
+    ],
+    [
+      'ERROR 1792 (25006) at line 1: Cannot execute statement in a READ ONLY transaction.\n',
+      'that statement writes, and this connection is read-only',
+    ],
+    [
+      "ERROR 2003 (HY000): Can't connect to MySQL server on '127.0.0.1:1' (111)\n",
+      'nothing answers at its address (is the tunnel up?)',
+    ],
+    [
+      "ERROR 1045 (28000): Access denied for user 'root'@'127.0.0.1' (using password: YES)\n",
+      'it refused the user name or password',
+    ],
+  ];
+  for (const [printed, why] of cases) assert.equal(failure(printed), why, printed);
 });

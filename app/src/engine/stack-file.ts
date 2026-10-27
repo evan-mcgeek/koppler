@@ -4,7 +4,7 @@ import { readUpgraded } from '../upgraded.ts';
 import path from 'node:path';
 import { readJson, writeJson } from '../json-files.ts';
 import { kindsFor } from '../core/kinds.ts';
-import { validateStack } from '../core/stack.ts';
+import { unknownFields, validateStack } from '../core/stack.ts';
 import { withoutMissingApps } from '../core/missing-apps.ts';
 import { getAt, parsePath, setAt } from '../core/stack-path.ts';
 import { brokenLock, LOCKED } from './locks.ts';
@@ -96,6 +96,18 @@ export function refreshRegistry(): void {
   if (source && registry && stack) writeData('registry', { ...stack, source, found: registry['found'] });
 }
 
+/** What a change breaks that the stack did not break before: a rule, or a field the format does not know. */
+function newProblems(before: unknown, next: unknown): string[] {
+  const broken = new Set(validateStack(before));
+  const unknown = new Set(unknownFields(before));
+  return [
+    ...validateStack(next).filter(problem => !broken.has(problem)),
+    ...unknownFields(next)
+      .filter(where => !unknown.has(where))
+      .map(where => `${where}: not a field Koppler knows (koppler stack schema lists them)`),
+  ];
+}
+
 /**
  * Replaces the whole stack with an edited copy, as the settings panels save it: checked against every rule first and
  * against the locks, and written only when it passes. The problems are given as `where: what`, so each finds its field.
@@ -106,8 +118,7 @@ export function replaceStack(
 ): { problems: string[]; error?: undefined } | { error: string; problems?: string[] } {
   const used = stackInUse(config);
   if (used.error !== undefined) return used;
-  const before = new Set(validateStack(used.stack));
-  const problems = validateStack(next).filter(problem => !before.has(problem));
+  const problems = newProblems(used.stack, next);
   if (problems.length) return { error: problems.slice(0, 5).join('; '), problems };
   return saveStack(used.source, used.stack, next) ?? { problems: [] };
 }
@@ -139,7 +150,6 @@ export function editStack(
   if (used.error !== undefined) return used;
   const parsed = parsePath(pathText);
   if ('error' in parsed) return parsed;
-  const before = new Set(validateStack(used.stack));
   let first = '';
   for (const value of values ?? [undefined]) {
     let next: unknown;
@@ -148,7 +158,7 @@ export function editStack(
     } catch (error) {
       return { error: `${pathText}: ${(error as Error).message}` };
     }
-    const broken = validateStack(next).filter(problem => !before.has(problem));
+    const broken = newProblems(used.stack, next);
     if (!broken.length) return saveStack(used.source, used.stack, next) ?? { path: pathText, value };
     first ||= broken.slice(0, 5).join('; ');
   }

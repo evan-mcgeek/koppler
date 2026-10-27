@@ -18,11 +18,28 @@ const MAX_LINES = 500;
 const REFUSED = /password authentication failed|access denied|WRONGPASS/i;
 const UNREACHED =
   /connection refused|could not connect|can't connect|timeout|timed out|could not translate|unknown (mysql )?server host|ENOTFOUND/i;
-const reason = (text: string) => {
+/**
+ * Why a statement failed, from what the client printed: a write the read-only transaction refused, else the server's
+ * own error about the statement, else why the connection failed. The client's echo of the statement is never read as a
+ * reason (it holds READ ONLY, and any word the statement has).
+ */
+export function failure(stderr: string): string {
+  const lines = stderr
+    .split('\n')
+    .map(line => line.trim())
+    .filter(line => line && !/^LINE \d+:/.test(line) && !/^\^$/.test(line));
+  if (lines.some(line => /cannot execute .* in a read[- ]only transaction/i.test(line)))
+    return 'that statement writes, and this connection is read-only';
+  // Postgres says it as "ERROR:  …"; MySQL as "ERROR 1054 (42S22) at line 1: …", its client's own errors from 2000 up.
+  const postgres = lines.find(line => /^ERROR:\s/.test(line));
+  if (postgres) return postgres.replace(/^ERROR:\s+/, '');
+  const mysql = lines.map(line => /^ERROR (\d+) \([0-9A-Z]{5}\)(?: at line \d+)?: (.+)$/.exec(line)).find(Boolean);
+  if (mysql && Number(mysql[1]) < 2000 && mysql[1] !== '1045') return mysql[2] ?? '';
+  const text = lines.join('\n');
   if (REFUSED.test(text)) return 'it refused the user name or password';
   if (UNREACHED.test(text)) return 'nothing answers at its address (is the tunnel up?)';
-  return /read-only|read only/i.test(text) ? 'that statement writes, and this connection is read-only' : null;
-};
+  return mysql?.[2] ?? lines.find(line => /error/i.test(line)) ?? 'see the database client';
+}
 
 // What only reads. The read-only transaction is a second line of defence: the statement itself must start with a
 // reading keyword and hold nothing that writes, ends the transaction, changes the session or the server, or runs a
@@ -188,11 +205,7 @@ export async function runQuery(to: Connection, sql: string): Promise<Checked<{ r
       resolve({ failed: !!error, stdout, stderr });
     });
   });
-  if (ran.failed) {
-    const sqlError = ran.stderr.split('\n').find(line => /ERROR/i.test(line));
-    const why = reason(ran.stderr) ?? sqlError?.replace(/^.*?ERROR[: ]*/i, '') ?? 'see the database client';
-    return { error: `the query failed: ${why}` };
-  }
+  if (ran.failed) return { error: `the query failed: ${failure(ran.stderr)}` };
   const lines = ran.stdout
     .trimEnd()
     .split('\n')
@@ -240,6 +253,14 @@ export async function queryCommand(args: string[]): Promise<void> {
       chosen = { name: secret.env ?? '', to: to as Connection };
       break;
     }
+  }
+  // None declared: doctor lists only the secrets the stack declares, so it has nothing to offer; declaring one does.
+  if (!candidates.length) {
+    const own = base.envs?.[env]?.secrets;
+    const at = own ? `apps.${app}.envs.${env}.secrets` : `apps.${app}.secrets`;
+    fail(
+      `${name} has no${named ? ` ${named}` : ''} database connection in the stack${own ? ` on ${env.toUpperCase()}` : ''}: declare it with koppler stack set '${at}[${String((own ?? base.secrets ?? []).length)}]' '{"env":"${named ?? 'ConnectionStrings__DB'}","type":"postgres"}' (or "mysql"), then store its value as koppler doctor ${app} --env ${env} says`,
+    );
   }
   if (!chosen)
     fail(

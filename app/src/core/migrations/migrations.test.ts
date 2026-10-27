@@ -175,14 +175,14 @@ test("0.2.1: a stack 0.2.0 left alone gets its databases, each tunnel's command 
         if (need.tunnel?.startsWith('aurora'))
           Object.assign(need, { cmd: `open ${need.tunnel}`, note: `${app.name} reads it` });
   const done = migrateStack(stamped as never);
-  expect(done.applied?.map(one => one.migration.version)).toEqual(['0.2.1', '0.2.2']);
+  expect(done.applied?.map(one => one.migration.version)).toEqual(['0.2.1', '0.2.2', '0.3.2']);
   const stack = done.value as unknown as OldStack & { databases: Record<string, Record<string, unknown>> };
   expect(stack.databases['orders']).toMatchObject({
     cmd: 'open aurora.qa.acme.example',
     envs: { prod: { cmd: 'open aurora.prod.acme.example' } },
   });
   expect(stack.apps['payments']?.uses).toEqual({ orders: { note: 'Payments API reads it' } });
-  expect(stack).toMatchObject({ koppler: '0.2.2' });
+  expect(stack).toMatchObject({ koppler: '0.3.2' });
 });
 
 test('a database its tunnel only calls "Database" is named after its host, without the environment', () => {
@@ -247,9 +247,10 @@ test('0.2.2: a stack that still names a removed app on its team boards and in ot
   const done = migrateStack(left);
   expect(done.applied?.map(one => [one.migration.version, one.changes])).toEqual([
     ['0.2.2', ['mentions of removed apps taken out']],
+    ['0.3.2', []],
   ]);
   expect(done.value).toMatchObject({
-    koppler: '0.2.2',
+    koppler: '0.3.2',
     apps: { web: { after: ['cart'], consumes: { cart: {} } } },
     presets: [{ nodes: { web: { run: 'cli' }, cart: {} }, edges: [{ from: 'web', to: 'cart' }] }, left.presets[1]],
   });
@@ -260,4 +261,52 @@ test('0.2.2: a stack that still names a removed app on its team boards and in ot
     apps: { ...left.apps, 'orders-api': { name: 'Orders', kind: 'node', slug: 'acme/orders-api' } },
   };
   expect(migrateStack(whole).applied?.[0]?.changes).toEqual([]);
+});
+
+test('0.3.2: a call whose how is written in words becomes how unknown, with the words kept as its note', () => {
+  const words = 'Remote config base URL (lib/config/model.dart)';
+  const old = {
+    koppler: '0.2.2',
+    envs: ['qa'],
+    apps: {
+      app: {
+        name: 'Mobile App',
+        kind: 'flutter',
+        slug: 'acme/app',
+        consumes: {
+          api: { how: words, file: 'lib/config/model.dart' },
+          web: { how: 'env', env: 'WEB_URL' },
+          cart: { how: 'set in the admin panel', note: 'Ask the cart team.' },
+        },
+        envs: { prod: { consumes: { api: { how: 'baked in at build' } } } },
+      },
+    },
+  };
+  const done = migrateStack(old);
+  expect(done.applied?.map(one => [one.migration.version, one.changes])).toEqual([
+    [
+      '0.3.2',
+      [
+        `app -> api: how "${words}" kept as its note`,
+        'app -> cart: how "set in the admin panel" kept as its note',
+        'app on prod -> api: how "baked in at build" kept as its note',
+      ],
+    ],
+  ]);
+  expect(done.value).toMatchObject({
+    koppler: '0.3.2',
+    apps: {
+      app: {
+        consumes: {
+          api: { how: 'unknown', note: words, file: 'lib/config/model.dart' },
+          web: { how: 'env', env: 'WEB_URL' },
+          cart: { how: 'unknown', note: 'Ask the cart team. set in the admin panel' },
+        },
+        envs: { prod: { consumes: { api: { how: 'unknown', note: 'baked in at build' } } } },
+      },
+    },
+  });
+  // A stack already in this format is left as it is.
+  expect(migrateStack(done.value as never).value).toEqual(done.value);
+  expect(migrateStack(done.value as never).applied ?? []).toEqual([]);
 });

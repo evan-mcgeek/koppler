@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
+import { STACK_FORMAT } from '../dist/core/migrations/stack/index.js';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 const entry = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'dist', 'koppler.mjs');
@@ -251,7 +252,7 @@ test('Updating clones: fetch, then fast-forward only a clean branch that is simp
 test('Removing an app: its entry, other apps\' calls to it and its cards on the team boards go; nothing else changes.', async () => {
   const { removeApp } = await import('../dist/engine/stack-file.js');
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-remove-'));
-  fs.writeFileSync(path.join(dir, 'stack.json'), JSON.stringify({ name: 'S', koppler: '0.2.2', envs: ['qa'], apps: { a: { name: 'A', kind: 'node', slug: 'x/a', consumes: { b: { how: 'env' }, c: { how: 'env' } } }, b: { name: 'B', kind: 'node', slug: 'x/b' }, c: { name: 'C', kind: 'node', slug: 'x/c' } }, presets: [{ name: 'P', version: 1, koppler: '0.1.0', nodes: { a: {}, b: {} }, edges: [] }] }));
+  fs.writeFileSync(path.join(dir, 'stack.json'), JSON.stringify({ name: 'S', koppler: STACK_FORMAT.version, envs: ['qa'], apps: { a: { name: 'A', kind: 'node', slug: 'x/a', consumes: { b: { how: 'env' }, c: { how: 'env' } } }, b: { name: 'B', kind: 'node', slug: 'x/b' }, c: { name: 'C', kind: 'node', slug: 'x/c' } }, presets: [{ name: 'P', version: 1, koppler: '0.1.0', nodes: { a: {}, b: {} }, edges: [] }] }));
   assert.deepEqual(removeApp('b', { config: { stack: dir } }), { removed: 'b', name: 'B' });
   const after = JSON.parse(fs.readFileSync(path.join(dir, 'stack.json'), 'utf8'));
   assert.deepEqual(Object.keys(after.apps), ['a', 'c']);
@@ -265,7 +266,7 @@ test('An outside system joins the stack with the apps that call it; what cannot 
   const { addOutside } = await import('../dist/engine/stack-file.js');
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-outside-'));
   const file = path.join(dir, 'stack.json');
-  fs.writeFileSync(file, JSON.stringify({ name: 'S', koppler: '0.2.2', envs: ['qa'], apps: { a: { name: 'A', kind: 'node', slug: 'x/a', consumes: { b: { how: 'env' } } }, b: { name: 'B', kind: 'node', slug: 'x/b' }, sf: { name: 'Salesforce', kind: 'other', outside: 'SaaS' } } }));
+  fs.writeFileSync(file, JSON.stringify({ name: 'S', koppler: STACK_FORMAT.version, envs: ['qa'], apps: { a: { name: 'A', kind: 'node', slug: 'x/a', consumes: { b: { how: 'env' } } }, b: { name: 'B', kind: 'node', slug: 'x/b' }, sf: { name: 'Salesforce', kind: 'other', outside: 'SaaS' } } }));
   const opts = { config: { stack: dir } };
   const before = fs.readFileSync(file, 'utf8');
   assert.match(addOutside({ name: ' ' }, opts).error, /Give the outside system a name/);
@@ -315,6 +316,26 @@ test('Any field of the stack is changed through one checked edit: the value that
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
+test('A field the stack format does not know is refused by an edit that adds it; one the file has already stays.', async () => {
+  const { editStack, readStackAt } = await import('../dist/engine/stack-file.js');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-unknown-'));
+  const file = path.join(dir, 'stack.json');
+  const app = { name: 'A', kind: 'node', slug: 'x/a', legacy: 'kept' };
+  fs.writeFileSync(file, JSON.stringify({ name: 'S', envs: ['qa', 'prod'], apps: { a: app } }));
+  const opts = { config: { stack: dir } };
+  readStackAt('', opts);
+  const before = fs.readFileSync(file, 'utf8');
+  assert.match(editStack('databases.orders-db', [{ port: 5432, env: 'Db__Host' }], opts).error, /^databases\.orders-db\.env: not a field Koppler knows/);
+  assert.match(editStack('apps.a.prereqs[0]', [{ tunnel: 'db.acme.example', prot: 5432 }], opts).error, /apps\.a\.prereqs\[0\]\.prot: not a field/);
+  assert.equal(fs.readFileSync(file, 'utf8'), before);
+  // An environment takes any field the app has; the stack takes notes; the field the file had is no edit's problem.
+  assert.equal(editStack('apps.a.envs.prod.deployedUrl', ['https://a.acme.example'], opts).error, undefined);
+  assert.equal(editStack('notes', [['The orders tunnel can move to another port.']], opts).error, undefined);
+  assert.equal(editStack('apps.a.url', ['http://localhost:3000'], opts).error, undefined);
+  assert.equal(readStackAt('apps.a.legacy', opts).value, 'kept');
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
 test('A locked field is kept as it is by every change, and only the person unlocks it.', async () => {
   const { editStack, removeApp } = await import('../dist/engine/stack-file.js');
   const { setLock } = await import('../dist/engine/locks.js');
@@ -322,7 +343,7 @@ test('A locked field is kept as it is by every change, and only the person unloc
   const was = process.env.KOPPLER_CONFIG_DIR;
   process.env.KOPPLER_CONFIG_DIR = dir;
   const file = path.join(dir, 'stack.json');
-  fs.writeFileSync(file, JSON.stringify({ name: 'S', koppler: '0.2.2', envs: ['qa'], apps: { a: { name: 'A', kind: 'node', slug: 'x/a', url: 'http://localhost:3000' }, b: { name: 'B', kind: 'node', slug: 'x/b' } } }));
+  fs.writeFileSync(file, JSON.stringify({ name: 'S', koppler: STACK_FORMAT.version, envs: ['qa'], apps: { a: { name: 'A', kind: 'node', slug: 'x/a', url: 'http://localhost:3000' }, b: { name: 'B', kind: 'node', slug: 'x/b' } } }));
   const opts = { config: { stack: dir } };
   assert.deepEqual(setLock(file, 'apps.a.url', true), {});
   const before = fs.readFileSync(file, 'utf8');
