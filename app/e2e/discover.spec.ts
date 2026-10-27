@@ -411,7 +411,15 @@ test.describe('a card opened on a busy map', () => {
       ...STACK,
       apps: {
         ...STACK.apps,
-        web: { ...STACK.apps.web, publishes: { receipts: {} }, consumes: { ...STACK.apps.web.consumes, refunds: {} } },
+        web: {
+          ...STACK.apps.web,
+          publishes: { receipts: {} },
+          consumes: {
+            orders: { how: 'env', env: 'ORDERS_URL' },
+            catalog: { how: 'env', env: 'CATALOG_URL' },
+            refunds: {},
+          },
+        },
         refunds: { ...STACK.apps.payments, name: 'Refunds', slug: 'acme/refunds', consumes: { payments: {} } },
         mail: { ...STACK.apps.payments, name: 'Mail', slug: 'acme/mail', reads: { receipts: {} } },
       },
