@@ -77,15 +77,31 @@ test('An own environment list missing the sign-in keeps its own tunnel; the sign
   assert.deepEqual(r.koppler, [`tunnel to prod-db on localhost:${free}`, 'start Wallet']);
 });
 
-test('A tunnel already listening is reported as open, not as something Koppler will start.', async () => {
-  const net = await import('node:net');
-  const srv = net.createServer().listen(0, '127.0.0.1'); await new Promise(r => srv.on('listening', r));
-  const port = srv.address().port;
-  const reg = { envs: ['qa'], apps: { w: { name: 'Wallet', prereqs: [{ tunnel: 'db.acme', port }] } } };
-  const out = []; const log = console.log; console.log = s => out.push(s);
-  useStack(reg); needs(['w', '--json'], { skill: '/skill', fail: e => { throw new Error(e); } });
-  console.log = log; srv.close();
-  assert.deepEqual(JSON.parse(out[0]).koppler, [`tunnel to db on localhost:${port} (already open)`, 'start Wallet']);
+test("A port held by this tunnel is open already; held by another host's tunnel or another program, it is named, as koppler up will stop on it.", async () => {
+  const { spawnSync } = await import('node:child_process');
+  const koppler = (...args) => spawnSync('node', [path.join(import.meta.dirname, '..', 'dist', 'koppler.mjs'), ...args], { encoding: 'utf8', env: process.env });
+  const [port] = await freePorts(1);
+  const serve = `require('net').createServer().listen(${String(port)}, '127.0.0.1')`;
+  // Orders API's database is db-a; Web API's, on the same port, is db-b.
+  const reg = { envs: ['qa'], apps: { o: { name: 'Orders API', prereqs: [{ tunnel: 'db-a.example', port }] }, w: { name: 'Web API', prereqs: [{ tunnel: 'db-b.example', port }] } } };
+  const plan = () => {
+    const out = []; const log = console.log; console.log = s => out.push(s);
+    try { useStack(reg); needs(['o', '--json'], { skill: '/skill', fail: e => { throw new Error(e); } }); } finally { console.log = log; }
+    return JSON.parse(out[0]).koppler[0];
+  };
+  try {
+    const other = `tunnel-db-b-example-${String(port)}`;
+    assert.equal(koppler('run', other, '--port', String(port), '--', 'node', '-e', serve).status, 0);
+    assert.equal(plan(), `tunnel to db-a on localhost:${String(port)} (the port is held by ${other}, not this tunnel: koppler stop ${other} first)`);
+    koppler('stop', other);
+    const own = `tunnel-db-a-example-${String(port)}`;
+    assert.equal(koppler('run', own, '--port', String(port), '--', 'node', '-e', serve).status, 0);
+    assert.equal(plan(), `tunnel to db-a on localhost:${String(port)} (already open)`);
+    koppler('stop', own);
+    const net = await import('node:net');
+    const srv = net.createServer().listen(port, '127.0.0.1'); await new Promise(r => srv.on('listening', r));
+    try { assert.match(plan(), new RegExp(`^tunnel to db-a on localhost:${String(port)} \\(the port is held by \\S+ \\(pid ${String(process.pid)}\\), not this tunnel: close it first\\)$`)); } finally { srv.close(); }
+  } finally { koppler('stop', '--all', '--yes'); }
 });
 
 test('A file secret with no steps for another environment is a gap that names the file.', async () => {
