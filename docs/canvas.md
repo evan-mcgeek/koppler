@@ -135,6 +135,7 @@ A card's **+N** brings in the links it leaves out; a dashed link was found in th
 A **?** on a link means the stack records the call without saying where it comes from (no setting, file or place in the code): **No source yet**.
 Resources are what the stack's `resources` name: an S3 bucket's link says whether the app **reads**, **writes** or **both**; an API Gateway's panel lists its routes and what each hands to; a Step Functions panel lists what starts it and its steps in order.
 **Read again** reads the code once more: your clones, and, with your `gh` login, the repos not cloned here, from a copy Koppler keeps for reading only (`koppler sync --github`).
+An app whose repo holds other apps of the stack too (a Lambda in an API's repo) shows that repo above its name.
 A queue or topic something sends to that nothing reads or passes on is flagged **Dead end · no readers**: its links stop at a bar.
 Pick several cards (Shift-click) and **Plan a run with these** puts the cloned ones on the board; the rest stay deployed and are listed in **Left out**, with a clone command for each app.
 
