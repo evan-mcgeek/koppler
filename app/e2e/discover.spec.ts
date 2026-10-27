@@ -367,3 +367,40 @@ test.describe('a topic nothing reads', () => {
     await page.screenshot({ path: 'test-results/dead-end-paper.png', clip: await clip() });
   });
 });
+
+test.describe('a call recorded with nothing on where it comes from', () => {
+  test.use({
+    stack: {
+      ...STACK,
+      apps: {
+        ...STACK.apps,
+        web: { ...STACK.apps.web, consumes: { orders: { how: 'env', env: 'ORDERS_URL' }, catalog: {} } },
+      },
+    },
+    board: { env: 'qa', mode: 'auto', zoom: 1, pan: { x: 60, y: 60 }, nodes: { web: at(0, 0) }, edges: [] },
+  });
+
+  test('shows a ? on its link, and the panel says it has no source yet', async ({ page }) => {
+    await discover(page);
+    await expect(page.locator('.mark.unsourced')).toHaveCount(1);
+    // The ? sits on the link to Catalog, between the two cards.
+    const [mark, web, catalog] = await Promise.all([
+      page.locator('.mark.unsourced rect').boundingBox(),
+      card(page, 'web').boundingBox(),
+      card(page, 'catalog').boundingBox(),
+    ]);
+    const between = (v: number, a: number, b: number) => v >= Math.min(a, b) && v <= Math.max(a, b);
+    expect(
+      !!mark &&
+        !!web &&
+        !!catalog &&
+        between(mark.x + 9, web.x + web.width, catalog.x) &&
+        between(mark.y + 9, Math.min(web.y, catalog.y), Math.max(web.y + web.height, catalog.y + catalog.height)),
+    ).toBe(true);
+    await card(page, 'web').click();
+    const panel = page.getByRole('complementary');
+    await expect(panel.getByText('No source yet')).toHaveCount(1);
+    await settled(page);
+    await page.screenshot({ path: 'test-results/discover-no-source.png' });
+  });
+});
