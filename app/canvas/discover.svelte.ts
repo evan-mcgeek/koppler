@@ -153,7 +153,8 @@ class Discovered {
     const kept = board.discover.at;
     const ids = this.map.cards.map(one => one.card);
     if (ids.every(id => kept[id])) return kept;
-    const laid = this.layout?.at ?? {};
+    // While a new layout is worked out, the cards stay where the last one put them.
+    const laid = (this.layout ?? this.laid)?.at ?? {};
     return Object.fromEntries(
       ids.flatMap(id => {
         const at = kept[id] ?? laid[id];
@@ -171,27 +172,33 @@ class Discovered {
     };
     return still(link.from) && still(link.to) ? layout.routes[linkKey(link)] : undefined;
   }
-  /** Arrange, as on a board: pressed again on the map as it left it, it gives the next of its layouts. */
-  arrange(): void {
+  /** Every card where the layout put it: nothing was moved by hand since. */
+  #untouched(): boolean {
     const layout = this.layout;
-    const untouched =
+    return (
       !!layout &&
       this.map.cards.every(({ card }) => {
         const [now, laid] = [this.positions[card], layout.at[card]];
         return !!now && !!laid && Math.abs(now.x - laid.x) < 0.5 && Math.abs(now.y - laid.y) < 0.5;
-      });
-    const next = (board.discover.layout ?? 0) + (untouched ? 1 : 0);
+      })
+    );
+  }
+  /** Arrange, as on a board: pressed again on the map as it left it, it gives the next of its layouts. */
+  arrange(): void {
+    const next = (board.discover.layout ?? 0) + (this.#untouched() ? 1 : 0);
     // The cards go where the layout puts them, once it is worked out.
     board.discover = { ...board.discover, at: {}, layout: next % DIRECTIONS.length };
   }
 
-  /** Brings in the links a card leaves out, beside it. */
+  /** Brings in the links a card leaves out: laid out again with the rest, or beside it once cards were moved by hand. */
   open(card: Card): void {
     const before = new Set(this.map.cards.map(one => one.card));
     const at = { ...this.positions };
+    const laidOut = this.#untouched();
     board.discover = { ...board.discover, open: [...new Set([...board.discover.open, card])] };
-    // Not placed yet: the layout places the new cards with the rest.
-    if (![...before].every(id => at[id])) return;
+    // Laid out and not moved since, or not placed yet: the layout places the new cards with the rest and routes every link.
+    if (laidOut) board.discover = { ...board.discover, at: {} };
+    if (laidOut || ![...before].every(id => at[id])) return;
     const from = at[card] ?? { x: 0, y: 0 };
     const fresh = this.map.cards.map(one => one.card).filter(id => !before.has(id));
     const x = from.x + CARD.w + 120;

@@ -405,6 +405,49 @@ test.describe('a call recorded with nothing on where it comes from', () => {
   });
 });
 
+test.describe('a card opened on a busy map', () => {
+  test.use({
+    stack: {
+      ...STACK,
+      apps: {
+        ...STACK.apps,
+        web: {
+          ...STACK.apps.web,
+          publishes: { receipts: {} },
+          consumes: {
+            orders: { how: 'env', env: 'ORDERS_URL' },
+            catalog: { how: 'env', env: 'CATALOG_URL' },
+            refunds: {},
+          },
+        },
+        refunds: { ...STACK.apps.payments, name: 'Refunds', slug: 'acme/refunds', consumes: { payments: {} } },
+        mail: { ...STACK.apps.payments, name: 'Mail', slug: 'acme/mail', reads: { receipts: {} } },
+      },
+      queues: { receipts: { name: 'Receipts', type: 'sqs' } },
+    },
+    board: { env: 'qa', mode: 'auto', zoom: 1, pan: { x: 60, y: 60 }, nodes: { web: at(0, 0) }, edges: [] },
+  });
+
+  test('is laid out with the rest, so no link loops out past the cards', async ({ page }) => {
+    await discover(page);
+    await page.getByRole('button', { name: 'Show 1 more link of Receipts' }).click();
+    await expect(card(page, 'mail')).toBeVisible();
+    await settled(page);
+    const outside = await page.evaluate(() => {
+      const cards = [...document.querySelectorAll('.svelte-flow__node')].map(node => node.getBoundingClientRect());
+      const [left, right] = [Math.min(...cards.map(box => box.left)), Math.max(...cards.map(box => box.right))];
+      return [...document.querySelectorAll('[data-link] .wire')]
+        .filter(wire => {
+          const box = wire.getBoundingClientRect();
+          return box.left < left - 2 || box.right > right + 2;
+        })
+        .map(wire => wire.parentElement?.getAttribute('data-link'));
+    });
+    expect(outside).toEqual([]);
+    await page.screenshot({ path: 'test-results/discover-opened-busy.png' });
+  });
+});
+
 test.describe('a bucket, an API Gateway and a Step Functions the apps use', () => {
   test.use({
     stack: {
