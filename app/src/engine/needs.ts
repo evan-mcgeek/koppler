@@ -11,6 +11,7 @@ import { readClones, readData, readStack } from '../data.ts';
 import { devicePage, sdkSignIn } from './aws-sso.ts';
 import { APPROVE, approved, checksFor, envGaps, stackCommands, startsFromStack } from './checks.ts';
 import { storeOf } from '../core/stack.ts';
+import { alive, listener, readRecord, records } from './processes.ts';
 
 /** A prerequisite as the stack states it; a tunnel is Koppler's own job and gives the user no step. */
 interface Need {
@@ -453,12 +454,22 @@ export function needs(
         ...(sdk && !sdk.holds && { note: sdkNote(step.apps, sdk.startUrl) }),
       };
     });
-  // A tunnel whose port already answers is not opened again.
-  const open = (port: number) => /\bLISTEN\b/.test(run('lsof', ['-nP', `-iTCP:${String(port)}`, '-sTCP:LISTEN']).out);
+  // Open already only when this tunnel holds its port; anything else there may reach another database, and koppler up
+  // stops on it, as this says.
+  const state = (tunnel: (typeof tunnels)[number]) => {
+    const { name } = planSteps(tunnel);
+    const own = readRecord(name);
+    if (own && alive(own)) return ' (already open)';
+    const holder = listener(tunnel.port, tunnel.bind);
+    if (!holder) return '';
+    const ours = records().find(record => record.port === tunnel.port && alive(record))?.name;
+    return ours
+      ? ` (the port is held by ${ours}, not this tunnel: koppler stop ${ours} first)`
+      : ` (the port is held by ${holder.command ?? 'another program'} (pid ${String(holder.pid)}), not this tunnel: close it first)`;
+  };
   const koppler = [
     ...tunnels.map(
-      tunnel =>
-        `tunnel to ${hostOf(tunnel.host)} on ${tunnel.bind}:${String(tunnel.port)}${open(tunnel.port) ? ' (already open)' : ''}`,
+      tunnel => `tunnel to ${hostOf(tunnel.host)} on ${tunnel.bind}:${String(tunnel.port)}${state(tunnel)}`,
     ),
     ...ids.map(id => `start ${nameOf(id)}`),
   ];
