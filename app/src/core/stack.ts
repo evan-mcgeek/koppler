@@ -347,6 +347,7 @@ const App = z.looseObject(
         runtime: z.string().optional(),
         project: z.string().optional().describe('The folder to build, when not the repo itself'),
         timeout: z.number().positive().optional().describe('Seconds a call may take'),
+        memory: z.number().positive().optional().describe('Megabytes it runs with (256 when not set)'),
         routes: z.array(z.string()).optional().describe('The paths it answers on'),
         env: z
           .array(z.string())
@@ -483,6 +484,10 @@ export const StackSchema = z.looseObject(
     checks: z.array(Check, { error: CHECKS }).max(50, CHECKS).optional(),
     signIns: z.record(z.string(), SignIn, { error: 'an object keyed by sign-in name' }).optional(),
     presets: z.array(Preset, { error: 'a list' }).optional(),
+    notes: z
+      .union([z.string(), z.array(z.string())], { error: 'a list of facts, in words' })
+      .optional()
+      .describe('Stack-wide facts the agent reads first'),
     /** How to install a program the stack's apps need, by its name. */
     install: z
       .record(z.string(), z.string(), { error: 'an object of program names and how to install each' })
@@ -670,6 +675,52 @@ export function validateStack(raw: unknown): string[] {
         .filter(issue => !named.has(where(issue.path)))
         .map(issue => (issue.path.length > 0 ? `${where(issue.path)}: ${issue.message}` : issue.message));
   return [...new Set([...expressions, ...shape, ...(isObject(stack) ? crossProblems(stack) : [])])];
+}
+
+type Shape = {
+  properties?: Record<string, Shape>;
+  propertyNames?: unknown;
+  additionalProperties?: Shape | boolean;
+  items?: Shape;
+  anyOf?: Shape[];
+  oneOf?: Shape[];
+  allOf?: Shape[];
+};
+let shape: Shape | undefined;
+/** The stack format as JSON Schema, with an environment's overlay taking any field the app does. */
+function stackShape(): Shape {
+  if (shape) return shape;
+  shape = z.toJSONSchema(StackSchema, { unrepresentable: 'any', io: 'input' }) as Shape;
+  const app = (shape.properties?.['apps']?.additionalProperties as Shape | undefined) ?? {};
+  const overlay = app.properties?.['envs']?.additionalProperties as Shape | undefined;
+  if (overlay) overlay.properties = { ...app.properties, ...overlay.properties };
+  return shape;
+}
+
+/** The fields the stack has that its format does not know, which nothing reads: `where` each one is. */
+export function unknownFields(raw: unknown): string[] {
+  const found: string[] = [];
+  const walk = (value: unknown, given: Shape | undefined, at: string) => {
+    const shapes = given ? [given, ...(given.anyOf ?? []), ...(given.oneOf ?? []), ...(given.allOf ?? [])] : [];
+    if (Array.isArray(value)) {
+      const items = shapes.find(one => one.items)?.items;
+      for (const [n, item] of value.entries()) walk(item, items, `${at}[${String(n)}]`);
+      return;
+    }
+    if (!isObject(value)) return;
+    const objects = shapes.filter(one => one.properties || one.propertyNames);
+    // An object with no fields of its own (a board's card) takes any.
+    if (!objects.length || objects.some(one => one.properties && !Object.keys(one.properties).length)) return;
+    const record = objects.find(one => one.propertyNames)?.additionalProperties;
+    for (const [key, field] of Object.entries(value)) {
+      const named = objects.find(one => one.properties && Object.hasOwn(one.properties, key))?.properties?.[key];
+      const next = named ?? (typeof record === 'object' ? record : undefined);
+      if (next) walk(field, next, at ? `${at}.${key}` : key);
+      else found.push(at ? `${at}.${key}` : key);
+    }
+  };
+  walk(raw, stackShape(), '');
+  return found;
 }
 
 /** An app as an environment has it: that environment's fields replace the app's own, a list whole. */

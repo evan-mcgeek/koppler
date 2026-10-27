@@ -1,6 +1,7 @@
 # Shared stack config: `stack.json`
 
 Nobody writes this file directly. Change any field with `koppler stack set <path> <value>` or `koppler stack unset <path>` (read one with `koppler stack get <path>`); paths look like `apps.orders.url`, `apps.orders.prereqs[0].port` or `apps.orders.envs.prod.start`. Each change is checked against the rules below before it is kept.
+A field the format does not know is refused (`koppler stack schema` lists every one); anything else worth knowing goes in the stack's `notes`.
 
 One file per stack, in the team's repo, reviewed through PRs.
 It holds facts about the apps, never secret values.
@@ -24,7 +25,6 @@ It holds facts about the apps, never secret values.
       "baseProfile": "QA",
       "url": "http://localhost:5001",
       "deployedUrl": "https://orders.qa.acme.dev",
-      "run": { "cli": "dotnet run --project src/Orders.Api --launch-profile <profile>", "ide": "Rider: launch profile <profile>" },
       "consumes": {
         "payments-api": { "how": "env", "env": ["Payments__BaseUrl"], "deployed": "https://payments.qa.acme.dev" }
       },
