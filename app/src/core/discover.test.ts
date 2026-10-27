@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { linksOf, mapOf, type Facts } from './discover.ts';
+import { deadEnds, linksOf, mapOf, type Facts } from './discover.ts';
 
 const app = (name: string, extra: object = {}) => ({ name, kind: 'node', slug: `acme/${name}`, ...extra });
 const facts = {
@@ -25,6 +25,21 @@ describe('linksOf', () => {
       { from: 'payments', to: 'psp', kind: 'call', sure: 'confirmed' },
       { from: 'queue:events', to: 'payments', kind: 'read', sure: 'confirmed', via: 'rule to Lambda' },
       { from: 'reports', to: 'payments', kind: 'call', sure: 'confirmed' },
+    ]);
+  });
+});
+
+describe('deadEnds', () => {
+  it('flags a queue sent to that nothing reads or passes on, and not one that does', () => {
+    const queues = {
+      events: { name: 'Order events', type: 'sqs' },
+      status: { name: 'Status', type: 'sns' },
+      bus: { name: 'Bus', type: 'eventbridge', feeds: { events: {} } },
+      idle: { name: 'Idle', type: 'sqs' },
+    };
+    const orders = { ...facts.apps['orders'], publishes: { events: {}, status: {}, bus: {} } };
+    expect([...deadEnds({ ...facts, apps: { ...facts.apps, orders }, queues } as unknown as Facts)]).toEqual([
+      'queue:status',
     ]);
   });
 });

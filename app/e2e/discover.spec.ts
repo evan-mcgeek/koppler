@@ -2,7 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Page } from '@playwright/test';
-import { at, card, expect, saveSettles, STACK, test } from './canvas.ts';
+import { at, card, expect, fromMenu, saveSettles, STACK, test } from './canvas.ts';
 
 const stack = {
   ...STACK,
@@ -320,5 +320,50 @@ test.describe('an outside system with a long description', () => {
     const row = crm.locator('.meta');
     expect(await row.evaluate(el => el.scrollWidth - el.clientWidth)).toBeLessThanOrEqual(0);
     await expect(crm.locator('[title$="deployed only"]')).toHaveCount(1);
+  });
+});
+
+test.describe('a topic nothing reads', () => {
+  test.use({
+    stack: {
+      ...STACK,
+      apps: {
+        ...STACK.apps,
+        web: { ...STACK.apps.web, publishes: { status: {}, events: {} } },
+        orders: { ...STACK.apps.orders, reads: { events: {} } },
+      },
+      queues: {
+        status: { name: 'Status topic', type: 'sns' },
+        events: { name: 'Order events', type: 'sqs' },
+      },
+    },
+    board: { env: 'qa', mode: 'auto', zoom: 1, pan: { x: 60, y: 60 }, nodes: { web: at(0, 0) }, edges: [] },
+  });
+
+  test('is flagged as a dead end, its links stopping at a bar on the side they would leave by', async ({ page }) => {
+    await discover(page);
+    const status = card(page, 'queue:status');
+    await expect(status.locator('.dead')).toHaveText('Dead end · no readers');
+    await expect(card(page, 'queue:events').locator('.dead')).toHaveCount(0);
+    const side = async () => {
+      const [box, stub] = [await status.locator('.lean').boundingBox(), await status.locator('.stub').boundingBox()];
+      if (!box || !stub) return '';
+      return stub.x >= box.x + box.width - 1 ? 'right' : stub.y >= box.y + box.height - 1 ? 'bottom' : 'inside';
+    };
+    expect(await side()).toBe('right');
+    await page.getByRole('button', { name: 'Arrange', exact: true }).click();
+    await expect.poll(side).toBe('bottom');
+    const clip = async () => {
+      const b = (await status.boundingBox()) ?? { x: 0, y: 0, width: 0, height: 0 };
+      return { x: b.x - 30, y: b.y - 30, width: b.width + 60, height: b.height + 60 };
+    };
+    await page.screenshot({ path: 'test-results/dead-end-down.png', clip: await clip() });
+    await page.getByRole('button', { name: 'Arrange', exact: true }).click();
+    await expect.poll(side).toBe('right');
+    await page.screenshot({ path: 'test-results/dead-end-right.png', clip: await clip() });
+    await fromMenu(page, 'Settings', 'Appearance');
+    await page.getByRole('radio', { name: /^Paper/ }).click();
+    await page.keyboard.press('Escape');
+    await page.screenshot({ path: 'test-results/dead-end-paper.png', clip: await clip() });
   });
 });

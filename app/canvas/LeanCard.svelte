@@ -31,6 +31,11 @@
         title={data.meta}>{data.meta}</span
       >{/if}
   </span>
+  {#if data.deadEnd}
+    <span class="dead">Dead end · no readers</span>
+    <!-- Where its links would go on: they stop here. -->
+    {#if !data.hidden}<span class="stub" class:down={discovered.direction === 'DOWN'} aria-hidden="true"></span>{/if}
+  {/if}
   {#if data.proposed}
     <span class="proposal">
       <strong>Proposed</strong>
@@ -163,6 +168,53 @@
   }
   .ring .here {
     color: var(--ink-muted);
+  }
+  /* Flagged, not drawn as a link: a short line out that stops at a bar. */
+  .dead {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--warn);
+    font: 600 12px var(--sans);
+    white-space: nowrap;
+  }
+  .dead::before {
+    content: '';
+    width: 10px;
+    height: 2px;
+    background: var(--warn);
+  }
+  .stub {
+    position: absolute;
+    top: 50%;
+    left: 100%;
+    width: 20px;
+    height: 2px;
+    background: var(--warn);
+    transform: translateY(-50%);
+  }
+  .stub::after {
+    content: '';
+    position: absolute;
+    top: -7px;
+    right: 0;
+    width: 2px;
+    height: 16px;
+    background: var(--warn);
+  }
+  .stub.down {
+    top: 100%;
+    left: 50%;
+    width: 2px;
+    height: 20px;
+    transform: translateX(-50%);
+  }
+  .stub.down::after {
+    top: auto;
+    right: -7px;
+    bottom: 0;
+    width: 16px;
+    height: 2px;
   }
   /* On the edge facing the hidden links: clicking brings exactly those in, and the chip goes. */
   .more {
