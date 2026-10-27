@@ -419,7 +419,7 @@
       const box = board.boxes.get(id) ?? { w: 260, h: 160 };
       return full[id] ?? { w: box.w, h: board.fullHeights[id] ?? box.h };
     };
-    board.arrange(size);
+    await board.arrange(size);
     // The cards move first; the view follows once they are placed.
     requestAnimationFrame(() => void fit());
   };
