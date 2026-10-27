@@ -7,7 +7,8 @@ import { databasesOf, withDatabases } from '../src/core/databases.ts';
 import { BOARD_FORMAT } from '../src/core/migrations/board/index.ts';
 import { BOARD_FILE_FORMAT, migrateBoardFile } from '../src/core/migrations/board-file/index.ts';
 import { migrateStack } from '../src/core/migrations/stack/index.ts';
-import { arrange, sidesFor, type Point, type Side } from '../src/core/arrange.ts';
+import { sidesFor, type Point, type Side } from '../src/core/arrange.ts';
+import { layOut, type Direction } from '../src/core/layout.ts';
 import { endOffsets, orderSlots, sidePoint, SIDES, type Box, type Cable } from '../src/core/cables.ts';
 import { of as kindOf } from '../src/core/kinds.ts';
 import { isProtected, LOCAL_QUEUE_TYPES, queuesOf } from '../src/core/plan.ts';
@@ -23,6 +24,7 @@ import {
 } from '../src/core/presets.ts';
 import type { Registry } from '../src/data.ts';
 import { load, save, type Loaded, type SavedBoard } from './data.ts';
+import { engine } from './elk.ts';
 
 export interface CableData extends Record<string, unknown> {
   fromSide: Side;
@@ -70,12 +72,6 @@ export const FAR_ZOOM = 0.6;
 export const CARD_PANEL = 300;
 type Size = { w: number; h: number };
 /** Arrange's layouts, in the order it steps through them: callers on top or on the left, and each read the other way round. */
-const LAYOUTS = [
-  ['down', false],
-  ['right', false],
-  ['down', true],
-  ['right', true],
-] as const;
 /** A stack on this machine. */
 export interface KnownStack {
   dir: string;
@@ -190,8 +186,8 @@ export interface StackApp {
   libraries: { name: string; path: string }[];
 }
 const PAD = 24;
-// The height of an app card's header, the part its full and short forms share.
-const HEADER = 44;
+/** Arrange's layouts on a board, top-down first. */
+const LAYOUTS: readonly Direction[] = ['DOWN', 'RIGHT'];
 /** The room a new card is given before it has been measured. */
 const PLACE = { w: 300, h: 240, gap: 32 };
 export const cable = (from: string, to: string, data: CableData): CableEdge => ({
@@ -2020,20 +2016,22 @@ class Board {
    * Arrange: places the cards, picks each cable's sides and its order along them, and drops the waypoints.
    * Pressed again on the board as it left it, it gives the next of its layouts.
    */
-  arrange(card = (id: string): Size => this.boxes.get(id) ?? { w: 260, h: 160 }): void {
+  async arrange(card = (id: string): Size => this.boxes.get(id) ?? { w: 260, h: 160 }): Promise<void> {
     const key = () => JSON.stringify(this.nodes.map(({ id, position }) => [id, position.x, position.y]));
     const was = key();
     let version = was === this.#arranged.key ? this.#arranged.version + 1 : 0;
     // A layout that leaves every card where it is goes on to the next one.
     for (let tries = 0; tries < LAYOUTS.length; tries++, version++) {
-      const [dir, mirror] = LAYOUTS[version % LAYOUTS.length] ?? LAYOUTS[0];
-      this.#place(card, dir, mirror);
+      if (!(await this.#place(card, LAYOUTS[version % LAYOUTS.length] ?? 'DOWN'))) return;
       if (key() !== was) break;
     }
     this.#arranged = { key: key(), version };
   }
 
-  #place(card: (id: string) => Size, dir: 'down' | 'right', mirror: boolean): void {
+  /** Lays the board out in one direction; false when the board changed while the layout was worked out. */
+  async #place(card: (id: string) => Size, direction: Direction): Promise<boolean> {
+    const dir = direction === 'DOWN' ? 'down' : 'right';
+    const nodes = this.nodes;
     const links = this.cables.map(({ from, to }) => ({ from, to }));
     // An app is given the room of its tunnel cards too: top-down beside it when it calls others, else under it. Its
     // cables keep off that side, and the cards go exactly there.
@@ -2061,15 +2059,17 @@ class Board {
     const flows = this.flows
       .map(({ from, to }) => ({ from: via(from), to: via(to) }))
       .filter(({ from, to }) => from !== to && onBoard(from) && onBoard(to));
-    const placed = arrange(
-      [...this.nodes.map(node => node.id), ...joined],
-      [...links, ...flows],
-      id => (joined.includes(id) ? (this.infraBoxes.get(id) ?? { w: 220, h: 70 }) : size(id)),
-      dir,
-      mirror,
-      // Lined up by the card's header, which reads the same in its full and short forms: not by the room kept for its
-      // own cards beside it.
-      { pad: PAD, anchor: id => (joined.includes(id) ? undefined : dir === 'down' ? card(id).w / 2 : HEADER / 2) },
+    const ids = [...this.nodes.map(node => node.id), ...joined];
+    const sizeOf = (id: string) => (joined.includes(id) ? (this.infraBoxes.get(id) ?? { w: 220, h: 70 }) : size(id));
+    const laid = await layOut(
+      ids.map(id => ({ id, ...sizeOf(id) })),
+      [...links, ...flows].map((link, n) => ({ id: String(n), ...link })),
+      direction,
+      engine(),
+    );
+    if (this.nodes !== nodes) return false;
+    const placed = Object.fromEntries(
+      Object.entries(laid.at).map(([id, { x, y }]) => [id, { x: x + PAD + 40, y: y + PAD + 40 }]),
     );
     const keep = Object.fromEntries(
       this.nodes.filter(node => this.ownedBy(node.id).length).map(node => [node.id, reserved(node.id)]),
@@ -2084,6 +2084,7 @@ class Board {
     });
     for (const node of this.nodes) cards = this.#beside(node.id, cards, card(node.id), true, keep[node.id]);
     this.infra = cards;
+    return true;
   }
 }
 

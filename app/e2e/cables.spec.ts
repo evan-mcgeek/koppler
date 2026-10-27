@@ -48,9 +48,21 @@ test('dragging a card leaves the ends of its cable where they are on their cards
 });
 
 test('after Arrange too, dragging a card leaves the ends where Arrange put them', async ({ page }) => {
-  await page.getByRole('button', { name: 'Arrange', exact: true }).click();
   await expect(page.locator('.ends .plug')).toBeVisible();
-  await page.waitForTimeout(600);
+  const placed = async () => JSON.stringify(await card(page, 'web').boundingBox());
+  const was = await placed();
+  await page.getByRole('button', { name: 'Arrange', exact: true }).click();
+  // Laid out in a worker: the cards move once it answers, then the view follows and comes to rest.
+  await expect.poll(placed).not.toBe(was);
+  let last = '';
+  await expect
+    .poll(async () => {
+      const now = await placed();
+      const same = now === last;
+      last = now;
+      return same;
+    })
+    .toBe(true);
   const before = await ends(page);
   await drag(page);
   expect(await ends(page)).toEqual(before);

@@ -297,7 +297,10 @@ test.describe('a board taller than the window', () => {
           cards.map(card => `${card.getAttribute('data-id') ?? ''} ${(card as HTMLElement).style.transform}`).sort(),
         );
     const settled = async () => {
+      const before = await places();
       await page.getByRole('button', { name: 'Arrange' }).click();
+      // Laid out in a worker: the cards move once it answers, then the view follows.
+      await expect.poll(places).not.toEqual(before);
       let last = '';
       await expect
         .poll(async () => {
