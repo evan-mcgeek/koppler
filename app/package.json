@@ -36,8 +36,11 @@
     "skills"
   ],
   "scripts": {
-    "test": "npm run build && vitest run && KOPPLER_EARLY_LOG=1 node --test --test-concurrency=1 test/*.test.mjs",
+    "test": "npm run build && npm run test:unit && npm run test:commands",
+    "test:unit": "vitest run",
+    "test:commands": "KOPPLER_EARLY_LOG=1 node --test --test-concurrency=4 test/*.test.mjs",
     "test:canvas": "npm run build && playwright test",
+    "check": "node scripts/check.mjs",
     "start": "node scripts/koppler-dev.mjs canvas",
     "play": "npm run build && node scripts/play.mjs",
     "lint": "eslint .",
