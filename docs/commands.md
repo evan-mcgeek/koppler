@@ -34,7 +34,7 @@ You can run these yourself too; the agent uses them to do its part.
 
 | Command | What it does |
 |---|---|
-| `koppler sync [--stack <dir>] [--rescan]` | Reload the stack and your clones |
+| `koppler sync [--stack <dir>] [--rescan] [--github]` | Reload the stack and your clones; `--github` also reads the repos not cloned here from GitHub |
 | `koppler refresh [--no-sync]` | After changes made outside the canvas: sync, then an open canvas reads the stack and its board again, in place |
 | `koppler discover [app...] [--no-fetch] [--no-github]` | What the repos say: local ports, tunnels, calls, conflicts and gaps, then what could be added to `stack.json` |
 | `koppler discover --deployed` | Also draft deployed addresses, settings, secret names, queues and calls from the infrastructure code, with the Kafka topics, event buses, pipes, rules and subscriptions that feed the queues, and the S3 buckets, API Gateways and Step Functions the apps use |

@@ -18,6 +18,7 @@
   import History from './History.svelte';
   import { credentials, opens } from './bar.svelte.ts';
   import HistoryIcon from '@lucide/svelte/icons/history';
+  import RefreshCw from '@lucide/svelte/icons/refresh-cw';
   import BarMenu from './BarMenu.svelte';
   import BoardPicker from './BoardPicker.svelte';
   import Settings from './Settings.svelte';
@@ -53,6 +54,22 @@
 
   // A board file can be dropped anywhere on the page, which shows where it will land.
   let dropping = $state(false);
+  let reading = $state(false);
+  const readAgain = async () => {
+    reading = true;
+    const said = await post<{ unread: number }>('read-again');
+    reading = false;
+    if ('error' in said) {
+      toasts.show(said.error, 'warning');
+      return;
+    }
+    await board.reload();
+    if (said.unread)
+      toasts.show(
+        `${String(said.unread)} ${said.unread === 1 ? 'repo' : 'repos'} could not be read from GitHub: is gh signed in (gh auth status)?`,
+        'warning',
+      );
+  };
   const withFile = (ev: DragEvent) => !!ev.dataTransfer?.types.includes('Files');
   const dragIn = (ev: DragEvent) => {
     if (withFile(ev)) dropping = true;
@@ -450,6 +467,17 @@
         >
       </BarMenu>
     {/if}
+    {#if board.discovering}
+      <button
+        class="read-again"
+        type="button"
+        aria-label={reading ? 'Reading…' : 'Read again'}
+        title="Read the code again: your clones, and the repos not cloned here from GitHub"
+        disabled={reading}
+        onclick={() => void readAgain()}
+        ><Icon of={RefreshCw} size={14} /><span class="words">{reading ? 'Reading…' : 'Read again'}</span></button
+      >
+    {/if}
     <BarMenu
       label="Settings"
       name="settings"
@@ -719,6 +747,30 @@
     display: flex;
     gap: 10px;
   }
+  .read-again {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    height: 32px;
+    padding: 0 11px;
+    border: 1px solid var(--line-strong);
+    background: none;
+    color: var(--ink);
+    font: 600 13px var(--sans);
+    white-space: nowrap;
+    cursor: pointer;
+  }
+  .read-again:hover:not(:disabled) {
+    border-color: var(--ink);
+  }
+  .read-again:focus-visible {
+    outline: 2px solid var(--ink);
+    outline-offset: 2px;
+  }
+  .read-again:disabled {
+    color: var(--ink-muted);
+    cursor: progress;
+  }
   .glyph {
     position: relative;
     display: inline-flex;
@@ -736,6 +788,7 @@
   /* As the bar runs short of room it gives way one step at a time, in this order; Run, Stop, the view switch and the
      environment keep their words at every width. */
   header:global(.l1) :global(.settings .words),
+  header:global(.l1) .read-again .words,
   header:global(.l2) .word,
   header:global(.l4) :global(.activity :is(.words, .chev)),
   header:global(.l4) :global(.picker .kind) {
@@ -743,6 +796,7 @@
   }
   /* A menu without its word is its icon in a square, as the side pane's toggle is. */
   header:global(.l1) :global(.settings),
+  header:global(.l1) .read-again,
   header:global(.l4) :global(.activity) {
     justify-content: center;
     width: 32px;
