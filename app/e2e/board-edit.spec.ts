@@ -150,7 +150,9 @@ test('a proposed change waits for a yes in the inbox: accepted it is made, decli
   koppler(canvas, 'board', 'edit', 'Shop', '--add', 'payments', '--cable', 'orders:payments', '--propose');
   expect(Object.keys(state(canvas.temp).presets[0]?.nodes ?? {})).toEqual(['web', 'orders']);
   const panel = page.getByRole('dialog', { name: 'Messages from the agent' });
-  await expect(panel.getByRole('heading', { level: 3 }).first()).toHaveText('Change Shop?');
+  // A message reaches the page with the server's status: put together every 1.5 s (slower on a busy machine), then
+  // fetched by the page every 1.5 s.
+  await expect(panel.getByRole('heading', { level: 3 }).first()).toHaveText('Change Shop?', { timeout: 15_000 });
   await expect(panel).toContainText('add Payments API');
   await expect(panel).toContainText('cable Orders API to Payments API');
   await expect(card(page, 'payments')).toHaveCount(0);

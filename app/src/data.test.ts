@@ -1,3 +1,4 @@
+import { STACK_FORMAT } from './core/migrations/stack/index.ts';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -17,8 +18,8 @@ afterEach(() => {
 
 test('a run file comes back as it was written, readable by the user alone', () => {
   expect(readData('registry')).toBeNull();
-  writeData('registry', { name: 'Acme Shop', koppler: '0.2.2', envs: ['qa'] });
-  expect(readData('registry')).toEqual({ name: 'Acme Shop', koppler: '0.2.2', envs: ['qa'] });
+  writeData('registry', { name: 'Acme Shop', koppler: STACK_FORMAT.version, envs: ['qa'] });
+  expect(readData('registry')).toEqual({ name: 'Acme Shop', koppler: STACK_FORMAT.version, envs: ['qa'] });
   expect(dataFile('registry')).toBe(path.join(dir, 'registry.json'));
   expect(fs.statSync(dataFile('registry')).mode & 0o777).toBe(0o600);
   expect(fs.readdirSync(dir)).toEqual(['registry.json']);

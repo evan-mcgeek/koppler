@@ -1,5 +1,6 @@
 // The canvas under test: its own server on a free port, holding a small made-up stack in throwaway folders.
 // A test gets `canvas` ({ url, dir, saved() }) and a `page` already showing it.
+import { STACK_FORMAT } from '../src/core/migrations/stack/index.ts';
 import fs from 'node:fs';
 import net, { type AddressInfo } from 'node:net';
 import os from 'node:os';
@@ -31,7 +32,7 @@ const app = (name: string, kind: string, port: number, extra: Record<string, unk
 export const STACK: Stack = {
   name: 'Acme Shop',
   // In this Koppler's format: its tunnels are the apps' own, not databases a migration would name.
-  koppler: '0.2.2',
+  koppler: STACK_FORMAT.version,
   envs: ['qa', 'prod'],
   apps: {
     web: app('Web Shop', 'node', 3000, {
