@@ -315,6 +315,26 @@ test('Any field of the stack is changed through one checked edit: the value that
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
+test('A field the stack format does not know is refused by an edit that adds it; one the file has already stays.', async () => {
+  const { editStack, readStackAt } = await import('../dist/engine/stack-file.js');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-unknown-'));
+  const file = path.join(dir, 'stack.json');
+  const app = { name: 'A', kind: 'node', slug: 'x/a', legacy: 'kept' };
+  fs.writeFileSync(file, JSON.stringify({ name: 'S', envs: ['qa', 'prod'], apps: { a: app } }));
+  const opts = { config: { stack: dir } };
+  readStackAt('', opts);
+  const before = fs.readFileSync(file, 'utf8');
+  assert.match(editStack('databases.orders-db', [{ port: 5432, env: 'Db__Host' }], opts).error, /^databases\.orders-db\.env: not a field Koppler knows/);
+  assert.match(editStack('apps.a.prereqs[0]', [{ tunnel: 'db.acme.example', prot: 5432 }], opts).error, /apps\.a\.prereqs\[0\]\.prot: not a field/);
+  assert.equal(fs.readFileSync(file, 'utf8'), before);
+  // An environment takes any field the app has; the stack takes notes; the field the file had is no edit's problem.
+  assert.equal(editStack('apps.a.envs.prod.deployedUrl', ['https://a.acme.example'], opts).error, undefined);
+  assert.equal(editStack('notes', [['The orders tunnel can move to another port.']], opts).error, undefined);
+  assert.equal(editStack('apps.a.url', ['http://localhost:3000'], opts).error, undefined);
+  assert.equal(readStackAt('apps.a.legacy', opts).value, 'kept');
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
 test('A locked field is kept as it is by every change, and only the person unlocks it.', async () => {
   const { editStack, removeApp } = await import('../dist/engine/stack-file.js');
   const { setLock } = await import('../dist/engine/locks.js');
