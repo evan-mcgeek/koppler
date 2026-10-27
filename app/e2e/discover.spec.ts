@@ -200,12 +200,14 @@ test.describe('a board with an app', () => {
     await page.getByRole('button', { name: 'Fit', exact: true }).click();
     await settled(page);
     const lean = page.locator('.lean');
-    // An area dragged over the map picks the cards in it.
+    // An area dragged over the map picks the cards in it, from beside the first card across the rest, as a hand drags it:
+    // on its way it covers one card alone, and that opens no panel either.
     const pane = await page.locator('.svelte-flow__pane').boundingBox();
-    if (!pane) throw new Error('no map');
-    await page.mouse.move(pane.x + 4, pane.y + 4);
+    const first = await lean.first().boundingBox();
+    if (!pane || !first) throw new Error('no map');
+    await page.mouse.move(first.x - 8, first.y - 8);
     await page.mouse.down();
-    await page.mouse.move(pane.x + pane.width - 4, pane.y + pane.height - 4, { steps: 10 });
+    await page.mouse.move(pane.x + pane.width - 4, pane.y + pane.height - 4, { steps: 40 });
     await page.mouse.up();
     await expect(page.locator('.lean.picked')).toHaveCount(await lean.count());
     // An area picked opens no card's panel.
