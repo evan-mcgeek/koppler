@@ -8,18 +8,27 @@ import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 const app = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
-const build = () =>
-  new Promise(resolve => {
-    const child = spawn(process.execPath, [path.join(app, 'scripts', 'build.mjs')], { stdio: 'ignore' });
-    child.on('exit', resolve);
-  });
 
 test('two builds at once both finish, one after the other, and leave a Koppler that runs', async () => {
-  assert.deepEqual(await Promise.all([build(), build()]), [0, 0]);
-  assert.equal(fs.existsSync(path.join(app, 'dist.lock')), false);
-  assert.equal(fs.existsSync(path.join(app, 'dist.next')), false);
-  const ran = spawnSync(process.execPath, [path.join(app, 'dist', 'koppler.mjs'), '--version'], { encoding: 'utf8' });
-  assert.match(ran.stdout, /^koppler /);
+  // In a copy of the app: a build swaps dist/ out, and other tests run Koppler from the real one meanwhile.
+  const copy = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-build-'));
+  try {
+    for (const name of ['bin', 'canvas', 'scripts', 'src', 'package.json', 'tsconfig.json', 'tsconfig.build.json'])
+      fs.cpSync(path.join(app, name), path.join(copy, name), { recursive: true });
+    fs.symlinkSync(path.join(app, 'node_modules'), path.join(copy, 'node_modules'));
+    const build = () =>
+      new Promise(resolve => {
+        const child = spawn(process.execPath, [path.join(copy, 'scripts', 'build.mjs')], { stdio: 'ignore' });
+        child.on('exit', resolve);
+      });
+    assert.deepEqual(await Promise.all([build(), build()]), [0, 0]);
+    assert.equal(fs.existsSync(path.join(copy, 'dist.lock')), false);
+    assert.equal(fs.existsSync(path.join(copy, 'dist.next')), false);
+    const ran = spawnSync(process.execPath, [path.join(copy, 'dist', 'koppler.mjs'), '--version'], { encoding: 'utf8' });
+    assert.match(ran.stdout, /^koppler /);
+  } finally {
+    fs.rmSync(copy, { recursive: true, force: true });
+  }
 });
 
 test('installed inside another git repo, --version names no commit; run from its own clone, it does', () => {

@@ -73,11 +73,11 @@ Everything else depends on your stack (the .NET SDK, Flutter, Docker, the AWS CL
 
 ## Repository
 
-| Folder | What |
-|---|---|
-| [`app/`](app) | The `koppler` package: the command, the engine, the canvas and its local server |
-| [`plugin/`](plugin) | The agent add-on: a Claude Code plugin with the `koppler-run` skill |
-| [`docs/`](docs) | User documentation |
+| Folder              | What                                                                            |
+| ------------------- | ------------------------------------------------------------------------------- |
+| [`app/`](app)       | The `koppler` package: the command, the engine, the canvas and its local server |
+| [`plugin/`](plugin) | The agent add-on: a Claude Code plugin with the `koppler-run` skill             |
+| [`docs/`](docs)     | User documentation                                                              |
 
 Koppler runs from `app/dist/`, which `npm run build` makes from `app/src/` (`npm install` first).
 While working on Koppler itself, link `app/scripts/koppler-dev.mjs` as `koppler`: it rebuilds when the source is newer, then runs the build.
@@ -85,6 +85,7 @@ Run the tests with `npm test` in `app/`; unit tests sit next to their module as 
 The documentation's screenshots come from `npm run screenshots` in `app/`: it drives the canvas on a demo stack and writes `docs/images/`, with the hero and the social card drawn from `app/screenshots/brand.html`.
 The canvas has tests of its own that drive it in a browser: `npm install`, `npx playwright install chromium` once, then `npm run test:canvas`.
 `npm run lint`, `npm run types` and `npm run format:check` are what CI checks besides the tests; `npm run format` formats.
+`npm run check` runs all of it as CI does, side by side where it can, in about two minutes.
 
 ## Reporting bugs
 
