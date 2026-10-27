@@ -119,6 +119,7 @@
           // On a feature board its steps are drawn in ink and every other link drawn back.
           board: board.feature ? !!step : onBoard.has(link.from) && onBoard.has(link.to),
           found: link.sure === 'found' || !!step?.step.proposed,
+          unsourced: !!link.unsourced && !step,
           faded:
             (!!near && !(discovered.picked.includes(link.from) || discovered.picked.includes(link.to))) ||
             (phase !== null && step?.phase !== phase),
@@ -350,6 +351,14 @@
                 </g>
               {/if}
             {/each}
+            {#each drawn.filter(one => one.unsourced) as one (one.key)}
+              <g class="mark unsourced" class:board={one.board} class:faded={one.faded}>
+                <g class="number" transform="translate({one.middle.x} {one.middle.y})">
+                  <rect x="-9" y="-9" width="18" height="18" />
+                  <text text-anchor="middle" dy="4">?</text>
+                </g>
+              </g>
+            {/each}
             {#each phases as phase (phase.at)}
               <g
                 class="phase"
@@ -424,6 +433,13 @@
         <span
           ><svg width="28" height="8" aria-hidden="true"><path d="M0 4H28" class="dash" /></svg>Found in code, not
           confirmed</span
+        >
+        <span class="unknown"
+          ><svg width="28" height="14" aria-hidden="true"
+            ><path d="M0 7H28" /><rect x="7" y="0.5" width="14" height="13" /><text x="14" y="10.5" text-anchor="middle"
+              >?</text
+            ></svg
+          >No source yet</span
         >
         <span class="dim"
           ><svg width="28" height="8" aria-hidden="true"><path d="M0 4H28" /></svg>{board.feature
@@ -526,7 +542,9 @@
                     <span>Found in code, not confirmed</span>
                     <button class="text" type="button" onclick={() => void discovered.confirm(link)}>Confirm</button>
                   </span>
-                {:else if link.via}<span class="detail"><span>{link.via}</span></span>{/if}
+                {:else if link.unsourced}<span class="detail"><span>No source yet</span></span>{:else if link.via}<span
+                    class="detail"><span>{link.via}</span></span
+                  >{/if}
               </div>
             {/each}
           {:else}
@@ -621,6 +639,10 @@
     fill: var(--ink);
     font: 600 11px var(--mono);
   }
+  /* Recorded with nothing on where it comes from: a ? on the link, in a box like a step's number. */
+  .unsourced .number rect {
+    stroke: var(--ink-muted);
+  }
   .phase rect {
     fill: var(--ink);
   }
@@ -662,6 +684,14 @@
     color: var(--ink);
     font: 600 13px var(--sans);
     cursor: pointer;
+  }
+  .legend .unknown rect {
+    fill: var(--desk);
+    stroke: var(--ink-muted);
+  }
+  .legend .unknown text {
+    fill: var(--ink);
+    font: 600 10px var(--mono);
   }
   .legend .lit path {
     stroke: var(--ink);

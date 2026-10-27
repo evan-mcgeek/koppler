@@ -4,11 +4,11 @@ import { deadEnds, linksOf, mapOf, type Facts } from './discover.ts';
 const app = (name: string, extra: object = {}) => ({ name, kind: 'node', slug: `acme/${name}`, ...extra });
 const facts = {
   apps: {
-    web: app('Web Shop', { consumes: { orders: {} } }),
+    web: app('Web Shop', { consumes: { orders: { how: 'env', env: 'ORDERS_URL' } } }),
     orders: app('Orders API', { publishes: { events: {} }, uses: { 'orders-db': {} } }),
     payments: app('Payments API', { reads: { events: { via: 'rule to Lambda' } }, consumes: { psp: {} } }),
     psp: app('Pay provider', { outside: 'SaaS' }),
-    reports: app('Reports', { consumes: { payments: {} } }),
+    reports: app('Reports', { consumes: { payments: { found: 'src/pay.ts:3' } } }),
   },
   queues: { events: { name: 'Order events', type: 'sqs' } },
   databases: { 'orders-db': { name: 'Orders', kind: 'postgres' } },
@@ -22,7 +22,8 @@ describe('linksOf', () => {
       { from: 'orders', to: 'payments', kind: 'call', sure: 'found', via: 'src/pay.ts' },
       { from: 'orders', to: 'queue:events', kind: 'publish', sure: 'confirmed' },
       { from: 'orders', to: 'database:orders-db', kind: 'uses', sure: 'confirmed' },
-      { from: 'payments', to: 'psp', kind: 'call', sure: 'confirmed' },
+      // Recorded, with nothing on where it comes from.
+      { from: 'payments', to: 'psp', kind: 'call', sure: 'confirmed', unsourced: true },
       { from: 'queue:events', to: 'payments', kind: 'read', sure: 'confirmed', via: 'rule to Lambda' },
       { from: 'reports', to: 'payments', kind: 'call', sure: 'confirmed' },
     ]);

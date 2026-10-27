@@ -1,6 +1,6 @@
 // Discover: how the stack fits together, read from its facts. The board's apps, everything one step away from them, and
 // one step further from each card whose hidden links were brought in.
-import type { Stack } from './stack.ts';
+import type { Call, Stack } from './stack.ts';
 
 /** A card on the map: an app or outside system by its id, a queue as `queue:<id>`, a database as `database:<id>`. */
 export type Card = string;
@@ -13,6 +13,8 @@ export interface Link {
   sure: 'confirmed' | 'found';
   /** How it goes when the stack says: a rule, a pipe, where it was found. */
   via?: string;
+  /** A call the stack records without saying where it comes from: no setting, file or place in the code. */
+  unsourced?: true;
 }
 
 export type Facts = Pick<Stack, 'apps'> &
@@ -21,6 +23,9 @@ export type Facts = Pick<Stack, 'apps'> &
     found?: Record<string, Record<string, string>>;
   };
 
+/** Whether a recorded call says where it comes from. */
+const sourced = (call: Call | undefined) =>
+  !!call && (!!call.env || !!call.file || !!call.key || !!call.found || (!!call.how && call.how !== 'unknown'));
 const via = (use: unknown): string | undefined => {
   const said = (use as { via?: unknown } | null | undefined)?.via;
   return typeof said === 'string' && said ? said : undefined;
@@ -31,8 +36,9 @@ export function linksOf(facts: Facts): Link[] {
   const links: Link[] = [];
   const apps = facts.apps;
   for (const [id, app] of Object.entries(apps)) {
-    for (const to of Object.keys(app.consumes ?? {}))
-      if (apps[to]) links.push({ from: id, to, kind: 'call', sure: 'confirmed' });
+    for (const [to, call] of Object.entries(app.consumes ?? {}))
+      if (apps[to])
+        links.push({ from: id, to, kind: 'call', sure: 'confirmed', ...(!sourced(call) && { unsourced: true }) });
     for (const [to, where] of Object.entries(facts.found?.[id] ?? {}))
       if (apps[to] && !app.consumes?.[to]) links.push({ from: id, to, kind: 'call', sure: 'found', via: where });
     for (const [queue, use] of Object.entries(app.publishes ?? {}))
