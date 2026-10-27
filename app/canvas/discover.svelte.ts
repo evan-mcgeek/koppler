@@ -2,7 +2,7 @@
 // board; it keeps only which cards were opened and where its cards sit, per board.
 import type { Point } from '../src/core/arrange.ts';
 import { DIRECTIONS, type Direction, type Laid } from '../src/core/layout.ts';
-import { linksOf, mapOf, type Card, type Link } from '../src/core/discover.ts';
+import { deadEnds, linksOf, mapOf, type Card, type Link } from '../src/core/discover.ts';
 import {
   editFeature,
   featureCards,
@@ -30,6 +30,8 @@ export interface LeanData extends Record<string, unknown> {
   app: boolean;
   /** On a feature board, proposed by the agent and not accepted yet. */
   proposed: boolean;
+  /** A queue sent to that nothing reads or passes on. */
+  deadEnd: boolean;
 }
 
 export const CARD = { w: 200, h: 64 };
@@ -74,11 +76,12 @@ class Discovered {
   /** Each card's height as drawn: a long name makes a card taller. */
   heights = $state<Record<Card, number>>({});
 
+  #dead = $derived(board.facts ? deadEnds(board.facts) : new Set<Card>());
   /** What a card shows. */
   data(card: Card, onBoard: boolean, hidden: number): LeanData {
     const facts = board.facts;
     const proposed = !!board.feature && proposedCard(board.feature, card);
-    const base = { onBoard, hidden, cloned: false, app: false, proposed };
+    const base = { onBoard, hidden, cloned: false, app: false, proposed, deadEnd: this.#dead.has(card) };
     if (card.startsWith('queue:')) {
       const queue = facts?.queues?.[card.slice(6)];
       const [tag, meta] = QUEUE_TAGS[queue?.type ?? ''] ?? ['QUEUE', 'Queue'];
