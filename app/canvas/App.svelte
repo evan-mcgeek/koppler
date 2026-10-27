@@ -1018,6 +1018,7 @@
   }
   .empty {
     display: grid;
+    align-content: start;
     gap: 8px;
     max-width: 420px;
     padding: 24px 16px;
