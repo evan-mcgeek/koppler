@@ -12,15 +12,18 @@ import { hostsByApp } from './calls.ts';
 import { writeJson } from '../json-files.ts';
 import { appOn } from '../core/stack.ts';
 import {
+  type BucketUse,
   type Call,
   type Domain,
   ENV_TOKEN,
   type EnvStack,
   type FeedVia,
   hostOf,
+  type MachineUse,
   type Module,
   type NamedQueue,
   readModule,
+  type RouteUse,
   samDomains,
   type SecretName,
   type Setting,
@@ -40,6 +43,9 @@ export interface Draft {
   unnamedSecrets: number;
   calls: Call[];
   queues: Omit<NamedQueue, 'raw'>[];
+  buckets: BucketUse[];
+  routes: RouteUse[];
+  machines: MachineUse[];
 }
 
 type Drafts = Record<string, Record<string, Partial<Draft>>>;
@@ -117,6 +123,9 @@ export function readRepo(repo: string, workspaces: string[] = []): Module[] {
       settings: [],
       secrets: [],
       queues: [],
+      buckets: [],
+      routes: [],
+      machines: [],
       dir: 'samconfig.toml',
     }));
   } catch {
@@ -144,6 +153,9 @@ export function draftApp(
     secrets: Map<string, SecretName>;
     accounts: Set<string>;
     queues: Map<string, Omit<NamedQueue, 'raw'>>;
+    buckets: Map<string, BucketUse>;
+    routes: Map<string, RouteUse>;
+    machines: Map<string, MachineUse>;
   }
   const gathered: Record<string, Gathered> = {};
   // What a repo says under the environment's own name wins over what it says under an alias.
@@ -157,7 +169,21 @@ export function draftApp(
       secrets: new Map(),
       accounts: new Set(),
       queues: new Map(),
+      buckets: new Map(),
+      routes: new Map(),
+      machines: new Map(),
     });
+    for (const bucket of module.buckets) {
+      // A bucket named for another of the stack's environments is that one's.
+      const named = tokenIn(bucket.name ?? undefined);
+      const its = named ? stackEnv(named, stack) : null;
+      if (its && its !== env) continue;
+      const key = bucket.name ?? `${module.dir ?? ''}:${bucket.address}`;
+      const had = into.buckets.get(key);
+      into.buckets.set(key, { ...bucket, reads: !!had?.reads || bucket.reads, writes: !!had?.writes || bucket.writes });
+    }
+    for (const route of module.routes) into.routes.set(`${route.api} ${route.route}`, route);
+    for (const machine of module.machines) into.machines.set(`${module.dir ?? ''}:${machine.address}`, machine);
     if (own(module) && module.domains.length) into.domains = into.domains.filter(domain => domain.own);
     into.domains.push(...module.domains.map(domain => ({ ...domain, own: own(module) })));
     if (module.account) into.accounts.add(module.account);
@@ -228,6 +254,9 @@ export function draftApp(
           queues: [...found.queues.values()].filter(
             (queue, _, all) => queue.name || !all.some(other => other.name && other.address === queue.address),
           ),
+          buckets: [...found.buckets.values()],
+          routes: [...found.routes.values()],
+          machines: [...found.machines.values()],
         },
       ];
     }),
@@ -360,6 +389,97 @@ export function linkQueues(drafts: Drafts, stack: EnvStack): LinkedQueue[] {
 }
 
 const QUEUE_WORDS = ['sqs', 'sns', 'queue', 'topic'];
+const RESOURCE_WORDS = ['s3', 'bucket', 'api', 'apigw', 'gateway', 'sfn', 'statemachine', 'state', 'machine'];
+/** "acme-receipts-qa-bucket" becomes "acme-receipts": its name less the environment and the words for its kind. */
+const resourceId = (name: string): string =>
+  name
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter(word => word && !ENV_TOKEN.test(`-${word}-`) && !RESOURCE_WORDS.includes(word))
+    .join('-') || 'resource';
+
+interface ResourceStack {
+  resources?: Record<string, { type: string; bucket?: string | undefined }> | undefined;
+  apps: Record<string, { buckets?: Record<string, unknown> | undefined } | undefined>;
+}
+
+/**
+ * What stack.json would need for the resources it does not list yet: the buckets the apps' policies read or write, an
+ * API Gateway with a route to more than its own Lambda, each state machine with its steps; and each app's buckets.
+ */
+export function resourceDraft(drafts: Drafts, queues: LinkedQueue[], stack: EnvStack & ResourceStack) {
+  const out: {
+    resources: Record<string, Record<string, unknown>>;
+    apps: Record<string, { buckets: Record<string, { access: 'read' | 'write' | 'both' }> }>;
+  } = { resources: {}, apps: {} };
+  const [first = ''] = stack.envs;
+  const later = stack.envs.slice(1);
+  const known = Object.entries(stack.resources ?? {});
+  const free = (id: string) => (out.resources[id] || stack.resources?.[id] ? null : id);
+  const bucketIds = new Map<string, string>();
+  // The app that declares a bucket first, so its names for the other environments are known.
+  const uses = Object.entries(drafts)
+    .flatMap(([app, envs]) => (envs[first]?.buckets ?? []).map(bucket => ({ app, envs, bucket })))
+    .sort((a, b) => Number(a.bucket.address.startsWith('name:')) - Number(b.bucket.address.startsWith('name:')));
+  for (const { app, envs, bucket } of uses) {
+    if (!bucket.name) continue;
+    const own = known.find(([, resource]) => resource.type === 's3' && resource.bucket === bucket.name)?.[0];
+    let id = own ?? bucketIds.get(bucket.name);
+    if (!id) {
+      id = free(resourceId(bucket.name)) ?? `${resourceId(bucket.name)}-bucket`;
+      const perEnv = later.flatMap(env => {
+        const there = envs[env]?.buckets?.find(
+          other => other.address === bucket.address && !bucket.address.startsWith('name:'),
+        );
+        return there?.name ? [[env, { bucket: there.name }] as const] : [];
+      });
+      out.resources[id] = {
+        type: 's3',
+        name: titled(id),
+        bucket: bucket.name,
+        ...(perEnv.length && { envs: Object.fromEntries(perEnv) }),
+      };
+    }
+    bucketIds.set(bucket.name, id);
+    if (stack.apps[app]?.buckets?.[id]) continue;
+    const access = bucket.reads && bucket.writes ? 'both' : bucket.reads ? 'read' : 'write';
+    (out.apps[app] ??= { buckets: {} }).buckets[id] = { access };
+  }
+  for (const [app, envs] of Object.entries(drafts)) {
+    const routes = envs[first]?.routes ?? [];
+    for (const api of new Set(routes.map(route => route.api))) {
+      const own = routes.filter(route => route.api === api);
+      // An API that only fronts its own Lambda is that app's address, not a card of its own.
+      if (own.every(route => 'own' in route.to)) continue;
+      const to = (route: RouteUse) => {
+        if ('own' in route.to) return app;
+        const target = route.to;
+        const queue = 'queue' in target && queues.find(one => one.owner === app && one.address === target.queue);
+        return queue ? `queue:${queue.id}` : null;
+      };
+      const name = own[0]?.apiName ?? `${app} API`;
+      const id = free(resourceId(name));
+      if (!id) continue;
+      const mapped = own.flatMap(route => {
+        const target = to(route);
+        return target ? [[route.route, target] as const] : [];
+      });
+      out.resources[id] = { type: 'apigw', name: titled(id), routes: Object.fromEntries(mapped) };
+    }
+    for (const machine of envs[first]?.machines ?? []) {
+      const id = free(resourceId(machine.name ?? `${app}-${machine.address.split('.').pop() ?? ''}`));
+      if (!id) continue;
+      out.resources[id] = {
+        type: 'sfn',
+        name: titled(id),
+        ...(machine.startedHere && { startedBy: [app] }),
+        steps: machine.steps.map(step => ({ name: step.name, ...(step.own && { calls: app }) })),
+        ...(machine.scheduled && { note: 'Started on a schedule' }),
+      };
+    }
+  }
+  return out;
+}
 
 /** "bookings-sqs-queue-dev" and "user-media-thumbnail-queue" become "bookings" and "user-media-thumbnail". */
 export const queueId = (name: string): string =>
@@ -676,11 +796,43 @@ export function deployed(args: string[] = []): void {
       }
   }
   const queueSuggestions = queueDraft(queues, stack);
+  const resourceSuggestions = resourceDraft(drafts, queues, stack);
+  const newResources = Object.entries(resourceSuggestions.resources);
+  const usersOf = (id: string) =>
+    Object.entries(resourceSuggestions.apps).flatMap(([app, { buckets }]) => {
+      const access = buckets[id]?.access;
+      return access ? [`${nameOf(app)} ${access === 'both' ? 'reads and writes' : `${access}s`}`] : [];
+    });
+  if (newResources.length) {
+    console.log('\nBuckets, API Gateways and Step Functions');
+    for (const [id, resource] of newResources) {
+      const said =
+        resource['type'] === 's3'
+          ? usersOf(id).join(', ')
+          : resource['type'] === 'apigw'
+            ? Object.entries(resource['routes'] as Record<string, string>)
+                .map(([route, to]) => `${route} to ${to.startsWith('queue:') ? to : nameOf(to)}`)
+                .join(', ')
+            : `${String((resource['steps'] as unknown[]).length)} steps`;
+      console.log(
+        `  ${String(resource['bucket'] ?? resource['name'])} (${String(resource['type']).toUpperCase()})  ${said}  NEW`,
+      );
+    }
+  }
   const file = path.join(tempDir(), 'stack.deployed.json');
-  const draft = { at: new Date().toISOString(), suggestions, queueSuggestions, outsideSuggestions, apps: drafts };
+  const draft = {
+    at: new Date().toISOString(),
+    suggestions,
+    queueSuggestions,
+    resourceSuggestions,
+    outsideSuggestions,
+    apps: drafts,
+  };
   writeJson(file, draft);
   const newQueues = Object.keys(queueSuggestions.queues).length;
   if (newQueues) console.log(`${String(newQueues)} queues are new for stack.json (queueSuggestions in the draft).`);
+  if (newResources.length)
+    console.log(`${String(newResources.length)} resources are new for stack.json (resourceSuggestions in the draft).`);
   console.log(
     `\n${String(Object.keys(suggestions).length)} apps have something new for stack.json. Draft for review: ${file}`,
   );
