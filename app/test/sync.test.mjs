@@ -153,9 +153,13 @@ test('Stacks already on the Mac can be used from the empty state; a folder Koppl
   fsx.mkdirSync(shared, { recursive: true });
   fsx.writeFileSync(px.join(shared, 'stack.json'), JSON.stringify({ name: 'Shop', envs: ['qa', 'prod'], apps: { api: { name: 'API', kind: 'node', slug: 'acme/api' } } }));
   fsx.mkdirSync(px.join(repo, 'stacks', 'broken')); fsx.writeFileSync(px.join(repo, 'stacks', 'broken', 'stack.json'), '{"apps": []}');
+  // Written before 0.3.2, with a way of calling that the 0.3.2 format moves into note: listed, as reading brings it up to date.
+  const older = px.join(repo, 'stacks', 'older');
+  fsx.mkdirSync(older);
+  fsx.writeFileSync(px.join(older, 'stack.json'), JSON.stringify({ name: 'Older', envs: ['qa'], apps: { app: { name: 'App', kind: 'flutter', slug: 'acme/app', consumes: { api: { how: 'dart-define' } } }, api: { name: 'API', kind: 'node', slug: 'acme/api' } } }));
   const index = { repos: [{ path: repo, keys: ['github.com/acme/team-repo'] }] }, config = {};
   const found = knownStacks(index).filter(s => s.dir.startsWith(dir));
-  assert.deepEqual(found.map(s => [s.name, s.apps, s.envs.join(), s.shared]), [['Shop', 1, 'qa,prod', true]]);
+  assert.deepEqual(found.map(s => [s.name, s.apps, s.envs.join(), s.shared]).sort(), [['Older', 2, 'qa', true], ['Shop', 1, 'qa,prod', true]]);
   assert.match(useStack('/etc', { config, index, save() {} }).error, /not a stack Koppler found/);
   assert.deepEqual(useStack(shared, { config, index, save() {} }), { stack: shared });
   assert.equal(config.stack, shared);

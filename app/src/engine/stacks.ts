@@ -3,7 +3,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { readJson, writeJson } from '../json-files.ts';
-import { validateStack } from '../core/stack.ts';
+import { stackProblems } from '../core/stack.ts';
 import { writeData } from '../data.ts';
 import { Failure } from '../failure.ts';
 import { configDir, tempDir } from '../paths.ts';
@@ -155,7 +155,7 @@ export function knownStacks(index: Pick<Index, 'repos'> | null | undefined): Kno
   return dirs.flatMap(([dir, inRepo]): KnownStack[] => {
     const stack = readJson(path.join(dir, 'stack.json')) as StackFile | null;
     const linked = (readJson(path.join(dir, '.source.json')) as { url?: string } | null)?.url;
-    if (!stack || validateStack(stack).length) return [];
+    if (!stack || stackProblems(stack).length) return [];
     return [
       {
         dir,

@@ -7,6 +7,7 @@ import { BUILT_IN_KINDS } from './kinds.ts';
 import { QUEUE_TYPES } from './plan.ts';
 import { VERSION as PRESET_VERSION } from './presets.ts';
 import { BOARD_FORMAT } from './migrations/board/index.ts';
+import { migrateStack } from './migrations/stack/index.ts';
 import { compareVersions, isVersion } from './migrations/run.ts';
 import { SECRET_TYPES } from './secret-types.ts';
 
@@ -750,6 +751,13 @@ export function validateStack(raw: unknown): string[] {
         .filter(issue => !named.has(where(issue.path)))
         .map(issue => (issue.path.length > 0 ? `${where(issue.path)}: ${issue.message}` : issue.message));
   return [...new Set([...expressions, ...shape, ...(isObject(stack) ? crossProblems(stack) : [])])];
+}
+
+/** A stack file's problems as Koppler reads it: brought up to this format first, so an older file is not refused. */
+export function stackProblems(raw: unknown): string[] {
+  if (!isObject(raw)) return validateStack(raw);
+  const migrated = migrateStack(raw);
+  return migrated.error === undefined ? validateStack(migrated.value) : [migrated.error];
 }
 
 type Shape = {
