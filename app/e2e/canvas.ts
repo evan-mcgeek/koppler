@@ -73,6 +73,7 @@ type Stack = {
   apps: Record<string, Record<string, unknown>>;
   queues?: Record<string, Record<string, unknown>>;
   databases?: Record<string, Record<string, unknown>>;
+  resources?: Record<string, Record<string, unknown>>;
   found?: Record<string, Record<string, string>>;
   presets?: unknown[];
 };
@@ -135,7 +136,7 @@ export const test = base.extend<{
     // A Run confirmed in a test is carried out for real: the tools that reach real infrastructure fail as if missing.
     const bin = path.join(dir, 'bin');
     fs.mkdirSync(bin);
-    for (const tool of ['cloudflared', 'docker', 'aws', 'ssh'])
+    for (const tool of ['cloudflared', 'docker', 'aws', 'ssh', 'gh'])
       fs.writeFileSync(path.join(bin, tool), `#!/bin/sh\necho "${tool}: not run in tests" >&2\nexit 127\n`, {
         mode: 0o755,
       });

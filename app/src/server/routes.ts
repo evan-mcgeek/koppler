@@ -304,6 +304,18 @@ export const ROUTES: Record<string, Route> = {
         ?.replace(/^koppler: /, '') || 'The scan did not finish.';
     return failed ? { status: 500, body: { error: why } } : { status: 200, body: { ok: true } };
   },
+  // Discover's Read again: the stack and the clones again, and the repos not cloned here from GitHub.
+  '/read-again': async () => {
+    const { failed, said } = await koppler(['sync', '--github'], 300000);
+    const why =
+      said
+        .trim()
+        .split('\n')
+        .pop()
+        ?.replace(/^koppler: /, '') || 'Reading did not finish.';
+    const unread = said.split('\n').filter(line => line.startsWith('GITHUB ')).length;
+    return failed ? { status: 500, body: { error: why } } : { status: 200, body: { ok: true, unread } };
+  },
   // What the user has to do before these apps run on this environment, worked out live by `koppler doctor`.
   '/needs': async body => {
     const ids = (Array.isArray(body['apps']) ? (body['apps'] as unknown[]) : []).filter(isApp).slice(0, 50);

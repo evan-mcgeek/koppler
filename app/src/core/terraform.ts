@@ -61,10 +61,40 @@ export interface SecretName {
   name: string | null;
 }
 
+/** A bucket an app's role may read or write: one its Terraform declares (`aws_s3_bucket.x`), or `name:<bucket>`. */
+export interface BucketUse {
+  address: string;
+  name: string | null;
+  reads: boolean;
+  writes: boolean;
+}
+
+/** An API Gateway route and what it hands to: the app's own Lambda, a queue or a state machine, by Terraform address. */
+export interface RouteUse {
+  api: string;
+  apiName: string | null;
+  route: string;
+  to: { own: true } | { queue: string } | { machine: string };
+}
+
+/** A Step Functions state machine: its steps in order, whether the app's own Lambda runs each, and what starts it. */
+export interface MachineUse {
+  address: string;
+  name: string | null;
+  steps: { name: string; own: boolean }[];
+  /** The app's own role may start it. */
+  startedHere: boolean;
+  /** A schedule starts it. */
+  scheduled: boolean;
+}
+
 /** One Terraform folder as one of its environments has it. */
 export interface Module {
   token: string | null;
   queues: NamedQueue[];
+  buckets: BucketUse[];
+  routes: RouteUse[];
+  machines: MachineUse[];
   account: string | null;
   domains: Domain[];
   settings: Setting[];
@@ -343,6 +373,7 @@ export function queueUses(tf: string): QueueUse[] {
         } else if (type === 'aws_lambda_event_source_mapping') queue.reads = true;
         else if (type === 'aws_s3_bucket_notification') queue.fedBy.add('S3 bucket notifications');
         else if (type === 'aws_cloudwatch_event_target') queue.fedBy.add('an EventBridge rule');
+        else if (type === 'aws_apigatewayv2_integration') queue.fedBy.add('an API Gateway route');
         else {
           // One statement can allow both.
           if (/sqs:SendMessage|sns:Publish|"sqs:\*"/.test(near)) queue.sends = true;
@@ -411,6 +442,132 @@ export function queueUses(tf: string): QueueUse[] {
     env: [...queue.env].sort(),
     fedBy: [...queue.fedBy],
   }));
+}
+
+const READS_BUCKET = /s3:(Get|List)\w*|s3:\*/;
+const WRITES_BUCKET = /s3:(Put|Delete|Abort)\w*|s3:\*/;
+const reference = (address: string, fields: string) =>
+  new RegExp(`${address.replace(/\./g, '\\.')}(?:\\[[^\\]]*\\])?\\.(?:${fields})\\b`, 'g');
+
+/** The entries of a JSON-like object body, in written order: each `"name": { ... }` with its body. */
+function objectEntries(body: string): { name: string; body: string }[] {
+  const out: { name: string; body: string }[] = [];
+  const head = /^[\s,]*"([^"]+)"\s*[:=]\s*\{/;
+  for (let rest = body, match = head.exec(rest); match; match = head.exec(rest)) {
+    const [block] = blocks(rest, new RegExp(head.source, 'g'));
+    if (!block) break;
+    out.push({ name: match[1] ?? '', body: block.body });
+    rest = rest.slice(match[0].length + block.body.length + 1);
+  }
+  return out;
+}
+
+/** The steps of a state machine's `jsonencode` definition: from StartAt along each Next, then the rest as written. */
+function stepsOf(definition: string): { name: string; body: string }[] {
+  const [states] = blocks(definition, /"States"\s*[:=]\s*\{/g);
+  if (!states) return [];
+  const all = objectEntries(states.body);
+  // Its own Next, not one of the states nested in it (a Map's).
+  const next = (body: string) => {
+    let own = body;
+    for (let was = ''; was !== own;) [was, own] = [own, own.replace(/\{[^{}]*\}/g, '')];
+    return /"Next"\s*[:=]\s*"([^"]+)"/.exec(own)?.[1];
+  };
+  const ordered: typeof all = [];
+  for (let name = /"StartAt"\s*[:=]\s*"([^"]+)"/.exec(definition)?.[1]; name;) {
+    const state = all.find(one => one.name === name);
+    if (!state || ordered.includes(state)) break;
+    ordered.push(state);
+    name = next(state.body);
+  }
+  // A Fail or Succeed state only ends the run.
+  return [...ordered, ...all.filter(one => !ordered.includes(one))].filter(
+    one => !/"Type"\s*[:=]\s*"(Fail|Succeed)"/.test(one.body),
+  );
+}
+
+/**
+ * The buckets, API Gateway routes and state machines a Terraform folder declares, and how its app uses each: a
+ * bucket's access from the app's own policies, a route's target, a state machine's steps and who starts it.
+ */
+export function resourceUses(tf: string) {
+  const buckets = blocks(tf, /(resource|data)\s+"aws_s3_bucket"\s+"([\w-]+)"\s*\{/g).map(({ match, body }) => ({
+    address: `${match[1] === 'data' ? 'data.' : ''}aws_s3_bucket.${match[2] ?? ''}`,
+    raw: assigned(body, 'bucket') ?? null,
+    reads: false,
+    writes: false,
+  }));
+  const machines = blocks(tf, resource('aws_sfn_state_machine')).flatMap(({ match, body }) => {
+    const name = /"([\w-]+)"\s*\{$/.exec(match[0])?.[1];
+    if (!name) return [];
+    const steps = stepsOf(assigned(body, 'definition') ?? '').map(step => ({
+      name: step.name,
+      own: /aws_lambda_function\./.test(step.body),
+    }));
+    return [
+      {
+        address: `aws_sfn_state_machine.${name}`,
+        raw: assigned(body, 'name') ?? null,
+        steps,
+        startedHere: false,
+        scheduled: false,
+      },
+    ];
+  });
+  for (const { match, body } of blocks(tf, /(?:resource|data)\s+"([\w-]+)"\s+"[\w-]+"\s*\{/g)) {
+    const type = match[1] ?? '';
+    // A bucket's own settings and policy say what others may do, not what this app does.
+    if (type.startsWith('aws_s3_bucket')) continue;
+    for (const bucket of buckets)
+      for (const use of body.matchAll(reference(bucket.address, 'arn|id|bucket'))) {
+        // Written inside "${...}", the statement is around the interpolation, not inside it.
+        const near = around(body, body.slice(0, use.index).endsWith('${') ? use.index - 2 : use.index);
+        bucket.reads ||= READS_BUCKET.test(near);
+        bucket.writes ||= WRITES_BUCKET.test(near);
+      }
+    for (const machine of machines)
+      for (const use of body.matchAll(reference(machine.address, 'arn|id|name'))) {
+        if (type === 'aws_scheduler_schedule' || type === 'aws_cloudwatch_event_target') machine.scheduled = true;
+        else if (/states:StartExecution|states:StartSyncExecution|"states:\*"/.test(around(body, use.index)))
+          machine.startedHere = true;
+      }
+  }
+  // A bucket another repo declares, named in this app's policies by its ARN.
+  // ponytail: a bucket handed in from a parent module (var.bucket.arn) is not followed across folders yet.
+  const named = [...tf.matchAll(/"arn:aws:s3:::([^"/*]+)[^"]*"/g)].map(use => ({
+    raw: `"${use[1] ?? ''}"`,
+    reads: READS_BUCKET.test(around(tf, use.index)),
+    writes: WRITES_BUCKET.test(around(tf, use.index)),
+  }));
+  const apis = new Map(
+    blocks(tf, resource('aws_apigatewayv2_api')).map(({ match, body }) => [
+      `aws_apigatewayv2_api.${/"([\w-]+)"\s*\{$/.exec(match[0])?.[1] ?? ''}`,
+      assigned(body, 'name') ?? null,
+    ]),
+  );
+  const integrations = new Map<string, RouteUse['to'] | null>(
+    blocks(tf, resource('aws_apigatewayv2_integration')).map(({ match, body }): [string, RouteUse['to'] | null] => {
+      const at = (pattern: RegExp) => pattern.exec(body)?.[0];
+      const queue = at(/aws_sqs_queue\.[\w-]+/);
+      const machine = at(/aws_sfn_state_machine\.[\w-]+/);
+      const to: RouteUse['to'] | null = queue
+        ? { queue }
+        : machine
+          ? { machine }
+          : /aws_lambda_function\./.test(body)
+            ? { own: true }
+            : null;
+      return [`aws_apigatewayv2_integration.${/"([\w-]+)"\s*\{$/.exec(match[0])?.[1] ?? ''}`, to];
+    }),
+  );
+  // ponytail: API Gateway v2 only; a REST API (v1) is read once one hands to more than its own Lambda.
+  const routes = blocks(tf, resource('aws_apigatewayv2_route')).flatMap(({ body }) => {
+    const api = /aws_apigatewayv2_api\.[\w-]+/.exec(assigned(body, 'api_id') ?? '')?.[0];
+    const to = integrations.get(/aws_apigatewayv2_integration\.[\w-]+/.exec(assigned(body, 'target') ?? '')?.[0] ?? '');
+    const route = /^"([^"$]+|\$default)"$/.exec(assigned(body, 'route_key')?.trim() ?? '')?.[1];
+    return api && to && route ? [{ api, apiRaw: apis.get(api) ?? null, route, to }] : [];
+  });
+  return { buckets, named, routes, machines };
 }
 
 /** Another account's bus a rule sends to, by the ARN written for it: `name:<bus>`; a map per environment gives its first. */
@@ -545,6 +702,7 @@ export function readModule(files: { name: string; text: string }[], workspaces: 
     ],
   };
   const queues = queueUses(tf);
+  const resources = resourceUses(tf);
   // Only a variable that names the account, with a value that reads as an id or a name: never a key or a token.
   const accountOf = (context: Context) =>
     Object.entries(context.vars)
@@ -564,6 +722,21 @@ export function readModule(files: { name: string; text: string }[], workspaces: 
           : [{ ...queue, name: named(queue.raw, context) }],
       )
       .filter(queue => !DEAD_LETTER.test(queue.name ?? '')),
+    buckets: [
+      ...resources.buckets.map(({ raw, ...bucket }) => ({ ...bucket, name: named(raw, context) })),
+      ...resources.named.flatMap(({ raw, reads, writes }) => {
+        const name = named(raw, context);
+        return name ? [{ address: `name:${name}`, name, reads, writes }] : [];
+      }),
+    ]
+      // The same bucket twice is one.
+      .filter(bucket => bucket.reads || bucket.writes)
+      .filter(
+        (bucket, at, all) =>
+          all.findIndex(other => (other.name ?? other.address) === (bucket.name ?? bucket.address)) === at,
+      ),
+    routes: resources.routes.map(({ apiRaw, ...route }) => ({ ...route, apiName: named(apiRaw, context) })),
+    machines: resources.machines.map(({ raw, ...machine }) => ({ ...machine, name: named(raw, context) })),
     account: accountOf(context),
     domains: declared.domains.flatMap(({ raw, from: source }): Domain[] => {
       const host = addressOf(resolve(raw, context) ?? '');

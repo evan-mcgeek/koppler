@@ -586,8 +586,8 @@ const COMMANDS: Command[] = [
   {
     name: 'sync',
     who: 'agent',
-    args: '[--stack <dir>] [--rescan]',
-    about: 'reload the stack and your clones',
+    args: '[--stack <dir>] [--rescan] [--github]',
+    about: 'reload the stack and your clones; --github reads the repos not cloned here from GitHub too',
     run: sync,
     example: 'koppler sync --rescan',
   },

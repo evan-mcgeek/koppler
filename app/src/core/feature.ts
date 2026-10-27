@@ -38,7 +38,7 @@ export interface FeatureEdit {
 }
 
 const MAX_REQUEST = 4000;
-const KINDS: Link['kind'][] = ['call', 'publish', 'read', 'uses', 'feeds'];
+const KINDS: Link['kind'][] = ['call', 'publish', 'read', 'uses', 'feeds', 'bucket', 'route', 'starts'];
 const isCard = (value: unknown): value is Card =>
   typeof value === 'string' && /^((queue|database):)?[a-z0-9][a-z0-9-]{0,63}$/.test(value);
 const isObject = (value: unknown): value is Record<string, unknown> =>
@@ -88,6 +88,7 @@ export function kindBetween(facts: Facts, from: Card, to: Card): Link['kind'] {
 export function inStack(facts: Facts, card: Card): boolean {
   if (card.startsWith('queue:')) return !!facts.queues?.[card.slice(6)];
   if (card.startsWith('database:')) return !!facts.databases?.[card.slice(9)];
+  if (card.startsWith('resource:')) return !!facts.resources?.[card.slice(9)];
   return !!facts.apps[card];
 }
 
@@ -158,7 +159,7 @@ export function stackPath(facts: Facts, link: { from: Card; to: Card; kind: Link
   const id = (card: Card) => card.slice(card.indexOf(':') + 1);
   switch (link.kind) {
     case 'call':
-      return `apps.${from}.consumes.${to}`;
+      return from.startsWith('resource:') ? null : `apps.${from}.consumes.${to}`;
     case 'publish':
       return `apps.${from}.publishes.${id(to)}`;
     case 'read':
@@ -167,5 +168,10 @@ export function stackPath(facts: Facts, link: { from: Card; to: Card; kind: Link
       return `apps.${from}.uses.${id(to)}`;
     case 'feeds':
       return `queues.${id(from)}.feeds.${id(to)}`;
+    // Each needs more than the link says: whether it reads or writes, the route, where in the list it goes.
+    case 'bucket':
+    case 'route':
+    case 'starts':
+      return null;
   }
 }

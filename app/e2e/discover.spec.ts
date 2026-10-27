@@ -285,6 +285,41 @@ test.describe('a board with an app', () => {
   });
 });
 
+test.describe('Read again', () => {
+  test.use({
+    stack,
+    uncloned: ['search'],
+    board: { env: 'qa', mode: 'auto', zoom: 1, pan: { x: 60, y: 60 }, nodes: { web: at(0, 0) }, edges: [] },
+  });
+
+  test('reads the code again, from GitHub for a repo not cloned here, and says when it could not', async ({ page }) => {
+    await expect(card(page, 'web')).toBeVisible();
+    const button = page.getByRole('button', { name: 'Read again' });
+    // Only Discover reads the code.
+    await expect(button).toHaveCount(0);
+    await page.keyboard.press('d');
+    await expect(button).toBeVisible();
+    // What the server says is what the page says: why it failed, as it is.
+    await button.click();
+    await expect(page.getByRole('alert').filter({ hasText: 'no stack set yet' })).toBeVisible({ timeout: 30_000 });
+    await expect(button).toBeEnabled();
+    // Read, but a repo GitHub would not give (koppler sync --github itself is tested in test/github-reads).
+    let answer = () => {};
+    await page.route('**/read-again?*', async route => {
+      await new Promise<void>(done => (answer = done));
+      await route.fulfill({ json: { ok: true, unread: 1 } });
+    });
+    await button.click();
+    await expect(page.getByRole('button', { name: 'Reading…' })).toBeDisabled();
+    answer();
+    await expect(
+      page.getByText('1 repo could not be read from GitHub: is gh signed in (gh auth status)?'),
+    ).toBeVisible();
+    await expect(button).toBeEnabled();
+    await expect(card(page, 'web')).toBeVisible();
+  });
+});
+
 test.describe('an empty board', () => {
   test.use({ board: { env: 'qa', mode: 'auto', zoom: 1, pan: { x: 60, y: 60 }, nodes: {}, edges: [] } });
 
@@ -365,6 +400,133 @@ test.describe('a topic nothing reads', () => {
     await page.getByRole('radio', { name: /^Paper/ }).click();
     await page.keyboard.press('Escape');
     await page.screenshot({ path: 'test-results/dead-end-paper.png', clip: await clip() });
+  });
+});
+
+test.describe('a call recorded with nothing on where it comes from', () => {
+  test.use({
+    stack: {
+      ...STACK,
+      apps: {
+        ...STACK.apps,
+        web: { ...STACK.apps.web, consumes: { orders: { how: 'env', env: 'ORDERS_URL' }, catalog: {} } },
+      },
+    },
+    board: { env: 'qa', mode: 'auto', zoom: 1, pan: { x: 60, y: 60 }, nodes: { web: at(0, 0) }, edges: [] },
+  });
+
+  test('shows a ? on its link, and the panel says it has no source yet', async ({ page }) => {
+    await discover(page);
+    await expect(page.locator('.mark.unsourced')).toHaveCount(1);
+    // The ? sits on the link to Catalog, between the two cards.
+    const [mark, web, catalog] = await Promise.all([
+      page.locator('.mark.unsourced rect').boundingBox(),
+      card(page, 'web').boundingBox(),
+      card(page, 'catalog').boundingBox(),
+    ]);
+    const between = (v: number, a: number, b: number) => v >= Math.min(a, b) && v <= Math.max(a, b);
+    expect(
+      !!mark &&
+        !!web &&
+        !!catalog &&
+        between(mark.x + 9, web.x + web.width, catalog.x) &&
+        between(mark.y + 9, Math.min(web.y, catalog.y), Math.max(web.y + web.height, catalog.y + catalog.height)),
+    ).toBe(true);
+    await card(page, 'web').click();
+    const panel = page.getByRole('complementary');
+    await expect(panel.getByText('No source yet')).toHaveCount(1);
+    await settled(page);
+    await page.screenshot({ path: 'test-results/discover-no-source.png' });
+  });
+});
+
+test.describe('a card opened on a busy map', () => {
+  test.use({
+    stack: {
+      ...STACK,
+      apps: {
+        ...STACK.apps,
+        web: {
+          ...STACK.apps.web,
+          publishes: { receipts: {} },
+          consumes: {
+            orders: { how: 'env', env: 'ORDERS_URL' },
+            catalog: { how: 'env', env: 'CATALOG_URL' },
+            refunds: {},
+          },
+        },
+        refunds: { ...STACK.apps.payments, name: 'Refunds', slug: 'acme/refunds', consumes: { payments: {} } },
+        mail: { ...STACK.apps.payments, name: 'Mail', slug: 'acme/mail', reads: { receipts: {} } },
+      },
+      queues: { receipts: { name: 'Receipts', type: 'sqs' } },
+    },
+    board: { env: 'qa', mode: 'auto', zoom: 1, pan: { x: 60, y: 60 }, nodes: { web: at(0, 0) }, edges: [] },
+  });
+
+  test('is laid out with the rest, so no link loops out past the cards', async ({ page }) => {
+    await discover(page);
+    await page.getByRole('button', { name: 'Show 1 more link of Receipts' }).click();
+    await expect(card(page, 'mail')).toBeVisible();
+    await settled(page);
+    const outside = await page.evaluate(() => {
+      const cards = [...document.querySelectorAll('.svelte-flow__node')].map(node => node.getBoundingClientRect());
+      const [left, right] = [Math.min(...cards.map(box => box.left)), Math.max(...cards.map(box => box.right))];
+      return [...document.querySelectorAll('[data-link] .wire')]
+        .filter(wire => {
+          const box = wire.getBoundingClientRect();
+          return box.left < left - 2 || box.right > right + 2;
+        })
+        .map(wire => wire.parentElement?.getAttribute('data-link'));
+    });
+    expect(outside).toEqual([]);
+    await page.screenshot({ path: 'test-results/discover-opened-busy.png' });
+  });
+});
+
+test.describe('a bucket, an API Gateway and a Step Functions the apps use', () => {
+  test.use({
+    stack: {
+      ...STACK,
+      apps: {
+        ...STACK.apps,
+        web: { ...STACK.apps.web, buckets: { receipts: { access: 'write' } } },
+        mail: { ...STACK.apps.payments, name: 'Mail', slug: 'acme/mail', buckets: { receipts: { access: 'read' } } },
+      },
+      resources: {
+        receipts: { type: 's3', name: 'Receipts', bucket: 'acme-receipts-qa' },
+        api: { type: 'apigw', name: 'Public API', routes: { 'POST /orders': 'web', 'GET /orders': 'web' } },
+        refunds: {
+          type: 'sfn',
+          name: 'Refund flow',
+          startedBy: ['web'],
+          steps: [{ name: 'Check the refund' }, { name: 'Pay it back', calls: 'payments' }],
+        },
+      },
+    },
+    board: { env: 'qa', mode: 'auto', zoom: 1, pan: { x: 60, y: 60 }, nodes: { web: at(0, 0) }, edges: [] },
+  });
+
+  test('shows each as a card, says what a bucket link does, and lists routes and steps', async ({ page }) => {
+    await discover(page);
+    await expect(card(page, 'resource:receipts')).toContainText('Bucket');
+    await expect(card(page, 'resource:api')).toContainText('2 routes');
+    await expect(card(page, 'resource:refunds')).toContainText('2 steps');
+    await expect(page.locator('.mark.label')).toHaveText(['writes']);
+    await page.getByRole('button', { name: 'Show 1 more link of Receipts' }).click();
+    await expect(page.locator('.mark.label')).toHaveText(['writes', 'reads']);
+    await settled(page);
+    await page.screenshot({ path: 'test-results/discover-resources.png' });
+
+    const panel = page.getByRole('complementary');
+    await card(page, 'resource:api').click();
+    await expect(panel.getByRole('heading', { name: 'Routes' })).toBeVisible();
+    await expect(panel.getByText('POST /orders, GET /orders')).toBeVisible();
+
+    await card(page, 'resource:refunds').click();
+    await expect(panel.getByRole('heading', { name: 'Started by' })).toBeVisible();
+    await expect(panel.locator('.step')).toHaveText(['1 Check the refund', '2 Pay it backCalls Payments API']);
+    await settled(page);
+    await page.screenshot({ path: 'test-results/discover-sfn-panel.png' });
   });
 });
 

@@ -78,6 +78,7 @@ const Secret = z.looseObject(
   },
   { error: 'an object' },
 );
+export const BUCKET_ACCESS = ['read', 'write', 'both'] as const;
 /** The ways of calling Koppler applies, to point a caller at a local copy. */
 export const CALL_HOWS = ['env', 'env-file', 'edit', 'secret', 'unknown'] as const;
 /** How one app calls another, and so what to change to point it at a local copy. */
@@ -312,6 +313,17 @@ const App = z.looseObject(
       .describe('The databases and caches it uses, by id under databases'),
     publishes: z.record(z.string(), z.unknown(), { error: 'an object' }).optional().describe('The queues it sends to'),
     reads: z.record(z.string(), z.unknown(), { error: 'an object' }).optional().describe('The queues it reads from'),
+    buckets: z
+      .record(
+        z.string(),
+        z.looseObject(
+          { access: z.enum(BUCKET_ACCESS, { error: `one of ${BUCKET_ACCESS.join(', ')}` }) },
+          { error: 'an object with access' },
+        ),
+        { error: 'an object keyed by resource id' },
+      )
+      .optional()
+      .describe('The S3 buckets it uses, by id under resources, and whether it reads, writes or both'),
     envs: z
       .record(z.string(), EnvOverlay, { error: 'an object' })
       .optional()
@@ -407,6 +419,40 @@ const Queue = z.looseObject(
   },
   { error: 'an object' },
 );
+/** What a stack's app uses that is deployed only and never runs here. */
+export const RESOURCE_TYPES = ['s3', 'apigw', 'sfn'] as const;
+const ROUTE = /^(?:(?:GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS|ANY) \/\S*|\$default)$/;
+const Resource = z.looseObject(
+  {
+    type: z
+      .enum(RESOURCE_TYPES, { error: `one of ${RESOURCE_TYPES.join(', ')}` })
+      .describe('s3 (a bucket), apigw (an API Gateway) or sfn (a Step Functions state machine)'),
+    name: required.describe('Its name on the map'),
+    bucket: z.string().optional().describe('S3: the bucket'),
+    envs: z
+      .record(z.string(), z.looseObject({ bucket: z.string().optional() }), { error: 'an object keyed by environment' })
+      .optional()
+      .describe('S3: the bucket on another environment'),
+    routes: z
+      .record(matching(ROUTE, 'a route such as POST /orders'), z.string(), {
+        error: 'an object keyed by route, such as POST /orders',
+      })
+      .optional()
+      .describe('API Gateway: each route, and the app or queue:<id> it hands to'),
+    startedBy: z
+      .array(z.string(), { error: 'a list of app ids' })
+      .optional()
+      .describe('Step Functions: what starts it'),
+    steps: z
+      .array(z.looseObject({ name: required, calls: z.string().optional() }, { error: 'an object with a name' }), {
+        error: 'a list',
+      })
+      .optional()
+      .describe('Step Functions: its steps in order, and the app each calls'),
+    note: z.string().optional().describe('Anything else worth knowing, in words'),
+  },
+  { error: 'an object with a type and a name' },
+);
 const CHECK = 'needs a name (up to 80 characters) and a run command (up to 2000)';
 // What gets approved is what runs: a check list or command too long to show in full is refused, never cut short.
 const isCheck = (value: unknown): value is { name: string; run: string } => {
@@ -481,6 +527,10 @@ export const StackSchema = z.looseObject(
     kinds: z.record(z.string(), Kind, { error: 'an object keyed by kind id' }).optional(),
     queues: z.record(z.string(), Queue, { error: 'an object keyed by queue id' }).optional(),
     databases: z.record(z.string(), Database, { error: 'an object keyed by database id' }).optional(),
+    resources: z
+      .record(z.string(), Resource, { error: 'an object keyed by resource id' })
+      .optional()
+      .describe('S3 buckets, API Gateways and Step Functions the apps use; shown on Discover, never run here'),
     checks: z.array(Check, { error: CHECKS }).max(50, CHECKS).optional(),
     signIns: z.record(z.string(), SignIn, { error: 'an object keyed by sign-in name' }).optional(),
     presets: z.array(Preset, { error: 'a list' }).optional(),
@@ -502,6 +552,7 @@ export type Prereq = z.infer<typeof Prereq>;
 export type Database = z.infer<typeof Database>;
 export type Secret = z.infer<typeof Secret>;
 export type Call = z.infer<typeof Call>;
+export type Resource = z.infer<typeof Resource>;
 
 type Loose = Record<string, unknown>;
 const isObject = (value: unknown): value is Loose =>
@@ -627,6 +678,25 @@ function crossProblems(stack: Loose): string[] {
       if (to === id) problems.push(`queues.${id}.feeds.${to}: a queue cannot feed itself`);
       else if (!has(stack['queues'], to)) problems.push(`queues.${id}.feeds.${to}: no such queue under "queues"`);
   }
+  for (const [id, resource] of entries(stack['resources'])) {
+    const at = `resources.${id}`;
+    if (!ID.test(id)) problems.push(`${at}: id must be lowercase letters, digits and dashes`);
+    if (!isObject(resource)) continue;
+    const isApp = (ref: unknown) => typeof ref === 'string' && has(stack['apps'], ref);
+    for (const [env] of entries(resource['envs']))
+      if (!envs.includes(env)) problems.push(`${at}.envs.${env}: must be one of envs`);
+    for (const [route, to] of entries(resource['routes'])) {
+      const queue = typeof to === 'string' && to.startsWith('queue:') && has(stack['queues'], to.slice(6));
+      if (!isApp(to) && !queue) problems.push(`${at}.routes.${route}: no such app, or queue:<id> under "queues"`);
+    }
+    list(resource['startedBy']).forEach((by, n) => {
+      if (!isApp(by)) problems.push(`${at}.startedBy[${String(n)}]: no such app`);
+    });
+    list(resource['steps']).forEach((step, n) => {
+      const calls = isObject(step) ? step['calls'] : undefined;
+      if (calls !== undefined && !isApp(calls)) problems.push(`${at}.steps[${String(n)}].calls: no such app`);
+    });
+  }
   for (const [id, database] of entries(stack['databases'])) {
     if (!ID.test(id)) problems.push(`databases.${id}: id must be lowercase letters, digits and dashes`);
     for (const [env] of entries(isObject(database) ? database['envs'] : undefined))
@@ -636,6 +706,11 @@ function crossProblems(stack: Loose): string[] {
     if (!ID.test(id)) problems.push(`apps.${id}: id must be lowercase letters, digits and dashes`);
     for (const [used] of entries(isObject(app) ? app['uses'] : undefined))
       if (!has(stack['databases'], used)) problems.push(`apps.${id}.uses.${used}: no such database under "databases"`);
+    for (const [bucket] of entries(isObject(app) ? app['buckets'] : undefined)) {
+      const resource = isObject(stack['resources']) ? stack['resources'][bucket] : undefined;
+      if (!has(stack['resources'], bucket) || !isObject(resource) || resource['type'] !== 's3')
+        problems.push(`apps.${id}.buckets.${bucket}: no such s3 resource under "resources"`);
+    }
     if (isObject(app)) problems.push(...appProblems(id, app, stack, envs));
   }
   for (const [index, preset] of list(stack['presets']).entries())

@@ -34,10 +34,10 @@ You can run these yourself too; the agent uses them to do its part.
 
 | Command | What it does |
 |---|---|
-| `koppler sync [--stack <dir>] [--rescan]` | Reload the stack and your clones |
+| `koppler sync [--stack <dir>] [--rescan] [--github]` | Reload the stack and your clones; `--github` also reads the repos not cloned here from GitHub |
 | `koppler refresh [--no-sync]` | After changes made outside the canvas: sync, then an open canvas reads the stack and its board again, in place |
 | `koppler discover [app...] [--no-fetch] [--no-github]` | What the repos say: local ports, tunnels, calls, conflicts and gaps, then what could be added to `stack.json` |
-| `koppler discover --deployed` | Also draft deployed addresses, settings, secret names, queues and calls from the infrastructure code, with the Kafka topics, event buses, pipes, rules and subscriptions that feed the queues |
+| `koppler discover --deployed` | Also draft deployed addresses, settings, secret names, queues and calls from the infrastructure code, with the Kafka topics, event buses, pipes, rules and subscriptions that feed the queues, and the S3 buckets, API Gateways and Step Functions the apps use |
 | `koppler discover --deployed --aws [--env <env>]` | Also check what AWS runs, read-only with each app's AWS profile (its view role when there is one): every EventBridge Pipe and Lambda Kafka listener, as `OK` (the stack has it), `FOUND` (AWS has it, the stack does not) or `MISSING` (the stack says a pipe reads a topic, and none does) |
 | `koppler discover --apply` | Keep the agreed findings in the stack |
 | `koppler discover --find "<name,...>"` | The repos behind names in a description: the stack, your clones, your GitHub orgs |
