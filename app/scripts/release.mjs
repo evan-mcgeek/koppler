@@ -35,6 +35,9 @@ const pr = run(
   'create',
   '--base',
   'main',
+  // Named, since gh cannot always tell which remote branch the one just pushed is.
+  '--head',
+  branch,
   '--title',
   `Koppler ${version}`,
   '--body',
