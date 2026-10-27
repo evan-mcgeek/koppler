@@ -367,3 +367,27 @@ test.describe('a topic nothing reads', () => {
     await page.screenshot({ path: 'test-results/dead-end-paper.png', clip: await clip() });
   });
 });
+
+test.describe('a Lambda in the repo of another app', () => {
+  test.use({
+    stack: {
+      ...STACK,
+      apps: {
+        ...STACK.apps,
+        orders: { ...STACK.apps.orders, consumes: { ...(STACK.apps.orders?.['consumes'] as object), changes: {} } },
+        changes: { name: 'order-changes', kind: 'lambda', slug: 'acme/orders-api' },
+      },
+    },
+    uncloned: ['changes'],
+    board: { env: 'qa', mode: 'auto', zoom: 1, pan: { x: 60, y: 60 }, nodes: { orders: at(0, 0) }, edges: [] },
+  });
+
+  test('shows the repo above its name, as on every app from that repo, and not on the others', async ({ page }) => {
+    await expect(card(page, 'orders')).toBeVisible();
+    await page.keyboard.press('d');
+    await expect(card(page, 'changes').locator('.repo')).toHaveText('orders-api /');
+    await expect(card(page, 'orders').locator('.repo')).toHaveText('orders-api /');
+    await expect(card(page, 'payments').locator('.repo')).toHaveCount(0);
+    await card(page, 'changes').screenshot({ path: 'test-results/part-card.png' });
+  });
+});

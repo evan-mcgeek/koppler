@@ -21,6 +21,7 @@
   title={data.name}
   bind:offsetHeight={height}
 >
+  {#if data.repo}<span class="repo">{data.repo} /</span>{/if}
   <span class="top">
     <span class="name">{data.name}</span>
     <span class="tag">{data.tag}</span>
@@ -123,6 +124,15 @@
   .lean.picked {
     outline: 2px solid var(--ink);
     outline-offset: 2px;
+  }
+  /* A piece of a repo that holds other apps too: the repo above its name. */
+  .repo {
+    margin-bottom: -3px;
+    overflow: hidden;
+    color: var(--ink-muted);
+    font: 400 11px var(--sans);
+    white-space: nowrap;
+    text-overflow: ellipsis;
   }
   .top {
     display: flex;

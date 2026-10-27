@@ -30,6 +30,8 @@ export interface LeanData extends Record<string, unknown> {
   app: boolean;
   /** On a feature board, proposed by the agent and not accepted yet. */
   proposed: boolean;
+  /** The repo it is a piece of, when that repo holds another app of the stack too. */
+  repo: string;
   /** A queue sent to that nothing reads or passes on. */
   deadEnd: boolean;
 }
@@ -77,11 +79,21 @@ class Discovered {
   heights = $state<Record<Card, number>>({});
 
   #dead = $derived(board.facts ? deadEnds(board.facts) : new Set<Card>());
+  /** How many of the stack's apps each repo holds. */
+  #perRepo = $derived(
+    Object.values(board.facts?.apps ?? {}).reduce<Record<string, number>>((count, app) => {
+      const slug = app.slug?.toLowerCase();
+      if (slug) count[slug] = (count[slug] ?? 0) + 1;
+      return count;
+    }, {}),
+  );
   /** What a card shows. */
   data(card: Card, onBoard: boolean, hidden: number): LeanData {
     const facts = board.facts;
     const proposed = !!board.feature && proposedCard(board.feature, card);
-    const base = { onBoard, hidden, cloned: false, app: false, proposed, deadEnd: this.#dead.has(card) };
+    const slug = facts?.apps[card]?.slug ?? '';
+    const repo = (this.#perRepo[slug.toLowerCase()] ?? 0) > 1 ? (slug.split('/').pop() ?? '') : '';
+    const base = { onBoard, hidden, cloned: false, app: false, proposed, deadEnd: this.#dead.has(card), repo };
     if (card.startsWith('queue:')) {
       const queue = facts?.queues?.[card.slice(6)];
       const [tag, meta] = QUEUE_TAGS[queue?.type ?? ''] ?? ['QUEUE', 'Queue'];
