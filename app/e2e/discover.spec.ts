@@ -285,6 +285,41 @@ test.describe('a board with an app', () => {
   });
 });
 
+test.describe('Read again', () => {
+  test.use({
+    stack,
+    uncloned: ['search'],
+    board: { env: 'qa', mode: 'auto', zoom: 1, pan: { x: 60, y: 60 }, nodes: { web: at(0, 0) }, edges: [] },
+  });
+
+  test('reads the code again, from GitHub for a repo not cloned here, and says when it could not', async ({ page }) => {
+    await expect(card(page, 'web')).toBeVisible();
+    const button = page.getByRole('button', { name: 'Read again' });
+    // Only Discover reads the code.
+    await expect(button).toHaveCount(0);
+    await page.keyboard.press('d');
+    await expect(button).toBeVisible();
+    // What the server says is what the page says: why it failed, as it is.
+    await button.click();
+    await expect(page.getByRole('alert').filter({ hasText: 'no stack set yet' })).toBeVisible({ timeout: 30_000 });
+    await expect(button).toBeEnabled();
+    // Read, but a repo GitHub would not give (koppler sync --github itself is tested in test/github-reads).
+    let answer = () => {};
+    await page.route('**/read-again?*', async route => {
+      await new Promise<void>(done => (answer = done));
+      await route.fulfill({ json: { ok: true, unread: 1 } });
+    });
+    await button.click();
+    await expect(page.getByRole('button', { name: 'Reading…' })).toBeDisabled();
+    answer();
+    await expect(
+      page.getByText('1 repo could not be read from GitHub: is gh signed in (gh auth status)?'),
+    ).toBeVisible();
+    await expect(button).toBeEnabled();
+    await expect(card(page, 'web')).toBeVisible();
+  });
+});
+
 test.describe('an empty board', () => {
   test.use({ board: { env: 'qa', mode: 'auto', zoom: 1, pan: { x: 60, y: 60 }, nodes: {}, edges: [] } });
 

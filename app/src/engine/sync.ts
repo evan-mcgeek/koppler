@@ -13,6 +13,7 @@ import { checkStack as checkLoadedStack } from './checks.ts';
 import { readStackFile } from './stack-file.ts';
 import { librariesFor, packageOf, type Library } from './libraries.ts';
 import { grepClone, hostOwners, hostsByApp, lines, missingCalls } from './calls.ts';
+import { githubCopy } from './github-copies.ts';
 import { CONFIG, expand, fail, type Index, loadConfig, readIndex, type Save, tilde } from './config.ts';
 import {
   branchesOf,
@@ -31,6 +32,8 @@ interface Flags {
   stack?: string;
   depth?: number;
   rescan?: true;
+  /** Take, or bring up to date, a copy from GitHub of each repo not cloned here, to read its calls. */
+  github?: true;
 }
 
 function parseFlags(args: string[]): Flags {
@@ -41,6 +44,7 @@ function parseFlags(args: string[]): Flags {
     else if (arg === '--stack') flags.stack = expand(args[++at] ?? fail('--stack needs a folder'));
     else if (arg === '--depth') flags.depth = Number(args[++at]);
     else if (arg === '--rescan') flags.rescan = true;
+    else if (arg === '--github') flags.github = true;
     else fail(`unknown option ${String(arg)}`);
   }
   if (flags.depth !== undefined && !(flags.depth >= 1 && flags.depth <= 8)) fail('--depth must be 1 to 8');
@@ -48,7 +52,7 @@ function parseFlags(args: string[]): Flags {
 }
 
 /** Copies the stack and resolves each app to a clone from the index; branch and changes are read fresh every time. */
-function syncStack(stackDir: string, index: Index): void {
+function syncStack(stackDir: string, index: Index, github = false): void {
   const source = path.join(stackDir, 'stack.json');
   const read = readStackFile(source);
   if (read.error !== undefined) fail(read.error);
@@ -95,9 +99,14 @@ function syncStack(stackDir: string, index: Index): void {
   writeData('local', { roots: index.roots, at: new Date().toISOString(), apps: local });
 
   // An empty `consumes` means nobody has mapped that app yet, not that it calls nothing: look in every clone.
+  // A repo not cloned here is read from its copy from GitHub, when there is one.
   const found = missingCalls(stack, (id, hosts) => {
     const clone = local[id];
-    return clone ? grepClone(clone.path, hosts) : [];
+    if (clone) return grepClone(clone.path, hosts);
+    const slug = stack.apps[id]?.slug;
+    const copy = !stack.apps[id]?.outside && slug ? githubCopy(slug, github) : null;
+    if (github && slug && !copy) console.log(`GITHUB ${id}: could not read ${slug} (is gh signed in? gh auth status)`);
+    return copy ? grepClone(copy, hosts).map(line => `GitHub ${String(slug)}: ${line}`) : [];
   });
   for (const [caller, calls] of Object.entries(found))
     for (const [callee, where] of Object.entries(calls))
@@ -173,7 +182,7 @@ export function sync(args: string[]): void {
       index = scan(config.roots, config.depth ?? DEFAULT_DEPTH);
     }
     writeJson(CONFIG, config);
-    syncStack(config.stack, index);
+    syncStack(config.stack, index, !!flags.github);
   } finally {
     fs.rmSync(LOADING, { force: true });
   }
