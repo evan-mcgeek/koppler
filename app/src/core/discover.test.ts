@@ -4,11 +4,11 @@ import { deadEnds, linksOf, mapOf, type Facts } from './discover.ts';
 const app = (name: string, extra: object = {}) => ({ name, kind: 'node', slug: `acme/${name}`, ...extra });
 const facts = {
   apps: {
-    web: app('Web Shop', { consumes: { orders: {} } }),
+    web: app('Web Shop', { consumes: { orders: { how: 'env', env: 'ORDERS_URL' } } }),
     orders: app('Orders API', { publishes: { events: {} }, uses: { 'orders-db': {} } }),
     payments: app('Payments API', { reads: { events: { via: 'rule to Lambda' } }, consumes: { psp: {} } }),
     psp: app('Pay provider', { outside: 'SaaS' }),
-    reports: app('Reports', { consumes: { payments: {} } }),
+    reports: app('Reports', { consumes: { payments: { found: 'src/pay.ts:3' } } }),
   },
   queues: { events: { name: 'Order events', type: 'sqs' } },
   databases: { 'orders-db': { name: 'Orders', kind: 'postgres' } },
@@ -22,9 +22,57 @@ describe('linksOf', () => {
       { from: 'orders', to: 'payments', kind: 'call', sure: 'found', via: 'src/pay.ts' },
       { from: 'orders', to: 'queue:events', kind: 'publish', sure: 'confirmed' },
       { from: 'orders', to: 'database:orders-db', kind: 'uses', sure: 'confirmed' },
-      { from: 'payments', to: 'psp', kind: 'call', sure: 'confirmed' },
+      // Recorded, with nothing on where it comes from.
+      { from: 'payments', to: 'psp', kind: 'call', sure: 'confirmed', unsourced: true },
       { from: 'queue:events', to: 'payments', kind: 'read', sure: 'confirmed', via: 'rule to Lambda' },
       { from: 'reports', to: 'payments', kind: 'call', sure: 'confirmed' },
+    ]);
+  });
+});
+
+describe('linksOf with resources', () => {
+  it('links buckets by access, routes by what they hand to, and a state machine by what starts it and what it calls', () => {
+    const withResources = {
+      apps: {
+        shop: app('Shop', { buckets: { receipts: { access: 'write' } } }),
+        mail: app('Mail', { buckets: { receipts: { access: 'read' } } }),
+        admin: app('Admin', { buckets: { receipts: { access: 'both' }, gone: { access: 'read' } } }),
+        cards: app('Gift Cards'),
+      },
+      queues: { changes: { name: 'Order changes', type: 'sqs' } },
+      resources: {
+        receipts: { type: 's3', name: 'Receipts', bucket: 'acme-receipts' },
+        api: {
+          type: 'apigw',
+          name: 'Public API',
+          routes: {
+            'POST /top-up': 'cards',
+            'GET /top-up': 'cards',
+            'POST /changes': 'queue:changes',
+            'GET /x': 'nope',
+          },
+        },
+        refunds: {
+          type: 'sfn',
+          name: 'Refund flow',
+          startedBy: ['shop'],
+          steps: [{ name: 'Check' }, { name: 'Top up', calls: 'cards' }, { name: 'Again', calls: 'cards' }],
+        },
+      },
+    } as unknown as Facts;
+    expect(linksOf(withResources)).toEqual([
+      { from: 'shop', to: 'resource:receipts', kind: 'bucket', sure: 'confirmed', via: 'writes' },
+      { from: 'resource:receipts', to: 'mail', kind: 'bucket', sure: 'confirmed', via: 'reads' },
+      { from: 'admin', to: 'resource:receipts', kind: 'bucket', sure: 'confirmed', via: 'both' },
+      { from: 'resource:api', to: 'cards', kind: 'route', sure: 'confirmed', via: 'POST /top-up, GET /top-up' },
+      { from: 'resource:api', to: 'queue:changes', kind: 'route', sure: 'confirmed', via: 'POST /changes' },
+      { from: 'shop', to: 'resource:refunds', kind: 'starts', sure: 'confirmed' },
+      { from: 'resource:refunds', to: 'cards', kind: 'call', sure: 'confirmed' },
+    ]);
+    expect(mapOf(withResources, ['shop']).cards.map(one => one.card)).toEqual([
+      'shop',
+      'resource:receipts',
+      'resource:refunds',
     ]);
   });
 });

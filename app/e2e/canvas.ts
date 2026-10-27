@@ -73,6 +73,7 @@ type Stack = {
   apps: Record<string, Record<string, unknown>>;
   queues?: Record<string, Record<string, unknown>>;
   databases?: Record<string, Record<string, unknown>>;
+  resources?: Record<string, Record<string, unknown>>;
   found?: Record<string, Record<string, string>>;
   presets?: unknown[];
 };

@@ -66,9 +66,13 @@ test('Clear empties the board, and undo brings it back', async ({ page }) => {
 test('F fits the board, Delete removes the picked cards, and a focused card moves with the arrows', async ({
   page,
 }) => {
+  await expect(card(page, 'web')).toBeInViewport();
   await page.mouse.move(700, 700);
-  await page.mouse.wheel(3000, 3000);
-  await expect(card(page, 'web')).not.toBeInViewport();
+  // The saved view is put back as the board opens: a scroll made before that is undone, so it scrolls until it holds.
+  await expect(async () => {
+    await page.mouse.wheel(3000, 3000);
+    await expect(card(page, 'web')).not.toBeInViewport({ timeout: 300 });
+  }).toPass();
   await page.keyboard.press('f');
   await expect(card(page, 'web')).toBeInViewport();
   await expect(card(page, 'catalog')).toBeInViewport();

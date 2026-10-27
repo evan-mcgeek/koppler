@@ -1,38 +1,49 @@
 // Discover: how the stack fits together, read from its facts. The board's apps, everything one step away from them, and
 // one step further from each card whose hidden links were brought in.
-import type { Stack } from './stack.ts';
+import type { Call, Stack } from './stack.ts';
 
-/** A card on the map: an app or outside system by its id, a queue as `queue:<id>`, a database as `database:<id>`. */
+/**
+ * A card on the map: an app or outside system by its id, a queue as `queue:<id>`, a database as `database:<id>`, a
+ * bucket, API Gateway or Step Functions as `resource:<id>`.
+ */
 export type Card = string;
 
 export interface Link {
   from: Card;
   to: Card;
-  kind: 'call' | 'publish' | 'read' | 'uses' | 'feeds';
+  kind: 'call' | 'publish' | 'read' | 'uses' | 'feeds' | 'bucket' | 'route' | 'starts';
   /** Recorded in the stack, or only found in the code. */
   sure: 'confirmed' | 'found';
-  /** How it goes when the stack says: a rule, a pipe, where it was found. */
+  /** How it goes when the stack says: a rule, a pipe, where it was found, a bucket's reads, writes or both, routes. */
   via?: string;
+  /** A call the stack records without saying where it comes from: no setting, file or place in the code. */
+  unsourced?: true;
 }
 
 export type Facts = Pick<Stack, 'apps'> &
-  Partial<Pick<Stack, 'queues' | 'databases'>> & {
+  Partial<Pick<Stack, 'queues' | 'databases' | 'resources'>> & {
     /** Calls the stack does not record, found in the clones: caller, then callee, then where. */
     found?: Record<string, Record<string, string>>;
   };
 
+/** Whether a recorded call says where it comes from. */
+const sourced = (call: Call | undefined) =>
+  !!call && (!!call.env || !!call.file || !!call.key || !!call.found || (!!call.how && call.how !== 'unknown'));
 const via = (use: unknown): string | undefined => {
   const said = (use as { via?: unknown } | null | undefined)?.via;
   return typeof said === 'string' && said ? said : undefined;
 };
 
-/** Every link the stack knows: its calls, the calls found in the code, its queues and databases. */
+const ACCESS = { read: 'reads', write: 'writes', both: 'both' } as const;
+
+/** Every link the stack knows: its calls, the calls found in the code, its queues, databases and resources. */
 export function linksOf(facts: Facts): Link[] {
   const links: Link[] = [];
   const apps = facts.apps;
   for (const [id, app] of Object.entries(apps)) {
-    for (const to of Object.keys(app.consumes ?? {}))
-      if (apps[to]) links.push({ from: id, to, kind: 'call', sure: 'confirmed' });
+    for (const [to, call] of Object.entries(app.consumes ?? {}))
+      if (apps[to])
+        links.push({ from: id, to, kind: 'call', sure: 'confirmed', ...(!sourced(call) && { unsourced: true }) });
     for (const [to, where] of Object.entries(facts.found?.[id] ?? {}))
       if (apps[to] && !app.consumes?.[to]) links.push({ from: id, to, kind: 'call', sure: 'found', via: where });
     for (const [queue, use] of Object.entries(app.publishes ?? {}))
@@ -44,6 +55,25 @@ export function linksOf(facts: Facts): Link[] {
     for (const database of Object.keys(app.uses ?? {}))
       if (facts.databases?.[database])
         links.push({ from: id, to: `database:${database}`, kind: 'uses', sure: 'confirmed' });
+    for (const [bucket, use] of Object.entries(app.buckets ?? {}))
+      if (facts.resources?.[bucket]?.type === 's3') {
+        const [one, other] = use.access === 'read' ? [`resource:${bucket}`, id] : [id, `resource:${bucket}`];
+        links.push({ from: one, to: other, kind: 'bucket', sure: 'confirmed', via: ACCESS[use.access] });
+      }
+  }
+  for (const [id, resource] of Object.entries(facts.resources ?? {})) {
+    const card = `resource:${id}`;
+    // One link per app or queue it hands to, with every route to it.
+    const routes = new Map<Card, string[]>();
+    for (const [route, to] of Object.entries(resource.routes ?? {}))
+      if (to.startsWith('queue:') ? facts.queues?.[to.slice(6)] : apps[to])
+        routes.set(to, [...(routes.get(to) ?? []), route]);
+    for (const [to, said] of routes)
+      links.push({ from: card, to, kind: 'route', sure: 'confirmed', via: said.join(', ') });
+    for (const by of new Set(resource.startedBy ?? []))
+      if (apps[by]) links.push({ from: by, to: card, kind: 'starts', sure: 'confirmed' });
+    for (const to of new Set((resource.steps ?? []).flatMap(step => (step.calls ? [step.calls] : []))))
+      if (apps[to]) links.push({ from: card, to, kind: 'call', sure: 'confirmed' });
   }
   for (const [id, queue] of Object.entries(facts.queues ?? {}))
     for (const [to, feed] of Object.entries(queue.feeds ?? {}))
@@ -93,7 +123,9 @@ export function mapOf(
       ? !!facts.queues?.[card.slice(6)]
       : card.startsWith('database:')
         ? !!facts.databases?.[card.slice(9)]
-        : !!facts.apps[card];
+        : card.startsWith('resource:')
+          ? !!facts.resources?.[card.slice(9)]
+          : !!facts.apps[card];
   const onBoard = board.filter(exists);
   const shown = new Set<Card>(onBoard);
   for (const card of [...(around ? onBoard : []), ...open.filter(exists)]) {
@@ -101,7 +133,7 @@ export function mapOf(
     for (const other of near(card)) shown.add(other);
   }
   const links = all.filter(link => shown.has(link.from) && shown.has(link.to));
-  // A queue or database a board app uses is the board's own too: it is drawn with them, not drawn back.
+  // A queue, database or resource a board app uses is the board's own too: it is drawn with them, not drawn back.
   const own = (card: Card) =>
     onBoard.includes(card) || (card.includes(':') && near(card).some(other => onBoard.includes(other)));
   const cards = [...shown].map(card => ({
