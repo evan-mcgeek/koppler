@@ -230,11 +230,14 @@
     fitWhenLaid = false;
     requestAnimationFrame(() => void fit());
   });
+  /** An area is being dragged over the map: on its way it covers one card alone, which is still no click. */
+  let selecting = false;
   // The panel shows the card clicked, or the only one picked; an area picked opens nothing, as on a board.
   const pick = (cards: Card[]) => {
     discovered.picked = cards;
-    discovered.last =
-      discovered.last && cards.includes(discovered.last)
+    discovered.last = selecting
+      ? null
+      : discovered.last && cards.includes(discovered.last)
         ? discovered.last
         : cards.length === 1
           ? (cards[0] ?? null)
@@ -333,6 +336,13 @@
         }}
         onpaneclick={() => {
           pick([]);
+        }}
+        onselectionstart={() => {
+          selecting = true;
+          discovered.last = null;
+        }}
+        onselectionend={() => {
+          selecting = false;
         }}
         onnodedragstop={({ targetNode }) => {
           if (targetNode) discovered.moved(targetNode.id, targetNode.position);
