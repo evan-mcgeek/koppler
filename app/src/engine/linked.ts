@@ -2,7 +2,7 @@
 // shows as changes not in the shared stack yet, and reaches the team only through a pull request the user opens.
 // Next to the copy, .source.json holds the link and `base`: the shared file as it was when last fetched.
 import path from 'node:path';
-import { validateStack } from '../core/stack.ts';
+import { stackProblems } from '../core/stack.ts';
 import { fileUrl, githubFile, proposeFile, readFile, type GithubFile } from '../github.ts';
 import { setStack, switchRefused } from './stacks.ts';
 import { configDir } from '../paths.ts';
@@ -47,7 +47,7 @@ async function fetchStack(
   } catch {
     return { error: 'That file is not JSON.' };
   }
-  const errors = validateStack(stack);
+  const errors = stackProblems(stack);
   return errors.length ? { error: `That is not a stack Koppler can use: ${errors.slice(0, 3).join('; ')}` } : { stack };
 }
 

@@ -6,6 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { STACK_FORMAT } from '../dist/core/migrations/stack/index.js';
 
 const entry = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'dist', 'koppler.mjs');
 const app = (name, port) => ({ name, kind: 'node', slug: `acme/${name.toLowerCase()}`, url: `http://localhost:${port}` });
@@ -53,7 +54,8 @@ test('stack check passes a good stack file and fails a bad one with each problem
   assert.equal(good.status, 0, good.stderr);
   assert.match(good.stdout, /stack\.json: OK/);
   const bad = path.join(dir, 'bad.json');
-  fs.writeFileSync(bad, JSON.stringify({ name: 'Acme', envs: ['qa'], apps: { web: { kind: 'node', consumes: { nope: {} } } } }));
+  // Written in this format: an older one is checked as Koppler reads it, brought up to date first.
+  fs.writeFileSync(bad, JSON.stringify({ koppler: STACK_FORMAT.version, name: 'Acme', envs: ['qa'], apps: { web: { kind: 'node', consumes: { nope: {} } } } }));
   const failed = koppler('stack', 'check', bad);
   assert.equal(failed.status, 1);
   assert.match(failed.stderr, /bad\.json: \d+ problems?/);

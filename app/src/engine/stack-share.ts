@@ -4,7 +4,7 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import * as z from 'zod';
-import { StackSchema, validateStack } from '../core/stack.ts';
+import { StackSchema, stackProblems, validateStack } from '../core/stack.ts';
 import { fail } from '../failure.ts';
 import { proposeFile, readFile } from '../github.ts';
 import { changes, proposeChanges, sourceOf, type StackJson } from './linked.ts';
@@ -26,7 +26,7 @@ export function checkStackFile(file: string): string[] {
   } catch (error) {
     return [`${file} cannot be read as JSON: ${(error as Error).message}`];
   }
-  return validateStack(data);
+  return stackProblems(data);
 }
 
 /**
