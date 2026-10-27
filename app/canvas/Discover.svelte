@@ -99,7 +99,7 @@
       })();
       const { start, end, d, middle } = path;
       const [nx, ny] = path.normal;
-      const both = link.kind === 'uses';
+      const both = link.kind === 'uses' || (link.kind === 'bucket' && link.via === 'both');
       const arrow = both
         ? ''
         : `M${String(end.x + nx * 18 - ny * 5)} ${String(end.y + ny * 18 + nx * 5)}L${String(end.x + nx * 13)} ${String(end.y + ny * 13)}L${String(end.x + nx * 18 + ny * 5)} ${String(end.y + ny * 18 - nx * 5)}`;
@@ -120,6 +120,8 @@
           board: board.feature ? !!step : onBoard.has(link.from) && onBoard.has(link.to),
           found: link.sure === 'found' || !!step?.step.proposed,
           unsourced: !!link.unsourced && !step,
+          // A bucket's link says whether it reads, writes or both.
+          label: link.kind === 'bucket' && !step ? link.via : undefined,
           faded:
             (!!near && !(discovered.picked.includes(link.from) || discovered.picked.includes(link.to))) ||
             (phase !== null && step?.phase !== phase),
@@ -149,6 +151,15 @@
     const out = (kind: Link['kind']) => (link: Link) => link.kind === kind && link.from === card;
     const queue = card.startsWith('queue:');
     const database = card.startsWith('database:');
+    const resource = card.startsWith('resource:') ? board.facts?.resources?.[card.slice(9)] : undefined;
+    const bucket = (link: Link) => link.kind === 'bucket' && (link.from === card || link.to === card);
+    const away = (link: Link) => (link.from === card ? link.to : link.from);
+    if (resource)
+      return resource.type === 's3'
+        ? [{ title: 'Used by', rows: of(bucket, away) }]
+        : resource.type === 'apigw'
+          ? [{ title: 'Routes', rows: of(out('route'), link => link.to) }]
+          : [{ title: 'Started by', rows: of(into('starts'), link => link.from) }];
     return [
       ...(queue || database
         ? []
@@ -158,6 +169,12 @@
             { title: 'Reads', rows: of(into('read'), link => link.from) },
             { title: 'Publishes', rows: of(out('publish'), link => link.to) },
             { title: 'Data', rows: of(out('uses'), link => link.to) },
+            // Only when it has any: most apps use none.
+            ...[
+              { title: 'Buckets', rows: of(bucket, away) },
+              { title: 'Routed from', rows: of(into('route'), link => link.from) },
+              { title: 'Starts', rows: of(out('starts'), link => link.to) },
+            ].filter(group => group.rows.length),
           ]),
       ...(queue
         ? [
@@ -169,6 +186,12 @@
         : []),
       ...(database ? [{ title: 'Used by', rows: of(into('uses'), link => link.from) }] : []),
     ];
+  });
+  /** A Step Functions card's steps, listed in its panel. */
+  const lastSteps = $derived.by(() => {
+    const card = discovered.last;
+    const resource = card?.startsWith('resource:') ? board.facts?.resources?.[card.slice(9)] : undefined;
+    return resource?.type === 'sfn' ? (resource.steps ?? []) : undefined;
   });
   const lastApp = $derived(discovered.last ? board.app(discovered.last) : undefined);
   const lastStack = $derived(discovered.last ? board.facts?.apps[discovered.last] : undefined);
@@ -358,6 +381,17 @@
                   <text text-anchor="middle" dy="4">?</text>
                 </g>
               </g>
+            {/each}
+            {#each drawn.filter(one => one.label) as one (one.key)}
+              <text
+                class="mark label"
+                class:board={one.board}
+                class:faded={one.faded}
+                x={one.middle.x}
+                y={one.middle.y}
+                dy="4"
+                text-anchor="middle">{one.label}</text
+              >
             {/each}
             {#each phases as phase (phase.at)}
               <g
@@ -552,6 +586,28 @@
           {/if}
         </section>
       {/each}
+      {#if lastSteps}
+        <section>
+          <h3>Steps, in order</h3>
+          {#each lastSteps as step, at (at)}
+            <div class="step">
+              <span class="at">{at + 1}</span>
+              <span
+                >{step.name}{#if step.calls && board.facts?.apps[step.calls]}
+                  {@const calls = step.calls}<span class="calls"
+                    >Calls <button
+                      class="name"
+                      type="button"
+                      onclick={() => {
+                        show(calls);
+                      }}>{name(calls)}</button
+                    ></span
+                  >{/if}</span
+              >
+            </div>
+          {/each}
+        </section>
+      {/if}
     </aside>
   {:else if board.feature && map.cards.length}
     <FeaturePanel feature={board.feature} />
@@ -642,6 +698,34 @@
   /* Recorded with nothing on where it comes from: a ? on the link, in a box like a step's number. */
   .unsourced .number rect {
     stroke: var(--ink-muted);
+  }
+  .label {
+    fill: var(--ink-muted);
+    font: 400 12px var(--sans);
+    paint-order: stroke;
+    stroke: var(--desk);
+    stroke-width: 10px;
+    stroke-linejoin: miter;
+  }
+  .step {
+    display: flex;
+    gap: 10px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--line);
+    font: 400 13px var(--sans);
+    color: var(--ink);
+  }
+  .step .at {
+    width: 16px;
+    flex: none;
+    color: var(--ink-muted);
+    font: 400 11px var(--mono);
+    line-height: 18px;
+  }
+  .step .calls {
+    display: block;
+    color: var(--ink-muted);
+    font-size: 12px;
   }
   .phase rect {
     fill: var(--ink);
@@ -879,7 +963,8 @@
     stroke: var(--ink);
     stroke-width: 1.5;
   }
-  .item .name {
+  .item .name,
+  .step .name {
     flex: 1;
     min-width: 0;
     padding: 0;
@@ -892,6 +977,9 @@
     text-decoration-color: var(--line-strong);
     text-underline-offset: 3px;
     cursor: pointer;
+  }
+  .step .name {
+    font-size: 12px;
   }
   .source {
     color: var(--ink-muted);

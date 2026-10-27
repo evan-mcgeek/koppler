@@ -44,6 +44,9 @@ const QUEUE_TAGS: Record<string, [string, string]> = {
   kafka: ['KAFKA', 'Topic'],
 };
 
+const RESOURCE_TAGS: Record<string, string> = { s3: 'S3', apigw: 'APIGW', sfn: 'SFN' };
+const counted = (n: number, one: string) => `${String(n)} ${one}${n === 1 ? '' : 's'}`;
+
 class Discovered {
   /** The map: the board's apps, what they touch, and what was brought in from each opened card. */
   /** The board's own cards: its apps, and the outside systems put on it by hand. */
@@ -86,6 +89,16 @@ class Discovered {
       const queue = facts?.queues?.[card.slice(6)];
       const [tag, meta] = QUEUE_TAGS[queue?.type ?? ''] ?? ['QUEUE', 'Queue'];
       return { ...base, name: queue?.name ?? card.slice(6), tag, meta };
+    }
+    if (card.startsWith('resource:')) {
+      const resource = facts?.resources?.[card.slice(9)];
+      const meta =
+        resource?.type === 'apigw'
+          ? counted(Object.keys(resource.routes ?? {}).length, 'route')
+          : resource?.type === 'sfn'
+            ? counted(resource.steps?.length ?? 0, 'step')
+            : 'Bucket';
+      return { ...base, name: resource?.name ?? card.slice(9), tag: RESOURCE_TAGS[resource?.type ?? ''] ?? '', meta };
     }
     if (card.startsWith('database:')) {
       const id = card.slice(9);

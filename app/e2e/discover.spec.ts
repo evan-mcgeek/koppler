@@ -447,3 +447,50 @@ test.describe('a card opened on a busy map', () => {
     await page.screenshot({ path: 'test-results/discover-opened-busy.png' });
   });
 });
+
+test.describe('a bucket, an API Gateway and a Step Functions the apps use', () => {
+  test.use({
+    stack: {
+      ...STACK,
+      apps: {
+        ...STACK.apps,
+        web: { ...STACK.apps.web, buckets: { receipts: { access: 'write' } } },
+        mail: { ...STACK.apps.payments, name: 'Mail', slug: 'acme/mail', buckets: { receipts: { access: 'read' } } },
+      },
+      resources: {
+        receipts: { type: 's3', name: 'Receipts', bucket: 'acme-receipts-qa' },
+        api: { type: 'apigw', name: 'Public API', routes: { 'POST /orders': 'web', 'GET /orders': 'web' } },
+        refunds: {
+          type: 'sfn',
+          name: 'Refund flow',
+          startedBy: ['web'],
+          steps: [{ name: 'Check the refund' }, { name: 'Pay it back', calls: 'payments' }],
+        },
+      },
+    },
+    board: { env: 'qa', mode: 'auto', zoom: 1, pan: { x: 60, y: 60 }, nodes: { web: at(0, 0) }, edges: [] },
+  });
+
+  test('shows each as a card, says what a bucket link does, and lists routes and steps', async ({ page }) => {
+    await discover(page);
+    await expect(card(page, 'resource:receipts')).toContainText('Bucket');
+    await expect(card(page, 'resource:api')).toContainText('2 routes');
+    await expect(card(page, 'resource:refunds')).toContainText('2 steps');
+    await expect(page.locator('.mark.label')).toHaveText(['writes']);
+    await page.getByRole('button', { name: 'Show 1 more link of Receipts' }).click();
+    await expect(page.locator('.mark.label')).toHaveText(['writes', 'reads']);
+    await settled(page);
+    await page.screenshot({ path: 'test-results/discover-resources.png' });
+
+    const panel = page.getByRole('complementary');
+    await card(page, 'resource:api').click();
+    await expect(panel.getByRole('heading', { name: 'Routes' })).toBeVisible();
+    await expect(panel.getByText('POST /orders, GET /orders')).toBeVisible();
+
+    await card(page, 'resource:refunds').click();
+    await expect(panel.getByRole('heading', { name: 'Started by' })).toBeVisible();
+    await expect(panel.locator('.step')).toHaveText(['1 Check the refund', '2 Pay it backCalls Payments API']);
+    await settled(page);
+    await page.screenshot({ path: 'test-results/discover-sfn-panel.png' });
+  });
+});
