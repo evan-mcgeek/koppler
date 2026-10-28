@@ -6,7 +6,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fail } from '../failure.ts';
-import { readData } from '../data.ts';
+import { readData, writeData } from '../data.ts';
+import { writeJson } from '../json-files.ts';
+import { tempDir } from '../paths.ts';
 import { updateActions, type Action, type CheckoutAction } from './actions.ts';
 
 /** What a switch came to: what to tell the user, or why it did not happen. */
@@ -42,10 +44,28 @@ function stashOf(repo: string, label: string): string | undefined {
   return entries.map(line => line.split('\t')).find(([, subject]) => subject?.endsWith(label))?.[0];
 }
 
+/** The clone as it is after a switch, its branch and uncommitted changes, kept and shown by an open canvas at once. */
+function noteClone(app: string): void {
+  const local = readData('local');
+  const apps = (local?.['apps'] ?? {}) as Record<string, { path?: string } | null>;
+  const clone = apps[app];
+  if (!local || !clone?.path) return;
+  const [branch, status] = [
+    tryGit(clone.path, 'branch', '--show-current'),
+    tryGit(clone.path, 'status', '--porcelain'),
+  ];
+  if (!branch.ok || !status.ok) return;
+  const dirty = status.out.split('\n').filter(Boolean).length;
+  writeData('local', { ...local, apps: { ...apps, [app]: { ...clone, branch: branch.out || null, dirty } } });
+  writeJson(path.join(tempDir(), 'refresh.json'), { at: new Date().toISOString() });
+}
+
 /** A git failure nobody foresaw (the clone is gone, not a repository) is an answer, not a crash in the middle of a Stop. */
 function safely(app: string, work: () => Outcome): Outcome {
   try {
-    return work();
+    const outcome = work();
+    noteClone(app);
+    return outcome;
   } catch (error) {
     const failure = error as GitFailure;
     if (failure.status === undefined && failure.spawnargs === undefined) throw error;
