@@ -8,6 +8,7 @@ const stack: StackFacts = {
   platforms: id => (id === 'app' ? ['ios', 'android', 'phone'] : []),
   canCall: (from, to) => `${from}>${to}` !== 'db-api>api',
   branches: id => (id === 'api' ? ['main', 'develop'] : null),
+  checkedOut: () => null,
 };
 
 test('what cannot be a preset is refused with a reason', () => {
@@ -96,6 +97,21 @@ test('a clean preset opens with nothing to say', () => {
     edges: [{ from: 'app', to: 'api' }],
   };
   expect(check(clean, stack)).toEqual({ preset: { ...clean, koppler: '0.1.0' }, notes: [] });
+});
+
+test('a clone with uncommitted work on another branch keeps its branch, and the note says why', () => {
+  const board = { name: 'Orders', version: 1, nodes: { api: { run: 'cli', branch: 'develop' } }, edges: [] };
+  const dirty = check(board, { ...stack, checkedOut: () => ({ branch: 'master', dirty: 3 }) });
+  expect(dirty.preset?.nodes).toEqual({ api: { run: 'cli' } });
+  expect(dirty.notes).toEqual([
+    'api stays on master: 3 uncommitted files. The board asks for develop; pick it on the card to switch',
+  ]);
+  const clean = check(board, { ...stack, checkedOut: () => ({ branch: 'master', dirty: 0 }) });
+  expect(clean.preset?.nodes).toEqual({ api: { run: 'cli', branch: 'develop' } });
+  expect(clean.notes).toEqual([]);
+  const there = check(board, { ...stack, checkedOut: () => ({ branch: 'develop', dirty: 3 }) });
+  expect(there.preset?.nodes).toEqual({ api: { run: 'cli', branch: 'develop' } });
+  expect(there.notes).toEqual([]);
 });
 
 test('nothing left to open is an error, not an empty board', () => {

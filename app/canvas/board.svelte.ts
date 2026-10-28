@@ -1295,6 +1295,10 @@ class Board {
         const all = app(id)?.branches ?? [];
         return all.length && all.length < 300 ? all : null;
       },
+      checkedOut: id => {
+        const one = app(id);
+        return one?.current ? { branch: one.current, dirty: one.dirty } : null;
+      },
     };
   }
   /** The board on screen as a board to keep: what runs and how, and the cables. */

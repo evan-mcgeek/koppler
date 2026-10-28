@@ -59,6 +59,8 @@ export interface StackFacts {
   canCall: (from: string, to: string) => boolean;
   /** The clone's branches, or null when they are not known. */
   branches: (id: string) => string[] | null;
+  /** The clone's current branch and how many files it has changed, or null when not known. */
+  checkedOut: (id: string) => { branch: string; dirty: number } | null;
   name?: (id: string) => string;
 }
 
@@ -100,7 +102,13 @@ function openNode(id: string, stored: Loose, stack: StackFacts, name: string, no
       notes.push(`${name} has no "${platform}" platform, using ${node.platform}`);
   }
   const branch = typeof stored['branch'] === 'string' ? stored['branch'].trim() : '';
-  if (branch) {
+  const clone = stack.checkedOut(id);
+  if (branch && clone?.branch && clone.branch !== branch && clone.dirty > 0) {
+    const files = clone.dirty === 1 ? 'file' : 'files';
+    notes.push(
+      `${name} stays on ${clone.branch}: ${String(clone.dirty)} uncommitted ${files}. The board asks for ${branch}; pick it on the card to switch`,
+    );
+  } else if (branch) {
     node.branch = branch;
     const branches = stack.branches(id);
     if (branches && !branches.includes(branch))
