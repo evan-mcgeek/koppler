@@ -2,6 +2,7 @@
 // the session left behind is gathered in one folder, and the agent is asked to find and fix the problems the user ran into.
 import fs from 'node:fs';
 import path from 'node:path';
+import { pairTimes } from '../core/shared-log.ts';
 import { CODE } from '../paths.ts';
 import { redact } from '../scrub.ts';
 
@@ -27,6 +28,14 @@ const read = (file: string) => {
   }
 };
 const lastLines = (text: string, count: number) => text.trimEnd().split('\n').slice(-count).join('\n');
+/** A log's lines, each with when it was written, from the times file beside it; lines with no time are taken as old. */
+const timedLines = (file: string) => {
+  const text = read(file);
+  const lines = text ? text.replace(/\n$/, '').split('\n') : [];
+  const times = read(`${file}.times`).split('\n').filter(Boolean).map(Number).filter(Number.isFinite);
+  const at = pairTimes(lines, times, text.endsWith('\n'));
+  return lines.map((line, index) => ({ line, at: at[index] ?? 0 }));
+};
 const jsonl = (text: string): Entry[] =>
   text.split('\n').flatMap(line => {
     try {
@@ -90,10 +99,14 @@ export function collectSession({
     .filter(([, text]) => text);
   for (const [id, text] of ups) write(`up-${id}.log`, text);
   const apps = [...new Set(session.flatMap(run => Object.keys(run.nodes ?? {})))];
+  const since = Date.parse(from) || 0;
   const appLogs = apps
     .map(id => {
       const log = path.join(logsDir, `${id}.log`);
-      return [id, redact(lastLines(read(`${log}.history`) + read(log), 3000))] as const;
+      const own = [...timedLines(`${log}.history`), ...timedLines(log)].flatMap(({ line, at }) =>
+        at >= since ? [line] : [],
+      );
+      return [id, redact(own.slice(-3000).join('\n'))] as const;
     })
     .filter(([, text]) => text.trim());
   for (const [id, text] of appLogs) write(path.join('logs', `${id}.log`), text);
@@ -149,15 +162,15 @@ export function collectSession({
   return { dir, quiet };
 }
 
-/** The previous log of an app is kept before a new run starts, so a session keeps every run's output (rolling, 5 MB). */
+/** The previous log of an app is kept, with its times, before a new run starts: a session keeps every run's output (rolling, 5 MB). */
 export function keepPreviousLog(log: string): void {
-  try {
-    const old = fs.readFileSync(log, 'utf8');
-    if (!old.trim()) return;
-    const history = `${log}.history`;
-    const joined = read(history) + old + '\n';
-    fs.writeFileSync(history, joined.length > 5_000_000 ? joined.slice(-5_000_000) : joined, { mode: 0o600 });
-  } catch {
-    // No log yet: nothing to keep.
-  }
+  if (!read(log).trim()) return;
+  const history = `${log}.history`;
+  const lines = [...timedLines(history), ...timedLines(log)];
+  let size = lines.reduce((sum, { line }) => sum + line.length + 1, 0);
+  let drop = 0;
+  while (size > 5_000_000) size -= (lines[drop++]?.line.length ?? 0) + 1;
+  const kept = lines.slice(drop);
+  fs.writeFileSync(history, kept.map(({ line }) => `${line}\n`).join(''), { mode: 0o600 });
+  fs.writeFileSync(`${history}.times`, kept.map(({ at }) => `${String(at)}\n`).join(''), { mode: 0o600 });
 }
