@@ -121,7 +121,30 @@ const insideClone = (file: string) =>
   !file.startsWith('/') && !/^[A-Za-z]:[\\/]/.test(file) && !file.split(/[\\/]/).includes('..');
 /** A code change the stack remembers for local runs: one file inside the app's own clone. */
 const LocalChange = z
-  .looseObject({ file: z.string().min(1), find: z.string().min(1), replace: z.string() }, { error: LOCAL_CHANGE })
+  .looseObject(
+    {
+      why: z.string().optional().describe('Why the app needs it to run locally'),
+      when: z
+        .looseObject(
+          {
+            always: z.boolean().optional().describe('On every run (the default)'),
+            env: z.string().optional().describe('Only on this environment'),
+            calls: z.string().optional().describe('Only when the app calls this local app'),
+          },
+          { error: 'an object with always, env or calls' },
+        )
+        .optional()
+        .describe('When it applies; every run without it'),
+      os: z
+        .string()
+        .optional()
+        .describe('The system it was made on (darwin, linux, win32) to apply only there, or any'),
+      file: z.string().min(1).describe("The file to change, inside the app's clone"),
+      find: z.string().min(1).describe('The text it replaces, there exactly once'),
+      replace: z.string().describe('The text it puts there'),
+    },
+    { error: LOCAL_CHANGE },
+  )
   .refine(change => insideClone(change.file), LOCAL_CHANGE);
 
 /** Where a database or cache is reached on one environment: the tunnel to it, and the name the apps' own settings dial. */

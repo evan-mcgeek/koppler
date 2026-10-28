@@ -86,7 +86,7 @@ export const tunnelsOf = (stack: Registry, id: string, env: string): TunnelNeed[
     tunnel && port ? [{ app: id, tunnel, port, env: setting, what, connectsAs }] : [],
   );
 const settingsFor = (up: Up, id: string) => (up.setEnv[id] ??= {});
-type LocalChange = NonNullable<App['localChanges']>[number] & { when?: { always: true } };
+type LocalChange = NonNullable<App['localChanges']>[number];
 
 interface Asked {
   env: string;
@@ -308,7 +308,6 @@ async function pointDatabases(up: Up, local: Record<string, 'local'>): Promise<R
         (changes[id] ??= []).push({
           ...use.change,
           replace: use.change.replace.replaceAll('{local}', value),
-          when: { always: true },
         });
       if (!use?.setting && !use?.change)
         left.push(
@@ -359,6 +358,7 @@ function applyRemembered(up: Up, extra: Record<string, LocalChange[]> = {}): voi
       console.log(`${app}: remembered change applied (${String(why)})`);
       up.step(app, 'Remembered change', 'done', why);
     }
+    if (state === 'skipped') console.log(`${app}: remembered change not applied (${String(why)}): ${String(detail)}`);
     if (state === 'moved' || state === 'missing') left.push(`${change} no longer fits (${String(detail)})`);
     if (state === 'refused') left.push(`${change} was refused: ${String(detail)}. Check it in stack.json`);
   }

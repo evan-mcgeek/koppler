@@ -66,10 +66,7 @@ test('remembered changes are kept, applied once inside the clone, and scored pri
   const run = (calls: any) =>
     prepare({ registry: registry(), apps: ['api'], env: 'qa', calls: { api: calls }, repoOf: () => repo, logFile });
   fs.writeFileSync(logFile, '[]');
-  assert.equal(
-    run([]).some(r => r.why!.startsWith('trust')),
-    false,
-  );
+  assert.equal(run([]).find(r => r.why!.startsWith('trust'))!.state, 'skipped');
   assert.equal(run(['wallet']).find(r => r.why!.startsWith('trust'))!.state, 'applied');
   assert.match(
     fs.readFileSync(path.join(repo, 'src/Startup.cs'), 'utf8'),
@@ -175,6 +172,40 @@ test('remembered changes are kept, applied once inside the clone, and scored pri
     });
     assert.equal(r!.state, 'refused');
     assert.equal(fs.readFileSync(path.join(d, 'outside.rc'), 'utf8'), 'export SAFE=1\n');
+  }
+});
+
+test('a stack change without when applies on every run; one for another environment is skipped with why', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-recipe-when-'));
+  vi.stubEnv('KOPPLER_CONFIG_DIR', path.join(dir, 'config'));
+  try {
+    fs.writeFileSync(path.join(dir, 'appsettings.json'), '"Profile": "old"\n"Region": "eu"\n');
+    const change = (extra: object) => ({ why: 'x', file: 'appsettings.json', replace: 'changed', ...extra });
+    const registry = {
+      apps: {
+        api: {
+          localChanges: [
+            change({ find: '"Profile": "old"' }),
+            change({ find: '"Region": "eu"', when: { env: 'prod' } }),
+          ],
+        },
+      },
+    };
+    const [always, prod] = prepare({
+      registry,
+      apps: ['api'],
+      env: 'qa',
+      calls: {},
+      repoOf: () => dir,
+      logFile: path.join(dir, 'actions.json'),
+    });
+    assert.equal(always?.state, 'applied');
+    assert.equal(prod?.state, 'skipped');
+    assert.equal(prod.detail, 'it is for prod, this run is on qa');
+    assert.equal(fs.readFileSync(path.join(dir, 'appsettings.json'), 'utf8'), 'changed\n"Region": "eu"\n');
+  } finally {
+    vi.unstubAllEnvs();
+    fs.rmSync(dir, { recursive: true, force: true });
   }
 });
 

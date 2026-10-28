@@ -56,7 +56,7 @@ interface Private {
 export interface Applied {
   app: string;
   id: string;
-  state: 'applied' | 'already' | 'moved' | 'missing' | 'refused';
+  state: 'applied' | 'already' | 'skipped' | 'moved' | 'missing' | 'refused';
   why: string | undefined;
   detail?: string;
   scope?: Recipe['scope'];
@@ -85,15 +85,22 @@ const whenOf = (given: string | undefined): When => {
   if (given?.startsWith('env:')) return { env: given.slice(4) };
   return { always: true };
 };
-/** A recipe is for the operating system it was made on (darwin, linux, win32) unless it was widened to any. */
-export const matches = (
-  recipe: Pick<Stored, 'os' | 'when'>,
-  { env, calls = [], platform = process.platform }: { env?: string; calls?: string[]; platform?: string },
-): boolean => {
-  const { when } = recipe;
-  const here = !recipe.os || recipe.os === 'any' || recipe.os === platform;
-  return here && !!(when?.always || (when?.env && when.env === env) || (when?.calls && calls.includes(when.calls)));
+type Run = { env?: string; calls?: string[]; platform?: string };
+/**
+ * Why a recipe does not apply to a run, or undefined when it does. It is for the operating system it was made on
+ * (darwin, linux, win32) unless it was widened to any, and for every run unless `when` names an env or a call.
+ */
+const unmatched = (
+  { os: madeOn, when }: Pick<Stored, 'os' | 'when'>,
+  { env, calls = [], platform = process.platform }: Run,
+): string | undefined => {
+  if (madeOn && madeOn !== 'any' && madeOn !== platform) return `it was made on ${madeOn}, this is ${platform}`;
+  if (when?.always) return undefined;
+  if (when?.env && when.env !== env) return `it is for ${when.env}, this run is on ${String(env)}`;
+  if (when?.calls && !calls.includes(when.calls)) return `it is for when the app calls local ${when.calls}`;
+  return undefined;
 };
+export const matches = (recipe: Pick<Stored, 'os' | 'when'>, run: Run): boolean => !unmatched(recipe, run);
 
 /** Every recipe for an app: the stack's, then this Mac's, each with how it did here. */
 export function recipesFor(stack: RecipeStack | null | undefined, app: string): Recipe[] {
@@ -201,10 +208,16 @@ export function prepare({
   const log: Action[] = readActions(logFile);
   const out: Applied[] = [];
   for (const app of apps)
-    for (const recipe of recipesFor(stack, app).filter(one => matches(one, { env, calls: calls[app] ?? [] }))) {
-      const { id, why } = recipe;
+    for (const recipe of recipesFor(stack, app)) {
+      const { id } = recipe;
+      const why = recipe.why || recipe.file;
       const say = (state: Applied['state'], detail?: string) =>
         out.push({ app, id, state, why, ...(detail && { detail }) });
+      const skip = unmatched(recipe, { env, calls: calls[app] ?? [] });
+      if (skip) {
+        say('skipped', skip);
+        continue;
+      }
       const repo = repoOf(app);
       const file = repo ? insideClone(repo, recipe.file) : undefined;
       if (log.some(action => (action.kind === 'edit' || action.kind === 'file') && action.recipe === id)) {
@@ -269,6 +282,7 @@ export function markRuns(logFile: string, ok: boolean): void {
 const OUTCOME = {
   applied: 'applied',
   already: 'already in place',
+  skipped: 'not for this run',
   moved: 'NOT applied, the code moved',
   missing: 'NOT applied, file missing',
   refused: 'NOT applied, the file is outside the clone',
@@ -287,12 +301,13 @@ export function recipesCommand(command: 'recipes' | 'remember' | 'prepare', args
         const did = here
           ? `${here.ok ? 'works on my machine' : 'failed here'}, last run ${here.at.slice(0, 10)}`
           : 'not run here yet';
-        const applies = when?.always
-          ? 'always'
-          : when?.calls
-            ? `when it calls local ${when.calls}`
-            : `on ${String(when?.env)}`;
-        console.log(`${app}  ${recipe.file}  (${recipe.scope}, ${did})\n  ${String(recipe.why)}; ${applies}`);
+        const applies =
+          when?.always || !(when?.calls || when?.env)
+            ? 'always'
+            : when.calls
+              ? `when it calls local ${when.calls}`
+              : `on ${String(when.env)}`;
+        console.log(`${app}  ${recipe.file}  (${recipe.scope}, ${did})\n  ${recipe.why || recipe.file}; ${applies}`);
       }
     return;
   }
