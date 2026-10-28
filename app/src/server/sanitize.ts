@@ -249,6 +249,7 @@ export function sanitizeLayout(input: unknown): Loose | null {
       x: num(node['x']),
       y: num(node['y']),
       branch: text(node['branch']),
+      ...(!!node['asked'] && { asked: text(node['asked']) }),
       run: text(node['run'], 16),
       ...(!!node['platform'] && { platform: text(node['platform'], 16) }),
       ...note(node['note']),

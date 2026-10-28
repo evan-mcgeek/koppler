@@ -102,7 +102,7 @@ test('a clean preset opens with nothing to say', () => {
 test('a clone with uncommitted work on another branch keeps its branch, and the note says why', () => {
   const board = { name: 'Orders', version: 1, nodes: { api: { run: 'cli', branch: 'develop' } }, edges: [] };
   const dirty = check(board, { ...stack, checkedOut: () => ({ branch: 'master', dirty: 3 }) });
-  expect(dirty.preset?.nodes).toEqual({ api: { run: 'cli' } });
+  expect(dirty.preset?.nodes).toEqual({ api: { run: 'cli', branch: 'develop', followsClone: true } });
   expect(dirty.notes).toEqual([
     'api stays on master: 3 uncommitted files. The board asks for develop; pick it on the card to switch',
   ]);

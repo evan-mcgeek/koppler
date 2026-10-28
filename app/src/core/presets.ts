@@ -68,6 +68,8 @@ export interface OpenedNode {
   run: string;
   platform?: string;
   branch?: string;
+  /** The card follows the clone, which has uncommitted work on another branch, until a branch is picked on it. */
+  followsClone?: true;
   note?: string;
   tunnels?: false;
   queues?: true;
@@ -103,13 +105,14 @@ function openNode(id: string, stored: Loose, stack: StackFacts, name: string, no
   }
   const branch = typeof stored['branch'] === 'string' ? stored['branch'].trim() : '';
   const clone = stack.checkedOut(id);
+  if (branch) node.branch = branch;
   if (branch && clone?.branch && clone.branch !== branch && clone.dirty > 0) {
+    node.followsClone = true;
     const files = clone.dirty === 1 ? 'file' : 'files';
     notes.push(
       `${name} stays on ${clone.branch}: ${String(clone.dirty)} uncommitted ${files}. The board asks for ${branch}; pick it on the card to switch`,
     );
   } else if (branch) {
-    node.branch = branch;
     const branches = stack.branches(id);
     if (branches && !branches.includes(branch))
       notes.push(`${name} has no branch ${branch} in your clone (fetch it first)`);
