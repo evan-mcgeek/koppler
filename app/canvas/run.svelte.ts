@@ -289,8 +289,8 @@ class Runs {
           .filter(
             ({ when }) =>
               when?.always ||
-              when?.env === graph.env ||
-              graph.edges.some(edge => edge.from === id && edge.to === when?.calls),
+              ((!when?.env || when.env === graph.env) &&
+                (!when?.calls || graph.edges.some(edge => edge.from === id && edge.to === when.calls))),
           )
           .map(recipe => {
             const ran = recipe.here

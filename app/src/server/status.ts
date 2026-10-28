@@ -168,7 +168,7 @@ function recipesByApp(): Record<string, object[]> {
         .filter(recipe => !recipe.os || recipe.os === 'any' || recipe.os === process.platform)
         .map(({ id: recipe, why, file, when, scope, here }) => ({
           id: recipe,
-          why: cut(why, 200),
+          why: cut(why || file, 200),
           file: cut(file, 200),
           when,
           scope,

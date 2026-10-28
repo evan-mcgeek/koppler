@@ -193,6 +193,29 @@ test('A remembered change must name a file inside the app\'s clone.', async () =
   for (const bad of ['../x', '/etc/hosts', 'a/../../x']) assert.match(validateStack(withChange(bad)).join(), /localChanges\[0\]/, bad);
 });
 
+test('A remembered change set with koppler stack set keeps why, when and os.', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-local-changes-'));
+  try {
+    const stack = path.join(dir, 'stack');
+    fs.mkdirSync(stack);
+    fs.mkdirSync(path.join(dir, 'code'));
+    fs.writeFileSync(path.join(stack, 'stack.json'), JSON.stringify({ name: 'Acme Shop', envs: ['qa', 'prod'], apps: {
+      'orders-api': { name: 'Orders API', kind: 'dotnet', slug: 'acme/orders' },
+    } }));
+    const env = { ...process.env, HOME: dir, KOPPLER_STATE: path.join(dir, 'state'), KOPPLER_TEMP: path.join(dir, 'temp'), KOPPLER_CONFIG_DIR: path.join(dir, 'config') };
+    delete env.CLAUDE_CODE_SESSION_ID;
+    const koppler = (...args) => spawnSync('node', [entry, ...args], { encoding: 'utf8', env });
+    const init = koppler('init', '--root', path.join(dir, 'code'), '--stack', stack, '--no-fetch');
+    assert.equal(init.status, 0, init.stderr);
+    const change = { why: 'use the QA profile', when: { env: 'qa' }, os: 'any', file: 'appsettings.json', find: '"Profile": "old"', replace: '"Profile": "new"' };
+    const set = koppler('stack', 'set', 'apps.orders-api.localChanges', JSON.stringify([change]));
+    assert.equal(set.status, 0, set.stderr + set.stdout);
+    assert.deepEqual(JSON.parse(fs.readFileSync(path.join(stack, 'stack.json'), 'utf8')).apps['orders-api'].localChanges, [change]);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('A tunnel\'s port must be a number: it reaches the page, shell commands and the port probe.', async () => {
   const st = port => ({ envs: ['qa', 'prod'], apps: { a: { name: 'A', kind: 'node', slug: 'acme/a', prereqs: [{ tunnel: 'db.acme.dev', port }], envs: { prod: { prereqs: [{ tunnel: 'db.acme.dev', port }] } } } } });
   assert.deepEqual(validateStack(st(5432)), []);
