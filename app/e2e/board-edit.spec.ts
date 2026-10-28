@@ -37,6 +37,7 @@ const koppler = ({ dir, temp }: { dir: string; temp: string }, ...args: string[]
   };
   const run = spawnSync(process.execPath, [entry, ...args], { encoding: 'utf8', env });
   expect(run.status, run.stderr).toBe(0);
+  return run.stdout;
 };
 const state = (temp: string) =>
   JSON.parse(fs.readFileSync(path.join(temp, 'state.json'), 'utf8')) as {
@@ -92,7 +93,7 @@ test('a board that is not on screen is changed where it is kept', async ({ page,
     .toEqual(['web', 'orders']);
 });
 
-test('a board made from the terminal joins your boards on an open canvas, which says so and keeps it', async ({
+test('a board made from the terminal joins your boards on an open canvas, which opens it, says so and keeps it', async ({
   page,
   canvas,
 }) => {
@@ -100,11 +101,33 @@ test('a board made from the terminal joins your boards on an open canvas, which 
   koppler(canvas, 'board', 'new', 'Orders work', '--add', 'orders,payments', '--cable', 'orders:payments');
   await expect(page.getByRole('status').filter({ hasText: 'The agent made a board, Orders work.' })).toBeVisible();
   await expect.poll(() => waiting(canvas.temp)).toBe(0);
-  // The board on screen stays as it was; the new one is among the user's, with its apps and cable.
-  await expect(page.locator('.svelte-flow__node-app')).toHaveCount(2);
+  await expect(page.getByRole('button', { name: /^Board: Orders work/ })).toBeVisible();
+  await expect(card(page, 'web')).toHaveCount(0);
+  await expect(page.locator('.svelte-flow__edge[data-id="orders>payments"]')).toHaveCount(1);
   await expect
     .poll(() => state(canvas.temp).presets.find(one => one.name === 'Orders work')?.nodes)
     .toEqual({ orders: { run: 'cli' }, payments: { run: 'cli' } });
+});
+
+test('koppler canvas --board switches a canvas open in a background tab to a board just made', async ({
+  page,
+  canvas,
+}) => {
+  await expect(card(page, 'web')).toBeVisible();
+  // The tab is out of view while the agent works in the terminal.
+  const hide = (hidden: boolean) =>
+    page.evaluate(hidden => {
+      Object.defineProperty(document, 'hidden', { value: hidden, configurable: true });
+      document.dispatchEvent(new Event('visibilitychange'));
+    }, hidden);
+  await hide(true);
+  koppler(canvas, 'board', 'new', 'Orders work', '--add', 'orders,payments', '--cable', 'orders:payments');
+  expect(koppler(canvas, 'canvas', '--board', 'Orders work')).toContain('Switched the open canvas to Orders work.');
+  await hide(false);
+  await expect(page.getByRole('button', { name: /^Board: Orders work/ })).toBeVisible();
+  await expect(card(page, 'web')).toHaveCount(0);
+  await expect(card(page, 'orders')).toBeVisible();
+  await expect(card(page, 'payments')).toBeVisible();
 });
 
 test('an edit with --arrange lays the board on screen out along its calls, as Arrange does', async ({

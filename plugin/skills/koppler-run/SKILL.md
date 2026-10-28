@@ -137,7 +137,7 @@ When the user asks in chat, start with `koppler up <apps> --cable <caller>:<call
 A sentence such as "run koppler on qa with the checkout board" names a board, and often an environment or another task next to it.
 1. Find the board: `koppler use --boards`, matched loosely on the name (a typo or a part of it is fine). With several matches or none, list them and ask.
 2. Start it: `koppler up --board "<name>" --env <env>` (without `--env`, the stack's first environment).
-3. Open it: `koppler canvas --board "<name>"`, every time, also when the canvas already runs. It opens that board in the browser.
+3. Open it: `koppler canvas --board "<name>"`, every time, also when the canvas already runs. It opens that board in the browser, or switches the open canvas to it.
 4. Paste the canvas address (`<state>/canvas-url`) in the chat reply as a link, next to what is running.
 
 Do steps 3 and 4 even when step 2 is blocked or fails, so the user can press Run on the board themselves.

@@ -102,9 +102,12 @@ export async function canvas(args: string[]): Promise<void> {
     console.log('The canvas has a new address; every address given out before no longer works.');
   }
   const board = flagValue(args, '--board');
+  const boards = [...(readStack()?.presets ?? []), ...((readData('state')?.['presets'] ?? []) as { name: string }[])];
+  if (board && !boards.some(one => one.name.toLowerCase() === board.toLowerCase()))
+    fail(`no board called ${board}; koppler use --boards lists them`);
   const hash = args.includes('--pick') ? '#pick' : board ? `#board=${encodeURIComponent(board)}` : '';
   if (!args.includes('--no-open') && (await shownInOpenPage(urlFile, hash))) {
-    console.log('The canvas is already open in your browser.');
+    console.log(board ? `Switched the open canvas to ${board}.` : 'The canvas is already open in your browser.');
     return;
   }
   if (!record || !alive(record)) {

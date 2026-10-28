@@ -8,7 +8,7 @@ Apps and tunnels that `koppler` starts run detached, so they keep running after 
 | Command | What it does |
 |---|---|
 | `koppler init [--new "<name>" --envs qa,prod] [--root <dir>]... [--stack <dir>] [--pick] [--no-fetch]` | Find your repos and the stack, or start a new stack and pick its apps |
-| `koppler canvas [start] [--board "<name>"] [--no-open] [--new-address] \| stop` | Start the canvas if needed and open it in your browser, on a board when one is named; `--new-address` gives it a new address, so every one given out before stops working; `stop` stops it |
+| `koppler canvas [start] [--board "<name>"] [--no-open] [--new-address] \| stop` | Start the canvas if needed and open it in your browser, on a board when one is named (an open canvas switches to it); `--new-address` gives it a new address, so every one given out before stops working; `stop` stops it |
 | `koppler use [stack] [--boards]` | List the stacks on this machine (`*` marks the one in use), switch to one, or list its boards |
 | `koppler db [local <database> <host:port[/database]> \| local <database> --clear]` | List the stack's databases, the apps that use them and where each runs on this Mac; set or forget the address a database switched to Local uses, kept on this Mac only |
 | `koppler link [<url> \| update \| discard \| pr]` | Use a stack shared on GitHub; then bring in its changes, drop yours, or open a pull request with yours |
@@ -57,7 +57,7 @@ You can run these yourself too; the agent uses them to do its part.
 | `koppler switch <app> <branch> [--set-aside \| --take-along]` | Switch a clone to the board's branch; `--back` undoes it |
 | `koppler recipes [app] \| --remember <app> --why "..." [--when ...] [--any-os] [--private] \| --apply <app...> [--env <env>]` | Remembered code changes: list them, keep the last edit, apply the matching ones. A stack's own are applied only after `koppler doctor --approve` |
 | `koppler listen take \| as <id> \| stop` | Wait for requests from the canvas; one agent session at a time. The canvas shows the session's name in Claude Code beside Agent, with its session id and folder on hover |
-| `koppler board new "<name>" [--add <app,...>] [--cable <caller>:<callee>]...` | Make a board of your own, with its apps and cables; an open canvas adds it to your boards |
+| `koppler board new "<name>" [--add <app,...>] [--cable <caller>:<callee>]...` | Make a board of your own, with its apps and cables; an open canvas adds it to your boards and switches to it |
 | `koppler board share "<name>"` | Propose one of your boards to the team: a pull request on the stack's repo on GitHub; a stack not on GitHub keeps it in its file to commit |
 | `koppler board open <file or link> [--no-open]` | Open a board from a file or a GitHub link: it joins your boards and the canvas opens on it; the board picker's Reload reads it again from there |
 | `koppler board new\|edit "<name>" [--request "<words>"] [--phase "<name>"] [--step <from>:<to>[="<note>"]]...` | Make it a feature board: the request it came from, and the stack's links it uses as numbered steps, each in the phase named before it |

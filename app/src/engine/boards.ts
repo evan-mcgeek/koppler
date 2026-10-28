@@ -300,7 +300,9 @@ export function changeBoard(name: string, edit: BoardEdit, create: boolean, prop
   return [
     `${create ? 'MADE' : 'CHANGED'} ${board.name}${said ? `: ${said}` : ''}`,
     canvas && alive(canvas)
-      ? 'An open canvas shows the change as soon as it is in view.'
+      ? create
+        ? `An open canvas switches to ${board.name} as soon as it is in view.`
+        : 'An open canvas shows the change as soon as it is in view.'
       : 'The canvas shows the change when it is opened.',
   ];
 }
