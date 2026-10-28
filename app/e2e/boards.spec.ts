@@ -1,6 +1,6 @@
 // The new canvas's boards: the one on screen is kept by name, and the team's and the user's own open from the picker.
 import type { Page } from '@playwright/test';
-import { card, expect, saveSettles, test } from './canvas.ts';
+import { card, expect, saveSettles, STACK, test } from './canvas.ts';
 
 const picker = (page: Page) => page.getByRole('button', { name: /^Board: / });
 const boards = (page: Page) => page.getByRole('dialog', { name: 'Boards' });
@@ -98,6 +98,69 @@ test.describe('a board with an app that is not cloned here', () => {
     await expect(page.locator('.svelte-flow__node-app')).toHaveCount(2);
     await expect(page.getByRole('status')).toContainText('Opened Checkout, changed to fit');
     await expect(page.getByRole('status')).toContainText('Payments API');
+  });
+});
+
+test.describe('a board asking for another branch than a clone with uncommitted changes', () => {
+  test.use({
+    dirty: ['orders'],
+    stack: {
+      ...STACK,
+      presets: [
+        { name: 'Orders', version: 1, nodes: { orders: { run: 'cli', branch: 'feature/checkout' } }, edges: [] },
+      ],
+    },
+  });
+
+  test('keeps the card on the clone, says why, and a pick on the card still switches', async ({ page }) => {
+    await picker(page).click();
+    await boards(page)
+      .getByRole('button', { name: /^Orders/ })
+      .click();
+    await expect(page.getByRole('status')).toContainText(
+      'Orders API stays on main: 3 uncommitted files. The board asks for feature/checkout; pick it on the card to switch',
+    );
+    const orders = card(page, 'orders');
+    const choice = orders.getByRole('radiogroup', { name: 'Your 3 uncommitted changes on main' });
+    await expect(orders.getByLabel('Branch')).toHaveValue('main');
+    await expect(choice).toHaveCount(0);
+    await page.getByRole('button', { name: 'Run', exact: true }).click();
+    await expect(page.getByRole('dialog').getByLabel('3 uncommitted on main')).toHaveCount(0);
+    await page.keyboard.press('Escape');
+    await orders.getByLabel('Branch').fill('feature/checkout');
+    await orders.getByLabel('Branch').blur();
+    await expect(choice.getByRole('radio', { name: 'Set aside' })).toBeChecked();
+  });
+
+  test('keeps the branch the board asks for, in the open board and in a copy of it', async ({ page, canvas }) => {
+    const state = async () =>
+      (await (await page.request.get(`${canvas.url}data/state.json`)).json()) as {
+        nodes?: Record<string, { branch?: string; asked?: string }>;
+        presets?: { name: string; nodes: Record<string, { branch?: string }> }[];
+      } | null;
+    await picker(page).click();
+    await boards(page)
+      .getByRole('button', { name: /^Orders/ })
+      .click();
+    await expect
+      .poll(async () => (await state())?.nodes?.['orders'])
+      .toMatchObject({ branch: '', asked: 'feature/checkout' });
+    // Opened and untouched, it stays the team's.
+    expect((await state())?.presets ?? []).toEqual([]);
+    await page.reload();
+    await expect(card(page, 'orders').getByLabel('Branch')).toHaveValue('main');
+    await page.getByRole('button', { name: 'Add Payments API to the board', exact: true }).first().click();
+    await expect(picker(page)).toHaveText('Orders (local)');
+    await expect
+      .poll(async () => (await state())?.presets?.find(one => one.name === 'Orders (local)')?.nodes['orders']?.branch)
+      .toBe('feature/checkout');
+    // A branch picked on the card replaces the one the board asked for.
+    await card(page, 'orders').getByLabel('Branch').fill('fix/other');
+    await card(page, 'orders').getByLabel('Branch').blur();
+    await expect
+      .poll(async () => (await state())?.presets?.find(one => one.name === 'Orders (local)')?.nodes['orders']?.branch)
+      .toBe('fix/other');
+    expect((await state())?.nodes?.['orders']?.asked).toBeUndefined();
   });
 });
 

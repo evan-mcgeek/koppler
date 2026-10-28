@@ -46,6 +46,8 @@ export interface CardData extends Record<string, unknown> {
   kindLabel: string;
   /** The branch to run; empty for the one the clone is on. */
   branch: string;
+  /** The board's branch, kept while the card follows a clone with uncommitted work elsewhere; a pick replaces it. */
+  asked?: string;
   /** Who starts it: Koppler, or the user (an IDE, a terminal). */
   run: string;
   /** The device a mobile app runs on. */
@@ -1295,6 +1297,10 @@ class Board {
         const all = app(id)?.branches ?? [];
         return all.length && all.length < 300 ? all : null;
       },
+      checkedOut: id => {
+        const one = app(id);
+        return one?.current ? { branch: one.current, dirty: one.dirty } : null;
+      },
     };
   }
   /** The board on screen as a board to keep: what runs and how, and the cables. */
@@ -1309,7 +1315,7 @@ class Board {
           {
             run: data.run,
             ...(data.platform && { platform: data.platform }),
-            ...(data.branch && { branch: data.branch }),
+            ...((data.branch || data.asked) && { branch: data.branch || data.asked }),
             ...(data.note && { note: data.note }),
             ...(data.hideTunnels && { tunnels: false }),
             ...(data.showQueues && this.queuesOf(id).length > 0 && { queues: true }),
@@ -1378,7 +1384,10 @@ class Board {
     const team = this.team.find(one => one.name === this.name);
     // A team board stays the team's until it is changed; branches, notes and how apps run count as changes too.
     const told = (preset: { nodes: unknown; edges: { from: string; to: string }[] }) =>
-      JSON.stringify([preset.nodes, preset.edges.map(edge => `${edge.from}>${edge.to}`).sort()]);
+      JSON.stringify(
+        [preset.nodes, preset.edges.map(edge => `${edge.from}>${edge.to}`).sort()],
+        (key, value: unknown) => (key === 'followsClone' ? undefined : value),
+      );
     const asOpened = team && check(team, this.#facts()).preset;
     if (team && asOpened && told(this.#asPreset(team.name) as never) === told(asOpened)) return;
     // One copy per team board: changing it again updates that copy.
@@ -1575,7 +1584,12 @@ class Board {
       const app = this.app(id);
       const node = preset.nodes[id];
       if (!app || !node) return [];
-      const chosen = { ...node, hideTunnels: node.tunnels === false, showQueues: node.queues === true };
+      const chosen = {
+        ...node,
+        hideTunnels: node.tunnels === false,
+        showQueues: node.queues === true,
+        ...(node.followsClone && { branch: '', asked: node.branch }),
+      };
       return [this.#card(app, (placed && place(id)) || { x: 0, y: 0 }, chosen)];
     });
     const at = Object.fromEntries(this.nodes.map(({ id, position }) => [id, position]));
@@ -1649,6 +1663,7 @@ class Board {
         }),
         ...(chosen.shownTunnels && { shownTunnels: chosen.shownTunnels }),
         branch: chosen.branch ?? '',
+        ...(typeof chosen.asked === 'string' && chosen.asked && { asked: chosen.asked }),
         run: run ?? 'cli',
         ...(platform && { platform }),
         note: chosen.note ?? '',
@@ -1814,7 +1829,19 @@ class Board {
           ({
             id,
             position,
-            data: { branch, run, platform, note, hideTunnels, showQueues, watch, changes, libraries, shownTunnels },
+            data: {
+              branch,
+              asked,
+              run,
+              platform,
+              note,
+              hideTunnels,
+              showQueues,
+              watch,
+              changes,
+              libraries,
+              shownTunnels,
+            },
           }) => [
             id,
             {
@@ -1822,6 +1849,7 @@ class Board {
               x: Math.round(position.x),
               y: Math.round(position.y),
               branch,
+              asked,
               run,
               ...(platform && { platform }),
               note,
@@ -1945,7 +1973,12 @@ class Board {
   }
   /** Changes what the user chose on a card. */
   set(id: string, chosen: Partial<CardData>): void {
-    this.nodes = this.nodes.map(node => (node.id === id ? { ...node, data: { ...node.data, ...chosen } } : node));
+    this.nodes = this.nodes.map(node => {
+      if (node.id !== id) return node;
+      // A branch picked on the card replaces the one the board asked for.
+      const { asked, ...data } = node.data;
+      return { ...node, data: { ...('branch' in chosen ? data : { ...data, ...(asked && { asked }) }), ...chosen } };
+    });
   }
 
   /**
