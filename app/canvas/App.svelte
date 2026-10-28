@@ -45,7 +45,7 @@
   import Toast from './Toast.svelte';
   import { board } from './board.svelte.ts';
   import { undo } from './undo.svelte.ts';
-  import { openFile } from './boards.ts';
+  import { openBoard, openFile } from './boards.ts';
   import { dialogs } from './dialogs.svelte.ts';
   import { load, post, save } from './data.ts';
   import { describeEdit } from '../src/core/presets.ts';
@@ -211,12 +211,16 @@
               : `Cannot open ${one.board}. ${out.error}`,
             out.error === undefined ? 'message' : 'warning',
           );
-        } else if (board.edit(one.board, one.edit, one.create))
+        } else if (board.edit(one.board, one.edit, one.create)) {
           toasts.show(
             one.create
               ? `The agent made a board, ${one.board}.`
               : `The agent changed ${one.board}: ${describeEdit(one.edit, name)}.`,
           );
+          // A board made from the terminal is the one the agent wants shown.
+          const fresh = one.create && board.name !== one.board && board.own.find(each => each.name === one.board);
+          if (fresh) openBoard(fresh);
+        }
         void post('board-edit-done', { id: one.id });
       }
     });

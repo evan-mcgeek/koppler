@@ -411,7 +411,10 @@ const COMMANDS: Command[] = [
     run: canvas,
     example: 'koppler canvas stop && koppler canvas start',
     forms: [
-      ['[start] [--board "<name>"] [--no-open]', 'start it if needed and open it in the browser, on that board'],
+      [
+        '[start] [--board "<name>"] [--no-open]',
+        'start it if needed and open it in the browser, on that board; an open canvas switches to it',
+      ],
       ['--new-address', 'give the canvas a new address: every address given out before stops working'],
       ['stop', 'stop the canvas; apps and tunnels keep running'],
     ],
@@ -716,7 +719,7 @@ const COMMANDS: Command[] = [
     forms: [
       [
         'new "<name>" [--add <app,...>] [--cable <caller>:<callee>]...',
-        'make a board of your own, with its apps and cables',
+        'make a board of your own, with its apps and cables; an open canvas switches to it',
       ],
       [
         'edit "<name>" [--add <app,...>] [--remove <app,...>]',
