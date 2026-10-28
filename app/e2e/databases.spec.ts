@@ -107,10 +107,7 @@ test('the Run review groups databases by where the data lives, and the run carri
   page,
   canvas,
 }) => {
-  await database(page, 'Payments').getByText('Local', { exact: true }).click();
-  const form = page.getByRole('form', { name: 'Where your local Payments runs' });
-  await form.getByLabel('Port').fill('5433');
-  await form.getByRole('button', { name: 'Use local' }).click();
+  await goLocal(page, 'Payments', '5433');
   await page.getByRole('button', { name: 'Run', exact: true }).click();
   const lines = page.getByRole('dialog').locator('.lines li');
   const group = (label: string) => lines.filter({ has: page.locator('.verb').getByText(label, { exact: true }) });
@@ -203,14 +200,24 @@ test("each database's line leaves the tunnel card from its own row", async ({ pa
   }
 });
 
-/** Right-clicks the middle of a line on the board, as a person would. */
+/** Right-clicks the middle of a line on the board, as a person would, once the board holds still under it. */
 const rightClick = async (page: Page, line: Locator) => {
-  const at = await line.evaluate(path => {
-    const svg = path as SVGPathElement;
-    const mid = svg.getPointAtLength(svg.getTotalLength() / 2);
-    const screen = new DOMPoint(mid.x, mid.y).matrixTransform(svg.getScreenCTM() ?? undefined);
-    return { x: screen.x, y: screen.y };
-  });
+  const middle = () =>
+    line.evaluate(path => {
+      const svg = path as SVGPathElement;
+      const mid = svg.getPointAtLength(svg.getTotalLength() / 2);
+      const screen = new DOMPoint(mid.x, mid.y).matrixTransform(svg.getScreenCTM() ?? undefined);
+      return { x: screen.x, y: screen.y };
+    });
+  let at = await middle();
+  await expect
+    .poll(async () => {
+      const was = at;
+      await page.waitForTimeout(120);
+      at = await middle();
+      return Math.abs(at.x - was.x) + Math.abs(at.y - was.y);
+    })
+    .toBeLessThan(0.5);
   await page.mouse.click(at.x, at.y, { button: 'right' });
 };
 
