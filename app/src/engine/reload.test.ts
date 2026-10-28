@@ -2,6 +2,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { afterEach, expect, test } from 'vitest';
+import os from 'node:os';
+import { startCommand } from '../core/launch.ts';
 import { stateDir } from '../paths.ts';
 import { flutterPid } from './app-start.ts';
 import { hotReload, reloadable } from './reload.ts';
@@ -42,4 +44,35 @@ test('once flutter run wrote its process id, reload signals it: SIGUSR1, or SIGU
     expect(await ended).toBe(signal);
   }
   expect(reloadable('mobile-app')).toBe(false);
+});
+
+const until = async (what: () => boolean) => {
+  for (let tries = 0; !what(); tries++) {
+    if (tries > 100) throw new Error('timed out');
+    await new Promise(resolve => setTimeout(resolve, 50));
+  }
+};
+
+test("a new start does not take an earlier run's process id: it waits for its own flutter run's", async () => {
+  const bin = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-flutter-'));
+  // A stand-in for `flutter run`: once told to, it writes its process id where --pid-file says.
+  const flutter = `#!/bin/sh\ntouch "${bin}/started"\nwhile [ ! -e "${bin}/go" ]; do sleep 0.05; done\necho $$ > "$3"\nexec sleep 30\n`;
+  fs.writeFileSync(path.join(bin, 'flutter'), flutter, { mode: 0o755 });
+  // An earlier run's file, its process id one that runs.
+  fs.mkdirSync(path.dirname(flutterPid('mobile-app')), { recursive: true });
+  fs.writeFileSync(flutterPid('mobile-app'), String(process.pid));
+  const ctx = { repo: bin, flutterPid: flutterPid('mobile-app'), device: { id: 'SIM-1', platform: 'ios' as const } };
+  const [shell = '', ...args] = startCommand({ kind: 'flutter' }, ctx).command ?? [];
+  const env = { ...process.env, PATH: `${bin}:${process.env['PATH'] ?? ''}` };
+  const wrapper = spawn(shell, args, { env, detached: true, stdio: 'ignore' });
+  try {
+    await until(() => fs.existsSync(path.join(bin, 'started')));
+    expect(reloadable('mobile-app')).toBe(false);
+    fs.writeFileSync(path.join(bin, 'go'), '');
+    await until(() => reloadable('mobile-app'));
+    expect(fs.readFileSync(flutterPid('mobile-app'), 'utf8').trim()).not.toBe(String(process.pid));
+  } finally {
+    process.kill(-(wrapper.pid ?? 0), 'SIGTERM');
+    fs.rmSync(bin, { recursive: true, force: true });
+  }
 });

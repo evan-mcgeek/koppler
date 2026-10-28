@@ -145,7 +145,7 @@ test('Flutter: run on the device and stay, its output the log, for hot reload; s
     device: { id: 'SIM-1', platform: 'ios' },
   });
   expect(script(kept)).toBe(
-    `tail -f /dev/null | { fvm flutter run --pid-file /t/flutter-app.pid --flavor qa --dart-define-from-file=.env_qa.json -d SIM-1${ends}`,
+    `rm -f /t/flutter-app.pid; tail -f /dev/null | { fvm flutter run --pid-file /t/flutter-app.pid --flavor qa --dart-define-from-file=.env_qa.json -d SIM-1${ends}`,
   );
   expect(ios.onStop).toEqual([['xcrun', 'simctl', 'terminate', 'SIM-1', 'com.acme.app']]);
   const android = startCommand(app, { repo: '/m', env: 'prod', device: { id: 'emulator-5554', platform: 'android' } });
