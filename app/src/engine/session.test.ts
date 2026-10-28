@@ -11,9 +11,12 @@ test('a session is gathered after a full Stop, with what went wrong at a glance'
   fs.mkdirSync(logs);
   // A restart keeps the previous run's log.
   const log = path.join(logs, 'api.log');
+  const stamp = () => fs.writeFileSync(`${log}.times`, `${String(Date.parse('2026-01-01T10:00:01Z'))}\n`);
   fs.writeFileSync(log, 'first run\nboom: Unhandled exception\n');
+  stamp();
   keepPreviousLog(log);
   fs.writeFileSync(log, 'second run\n');
+  stamp();
   assert.match(fs.readFileSync(`${log}.history`, 'utf8'), /first run/);
 
   // Only this session (after the previous finished Stop) is gathered, with a summary of what went wrong.
@@ -85,4 +88,36 @@ test('a session where nothing went wrong is gathered and called quiet, so no rev
   const { dir: out, quiet } = collectSession({ temp: dir, logsDir: logs, stop: runs[1]!, runs });
   assert.equal(quiet, true);
   assert.ok(fs.existsSync(path.join(out, 'summary.md')));
+});
+
+test('a session counts only the app log lines written since it began, not those of the session before', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-session-')),
+    logs = path.join(dir, 'logs');
+  fs.mkdirSync(logs);
+  const log = path.join(logs, 'api.log');
+  const start = (at: string, lines: string[]) => {
+    keepPreviousLog(log);
+    fs.writeFileSync(log, lines.map(line => `${line}\n`).join(''));
+    fs.writeFileSync(`${log}.times`, lines.map(() => `${String(Date.parse(at))}\n`).join(''));
+  };
+  const runs = [
+    { id: 'r1', kind: 'run', at: '2026-01-01T09:00:00Z', state: 'done', nodes: { api: {} } },
+    { id: 'stop1', kind: 'stop', at: '2026-01-01T09:30:00Z', state: 'done', nodes: {} },
+    { id: 'r2', kind: 'run', at: '2026-01-01T10:00:00Z', state: 'done', nodes: { api: {} } },
+    { id: 'stop2', kind: 'stop', at: '2026-01-01T10:02:00Z', state: 'done', nodes: {} },
+  ];
+  start('2026-01-01T09:00:01Z', ['$ api', 'boom: Unhandled exception', 'fail: refused']);
+  const first = collectSession({ temp: dir, logsDir: logs, stop: runs[1]!, runs });
+  assert.match(fs.readFileSync(path.join(first.dir, 'summary.md'), 'utf8'), /api 2/);
+
+  // A restart within the session keeps the earlier run's lines of it.
+  start('2026-01-01T10:00:01Z', ['$ api', 'listening']);
+  start('2026-01-01T10:01:00Z', ['$ api', 'listening again']);
+  const second = collectSession({ temp: dir, logsDir: logs, stop: runs[3]!, runs });
+  assert.equal(second.quiet, true);
+  assert.match(fs.readFileSync(path.join(second.dir, 'summary.md'), 'utf8'), /No error-like lines in app logs/);
+  assert.equal(
+    fs.readFileSync(path.join(second.dir, 'logs/api.log'), 'utf8'),
+    '$ api\nlistening\n$ api\nlistening again',
+  );
 });
