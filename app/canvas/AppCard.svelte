@@ -180,7 +180,7 @@
         Traces
       </a>
     {/if}
-    {#if app?.kind === 'flutter' && data.run === 'cli' && up}
+    {#if app?.kind === 'flutter' && data.run === 'cli' && live.reloadable(id)}
       <button
         type="button"
         aria-label="Hot reload {data.name}"

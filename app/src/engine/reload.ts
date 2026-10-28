@@ -3,17 +3,39 @@ import fs from 'node:fs';
 import { positional } from '../cli/output.ts';
 import { fail, Failure } from '../failure.ts';
 import { flutterPid } from './app-start.ts';
-import { NAME } from './processes.ts';
+import { alive, NAME, readRecord } from './processes.ts';
+
+/** The process id of the app's `flutter run`, written once the app is on the device. */
+function flutterRunPid(app: string): number | null {
+  try {
+    return Number(fs.readFileSync(flutterPid(app), 'utf8').trim()) || null;
+  } catch {
+    return null;
+  }
+}
+
+/** Whether the app's `flutter run` is there to take a hot reload. */
+export function reloadable(app: string): boolean {
+  const pid = flutterRunPid(app);
+  if (!pid) return false;
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 /** Sends hot reload (or with `restart`, hot restart) to the app's `flutter run`; says what it did. */
 export function hotReload(app: string, restart: boolean): string {
   if (!NAME.test(app)) throw new Failure(`${app} is not an app`);
-  let pid: number;
-  try {
-    pid = Number(fs.readFileSync(flutterPid(app), 'utf8').trim());
-  } catch {
+  const pid = flutterRunPid(app);
+  if (!pid) {
+    const record = readRecord(app);
     throw new Failure(
-      `${app} is not a Flutter app Koppler runs: start it with Koppler (Started by Koppler) to reload it`,
+      record && alive(record)
+        ? `${app} is still starting: hot reload works once flutter run has put it on the device`
+        : `${app} is not a Flutter app Koppler runs: start it with Koppler (Started by Koppler) to reload it`,
     );
   }
   try {

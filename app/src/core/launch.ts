@@ -137,7 +137,8 @@ function startFlutter(app: App, ctx: StartContext): Start {
     device.id,
   ];
   // `flutter run` stays, its output the app's log, for hot reload: its input is held open, or it would end at once.
-  const script = `tail -f /dev/null | ${run.map(quote).join(' ')}`;
+  // When it ends, so does what holds its input, or the shell would wait on it for good.
+  const script = `tail -f /dev/null | { ${run.map(quote).join(' ')}; s=$?; pkill -P $$ -x tail; exit $s; }`;
   const { iosBundleId, androidPackage } = app.mobile ?? {};
   // The app outlives the process that started it: stopping closes it on the device.
   const onStop =

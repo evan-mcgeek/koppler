@@ -46,6 +46,8 @@ interface AppStatus {
   listening?: boolean;
   /** A mobile app: the simulators and devices it runs on. */
   running?: Running[];
+  /** A Flutter app whose `flutter run` takes a hot reload. */
+  reloadable?: boolean;
   /** Its state in words, as the server works it out. */
   state?: AppState;
   steps?: Step[];
@@ -226,6 +228,10 @@ class Live {
     if (!info) return null;
     if (info.running) return info.running.length > 0;
     return info.listening ?? null;
+  }
+  /** Whether a sent Flutter app takes a hot reload: once `flutter run` has put it on the device. */
+  reloadable(id: string): boolean {
+    return this.#info(id)?.reloadable === true;
   }
   /** A sent app's state: the server's word for it, or a secret it lacks on this board's environment. */
   state(id: string): AppState | null {
