@@ -7,14 +7,13 @@ test.use({
   board: { env: 'qa', mode: 'auto', zoom: 1, pan: { x: 60, y: 120 }, nodes: { mobile: at(0, 0) }, edges: [] },
 });
 
-test('a running Flutter card hot reloads, and with Shift hot restarts, its app', async ({ page }) => {
+test('a Flutter card hot reloads once flutter run can take it, and with Shift hot restarts', async ({ page }) => {
   await expect(card(page, 'mobile')).toBeVisible();
   const reload = page.getByRole('button', { name: 'Hot reload Mobile App' });
   await expect(reload).toHaveCount(0);
-  const status = {
-    live: { env: 'qa', nodes: { mobile: {} } },
-    apps: { mobile: { running: [{ device: 'iPhone 16', platform: 'ios', source: 'koppler' }] } },
-  };
+  // On the device, but `flutter run` cannot take a reload yet: no Reload.
+  const mobileStatus = { running: [{ device: 'iPhone 16', platform: 'ios', source: 'koppler' }], reloadable: false };
+  const status = { live: { env: 'qa', nodes: { mobile: {} } }, apps: { mobile: mobileStatus } };
   await page.route('**/data/status.json', route => route.fulfill({ json: status }));
   await page.route('**/reload?*', route => {
     const { restart } = route.request().postDataJSON() as { restart: boolean };
@@ -22,6 +21,10 @@ test('a running Flutter card hot reloads, and with Shift hot restarts, its app',
   });
   await page.reload();
   const bar = await actions(page, 'mobile');
+  await expect(card(page, 'mobile').getByRole('img', { name: 'Running' })).toBeVisible();
+  await expect(bar.getByRole('button', { name: 'Settings for Mobile App' })).toBeVisible();
+  await expect(reload).toHaveCount(0);
+  mobileStatus.reloadable = true;
   await bar.getByRole('button', { name: 'Hot reload Mobile App' }).hover();
   await page.screenshot({ path: 'test-results/reload-card.png', clip: { x: 380, y: 60, width: 420, height: 420 } });
   const sent = page.waitForRequest(request => new URL(request.url()).pathname === '/reload');

@@ -1,3 +1,7 @@
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { spawnSync } from 'node:child_process';
 import { expect, test } from 'vitest';
 import { launchProfile, startCommand, type App, type Start, type StartContext } from './launch.ts';
 import { CLONES, repoOf } from './testing/repo.ts';
@@ -129,8 +133,9 @@ test('Flutter: run on the device and stay, its output the log, for hot reload; s
   };
   const ios = startCommand(app, { repo: '/m', env: 'qa', device: { id: 'SIM-1', platform: 'ios' } });
   expect(command(ios).slice(0, 2)).toEqual(['sh', '-c']);
+  const ends = '; s=$?; pkill -P $$ -x tail; exit $s; }';
   expect(script(ios)).toBe(
-    'tail -f /dev/null | fvm flutter run --flavor qa --dart-define-from-file=.env_qa.json -d SIM-1',
+    `tail -f /dev/null | { fvm flutter run --flavor qa --dart-define-from-file=.env_qa.json -d SIM-1${ends}`,
   );
   // It stays, with its process id kept for hot reload.
   const kept = startCommand(app, {
@@ -140,7 +145,7 @@ test('Flutter: run on the device and stay, its output the log, for hot reload; s
     device: { id: 'SIM-1', platform: 'ios' },
   });
   expect(script(kept)).toBe(
-    'tail -f /dev/null | fvm flutter run --pid-file /t/flutter-app.pid --flavor qa --dart-define-from-file=.env_qa.json -d SIM-1',
+    `rm -f /t/flutter-app.pid; tail -f /dev/null | { fvm flutter run --pid-file /t/flutter-app.pid --flavor qa --dart-define-from-file=.env_qa.json -d SIM-1${ends}`,
   );
   expect(ios.onStop).toEqual([['xcrun', 'simctl', 'terminate', 'SIM-1', 'com.acme.app']]);
   const android = startCommand(app, { repo: '/m', env: 'prod', device: { id: 'emulator-5554', platform: 'android' } });
@@ -148,7 +153,19 @@ test('Flutter: run on the device and stay, its output the log, for hot reload; s
   expect(startCommand(app, { repo: '/m', env: 'qa' }).error).toMatch(/needs a device/);
   // A device id is one shell word whatever it holds.
   const odd = startCommand({ kind: 'flutter' }, { repo: '/m', env: 'qa', device: { id: "it's", platform: 'ios' } });
-  expect(script(odd)).toBe("tail -f /dev/null | flutter run -d 'it'\\''s'");
+  expect(script(odd)).toBe(`tail -f /dev/null | { flutter run -d 'it'\\''s'${ends}`);
+});
+
+test('Flutter: what Koppler started ends when flutter run ends, with its exit status', () => {
+  const bin = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-flutter-'));
+  fs.writeFileSync(path.join(bin, 'flutter'), '#!/bin/sh\nexit 3\n', { mode: 0o755 });
+  const start = startCommand({ kind: 'flutter' }, { repo: bin, device: { id: 'SIM-1', platform: 'ios' } });
+  const [shell = '', ...args] = command(start);
+  const env = { ...process.env, PATH: `${bin}:${process.env['PATH'] ?? ''}` };
+  const ran = spawnSync(shell, args, { env, timeout: 5000 });
+  fs.rmSync(bin, { recursive: true, force: true });
+  expect(ran.signal).toBeNull();
+  expect(ran.status).toBe(3);
 });
 
 test("Node: the stack's script, else dev, else start", () => {

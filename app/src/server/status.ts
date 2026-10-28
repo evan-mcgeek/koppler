@@ -13,6 +13,7 @@ import { lockedPaths } from '../engine/locks.ts';
 import { stackSource } from '../engine/stack-file.ts';
 import { readMessages } from '../engine/messages.ts';
 import { recipesFor } from '../engine/recipes.ts';
+import { reloadable } from '../engine/reload.ts';
 import { runningEnvs, runningNames } from '../engine/runs.ts';
 import { live, notes, runs } from '../engine/history.ts';
 import { currentStack, LOADING, stacksHere } from '../engine/stacks.ts';
@@ -41,6 +42,8 @@ interface AppStatus extends Loose {
   steps?: Step[];
   listening?: boolean;
   running?: MobileApp[];
+  /** A Flutter app whose `flutter run` takes a hot reload. */
+  reloadable?: boolean;
   logTail?: string | null;
   state?: StateOf;
 }
@@ -255,6 +258,7 @@ async function snapshot(serving: boolean): Promise<Status> {
   for (const [id, app] of Object.entries(status.apps)) {
     if (app.port) app.listening = await portOpen(app.port);
     if (mobileState[id]) app.running = mobileState[id];
+    if (reloadable(id)) app.reloadable = true;
     app.logTail = tail(logFile(id, app.log));
     delete app.log;
   }
