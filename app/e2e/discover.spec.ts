@@ -81,6 +81,20 @@ test.describe('a board with an app', () => {
     await page.screenshot({ path: 'test-results/discover.png' });
   });
 
+  test('the layout Arrange gave is kept, after a reload too', async ({ page }) => {
+    await discover(page);
+    const layout = () =>
+      page.locator('.svelte-flow__node').evaluateAll(all => all.map(one => one.style.transform).join());
+    const was = await layout();
+    await page.getByRole('button', { name: 'Arrange', exact: true }).click();
+    await expect.poll(layout).not.toBe(was);
+    const arranged = await layout();
+    await saveSettles(page);
+    await page.reload();
+    await discover(page);
+    await expect.poll(layout).toBe(arranged);
+  });
+
   test('a card being dragged keeps its links on it, before it is let go', async ({ page }) => {
     await discover(page);
     await page.getByRole('button', { name: 'Fit', exact: true }).click();

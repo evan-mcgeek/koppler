@@ -232,6 +232,10 @@ const discoverOf = (given: unknown): DiscoverState => {
   return { open, at, ...(layout !== undefined && { layout }) };
 };
 
+/** Anything Discover has to keep: cards opened or moved, or the layout Arrange gave. */
+const discoverKept = (discover: DiscoverState) =>
+  discover.open.length > 0 || Object.keys(discover.at).length > 0 || discover.layout !== undefined;
+
 class Board {
   /** The stack's name and the environment the board runs against; empty until the board is opened. */
   stack = $state('');
@@ -1319,7 +1323,7 @@ class Board {
       ...(Object.keys(this.hiddenQueues).length && { hiddenQueues: Object.keys(this.hiddenQueues) }),
       ...(Object.keys(this.hiddenOutside).length && { hiddenOutside: Object.keys(this.hiddenOutside) }),
       ...(Object.keys(this.cardNotes).length && { cardNotes: this.cardNotes }),
-      ...((this.discover.open.length || Object.keys(this.discover.at).length) && { discover: this.discover }),
+      ...(discoverKept(this.discover) && { discover: this.discover }),
       ...(this.feature && { feature: this.feature }),
     };
   }
@@ -1840,7 +1844,7 @@ class Board {
       hiddenLogs: Object.keys(this.hiddenLogs).length ? this.hiddenLogs : undefined,
       logAliases: Object.keys(this.logAliases).length ? this.logAliases : undefined,
       cardNotes: Object.keys(this.cardNotes).length ? this.cardNotes : undefined,
-      discover: this.discover.open.length || Object.keys(this.discover.at).length ? this.discover : undefined,
+      discover: discoverKept(this.discover) ? this.discover : undefined,
       feature: this.feature ?? undefined,
       outside: this.pinned.length ? this.pinned : undefined,
       infra: Object.fromEntries(

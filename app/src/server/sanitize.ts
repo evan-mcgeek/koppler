@@ -65,7 +65,7 @@ const note = (value: unknown) => (typeof value === 'string' && value ? { note: t
 const CARD = /^(tunnel:[\w.-]{1,253}:\d{1,5}|(queue|outside):[a-z0-9-]{1,64})$/;
 /** Notes on the board's other cards, by card, for the agent: a run carries them. */
 /** Discover's part of a board: the cards opened with +N, and where its cards sit. */
-const discoverOf = (given: unknown): { open: string[]; at: Record<string, Point> } | undefined => {
+const discoverOf = (given: unknown): { open: string[]; at: Record<string, Point>; layout?: number } | undefined => {
   const kept = fieldsOf(given);
   const card = (key: unknown): key is string =>
     isId(key) || (typeof key === 'string' && (CARD.test(key) || /^database:[a-z0-9-]{1,64}$/.test(key)));
@@ -76,7 +76,9 @@ const discoverOf = (given: unknown): { open: string[]; at: Record<string, Point>
       .slice(0, 500)
       .map(([key, point]) => [key, xy(point)]),
   );
-  return open.length || Object.keys(at).length ? { open, at } : undefined;
+  const { layout } = kept;
+  const laid = typeof layout === 'number' && Number.isInteger(layout) && layout >= 0 && layout < 100 ? { layout } : {};
+  return open.length || Object.keys(at).length || 'layout' in laid ? { open, at, ...laid } : undefined;
 };
 const cardNotes = (given: unknown): Record<string, string> =>
   Object.fromEntries(
