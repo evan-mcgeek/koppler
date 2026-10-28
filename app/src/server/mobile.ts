@@ -20,8 +20,8 @@ export interface MobileApp {
 }
 /** How the stack names a mobile app on each platform. */
 interface MobileIds {
-  iosBundleId?: string;
-  androidPackage?: string;
+  iosBundleId?: string | undefined;
+  androidPackage?: string | undefined;
 }
 
 const MOBILE_INTERVAL_MS = 5000;

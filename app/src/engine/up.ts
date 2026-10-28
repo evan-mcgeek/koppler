@@ -36,6 +36,7 @@ import { appOn } from '../core/stack.ts';
 import { databasesOf, localValue } from '../core/databases.ts';
 import { localAddresses } from './local-databases.ts';
 import { opens } from '../server/cable-test.ts';
+import { findMobileApp, type MobileApp } from '../server/mobile.ts';
 import { earlyLogSeconds, readEarlyLogs } from './early-log.ts';
 import os from 'node:os';
 
@@ -220,6 +221,22 @@ async function stopFirst(up: Up, board: Run): Promise<void> {
     if (leaves && actions.some(action => action.app === id && action.kind !== 'process'))
       up.left.push(`revert ${nameOf(up.stack, id)}'s changes (it left the board)`);
   }
+}
+
+const DEVICE_WAIT_MINUTES = 20;
+
+/** Waits for a mobile app to be on a simulator or device, while what builds and installs it still runs. */
+export async function onDevice(
+  find: () => Promise<MobileApp[]>,
+  running: () => boolean,
+  { every = 5000, minutes = DEVICE_WAIT_MINUTES } = {},
+): Promise<{ on: 'device'; app: MobileApp } | { on: 'died' | 'waited' }> {
+  for (const until = Date.now() + minutes * 60_000; Date.now() < until; await sleep(every)) {
+    const [app] = await find();
+    if (app) return { on: 'device', app };
+    if (!running()) return { on: 'died' };
+  }
+  return { on: 'waited' };
 }
 
 /** Branches as the board asks, uncommitted changes as chosen on the card. */
@@ -624,7 +641,29 @@ async function startApps(up: Up): Promise<void> {
         step(id, 'Start', 'failed', error.message.split('\n')[0] ?? '');
         continue;
       }
-      step(id, 'Start', 'done', up.stack.apps[id]?.once ? 'Finished.' : 'Running.');
+      const mobile = up.stack.apps[id]?.mobile;
+      if (platform && runIn !== 'mock' && (mobile?.iosBundleId || mobile?.androidPackage)) {
+        // `flutter run` is up long before the app is: it builds first, then installs it on the device.
+        step(id, 'Start', 'todo', 'Building it and installing it on the device.');
+        const record = readRecord(id);
+        const reached = await onDevice(
+          () => findMobileApp(mobile),
+          () => !!record && alive(record),
+        );
+        if (reached.on === 'died') {
+          down.set(id, 'it stopped before it reached the device');
+          step(id, 'Start', 'failed', 'It stopped before it reached the device; its log says why.');
+          continue;
+        }
+        step(
+          id,
+          'Start',
+          reached.on === 'device' ? 'done' : 'todo',
+          reached.on === 'device'
+            ? `Running on ${reached.app.device ?? 'the device'}.`
+            : `Not on the device after ${String(DEVICE_WAIT_MINUTES)} min; its log says how far it got.`,
+        );
+      } else step(id, 'Start', 'done', up.stack.apps[id]?.once ? 'Finished.' : 'Running.');
       if (runIn !== 'mock' && !up.stack.apps[id]?.once) {
         started.push(id);
         step(id, FIRST, 'todo', 'Reading its log for problems.');

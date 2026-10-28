@@ -5,6 +5,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { switchBack, switchTo } from '../dist/engine/branch.js';
+import { readClones, writeData } from '../dist/data.js';
+import { tempDir } from '../dist/paths.js';
 import { test } from 'node:test';
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-branch-')), repo = path.join(dir, 'repo'), logFile = path.join(dir, 'actions.json');
@@ -100,4 +102,17 @@ test('A clone the user moved to a third branch stays there: Stop drops the switc
   assert.match(switchBack({ app: 'api', logFile: log }).message, /your set-aside changes wait in the stash as "koppler: api on develop while it runs feature\/x"/);
   assert.match(g('stash', 'list'), /koppler: api on develop/);
   assert.equal(entries(), 0);
+});
+
+test('A switch and the way back are kept for the clone at once, and an open canvas is asked to show them.', async () => {
+  fs.writeFileSync(path.join(repo, 'a.txt'), 'mine\n'); fs.writeFileSync(path.join(repo, 'new.txt'), 'untracked\n');
+  writeData('local', { apps: { api: { path: repo, branch: 'develop', dirty: 2, branches: ['develop', 'feature/x'] } } });
+  fs.rmSync(path.join(tempDir(), 'refresh.json'), { force: true });
+  switchTo({ app: 'api', repo, to: 'feature/x', how: 'set-aside', logFile });
+  assert.deepEqual(readClones().api, { path: repo, branch: 'feature/x', dirty: 0, branches: ['develop', 'feature/x'] });
+  assert.ok(fs.existsSync(path.join(tempDir(), 'refresh.json')));
+  switchBack({ app: 'api', logFile });
+  assert.equal(readClones().api.branch, 'develop');
+  assert.equal(readClones().api.dirty, 2);
+  fs.rmSync(path.join(repo, 'new.txt')); git('checkout', '-q', '--', 'a.txt');
 });
