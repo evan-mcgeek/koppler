@@ -76,6 +76,7 @@ Compose is checked last: many repos have a compose file only for their database.
 - **`other`:** any app, started by the command in its `start` field.
 - **Your own kinds:** a stack can define kinds for a technology Koppler has no recipe for: the files that recognise it, its start command and its port. See `kinds` in the [stack format](../plugin/skills/koppler-run/references/stack.md).
 - **Outside systems** (`outside`): things the apps call that never run locally, such as Salesforce or a SaaS API. They show in Discover, not on a board, and always use the deployed environment.
+  An outside system's own links can come from its repos, read by the agent on request; for Salesforce, see [reading a Salesforce org](../plugin/skills/koppler-run/references/salesforce.md).
 
 ## What every run gets
 

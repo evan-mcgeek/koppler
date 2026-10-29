@@ -43,7 +43,14 @@ export function linksOf(facts: Facts): Link[] {
   for (const [id, app] of Object.entries(apps)) {
     for (const [to, call] of Object.entries(app.consumes ?? {}))
       if (apps[to])
-        links.push({ from: id, to, kind: 'call', sure: 'confirmed', ...(!sourced(call) && { unsourced: true }) });
+        links.push({
+          from: id,
+          to,
+          kind: 'call',
+          sure: 'confirmed',
+          ...(call.found && { via: call.found }),
+          ...(!sourced(call) && { unsourced: true }),
+        });
     for (const [to, where] of Object.entries(facts.found?.[id] ?? {}))
       if (apps[to] && !app.consumes?.[to]) links.push({ from: id, to, kind: 'call', sure: 'found', via: where });
     for (const [queue, use] of Object.entries(app.publishes ?? {}))

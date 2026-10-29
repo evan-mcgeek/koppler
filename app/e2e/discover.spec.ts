@@ -456,6 +456,47 @@ test.describe('a call recorded with nothing on where it comes from', () => {
   });
 });
 
+test.describe('an outside system whose links were read from its own repo', () => {
+  const call = 'acme/crm-org force-app/main/default/classes/PaymentsService.cls:12';
+  const event = 'acme/crm-org force-app/main/default/classes/OrderEvents.cls:30';
+  test.use({
+    stack: {
+      ...STACK,
+      apps: {
+        ...STACK.apps,
+        orders: { ...STACK.apps.orders, reads: { changes: {} } },
+        crm: {
+          name: 'CRM',
+          kind: 'other',
+          outside: 'Salesforce org',
+          consumes: { payments: { how: 'unknown', found: call } },
+          publishes: { changes: { via: event } },
+        },
+      },
+      queues: { changes: { name: 'Order changed event', type: 'eventbridge' } },
+    },
+    board: {
+      env: 'qa',
+      mode: 'auto',
+      zoom: 1,
+      pan: { x: 60, y: 60 },
+      nodes: { web: at(0, 0), orders: at(400, 0), payments: at(400, 300) },
+      edges: [],
+    },
+  });
+
+  test('draws its call and its event, each with where it was read', async ({ page }) => {
+    await discover(page);
+    await expect(page.locator('[data-link="crm>payments>call"]')).toHaveCount(1);
+    await expect(page.locator('[data-link="crm>queue:changes>publish"]')).toHaveCount(1);
+    await expect(page.locator('.mark.unsourced')).toHaveCount(0);
+    await card(page, 'crm').click();
+    const panel = page.getByRole('complementary');
+    await expect(panel.getByText(call)).toHaveCount(1);
+    await expect(panel.getByText(event)).toHaveCount(1);
+  });
+});
+
 test.describe('a card opened on a busy map', () => {
   test.use({
     stack: {
