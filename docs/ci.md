@@ -40,7 +40,12 @@ koppler stack schema > stack.schema.json
 ```
 
 ```json
-{ "$schema": "./stack.schema.json", "name": "Acme", "envs": ["qa", "prod"], "apps": {} }
+{
+  "$schema": "./stack.schema.json",
+  "name": "Acme",
+  "envs": ["qa", "prod"],
+  "apps": {}
+}
 ```
 
 ## Proposing what was learned

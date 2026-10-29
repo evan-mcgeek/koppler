@@ -15,3 +15,6 @@ src/lambda-secrets-proxy.go
 test/*.mjs
 bin/
 .lavish/
+
+# Copies pulled from Claude Design, kept as they are.
+../docs/design/sources/

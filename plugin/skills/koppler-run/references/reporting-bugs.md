@@ -25,26 +25,32 @@ Never work around a Koppler bug silently, and never keep it only in `<state>/NOT
 
 Title: what goes wrong, in plain words ("Stop leaves the Kafka broker running after a failed Send").
 
-```markdown
+````markdown
 ## What happened
+
 One or two sentences: what the user did, what they expected, what happened instead.
 
 ## How to reproduce
+
 1. Numbered steps from a clean start, with the commands and the clicks.
 2. A minimal stack.json excerpt with neutral names, if the stack matters.
 
 ## Logs
+
 <scrubbed lines, only around the problem, in a ```text block>
 
 ## Where it goes wrong
+
 The file and line, or the instruction in the skill, and why it fails.
 
 ## Possible fix
+
 What you would change, and how it could be tested.
 
 ## Environment
+
 The first line of `koppler status --debug`, and the agent used.
-```
+````
 
 Never put in an issue: secret values, the user's stack.json as is, internal hostnames, company or app names, file paths under the user's home, screenshots of their apps.
 
@@ -52,13 +58,13 @@ Never put in an issue: secret values, the user's stack.json as is, internal host
 
 Every issue is a card on https://github.com/users/evan-mcgeek/projects/2, in one of five columns:
 
-| Column | Holds | Option id |
-|---|---|---|
-| Bugs | Something broken, not started | `f75ad846` |
-| Feature Requests | Something new or better, not started | `edf21591` |
-| In Progress | Being fixed or built, on a branch | `47fc9ee4` |
-| Testing | Merged, for the user to try | `394ec429` |
-| Done | The user tried it, or it needed no trying | `98236657` |
+| Column           | Holds                                     | Option id  |
+| ---------------- | ----------------------------------------- | ---------- |
+| Bugs             | Something broken, not started             | `f75ad846` |
+| Feature Requests | Something new or better, not started      | `edf21591` |
+| In Progress      | Being fixed or built, on a branch         | `47fc9ee4` |
+| Testing          | Merged, for the user to try               | `394ec429` |
+| Done             | The user tried it, or it needed no trying | `98236657` |
 
 To add an issue and set its column:
 
