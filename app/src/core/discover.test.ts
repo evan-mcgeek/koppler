@@ -25,7 +25,7 @@ describe('linksOf', () => {
       // Recorded, with nothing on where it comes from.
       { from: 'payments', to: 'psp', kind: 'call', sure: 'confirmed', unsourced: true },
       { from: 'queue:events', to: 'payments', kind: 'read', sure: 'confirmed', via: 'rule to Lambda' },
-      { from: 'reports', to: 'payments', kind: 'call', sure: 'confirmed' },
+      { from: 'reports', to: 'payments', kind: 'call', sure: 'confirmed', via: 'src/pay.ts:3' },
     ]);
   });
 });
