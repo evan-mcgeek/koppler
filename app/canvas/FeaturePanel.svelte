@@ -103,7 +103,14 @@
         {/if}
       </header>
       {#each steps.filter(step => step.phase === at) as { step, number } (number)}
-        <div class="step" class:proposed={step.proposed}>
+        <div
+          class="step"
+          class:proposed={step.proposed}
+          aria-current={discovered.step === number || undefined}
+          {@attach (row: HTMLElement) => {
+            if (discovered.step === number) row.scrollIntoView({ block: 'nearest' });
+          }}
+        >
           <span class="at">{number}</span>
           <span class="what">
             <span>{name(step.from)} → {name(step.to)}</span>
@@ -215,6 +222,13 @@
     color: var(--ink);
     font: 400 14px/1.5 var(--sans);
   }
+  /* Full width, as tall as its words, scrolling past half the window. */
+  textarea {
+    min-height: calc(4lh + 14px);
+    max-height: 50vh;
+    field-sizing: content;
+    resize: none;
+  }
   .uses {
     margin: 10px 0 0;
     padding-bottom: 12px;
@@ -267,6 +281,12 @@
     padding: 9px 0;
     border-bottom: 1px solid var(--line);
     font: 400 14px var(--sans);
+  }
+  /* Picked by its number on the map: tinted past the column on both sides, so its words stay where they were. */
+  .step[aria-current='true'] {
+    margin-inline: -8px;
+    padding-inline: 8px;
+    background: color-mix(in oklab, var(--cable) 12%, transparent);
   }
   .at {
     flex: none;

@@ -165,3 +165,58 @@ test('feature requests and board switches are restored by undo and redo', async 
   await page.getByRole('radio', { name: 'Discover', exact: true }).check();
   await expect(page.getByLabel('Describe the feature')).toHaveValue('Customers pay for an order.');
 });
+
+test("a step's number on the map picks its row in the panel", async ({ page, canvas }) => {
+  await newFeature(page);
+  await page.getByLabel('Describe the feature').fill('Customers pay for an order.');
+  await page.getByRole('button', { name: 'Hand it to the agent' }).click();
+  await expect.poll(() => kept(canvas.temp)?.feature?.request).toBe('Customers pay for an order.');
+  koppler(
+    canvas,
+    'board',
+    'edit',
+    'New feature',
+    '--phase',
+    'Pay',
+    '--step',
+    'web:orders',
+    '--step',
+    'orders:queue:events',
+    '--phase',
+    'Settle',
+    '--step',
+    'queue:events:payments',
+    '--step',
+    'web:payments',
+  );
+  const panel = page.getByRole('complementary', { name: 'New feature' });
+  const row = (number: string) => panel.locator('.step').filter({ has: page.getByText(number, { exact: true }) });
+  await expect(page.locator('.links .number text')).toHaveText(['1.1', '1.2', '2.1', '2.2']);
+  await page.locator('.links .number').filter({ hasText: '2.2' }).click();
+  await expect(row('2.2')).toHaveAttribute('aria-current', 'true');
+  await expect(panel.locator('.step[aria-current]')).toHaveCount(1);
+  await expect(row('2.2')).toBeInViewport();
+  await page.screenshot({ path: 'test-results/feature-step-picked.png' });
+  await page.locator('.links .number').filter({ hasText: '1.1' }).click();
+  await expect(row('1.1')).toHaveAttribute('aria-current', 'true');
+  await expect(panel.locator('.step[aria-current]')).toHaveCount(1);
+  // Clicked again, it lets go.
+  await page.locator('.links .number').filter({ hasText: '1.1' }).click();
+  await expect(panel.locator('.step[aria-current]')).toHaveCount(0);
+
+  // The request, changed in the panel, stays as wide as the panel and grows with its words, not by a handle.
+  await panel.getByTitle('Change the request').click();
+  const request = panel.getByLabel('The request');
+  await request.fill('Customers pay for an order.\n'.repeat(8));
+  const box = await request.boundingBox();
+  const room = await request.evaluate(el => {
+    const around = getComputedStyle(el.parentElement as HTMLElement);
+    return (
+      (el.parentElement as HTMLElement).clientWidth - parseFloat(around.paddingLeft) - parseFloat(around.paddingRight)
+    );
+  });
+  expect(box?.width).toBe(room);
+  expect(box?.height).toBeGreaterThan(8 * 20);
+  expect(await request.evaluate(el => getComputedStyle(el).resize)).toBe('none');
+  await page.screenshot({ path: 'test-results/feature-request-grows.png' });
+});
