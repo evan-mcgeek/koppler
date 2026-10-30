@@ -118,3 +118,19 @@ test('A file secret with no steps for another environment is a gap that names th
     assert.match(r.stdout + r.stderr, /^GAP\s+orders-api prod No steps for getting the file src\/Orders\/appsettings\.secrets\.json for Orders API on PROD$/m);
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
+
+test('Two databases on one port: the one whose app names the setting for its address moves to a free port, with no sudo step.', async () => {
+  const { spawnSync } = await import('node:child_process');
+  const db = (tunnel, name) => ({ name, kind: 'postgres', tunnel, port: 5432 });
+  useStack({
+    envs: ['qa'],
+    apps: {
+      o: { name: 'Orders API', kind: 'dotnet', url: 'http://localhost:5001', uses: { 'orders-db': { env: 'Db__Host' } } },
+      w: { name: 'Web API', kind: 'node', url: 'http://localhost:3000', uses: { 'web-db': {} } },
+    },
+    databases: { 'orders-db': db('orders-db.qa.acme.example', 'Orders'), 'web-db': db('web-db.qa.acme.example', 'Web') },
+  });
+  const out = spawnSync('node', [path.join(import.meta.dirname, '..', 'dist', 'koppler.mjs'), 'plan', 'o', 'w', '--env', 'qa'], { encoding: 'utf8', env: process.env });
+  assert.match(out.stdout, /^Orders API's orders tunnel moves from port 5432 to 5434/);
+  assert.doesNotMatch(out.stdout, /sudo/);
+});

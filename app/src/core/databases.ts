@@ -22,7 +22,7 @@ export const DATABASE_KINDS: Record<string, string> = {
 };
 
 /** The needs a database brings on one environment, or none when it is not reached there. */
-export function databaseNeeds(database: Database, env: string, first: string): Prereq[] {
+export function databaseNeeds(database: Database, env: string, first: string, setting?: string): Prereq[] {
   // Another environment's tunnel or name is never borrowed: each environment states its own.
   const reach = env === first ? database : database.envs?.[env];
   if (!reach) return [];
@@ -30,7 +30,15 @@ export function databaseNeeds(database: Database, env: string, first: string): P
   const what = `${database.name ?? 'Database'}${kind ? ` (${kind})` : ''}`;
   return [
     ...(reach.tunnel && reach.port
-      ? [{ tunnel: reach.tunnel, port: reach.port, what, ...(reach.cmd && { cmd: reach.cmd }) }]
+      ? [
+          {
+            tunnel: reach.tunnel,
+            port: reach.port,
+            what,
+            ...(reach.cmd && { cmd: reach.cmd }),
+            ...(setting && { env: setting }),
+          },
+        ]
       : []),
     ...(reach.hosts ? [{ hosts: reach.hosts, note: `${what}: the name its connection settings dial.` }] : []),
   ];
@@ -58,9 +66,12 @@ export function withDatabases<S extends Stackish>(stack: S, local: ReadonlySet<s
   const first = stack.envs[0] ?? '';
   const apps = Object.fromEntries(
     Object.entries(stack.apps).map(([id, app]) => {
-      const used = Object.keys(app?.uses ?? {}).flatMap(key => (databases[key] ? [databases[key]] : []));
+      const used = Object.entries(app?.uses ?? {}).flatMap(([key, use]) =>
+        databases[key] ? [{ database: databases[key], setting: (use as { env?: string } | null)?.env }] : [],
+      );
       if (!app || !used.length) return [id, app];
-      const needs = (env: string) => used.flatMap(database => databaseNeeds(database, env, first));
+      const needs = (env: string) =>
+        used.flatMap(({ database, setting }) => databaseNeeds(database, env, first, setting));
       const envs = Object.fromEntries(
         stack.envs.slice(1).flatMap(env => {
           const own = app.envs?.[env];

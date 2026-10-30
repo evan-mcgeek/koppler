@@ -180,6 +180,9 @@ const Database = z.looseObject(
 const Use = z.looseObject(
   {
     setting: setting.optional().describe('The setting its connection comes from, set to a local database when Local'),
+    env: setting
+      .optional()
+      .describe("The setting that holds the tunnel's host:port; with it, the tunnel can move to a free port"),
     change: LocalChange.optional().describe(
       'A code change for a run on a local database, when the app reads no setting for it; {local} is its address',
     ),
