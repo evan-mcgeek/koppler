@@ -371,8 +371,17 @@
             {/each}
             {#each drawn.filter(one => one.step) as one (one.key)}
               {#if one.step}
+                {@const number = one.step.number}
                 <g class="mark" class:board={one.board} class:faded={one.faded}>
-                  <g class="number" transform="translate({one.middle.x} {one.middle.y})">
+                  <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+                  <g
+                    class="number pick"
+                    class:picked={discovered.step === number}
+                    transform="translate({one.middle.x} {one.middle.y})"
+                    onclick={() => {
+                      discovered.step = discovered.step === number ? null : number;
+                    }}
+                  >
                     <rect
                       x={-one.step.number.length * 3.6 - 6}
                       y="-9"
@@ -704,6 +713,15 @@
   .number text {
     fill: var(--ink);
     font: 600 11px var(--mono);
+  }
+  /* A step's number picks its row in the panel; picked, it is outlined as a picked phase is. */
+  .pick {
+    cursor: pointer;
+    pointer-events: auto;
+  }
+  .pick.picked rect {
+    stroke: var(--ink);
+    stroke-width: 2;
   }
   /* Recorded with nothing on where it comes from: a ? on the link, in a box like a step's number. */
   .unsourced .number rect {

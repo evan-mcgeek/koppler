@@ -75,6 +75,8 @@ class Discovered {
   }
   /** The phase picked in the feature's panel: the others dim. */
   phase = $state<number | null>(null);
+  /** The step picked by its number on the map: its row in the panel is marked. */
+  step = $state<string | null>(null);
   /** The last card picked, whose links the panel lists. */
   last = $state<Card | null>(null);
   picked = $state<Card[]>([]);
