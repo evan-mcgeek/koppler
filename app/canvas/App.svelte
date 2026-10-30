@@ -117,7 +117,7 @@
     if (hash.startsWith('#board=')) {
       const want = decodeURIComponent(hash.slice(7)).toLowerCase();
       const asked = [...board.own, ...board.team].find(one => one.name.toLowerCase() === want);
-      if (asked && asked.name !== board.name) board.openBoard(asked);
+      if (asked && asked.name !== board.name) openBoard(asked);
     }
     // With no stack the page asks for one; with a stack that has no apps yet, for its repos.
     if (board.setup) dialogs.setup?.open();
@@ -218,7 +218,8 @@
               : `The agent changed ${one.board}: ${describeEdit(one.edit, name)}.`,
           );
           // A board made from the terminal is the one the agent wants shown.
-          const fresh = one.create && board.name !== one.board && board.own.find(each => each.name === one.board);
+          const fresh =
+            one.create && runs.idle && board.name !== one.board && board.own.find(each => each.name === one.board);
           if (fresh) openBoard(fresh);
         }
         void post('board-edit-done', { id: one.id });

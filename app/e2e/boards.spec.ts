@@ -279,3 +279,27 @@ test('a board of your own is shared with the team: it joins the stack as a team 
   await expect(boards(page).getByText('Team board').first()).toBeVisible();
   await expect(opens(page).filter({ hasText: 'Web Shop' })).toHaveCount(2);
 });
+
+test('with something running, opening another board first stops and reverts it', async ({ page }) => {
+  const live = { env: 'qa', nodes: { web: { run: 'cli' } }, edges: [] };
+  await page.route('**/data/status.json', route => route.fulfill({ json: { apps: {}, running: ['web'], live } }));
+  const sent: { tag: string; data: { action?: string } }[] = [];
+  await page.route('**/prompt?*', route => {
+    sent.push(route.request().postDataJSON() as (typeof sent)[number]);
+    return route.fulfill({ json: { ok: true } });
+  });
+  await page.reload();
+  await picker(page).click();
+  await boards(page)
+    .getByRole('button', { name: /^Checkout/ })
+    .click();
+  const review = page.getByRole('dialog', { name: 'Open Checkout' });
+  await expect(review).toContainText(
+    'Something is still running. It is stopped and reverted first, then Checkout opens.',
+  );
+  await expect(review).toContainText('Web Shop');
+  await expect(picker(page)).toHaveText('New board');
+  await review.getByRole('button', { name: 'Stop, revert and open' }).click();
+  await expect(picker(page)).toHaveText('Checkout');
+  expect(sent.map(one => [one.tag, one.data.action])).toEqual([['koppler-stop', 'stop']]);
+});
