@@ -2,7 +2,6 @@
 // request the agent or Koppler gets once it is confirmed. The plan itself is core/plan.
 import { describe, plan, type Plan, type RunIn } from '../src/core/plan.ts';
 import { board } from './board.svelte.ts';
-import { openBoard } from './boards.ts';
 import { post, save, send } from './data.ts';
 import { live } from './live.svelte.ts';
 import { dialogs } from './dialogs.svelte.ts';
@@ -631,7 +630,7 @@ class Runs {
       back: {
         label: `Back to ${before.name}`,
         run: () => {
-          openBoard(before);
+          board.openBoard(before);
         },
       },
     };
@@ -729,7 +728,8 @@ class Runs {
 
   /**
    * The review of a Stop and revert: what stops (unless `stops` is false), what else is listed, and what the agent is
-   * told once it is confirmed. `data` goes with the request, such as the stack to switch to afterwards.
+   * told once it is confirmed. `data` goes with the request, such as the stack to switch to afterwards; `then` runs once
+   * it is sent.
    */
   stopReview({
     stops = true,
@@ -737,6 +737,7 @@ class Runs {
     text,
     sent,
     data = {},
+    then,
     ...shown
   }: Pick<Review, 'title' | 'sub' | 'notices' | 'ok'> & {
     stops?: boolean;
@@ -744,6 +745,7 @@ class Runs {
     text: string;
     sent: string;
     data?: object;
+    then?: () => void;
   }): void {
     const steps = this.#plan({ env: board.env, nodes: {}, edges: [] });
     this.review = {
@@ -752,7 +754,11 @@ class Runs {
       prod: true,
       blocked: false,
       confirm: () => {
-        void this.deliver(text, { tag: 'koppler-stop', data: { action: 'stop', id: newRunId(), ...data } }, sent);
+        void this.deliver(text, { tag: 'koppler-stop', data: { action: 'stop', id: newRunId(), ...data } }, sent).then(
+          ok => {
+            if (ok) then?.();
+          },
+        );
       },
     };
   }
