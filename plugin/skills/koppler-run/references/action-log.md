@@ -10,16 +10,16 @@ If a command says the log is damaged, stop and tell the user: never start it afr
 Give every entry its `app`, so that when a later run drops one app from the board, only that app's entries are stopped and reverted and removed from the log; a full Stop and revert still empties it.
 The log says how to undo things; which runs and Stops happened, and how they ended, is the run history (`koppler history`, `<state>/history.jsonl`, written by the canvas and `koppler history done`).
 
-| `kind` | Fields |
-|---|---|
-| `edit` | `app`, `file`, `before`, `after` (exact strings), `recipe?` (set by `koppler recipes --apply` for a remembered change) |
-| `profile` | `app`, `file` (the full path, like every `file` in this log), `name`, `created` (bool), `previous` (env object, when an existing profile was updated) |
-| `process` | `name` (the `koppler run` name), `command`, `port?`. For the rare process not started through `koppler` (e.g. `flutter run` in the background): `label`, `pid` (the program's own pid, not a shell wrapper: find it by the listening port or the first word of `ps -o command=`, never with a bare `pgrep -f`), `command`, `port?` |
-| `env-file` | `app`, `file` (e.g. `.env.local`), `lines` added, `created` (bool: Koppler created the file) |
-| `file` | `app`, `file`, `before` (the file's text before the run, `null` when Koppler created it), `after` (the text Koppler wrote last): a local library's `pubspec_overrides.yaml`; Stop puts `before` back or removes the file, and leaves a file that no longer reads as `after` for you to sort out |
-| `npm-local` | `app`, `repo`, `packages`: local libraries installed with `npm install --no-save`; Stop runs `npm install` to go back to the published ones, after the branch is back |
-| `checkout` | `app`, `repo`, `from` (a branch, or a commit with `detached`), `to`, `stash?` (its label), `carried?`; written by `koppler switch`, do not add it yourself. It stays until the clone is back and its set-aside changes are too: when those clash, the clone is left clean, they stay in the stash, and the user takes them back with `git stash pop` |
-| `secret` | `app`, `env` (name only) |
+| `kind`      | Fields                                                                                                                                                                                                                                                                                                                                               |
+| ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `edit`      | `app`, `file`, `before`, `after` (exact strings), `recipe?` (set by `koppler recipes --apply` for a remembered change)                                                                                                                                                                                                                               |
+| `profile`   | `app`, `file` (the full path, like every `file` in this log), `name`, `created` (bool), `previous` (env object, when an existing profile was updated)                                                                                                                                                                                                |
+| `process`   | `name` (the `koppler run` name), `command`, `port?`. For the rare process not started through `koppler` (e.g. `flutter run` in the background): `label`, `pid` (the program's own pid, not a shell wrapper: find it by the listening port or the first word of `ps -o command=`, never with a bare `pgrep -f`), `command`, `port?`                   |
+| `env-file`  | `app`, `file` (e.g. `.env.local`), `lines` added, `created` (bool: Koppler created the file)                                                                                                                                                                                                                                                         |
+| `file`      | `app`, `file`, `before` (the file's text before the run, `null` when Koppler created it), `after` (the text Koppler wrote last): a local library's `pubspec_overrides.yaml`; Stop puts `before` back or removes the file, and leaves a file that no longer reads as `after` for you to sort out                                                      |
+| `npm-local` | `app`, `repo`, `packages`: local libraries installed with `npm install --no-save`; Stop runs `npm install` to go back to the published ones, after the branch is back                                                                                                                                                                                |
+| `checkout`  | `app`, `repo`, `from` (a branch, or a commit with `detached`), `to`, `stash?` (its label), `carried?`; written by `koppler switch`, do not add it yourself. It stays until the clone is back and its set-aside changes are too: when those clash, the clone is left clean, they stay in the stash, and the user takes them back with `git stash pop` |
+| `secret`    | `app`, `env` (name only)                                                                                                                                                                                                                                                                                                                             |
 
 `koppler history done` copies the code changes in this log (`edit`, `profile`, `env-file`, `checkout`) into the run's history entry, with secrets masked, so the canvas History shows them as diffs even after a revert. Log each change before calling it.
 
@@ -31,10 +31,11 @@ You get the Stop only for what it left (listed in the prompt; those entries stay
 ## Stop
 
 Stop only processes the agent started, as recorded in the log:
+
 - `name` entries: `koppler stop <name...>` (it stops the whole process tree, `TERM` then `KILL` after 8 s). `koppler status` lists what Koppler runs, after a Claude Code restart too; something there the log does not know about was started by the user, so leave it.
 - `pid` entries: only if the `pid` still runs the logged `command`; send `TERM`, wait up to 10 s, then `KILL`.
-Check each logged `port` is free afterwards.
-Leave running: anything the user started (IDE sessions, their own terminals, tunnels they opened), AWS SSO logins, and anything not in the log. Name what was left running in the report.
+  Check each logged `port` is free afterwards.
+  Leave running: anything the user started (IDE sessions, their own terminals, tunnels they opened), AWS SSO logins, and anything not in the log. Name what was left running in the report.
 
 ## Revert
 

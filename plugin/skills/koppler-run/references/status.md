@@ -23,10 +23,27 @@ What the card then holds:
       "port": 5001,
       "log": "/absolute/path/to/app.log",
       "steps": [
-        { "label": "Changes", "state": "done", "detail": "QA-LOCAL points Orders API at http://localhost:5001." },
-        { "label": "Prerequisites", "state": "done", "detail": "AWS login, Redis tunnel on :6379." },
-        { "label": "Start", "state": "user", "detail": "Run in your own terminal.", "copy": "<exact command>" },
-        { "label": "Check", "state": "todo", "detail": "http://localhost:5001 answers." }
+        {
+          "label": "Changes",
+          "state": "done",
+          "detail": "QA-LOCAL points Orders API at http://localhost:5001."
+        },
+        {
+          "label": "Prerequisites",
+          "state": "done",
+          "detail": "AWS login, Redis tunnel on :6379."
+        },
+        {
+          "label": "Start",
+          "state": "user",
+          "detail": "Run in your own terminal.",
+          "copy": "<exact command>"
+        },
+        {
+          "label": "Check",
+          "state": "todo",
+          "detail": "http://localhost:5001 answers."
+        }
       ]
     }
   }
@@ -53,13 +70,13 @@ Started through `koppler`, it keeps running across agent sessions.
 
 ## Where logs come from
 
-| App started by | Log |
-|---|---|
-| The agent or the user, through `koppler run <app> ...` | written by `koppler` |
-| The user, in the foreground of their own terminal | `bin/run-logged <app> -- <command>` |
-| The user, from an IDE: a Flutter app | `koppler run <app> --cwd <repo> --keep-alive -- fvm flutter logs -d <device id>` copies the app's output from the simulator, emulator or phone (`fvm flutter devices` lists ids). It follows the app across restarts and shows lines only when the app prints |
-| The user, from an IDE: anything else | none; the output stays in the IDE. The card still shows the port state and checklist |
-| A web front end's browser console | not captured yet; its dev server's output is, when started through `koppler run` |
+| App started by                                         | Log                                                                                                                                                                                                                                                           |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| The agent or the user, through `koppler run <app> ...` | written by `koppler`                                                                                                                                                                                                                                          |
+| The user, in the foreground of their own terminal      | `bin/run-logged <app> -- <command>`                                                                                                                                                                                                                           |
+| The user, from an IDE: a Flutter app                   | `koppler run <app> --cwd <repo> --keep-alive -- fvm flutter logs -d <device id>` copies the app's output from the simulator, emulator or phone (`fvm flutter devices` lists ids). It follows the app across restarts and shows lines only when the app prints |
+| The user, from an IDE: anything else                   | none; the output stays in the IDE. The card still shows the port state and checklist                                                                                                                                                                          |
+| A web front end's browser console                      | not captured yet; its dev server's output is, when started through `koppler run`                                                                                                                                                                              |
 
 Both write `~/.local/state/koppler/logs/<app>.log` (private to the user) and restart the file on each run, so the `koppler run` name must be the app id for the card to find it.
 
@@ -68,14 +85,14 @@ Both write `~/.local/state/koppler/logs/<app>.log` (private to the user) and res
 The board is kept by the canvas server as the user changes it, so a reload brings it back.
 While `status-watch.mjs` runs, it listens on `127.0.0.1` (port 4747 or `KOPPLER_PORT`; the token is kept in `~/.local/state/koppler/canvas-token`, so the page address survives restarts) and handles:
 
-| Request | What it does |
-|---|---|
-| `GET /s/<token>/` and `/s/<token>/data/<name>.json` | serves the canvas and its data; the URL is in `<state>/canvas-url` |
-| `POST /state?token=…` | keeps only known layout fields and writes `<state>/state.json`, which the page loads on open |
-| `POST /preset?token=…` | body `{ "url" }`: reads a preset file from an https GitHub link (through the user's `gh` login, else as a public file, 300 KB at most) and returns its presets with only known fields; any other address is refused |
-| `POST /secret?token=…`, `/secret-remove`, `/secret-test` | body `{ app, env, name }` (+ `value` to set): store, remove or test one secret the stack declares for that app and environment; nothing returns a value, and the test answers only `{ ok, message }` |
-| `POST /apps?token=…` | body `{ apps: [{ slug, name?, kind? }] }`: adds clones the user picked to `stack.json` as apps not set up yet (only clones the scan found, never one already there), then reloads the stack |
-| `POST /prompt?token=…` | a run/Stop from the standalone page (`koppler` or `koppler-stop` only); appended to `<state>/prompts.jsonl`, which `koppler listen` prints and consumes, and kept as a run in `<state>/history.jsonl` |
+| Request                                                  | What it does                                                                                                                                                                                                        |
+| -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /s/<token>/` and `/s/<token>/data/<name>.json`      | serves the canvas and its data; the URL is in `<state>/canvas-url`                                                                                                                                                  |
+| `POST /state?token=…`                                    | keeps only known layout fields and writes `<state>/state.json`, which the page loads on open                                                                                                                        |
+| `POST /preset?token=…`                                   | body `{ "url" }`: reads a preset file from an https GitHub link (through the user's `gh` login, else as a public file, 300 KB at most) and returns its presets with only known fields; any other address is refused |
+| `POST /secret?token=…`, `/secret-remove`, `/secret-test` | body `{ app, env, name }` (+ `value` to set): store, remove or test one secret the stack declares for that app and environment; nothing returns a value, and the test answers only `{ ok, message }`                |
+| `POST /apps?token=…`                                     | body `{ apps: [{ slug, name?, kind? }] }`: adds clones the user picked to `stack.json` as apps not set up yet (only clones the scan found, never one already there), then reloads the stack                         |
+| `POST /prompt?token=…`                                   | a run/Stop from the standalone page (`koppler` or `koppler-stop` only); appended to `<state>/prompts.jsonl`, which `koppler listen` prints and consumes, and kept as a run in `<state>/history.jsonl`               |
 
 The full list of routes is in `app/src/server/routes.ts`.
 Everything else gets 404, 400 or 413.
@@ -84,6 +101,7 @@ The page saves 400 ms after each change, and tries again when the server did not
 ## Mobile app detection
 
 The mobile app has no port, so for registry apps with a `mobile` field (`iosBundleId`, `androidPackage`) the watcher checks every 5 seconds:
+
 - iOS: each booted simulator's `launchctl list` for `UIKitApplication:<bundle id>[`
 - Android: `adb shell pidof <package>` on each connected device, with the model from `getprop ro.product.model`
 - the matching `flutter run` process for `--flavor` and `--machine` (started from an IDE) or not (CLI)
