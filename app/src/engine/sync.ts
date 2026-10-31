@@ -18,6 +18,7 @@ import { CONFIG, expand, fail, type Index, loadConfig, readIndex, type Save, til
 import {
   branchesOf,
   candidateRepos,
+  mainOf,
   DEFAULT_DEPTH,
   DEFAULT_ROOTS,
   git,
@@ -87,7 +88,14 @@ function syncStack(stackDir: string, index: Index, github = false): void {
     const dirty = lines(git(clone, 'status', '--porcelain')).length;
     const libraries = librariesFor(clone, packages);
     const branch = git(clone, 'branch', '--show-current') || null;
-    local[id] = { path: clone, branch, dirty, branches: branchesOf(clone), ...(libraries.length && { libraries }) };
+    local[id] = {
+      path: clone,
+      branch,
+      main: mainOf(clone),
+      dirty,
+      branches: branchesOf(clone),
+      ...(libraries.length && { libraries }),
+    };
     const also = others.length ? ` (also: ${others.map(tilde).join(', ')})` : '';
     console.log(`OK ${id}: ${tilde(clone)} [${branch ?? 'detached'}]${dirty ? ` dirty=${String(dirty)}` : ''}${also}`);
   }

@@ -4,6 +4,7 @@ import type { Edge, Node } from '@xyflow/svelte';
 import { resolveExpressions } from '../src/core/expressions.ts';
 import { editFeature, featureOf, type Feature } from '../src/core/feature.ts';
 import { databasesOf, withDatabases } from '../src/core/databases.ts';
+import { changedNote } from '../src/core/discover.ts';
 import { BOARD_FORMAT } from '../src/core/migrations/board/index.ts';
 import { BOARD_FILE_FORMAT, migrateBoardFile } from '../src/core/migrations/board-file/index.ts';
 import { migrateStack } from '../src/core/migrations/stack/index.ts';
@@ -184,6 +185,8 @@ export interface StackApp {
   current: string;
   branches: string[];
   dirty: number;
+  /** What its clone has that the repo's main branch does not, in words; empty when nothing. */
+  changed: string;
   /** The libraries it depends on that are cloned here, and where. */
   libraries: { name: string; path: string }[];
 }
@@ -1719,6 +1722,7 @@ class Board {
       current: clones[id]?.branch ?? '',
       branches: clones[id]?.branches ?? [],
       dirty: clones[id]?.dirty ?? 0,
+      changed: changedNote(clones[id] ?? {}),
       libraries: (clones[id]?.libraries ?? []).map(({ name, path }) => ({ name, path })),
       ...(app.outside && { outside: typeof app.outside === 'string' ? app.outside : 'an outside system' }),
     }));

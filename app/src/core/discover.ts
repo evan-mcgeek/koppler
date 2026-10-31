@@ -34,6 +34,13 @@ const via = (use: unknown): string | undefined => {
   return typeof said === 'string' && said ? said : undefined;
 };
 
+/** What a clone has that its repo's main branch does not: its branch, and how many files it changed. Empty when none. */
+export function changedNote(clone: { branch?: string | null; main?: string | null; dirty?: number }): string {
+  const branch = clone.branch && clone.main && clone.branch !== clone.main ? clone.branch : '';
+  const dirty = clone.dirty ? `${String(clone.dirty)} changed` : '';
+  return [branch, dirty].filter(Boolean).join(', ');
+}
+
 const ACCESS = { read: 'reads', write: 'writes', both: 'both' } as const;
 
 /** Every link the stack knows: its calls, the calls found in the code, its queues, databases and resources. */

@@ -56,6 +56,8 @@ export type Registry = Stack & {
 export interface Clone {
   path: string;
   branch?: string | null;
+  /** The branch the repo's remote starts from, when it says. */
+  main?: string | null;
   dirty?: number;
   branches?: string[];
   /** Clones of libraries the app depends on, which it can use in place of the published ones. */

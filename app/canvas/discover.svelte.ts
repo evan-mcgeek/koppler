@@ -34,6 +34,8 @@ export interface LeanData extends Record<string, unknown> {
   repo: string;
   /** A queue sent to that nothing reads or passes on. */
   deadEnd: boolean;
+  /** Its clone's branch and changed files, when the repo's main branch does not have them. */
+  changed: string;
 }
 
 export const CARD = { w: 200, h: 64 };
@@ -98,7 +100,16 @@ class Discovered {
     const proposed = !!board.feature && proposedCard(board.feature, card);
     const slug = facts?.apps[card]?.slug ?? '';
     const repo = (this.#perRepo[slug.toLowerCase()] ?? 0) > 1 ? (slug.split('/').pop() ?? '') : '';
-    const base = { onBoard, hidden, cloned: false, app: false, proposed, deadEnd: this.#dead.has(card), repo };
+    const base = {
+      onBoard,
+      hidden,
+      cloned: false,
+      app: false,
+      proposed,
+      deadEnd: this.#dead.has(card),
+      repo,
+      changed: '',
+    };
     if (card.startsWith('queue:')) {
       const queue = facts?.queues?.[card.slice(6)];
       const [tag, meta] = QUEUE_TAGS[queue?.type ?? ''] ?? ['QUEUE', 'Queue'];
@@ -140,6 +151,7 @@ class Discovered {
       meta: app?.cloned ? '' : 'On GitHub',
       cloned: !!app?.cloned,
       app: !!app?.cloned,
+      changed: app?.changed ?? '',
     };
   }
 

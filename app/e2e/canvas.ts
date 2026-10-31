@@ -118,6 +118,7 @@ export const test = base.extend<{
             {
               path: path.join(dir, 'clones', id),
               branch: 'main',
+              main: 'main',
               dirty: dirty.includes(id) ? 3 : 0,
               branches: ['main', 'feature/checkout'],
               ...(libraries[id] && {

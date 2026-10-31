@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { deadEnds, linksOf, mapOf, type Facts } from './discover.ts';
+import { changedNote, deadEnds, linksOf, mapOf, type Facts } from './discover.ts';
 
 const app = (name: string, extra: object = {}) => ({ name, kind: 'node', slug: `acme/${name}`, ...extra });
 const facts = {
@@ -121,5 +121,18 @@ describe('mapOf on a feature board', () => {
       { card: 'orders', onBoard: true, hidden: 3 },
     ]);
     expect(mapOf(facts, ['web', 'orders'], ['orders'], false).cards).toHaveLength(5);
+  });
+});
+
+describe('changedNote', () => {
+  it("says the clone's branch when it is not the main one, and how many files it changed", () => {
+    expect(changedNote({ branch: 'feat/refunds', main: 'main', dirty: 3 })).toBe('feat/refunds, 3 changed');
+    expect(changedNote({ branch: 'feat/refunds', main: 'main', dirty: 0 })).toBe('feat/refunds');
+    expect(changedNote({ branch: 'main', main: 'main', dirty: 2 })).toBe('2 changed');
+  });
+  it('says nothing for a clean main branch, or a branch whose main the remote does not name', () => {
+    expect(changedNote({ branch: 'main', main: 'main', dirty: 0 })).toBe('');
+    expect(changedNote({ branch: 'develop', main: null, dirty: 0 })).toBe('');
+    expect(changedNote({})).toBe('');
   });
 });
