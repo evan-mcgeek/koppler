@@ -1,5 +1,18 @@
 # Working on Koppler
 
+## How we work
+
+Before building a feature, follow `docs/workflow/feature.md`.
+Before fixing a bug or a flaky test, follow `docs/workflow/bugs.md`.
+
+- Decisions are the user's; facts are yours to find. Ask only what you cannot look up, one round at a time, each question with your recommended answer.
+- Show proposals and questions as a page the user can annotate, with the `lavish` skill: feature proposals, ideas borrowed from other tools, a grill round whose answers have options to compare, and plans. Their notes come back to you through it.
+- The user merges. One branch and one PR per issue, off `origin/main`; give the user the merge command.
+- Issues and tickets are drafted and shown first, then filed on the user's yes, onto the project board in their column.
+- Examples use the Acme Shop stack. Real stack names, hosts and apps stay out of the repo.
+- Any lint error, test failure or flake you see is yours to fix, in the same PR.
+- Write plain dashes, never em dashes. Commits and PR bodies carry no agent attribution.
+
 ## Golden rule: nobody edits JSON by hand
 
 Nobody writes a Koppler JSON file directly: not `stack.json`, not the state files, not a board.
