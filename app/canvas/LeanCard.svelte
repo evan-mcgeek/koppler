@@ -24,6 +24,7 @@
   {#if data.repo}<span class="repo">{data.repo} /</span>{/if}
   <span class="top">
     <span class="name">{data.name}</span>
+    {#if data.edited}<span class="edited" title={data.edited.says}>{data.edited.tag}</span>{/if}
     <span class="tag">{data.tag}</span>
   </span>
   <span class="meta">
@@ -157,6 +158,15 @@
     font: 400 10px var(--mono);
     letter-spacing: 0.06em;
     text-transform: uppercase;
+    white-space: nowrap;
+  }
+  /* Solid, unlike its kind: something here the shared stack does not have yet. */
+  .edited {
+    flex: none;
+    padding: 1px 5px;
+    background: var(--ink);
+    color: var(--desk);
+    font: 600 10px var(--sans);
     white-space: nowrap;
   }
   .meta {

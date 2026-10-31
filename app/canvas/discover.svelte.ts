@@ -14,6 +14,7 @@ import {
 } from '../src/core/feature.ts';
 import { board } from './board.svelte.ts';
 import { post } from './data.ts';
+import { live } from './live.svelte.ts';
 import { runs } from './run.svelte.ts';
 import { toasts } from './toast.svelte.ts';
 
@@ -34,6 +35,8 @@ export interface LeanData extends Record<string, unknown> {
   repo: string;
   /** A queue sent to that nothing reads or passes on. */
   deadEnd: boolean;
+  /** Added or changed here and not in the shared stack yet: what to tag it with, and what changed. */
+  edited: { tag: 'New' | 'Changed'; says: string } | null;
 }
 
 export const CARD = { w: 200, h: 64 };
@@ -98,7 +101,25 @@ class Discovered {
     const proposed = !!board.feature && proposedCard(board.feature, card);
     const slug = facts?.apps[card]?.slug ?? '';
     const repo = (this.#perRepo[slug.toLowerCase()] ?? 0) > 1 ? (slug.split('/').pop() ?? '') : '';
-    const base = { onBoard, hidden, cloned: false, app: false, proposed, deadEnd: this.#dead.has(card), repo };
+    const edit = live.status?.changed?.[card];
+    const edited = edit
+      ? {
+          tag: edit.added ? ('New' as const) : ('Changed' as const),
+          says: edit.added
+            ? 'Added here, not in the shared stack yet'
+            : `Changed here, not in the shared stack yet: ${edit.fields.join(', ')}`,
+        }
+      : null;
+    const base = {
+      onBoard,
+      hidden,
+      cloned: false,
+      app: false,
+      proposed,
+      deadEnd: this.#dead.has(card),
+      repo,
+      edited,
+    };
     if (card.startsWith('queue:')) {
       const queue = facts?.queues?.[card.slice(6)];
       const [tag, meta] = QUEUE_TAGS[queue?.type ?? ''] ?? ['QUEUE', 'Queue'];

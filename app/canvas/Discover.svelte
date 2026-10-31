@@ -194,6 +194,7 @@
     return resource?.type === 'sfn' ? (resource.steps ?? []) : undefined;
   });
   const lastApp = $derived(discovered.last ? board.app(discovered.last) : undefined);
+  const lastEdited = $derived(discovered.last ? discovered.data(discovered.last, false, 0).edited : null);
   const lastStack = $derived(discovered.last ? board.facts?.apps[discovered.last] : undefined);
   /** Brings a card to the middle of the map and picks it. */
   const show = (card: Card) => {
@@ -554,6 +555,7 @@
             ><Laptop size={14} aria-hidden="true" />Cloned here{lastApp.current ? ` · ${lastApp.current}` : ''}</span
           >{:else if lastStack && !lastStack.outside}<span class="where">On GitHub</span>{/if}
         {#if lastStack?.slug}<span class="slug">{lastStack.slug}</span>{/if}
+        {#if lastEdited}<span class="edited">{lastEdited.says}</span>{/if}
       </header>
       {#each groups as group (group.title)}
         <section>
@@ -960,6 +962,10 @@
     align-items: center;
     gap: 8px;
     font: 400 13px var(--sans);
+  }
+  .edited {
+    color: var(--ink);
+    font: 400 12px/1.5 var(--sans);
   }
   .slug {
     color: var(--ink-muted);

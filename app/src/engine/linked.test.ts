@@ -11,7 +11,8 @@ test('a stack linked from GitHub is copied, compared, updated and proposed back'
   process.env.KOPPLER_CONFIG_DIR = dir;
   process.env.KOPPLER_TEMP = path.join(dir, 'temp');
   fs.mkdirSync(process.env.KOPPLER_TEMP);
-  const { changes, discardChanges, linkStack, linkedStatus, proposeChanges, updateStack } = await import('./linked.ts');
+  const { changes, discardChanges, linkStack, linkedStatus, proposeChanges, stackChanges, updateStack } =
+    await import('./linked.ts');
   const link = 'https://github.com/acme/team-config/blob/main/stacks/shop/stack.json';
   let remote = { name: 'Shop', envs: ['qa'], apps: { api: { name: 'API', kind: 'node', slug: 'acme/api' } } };
   const read = async (f: any) => (
@@ -61,6 +62,11 @@ test('a stack linked from GitHub is copied, compared, updated and proposed back'
     }),
   );
   assert.deepEqual(linkedStatus(ok(linked).stack)!.changes, ['added Web', 'changed API: url']);
+  // The same, card by card, for the map.
+  assert.deepEqual(stackChanges(ok(linked).stack), {
+    api: { added: false, fields: ['url'] },
+    web: { added: true, fields: [] },
+  });
   remote = { ...remote, notes: ['new note'] } as any;
   assert.match(
     (await updateStack(ok(linked).stack, { read })).error as any,
