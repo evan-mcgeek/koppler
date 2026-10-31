@@ -11,6 +11,7 @@ import { actionsCommand, stepCommand } from './cli/records.ts';
 import { fail, Failure } from './failure.ts';
 import { canvas, logs, restart, status, stop } from './cli/running.ts';
 import { readData, readStack } from './data.ts';
+import { guide } from './core/guide.ts';
 import { switchCommand } from './engine/branch.ts';
 import { APPROVE, stackCommands } from './engine/checks.ts';
 import { deployed } from './engine/deployed.ts';
@@ -426,6 +427,16 @@ const COMMANDS: Command[] = [
     about: 'list the stacks on this Mac (* is in use), switch to one, or list its boards',
     run: use,
     example: 'koppler use "Shop"',
+  },
+  {
+    name: 'guide',
+    who: 'you',
+    args: '',
+    about: 'a page in Markdown for someone new to the stack: its apps, who calls whom, its features, what each needs',
+    run: () => {
+      process.stdout.write(guide(loaded()));
+    },
+    example: 'koppler guide > GUIDE.md',
   },
   {
     name: 'db',
