@@ -132,6 +132,7 @@ The chip opens the agent's messages; with no agent listening, or one gone quiet,
 Nothing on it runs or changes the board.
 Its tools are the board's: Select and Hand, Undo, Arrange (each press the next layout), Fit, zoom and Present, with the same keys; dragging over the map picks the cards in it, and the overview sits in the corner.
 A card's **+N** brings in the links it leaves out; a dashed link was found in the code and is not in the stack yet, and **Confirm** in the panel keeps it there.
+A call whose place in the code is known (where it was found, or the settings file the stack names) has **Open in editor**, which opens that file in the caller's clone, at its line, in VS Code or any editor that takes `vscode://` links.
 A **?** on a link means the stack records the call without saying where it comes from (no setting, file or place in the code): **No source yet**.
 Resources are what the stack's `resources` name: an S3 bucket's link says whether the app **reads**, **writes** or **both**; an API Gateway's panel lists its routes and what each hands to; a Step Functions panel lists what starts it and its steps in order.
 **Read again** reads the code once more: your clones, and, with your `gh` login, the repos not cloned here, from a copy Koppler keeps for reading only (`koppler sync --github`).

@@ -16,7 +16,7 @@
   import { around, facing, SIDES, type Box } from '../src/core/cables.ts';
   import { along, layOut, routePath } from '../src/core/layout.ts';
   import { engine } from './elk.ts';
-  import type { Card, Link } from '../src/core/discover.ts';
+  import { sourceOf, type Card, type Link } from '../src/core/discover.ts';
   import { isLight, appearance } from './appearance.svelte.ts';
   import { board } from './board.svelte.ts';
   import { CARD, discovered, linkKey, type LeanData } from './discover.svelte.ts';
@@ -140,6 +140,12 @@
   const proposals = $derived(discovered.proposals);
   const proposedCards = $derived(map.cards.filter(({ card }) => discovered.data(card, false, 0).proposed).length);
   const name = (card: Card) => discovered.data(card, false, 0).name;
+  /** Where a call is in the caller's clone, as a link the editor opens. */
+  const editorLink = (link: Link) => {
+    const at = board.facts && sourceOf(board.facts, link);
+    const clone = board.app(link.from)?.path;
+    return at && clone ? `vscode://file${encodeURI(`${clone}/${at.file}`)}${at.line ? `:${String(at.line)}` : ''}` : '';
+  };
   const tag = (card: Card) => discovered.data(card, false, 0).tag;
   /** The picked card's links, by what they do, as the panel lists them. */
   const groups = $derived.by(() => {
@@ -598,6 +604,15 @@
                 {:else if link.unsourced}<span class="detail"><span>No source yet</span></span>{:else if link.via}<span
                     class="detail"><span>{link.via}</span></span
                   >{/if}
+                {#if editorLink(link)}
+                  <span class="detail"
+                    ><a
+                      class="text"
+                      href={editorLink(link)}
+                      title="Opens in VS Code, or the editor that takes vscode:// links">Open in editor</a
+                    ></span
+                  >
+                {/if}
               </div>
             {/each}
           {:else}
@@ -874,7 +889,8 @@
     font: 600 13px var(--sans);
     cursor: pointer;
   }
-  button.text {
+  button.text,
+  a.text {
     padding: 0;
     border: 0;
     background: none;
@@ -1026,7 +1042,8 @@
     flex: 1;
     min-width: 0;
   }
-  .detail button.text {
+  .detail button.text,
+  .detail a.text {
     font-size: 12px;
   }
   .none {
