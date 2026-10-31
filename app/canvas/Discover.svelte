@@ -22,6 +22,7 @@
   import { CARD, discovered, linkKey, type LeanData } from './discover.svelte.ts';
   import FeaturePanel from './FeaturePanel.svelte';
   import FeatureStart from './FeatureStart.svelte';
+  import FindCard from './FindCard.svelte';
   import { heldKeys } from './held-keys.ts';
   import LeanCard from './LeanCard.svelte';
   import BoardTools from './BoardTools.svelte';
@@ -201,6 +202,22 @@
     discovered.last = card;
     void flow.fitView({ nodes: [{ id: card }], duration: 200, maxZoom: flow.getZoom(), minZoom: flow.getZoom() });
   };
+  let finding = $state(false);
+  /** A card found that was not on the map: shown once the layout has placed it. */
+  let bringing = $state<Card | null>(null);
+  const found = (card: Card) => {
+    if (map.cards.some(one => one.card === card)) show(card);
+    else {
+      bringing = card;
+      discovered.open(card);
+    }
+  };
+  $effect(() => {
+    if (bringing && placeOf(bringing)) {
+      show(bringing);
+      bringing = null;
+    }
+  });
   // The layout is worked out again whenever the map or the chosen layout changes; the same input, the same layout.
   $effect(() => {
     const { cards, links, key, measured } = discovered.layoutInput;
@@ -250,7 +267,10 @@
     if (document.querySelector('dialog[open], :popover-open')) return;
     const key = ev.key.toLowerCase();
     if (ev.metaKey || ev.ctrlKey) {
-      if (key === 'a') {
+      if (key === 'k') {
+        ev.preventDefault();
+        finding = true;
+      } else if (key === 'a') {
         ev.preventDefault();
         pick(map.cards.map(one => one.card));
       } else if (key === 'z') {
@@ -260,7 +280,10 @@
       }
       return;
     }
-    if (key === 'e') board.goEdit();
+    if (key === '/') {
+      ev.preventDefault();
+      finding = true;
+    } else if (key === 'e') board.goEdit();
     else if (key === 'l') board.goLive();
     else if (key === 'f') void fit();
     else if (key === 'p') void presentMap();
@@ -631,6 +654,13 @@
   {:else if board.feature && map.cards.length}
     <FeaturePanel feature={board.feature} />
   {/if}
+  <FindCard
+    open={finding}
+    onpick={found}
+    onclose={() => {
+      finding = false;
+    }}
+  />
 </div>
 
 <style>
