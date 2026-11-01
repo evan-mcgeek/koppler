@@ -3,7 +3,7 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Page } from '@playwright/test';
-import { actions, at, expect, STACK, test, fromMenu } from './canvas.ts';
+import { actions, at, expect, saved, STACK, test, fromMenu } from './canvas.ts';
 
 test.use({
   board: { env: 'qa', mode: 'auto', zoom: 1, pan: { x: 60, y: 60 }, nodes: { orders: at(0, 0) }, edges: [] },
@@ -464,8 +464,9 @@ test('a view picked while the board reads the saved stack again stays picked', a
     .filter({ hasText: /^Discover$/ })
     .click();
   await expect(page.getByRole('radio', { name: 'Discover' })).toBeChecked();
+  // Once the board is put together again from what came back, it is saved: that is when a snap back would show.
+  const kept = saved(page);
   answer();
-  await page.waitForResponse('**/data/registry.json');
-  await page.waitForTimeout(300);
+  await kept;
   await expect(page.getByRole('radio', { name: 'Discover' })).toBeChecked();
 });
