@@ -9,7 +9,7 @@ import { fail } from './failure.ts';
 import { upgradeBoardFile, upgradeStack, type Upgrade } from './core/migrations/files.ts';
 import { readUpgraded } from './upgraded.ts';
 import type { Stack } from './core/stack.ts';
-import { readJson, writeJson } from './json-files.ts';
+import { locked, readJson, writeJson } from './json-files.ts';
 import { tempDir } from './paths.ts';
 
 export type DataName = 'registry' | 'local' | 'repos' | 'state' | 'board-edits' | 'board-proposals' | 'local-databases';
@@ -80,4 +80,10 @@ export const readClones = () => (readData('local')?.['apps'] ?? {}) as Record<st
 export function writeData(name: DataName, value: Data): void {
   writeJson(dataFile(name), value);
   fs.rmSync(path.join(folder(), `${name}.js`), { force: true });
+}
+/** Reads, changes and writes a file while no other process does: a change made meanwhile by another is never lost. */
+export function changeData(name: DataName, change: (now: Data) => Data): void {
+  locked(dataFile(name), () => {
+    writeData(name, change(readData(name) ?? {}));
+  });
 }

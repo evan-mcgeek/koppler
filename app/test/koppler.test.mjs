@@ -561,3 +561,22 @@ test("An app stopped or restarted leaves no steps on its card: the agent's check
   koppler('stop', 'api');
   fs.rmSync(dir, { recursive: true, force: true });
 });
+
+test('Boards made from the terminal at the same time are all kept.', async () => {
+  const { spawn } = await import('node:child_process');
+  const fs = await import('node:fs'), os = await import('node:os'), path = await import('node:path'), { fileURLToPath } = await import('node:url');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-boards-'));
+  const env = { ...process.env, KOPPLER_STATE: dir, KOPPLER_TEMP: dir, KOPPLER_CONFIG_DIR: dir };
+  const entry = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'dist', 'koppler.mjs');
+  const write = (name, value) => fs.writeFileSync(path.join(dir, `${name}.json`), JSON.stringify(value));
+  write('registry', { name: 'Acme', envs: ['qa'], apps: { web: { name: 'Web' } } });
+  write('local', { apps: { web: { path: '/w' } } });
+  write('state', { presets: [] });
+  const names = Array.from({ length: 8 }, (_, i) => `Board ${String(i)}`);
+  const codes = await Promise.all(
+    names.map(name => new Promise(resolve => spawn('node', [entry, 'board', 'new', name, '--add', 'web'], { env, stdio: 'ignore' }).on('exit', resolve))),
+  );
+  assert.deepEqual(codes, names.map(() => 0));
+  const kept = JSON.parse(fs.readFileSync(path.join(dir, 'state.json'), 'utf8')).presets.map(one => one.name);
+  assert.deepEqual(kept.sort(), names);
+});
