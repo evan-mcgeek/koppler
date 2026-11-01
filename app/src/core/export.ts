@@ -1,5 +1,4 @@
-// What an exported page holds: the team's feature boards as flows to read, in plain words. Only the fields named
-// here leave the stack, so nothing added to it later slips into a page meant for people outside the team.
+// An exported page's data: only the fields named here leave the stack.
 import type { Point } from './arrange.ts';
 import type { Card } from './discover.ts';
 import { featureCards, featureOf } from './feature.ts';
@@ -16,16 +15,18 @@ export interface Flow {
   request: string;
   phases: { name: string; steps: { from: Card; to: Card; number: string; note?: string }[] }[];
   cards: FlowCard[];
-  /** Where the board's author left each card, or null when not every card has a place. */
-  at: Record<Card, Point> | null;
+  /** Where the board's author left the cards that have a place. */
+  at: Record<Card, Point>;
 }
-/** The page's data. */
 export interface Exported {
   stack: string;
-  /** When it was made, as an ISO date. */
+  /** ISO date. */
   exported: string;
   flows: Flow[];
 }
+
+/** A card's size on the page, as the layout sees it. */
+export const CARD = { w: 200, h: 60 };
 
 const KIND_WORDS: Record<string, string> = {
   flutter: 'Mobile app',
@@ -56,7 +57,9 @@ export function flowsOf(stack: Stack): Flow[] {
       ...feature,
       phases: feature.phases.map(phase => ({ ...phase, steps: phase.steps.filter(step => !step.proposed) })),
     };
+    // Numbered once the phases left with no step are gone, as the page numbers them.
     const phases = accepted.phases
+      .filter(phase => phase.steps.length)
       .map((phase, at) => ({
         name: phase.name,
         steps: phase.steps.map((step, index) => ({
@@ -65,22 +68,38 @@ export function flowsOf(stack: Stack): Flow[] {
           number: `${String(at + 1)}.${String(index + 1)}`,
           ...(step.note && { note: step.note }),
         })),
-      }))
-      .filter(phase => phase.steps.length);
+      }));
     const cards = featureCards(accepted).map(id => cardOf(stack, id));
-    const kept = ((preset as Record<string, unknown>)['discover'] as { at?: Record<Card, Point> } | undefined)?.at;
-    const placed = cards.every(card => {
-      const point = kept?.[card.id];
-      return typeof point?.x === 'number' && typeof point.y === 'number';
-    });
-    return [
-      {
-        name: preset.name,
-        request: feature.request,
-        phases,
-        cards,
-        at: placed && kept ? Object.fromEntries(cards.map(card => [card.id, kept[card.id] as Point])) : null,
-      },
-    ];
+    const saved = ((preset as Record<string, unknown>)['discover'] as { at?: Record<Card, unknown> } | undefined)?.at;
+    const at = Object.fromEntries(
+      cards.flatMap(card => {
+        const point = saved?.[card.id] as Partial<Point> | undefined;
+        return typeof point?.x === 'number' && typeof point.y === 'number'
+          ? [[card.id, { x: point.x, y: point.y }] as const]
+          : [];
+      }),
+    );
+    return [{ name: preset.name, request: feature.request, phases, cards, at }];
   });
 }
+
+/** Cards with no place yet go in a row under the placed ones, so the author's arrangement stays as it is. */
+export function placeRest(flow: Flow): Record<Card, Point> {
+  const placed = Object.values(flow.at);
+  const left = Math.min(...placed.map(point => point.x));
+  const below = Math.max(...placed.map(point => point.y)) + CARD.h + 80;
+  const rest = flow.cards.filter(card => !flow.at[card.id]);
+  return {
+    ...flow.at,
+    ...Object.fromEntries(rest.map((card, index) => [card.id, { x: left + index * (CARD.w + 60), y: below }])),
+  };
+}
+
+/** The page's file name, from the stack's name. */
+export const fileNameOf = (stack: string): string =>
+  `${
+    stack
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '') || 'stack'
+  }-flows.html`;

@@ -1,11 +1,11 @@
 <script lang="ts">
   // The flows a team shared, to read: pick one, move its cards and the map about, and walk its steps. Nothing is kept.
   import type { Point } from '../../src/core/arrange.ts';
-  import type { Exported, Flow } from '../../src/core/export.ts';
+  import { CARD, type Exported, type Flow } from '../../src/core/export.ts';
 
   const { data }: { data: Exported } = $props();
-  const W = 200;
-  const H = 60;
+  const W = CARD.w;
+  const H = CARD.h;
 
   let picked = $state(0);
   const flow = $derived<Flow | undefined>(data.flows[picked]);
@@ -132,7 +132,7 @@
 <div class="layout">
   <nav aria-label="Flows">
     <h2>Flows</h2>
-    {#each data.flows as one, index (one.name)}
+    {#each data.flows as one, index (index)}
       {@const count = one.phases.flatMap(phase => phase.steps).length}
       <button
         type="button"

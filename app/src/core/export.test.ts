@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { flowsOf } from './export.ts';
+import { fileNameOf, flowsOf, placeRest } from './export.ts';
 import type { Stack } from './stack.ts';
 
 const app = (name: string, extra: object = {}) => ({ name, kind: 'node', slug: `acme/${name}`, ...extra });
@@ -51,7 +51,10 @@ const stack = {
       feature: {
         request: 'r',
         cards: [],
-        phases: [{ name: 'R', steps: [{ from: 'orders', to: 'psp', kind: 'call' }] }],
+        phases: [
+          { name: 'Only proposed', steps: [{ from: 'shop', to: 'orders', kind: 'call', proposed: true }] },
+          { name: 'R', steps: [{ from: 'orders', to: 'psp', kind: 'call' }] },
+        ],
       },
     },
   ],
@@ -81,10 +84,12 @@ describe('flowsOf', () => {
     });
   });
 
-  it('leaves out boards that are no feature, and places it does not have for every card', () => {
+  it('leaves out boards that are no feature, phases with no step left, and places the board does not have', () => {
     const flows = flowsOf(stack);
     expect(flows.map(flow => flow.name)).toEqual(['Checkout', 'Refund']);
-    expect(flows[1]?.at).toBeNull();
+    expect(flows[1]?.at).toEqual({});
+    // A phase left with no step goes, and the next is numbered as the page shows it.
+    expect(flows[1]?.phases.map(phase => [phase.name, phase.steps[0]?.number])).toEqual([['R', '1.1']]);
     expect(flows[1]?.cards.find(card => card.id === 'psp')?.kind).toBe('Outside service');
   });
 
@@ -92,5 +97,23 @@ describe('flowsOf', () => {
     const text = JSON.stringify(flowsOf(stack));
     for (const kept of ['localhost', 'acme.example', 'ORDERS_DB', 'PSP_URL', 'acme/', 'flutter', 'dotnet'])
       expect(text).not.toContain(kept);
+  });
+
+  it('keeps the places the author gave, and puts a card added since in a row below', () => {
+    const [checkout] = flowsOf(stack);
+    if (!checkout) throw new Error('no Checkout');
+    const { orders: _, ...partial } = checkout.at;
+    expect(placeRest({ ...checkout, at: partial })).toEqual({
+      shop: { x: 0, y: 0 },
+      'queue:events': { x: 600, y: 0 },
+      orders: { x: 0, y: 140 },
+    });
+  });
+});
+
+describe('fileNameOf', () => {
+  it('names the page after the stack, in plain letters', () => {
+    expect(fileNameOf('Acme Shop')).toBe('acme-shop-flows.html');
+    expect(fileNameOf('  ** ')).toBe('stack-flows.html');
   });
 });
