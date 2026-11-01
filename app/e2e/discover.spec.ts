@@ -15,6 +15,8 @@ const stack = {
 };
 /** The view no longer moving: it refits when the map or the panel beside it changes. */
 const settled = async (page: Page) => {
+  // A refit due or under way, as the map says; then the view no longer moving.
+  await expect(page.locator('.map[data-moving]')).toHaveCount(0);
   const view = () => page.locator('.svelte-flow__viewport').getAttribute('style');
   await expect
     .poll(async () => {
@@ -24,6 +26,9 @@ const settled = async (page: Page) => {
     })
     .toBe(true);
 };
+/** Where a card sits on the map itself, which the view moving about does not change. */
+const onMap = async (page: Page, id: string) =>
+  Number(/translate\([^,]+,\s*(-?[\d.]+)px/.exec((await card(page, id).getAttribute('style')) ?? '')?.[1]);
 const discover = async (page: Page) => {
   await expect(card(page, 'web')).toBeVisible();
   await page.keyboard.press('d');
@@ -106,9 +111,13 @@ test.describe('a board with an app', () => {
     await page.mouse.move(from.x + 40, from.y + 20);
     await page.mouse.down();
     await page.mouse.move(from.x + 40, from.y + 160, { steps: 8 });
-    const now = await web.boundingBox();
-    if (!now) throw new Error('no Web Shop card');
-    expect(now.y).toBeGreaterThan(from.y + 100);
+    // The card is under the pointer, drawn a frame after it moved; dragging it opens no panel that would move the map.
+    const under = async () => {
+      const box = await web.boundingBox();
+      return !!box && box.y <= from.y + 160 && from.y + 160 <= box.y + box.height;
+    };
+    await expect.poll(under).toBe(true);
+    await expect(page.getByRole('complementary')).toHaveCount(0);
     // Where its link leaves it, on the page: on the card's edge as it is now, still held. On a slow machine the link
     // is drawn a frame after the card, so it is given those frames to catch up.
     const leaves = () =>
@@ -154,12 +163,13 @@ test.describe('a board with an app', () => {
     await settled(page);
     const [web, orders] = [await card(page, 'web').boundingBox(), await card(page, 'orders').boundingBox()];
     if (!web || !orders) throw new Error('no cards');
+    const [webWas, ordersWas] = [await onMap(page, 'web'), await onMap(page, 'orders')];
     await page.mouse.move(web.x + 40, web.y + 20);
     await page.mouse.down();
     await page.mouse.move(web.x + 40, web.y + 140, { steps: 8 });
     await page.mouse.up();
-    expect((await card(page, 'web').boundingBox())?.y).toBeGreaterThan(web.y + 60);
-    expect(Math.abs(((await card(page, 'orders').boundingBox())?.y ?? 0) - orders.y)).toBeLessThan(3);
+    await expect.poll(() => onMap(page, 'web')).toBeGreaterThan(webWas + 60);
+    expect(Math.abs((await onMap(page, 'orders')) - ordersWas)).toBeLessThan(1);
     const map = page.locator('.svelte-flow__pane');
     const box = await map.boundingBox();
     if (!box) throw new Error('no map');
@@ -182,13 +192,14 @@ test.describe('a board with an app', () => {
     );
     await card(page, 'orders').click();
     await settled(page);
-    const [web, orders] = [await card(page, 'web').boundingBox(), await card(page, 'orders').boundingBox()];
-    if (!web || !orders) throw new Error('no cards');
+    const web = await card(page, 'web').boundingBox();
+    if (!web) throw new Error('no Web Shop card');
+    const ordersWas = await onMap(page, 'orders');
     await page.mouse.move(web.x + 40, web.y + 20);
     await page.mouse.down();
     await page.mouse.move(web.x + 40, web.y + 140, { steps: 8 });
     await page.mouse.up();
-    expect(Math.abs(((await card(page, 'orders').boundingBox())?.y ?? 0) - orders.y)).toBeLessThan(3);
+    expect(Math.abs((await onMap(page, 'orders')) - ordersWas)).toBeLessThan(1);
     const box = await page.locator('.svelte-flow__pane').boundingBox();
     if (!box) throw new Error('no map');
     // Pointed at first, as a person does: the map takes the click once it has caught up with the pointer.
