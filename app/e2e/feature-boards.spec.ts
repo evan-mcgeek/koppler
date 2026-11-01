@@ -204,6 +204,34 @@ test("a step's number on the map picks its row in the panel", async ({ page, can
   await page.locator('.links .number').filter({ hasText: '1.1' }).click();
   await expect(panel.locator('.step[aria-current]')).toHaveCount(0);
 
+  // Walked through: the arrows go step by step, stopping at either end, and the bar says each step.
+  await panel.getByRole('button', { name: 'Walk through the steps' }).click();
+  const bar = page.getByRole('status', { name: /^Step / });
+  await expect(bar).toHaveAccessibleName('Step 1.1');
+  await expect(bar).toContainText('Web Shop → Orders API');
+  await expect(page.locator('.links .link:not(.faded)')).toHaveCount(1);
+  await page.keyboard.press('ArrowLeft');
+  await expect(bar).toHaveAccessibleName('Step 1.1');
+  for (const number of ['1.2', '2.1', '2.2', '2.2']) {
+    await page.keyboard.press('ArrowRight');
+    await expect(bar).toHaveAccessibleName(`Step ${number}`);
+    await expect(row(number)).toHaveAttribute('aria-current', 'true');
+  }
+  // Both ends of the step are brought into the map, clear of the panel.
+  const edge = await page.getByLabel('Discover map').evaluate(el => el.getBoundingClientRect().right);
+  await expect
+    .poll(async () => {
+      const box = await card(page, 'payments').boundingBox();
+      return box ? box.x + box.width <= edge : false;
+    })
+    .toBe(true);
+  await page.screenshot({ path: 'test-results/feature-step-walk.png' });
+  await bar.getByRole('button', { name: 'Previous step' }).click();
+  await expect(bar).toHaveAccessibleName('Step 2.1');
+  await page.keyboard.press('Escape');
+  await expect(bar).toHaveCount(0);
+  await expect(page.locator('.links .link.faded')).toHaveCount(0);
+
   // The request, changed in the panel, stays as wide as the panel and grows with its words, not by a handle.
   await panel.getByTitle('Change the request').click();
   const request = panel.getByLabel('The request');

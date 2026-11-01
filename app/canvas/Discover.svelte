@@ -4,6 +4,9 @@
   import Sparkle from '@lucide/svelte/icons/sparkle';
   import X from '@lucide/svelte/icons/x';
   import Laptop from '@lucide/svelte/icons/laptop';
+  import { untrack } from 'svelte';
+  import ChevronLeft from '@lucide/svelte/icons/chevron-left';
+  import ChevronRight from '@lucide/svelte/icons/chevron-right';
   import {
     SvelteFlow,
     Background,
@@ -31,6 +34,20 @@
 
   const flow = useSvelteFlow();
   const map = $derived(discovered.map);
+  // A step picked is brought into view, both its cards, without zooming in.
+  $effect(() => {
+    const step = discovered.current?.step;
+    if (step)
+      untrack(
+        () =>
+          void flow.fitView({
+            nodes: [{ id: step.from }, { id: step.to }],
+            duration: 200,
+            maxZoom: flow.getZoom(),
+            padding: 0.3,
+          }),
+      );
+  });
   // The map refits when it gains cards or the panel takes or gives back its room.
   const shape = $derived(`${String(map.cards.length)}:${String(!!discovered.last)}`);
   $effect(() => {
@@ -124,17 +141,19 @@
           label: link.kind === 'bucket' && !step ? link.via : undefined,
           faded:
             (!!near && !(discovered.picked.includes(link.from) || discovered.picked.includes(link.to))) ||
-            (phase !== null && step?.phase !== phase),
+            (phase !== null && step?.phase !== phase) ||
+            (!!discovered.current && step?.number !== discovered.current.number),
         },
       ];
     });
   });
-  /** Each phase's name, above the card its first step leaves. */
+  /** Each phase's name, over the card its first step leaves, above every card of the phase so its links pass below. */
   const phases = $derived(
     (board.feature?.phases ?? []).flatMap((phase, at) => {
       const first = phase.steps[0];
       const where = first && box(first.from);
-      return where ? [{ at, name: phase.name, x: where.x, y: where.y - 34 }] : [];
+      const tops = phase.steps.flatMap(step => [box(step.from), box(step.to)]).flatMap(one => (one ? [one.y] : []));
+      return where ? [{ at, name: phase.name, x: where.x, y: Math.min(...tops) - 34 }] : [];
     }),
   );
   const proposals = $derived(discovered.proposals);
@@ -270,8 +289,12 @@
     else if (key === 'l') board.goLive();
     else if (key === 'f') void fit();
     else if (key === 'p') void presentMap();
-    else if (key === 'escape') {
-      if (board.present) void presentMap();
+    else if (board.feature && (key === 'arrowright' || key === 'arrowleft')) {
+      ev.preventDefault();
+      discovered.walk(key === 'arrowright' ? 1 : -1);
+    } else if (key === 'escape') {
+      if (discovered.current) discovered.step = null;
+      else if (board.present) void presentMap();
       else pick([]);
     }
   };
@@ -424,6 +447,8 @@
                 class:faded={discovered.phase !== null && discovered.phase !== phase.at}
                 transform="translate({phase.x} {phase.y})"
               >
+                <!-- On the desk's colour, so a link passing under the label does not run through its words. -->
+                <rect class="plate" x="-4" y="-3" width={phase.name.length * 8.5 + 38} height="24" />
                 <rect width="18" height="18" />
                 <text class="at" x="9" y="13" text-anchor="middle">{phase.at + 1}</text>
                 <text class="name" x="26" y="14">{phase.name}</text>
@@ -507,7 +532,42 @@
         >
       </div>
 
-      {#if discovered.picked.length}
+      {#if discovered.current}
+        {@const { step, number } = discovered.current}
+        <div class="pickbar stepbar" role="status" aria-label="Step {number}">
+          <span class="said">
+            <strong>{number}</strong>
+            {name(step.from)} → {name(step.to)}{#if step.note}<span class="note">{step.note}</span>{/if}
+          </span>
+          <button
+            class="icon"
+            type="button"
+            aria-label="Previous step"
+            title="Previous step (←)"
+            onclick={() => {
+              discovered.walk(-1);
+            }}><ChevronLeft size={16} /></button
+          >
+          <button
+            class="icon"
+            type="button"
+            aria-label="Next step"
+            title="Next step (→)"
+            onclick={() => {
+              discovered.walk(1);
+            }}><ChevronRight size={16} /></button
+          >
+          <button
+            class="icon"
+            type="button"
+            aria-label="Stop"
+            title="Stop (Esc)"
+            onclick={() => {
+              discovered.step = null;
+            }}><X size={16} /></button
+          >
+        </div>
+      {:else if discovered.picked.length}
         <div class="pickbar" role="status">
           <span
             ><strong>{discovered.picked.length} picked{discovered.picked.length > 2 ? '.' : ':'}</strong>
@@ -773,6 +833,9 @@
   .phase rect {
     fill: var(--ink);
   }
+  .phase .plate {
+    fill: var(--desk);
+  }
   .phase .at {
     fill: var(--desk);
     font: 600 11px var(--mono);
@@ -874,6 +937,40 @@
     font: 400 13px var(--sans);
     white-space: nowrap;
     transform: translateX(-50%);
+  }
+  /* A step's note can be long: it wraps, the bar keeps to the map's width. */
+  .stepbar {
+    gap: 4px;
+    max-width: min(640px, calc(100% - 32px));
+    white-space: normal;
+  }
+  .stepbar .said {
+    display: grid;
+    flex: 1;
+    gap: 2px;
+    margin-right: 10px;
+  }
+  .stepbar strong {
+    font: 600 12px var(--mono);
+  }
+  .stepbar .note {
+    color: var(--ink-muted);
+    font-size: 12px;
+  }
+  .stepbar button.icon {
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--ink);
+    cursor: pointer;
+  }
+  .stepbar button.icon:hover {
+    background: var(--desk);
   }
   .nothing {
     padding: 8px 14px;
