@@ -165,6 +165,7 @@ Zoomed out below 60%, cards are short in Plan too: pick one and its fields open 
 | `D` / `E` / `L`                            | Discover, Plan, Live                                                                                             |
 | `P`, then `Esc`                            | Present, and back                                                                                                |
 | `F`                                        | Fit the board in the window                                                                                      |
+| `/`, or `Ctrl+K` (`Cmd` on a Mac)          | Find a card on Discover's map by name; one the map does not show yet is brought onto it                          |
 | `V` / `H`, or hold `Space`                 | Select by dragging, or move around: while moving around, a click or drag never picks, lets go of or moves a card |
 | `Ctrl+Z` / `Shift+Ctrl+Z` (`Cmd` on a Mac) | Undo, redo                                                                                                       |
 | `Tab`, arrows                              | Move between cards, and move the picked card                                                                     |

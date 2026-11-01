@@ -285,6 +285,47 @@ test.describe('a board with an app', () => {
       .toMatchObject({ search: { found: 'src/search.ts:12' } });
   });
 
+  test('/ or ⌘K finds a card by name, and brings one not on the map onto it', async ({ page }) => {
+    await discover(page);
+    await expect(card(page, 'search')).toHaveCount(0);
+    await page.keyboard.press('/');
+    const find = page.getByRole('dialog', { name: 'Find a card' });
+    await find.getByRole('searchbox').fill('sea');
+    await expect(find.getByRole('option')).toHaveText(['Search API .NET Show']);
+    await page.screenshot({ path: 'test-results/discover-find.png' });
+    await page.keyboard.press('Enter');
+    await expect(find).toBeHidden();
+    await expect(card(page, 'search')).toBeInViewport();
+    await expect(page.getByRole('complementary', { name: 'Search API' })).toBeVisible();
+
+    await page.keyboard.press('ControlOrMeta+k');
+    await find.getByRole('searchbox').fill('orders');
+    await expect(find.getByRole('option').first()).toContainText('On the map');
+    await find.getByRole('option').first().click();
+    await expect(page.getByRole('complementary', { name: 'Orders API' })).toBeVisible();
+    await page.keyboard.press('/');
+    await find.getByRole('searchbox').fill('nothing like it');
+    await expect(find).toContainText('No card is called that');
+    await page.keyboard.press('Escape');
+    await expect(find).toBeHidden();
+  });
+
+  test('/ pressed right after a card is picked opens the finder again', async ({ page }) => {
+    await discover(page);
+    await page.keyboard.press('/');
+    const find = page.getByRole('dialog', { name: 'Find a card' });
+    await find.getByRole('searchbox').fill('orders');
+    // The pick and the next / in one go, before the dialog's close event comes.
+    await find
+      .getByRole('option')
+      .first()
+      .evaluate(option => {
+        option.querySelector('button')?.click();
+        document.body.dispatchEvent(new KeyboardEvent('keydown', { key: '/', bubbles: true }));
+      });
+    await expect(find).toBeVisible();
+  });
+
   test('Plan a run with these puts the cloned apps on the board and lists the rest', async ({ page }) => {
     await discover(page);
     await page.getByRole('button', { name: 'Show 1 more link of Catalog API' }).click();
