@@ -6,7 +6,7 @@ import path from 'node:path';
 import { of as kindOf } from '../core/kinds.ts';
 import { dataFile, readStack } from '../data.ts';
 import { readJson as readJsonOr, whenChanged } from '../json-files.ts';
-import { linkedStatus } from '../engine/linked.ts';
+import { linkedStatus, stackChanges } from '../engine/linked.ts';
 import { listenerPid } from '../engine/listen.ts';
 import { boardEdits } from '../engine/boards.ts';
 import { lockedPaths } from '../engine/locks.ts';
@@ -283,6 +283,7 @@ async function snapshot(serving: boolean): Promise<Status> {
   status['checks'] = lastChecks();
   status['stacks'] = stacksHere();
   status['linked'] = inUse ? linkedStatus(inUse) : null;
+  status['changed'] = inUse ? stackChanges(inUse) : {};
   status['live'] = live();
   status['messages'] = readMessages();
   status['boardEdits'] = boardEdits();

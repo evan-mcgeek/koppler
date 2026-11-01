@@ -1,4 +1,5 @@
 // Discover: the board's apps and what is one step from them, from the stack's facts; picking some plans a run.
+import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Page } from '@playwright/test';
@@ -283,6 +284,38 @@ test.describe('a board with an app', () => {
     await expect
       .poll(() => (JSON.parse(fs.readFileSync(file, 'utf8')) as typeof STACK).apps['catalog']?.['consumes'])
       .toMatchObject({ search: { found: 'src/search.ts:12' } });
+  });
+
+  test('a card added or changed here and not in the shared stack yet is tagged so', async ({ page, canvas }) => {
+    const dir = path.join(canvas.dir, 'stack');
+    fs.mkdirSync(dir, { recursive: true });
+    fs.mkdirSync(path.join(canvas.dir, 'config'), { recursive: true });
+    fs.writeFileSync(path.join(canvas.dir, 'config', 'config.json'), JSON.stringify({ stack: dir }));
+    const { found: _, ...facts } = stack;
+    const write = (value: object) => {
+      fs.writeFileSync(path.join(dir, 'stack.json'), JSON.stringify(value));
+    };
+    const git = (...args: string[]) => execFileSync('git', ['-C', dir, ...args], { stdio: 'ignore' });
+    write(facts);
+    git('init', '-q');
+    git('add', 'stack.json');
+    git('-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-q', '-m', 'shared');
+    const changed = structuredClone(facts) as unknown as { apps: Record<string, Record<string, unknown>> };
+    changed.apps['orders'] = { ...changed.apps['orders'], url: 'http://localhost:5999' };
+    write(changed);
+    await discover(page);
+    const tag = card(page, 'orders').locator('.edited');
+    await expect(tag).toHaveText('Changed');
+    await expect(tag).toHaveAttribute('title', 'Changed here, not in the shared stack yet: url');
+    await expect(card(page, 'web').locator('.edited')).toHaveCount(0);
+    await card(page, 'orders').click();
+    await expect(page.getByRole('complementary', { name: 'Orders API' })).toContainText(
+      'Changed here, not in the shared stack yet: url',
+    );
+    await page.screenshot({ path: 'test-results/discover-edited.png' });
+    // Committed, it is the shared stack's too.
+    git('-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-q', '-am', 'shared too');
+    await expect(tag).toHaveCount(0);
   });
 
   test('/ or ⌘K finds a card by name, and brings one not on the map onto it', async ({ page }) => {

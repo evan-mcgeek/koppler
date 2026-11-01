@@ -152,6 +152,8 @@ interface Status {
   stacks?: { dir: string; name: string; path: string; apps: number; shared: boolean; linked?: string }[];
   /** For a stack linked from GitHub: what this copy has that the shared one does not, and a pull request already open. */
   linked?: { url?: string; changes: string[]; pr?: string } | null;
+  /** The cards this stack adds or changes that its shared copy does not have yet. */
+  changed?: Record<string, { added: boolean; fields: string[] }>;
   /** What the stack needs on this machine, as the last check found it. */
   /** Remembered code changes per app, with how each did on this Mac. */
   recipes?: Record<

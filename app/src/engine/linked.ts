@@ -1,7 +1,9 @@
 // Stacks used straight from GitHub. Koppler keeps a copy in the private config; what it learns goes into that copy,
 // shows as changes not in the shared stack yet, and reaches the team only through a pull request the user opens.
 // Next to the copy, .source.json holds the link and `base`: the shared file as it was when last fetched.
+import { execFileSync } from 'node:child_process';
 import path from 'node:path';
+import { cardChanges } from '../core/stack-changes.ts';
 import { stackProblems } from '../core/stack.ts';
 import { fileUrl, githubFile, proposeFile, readFile, type GithubFile } from '../github.ts';
 import { setStack, switchRefused } from './stacks.ts';
@@ -105,6 +107,28 @@ export function changes(base: StackJson, local: StackJson): string[] {
   for (const key of new Set([...Object.keys(base), ...Object.keys(local)]))
     if (key !== 'apps' && !same(base[key], local[key])) out.push(`changed ${key}`);
   return out;
+}
+
+/** The shared stack this copy starts from: the linked file as last fetched, or the stack folder's last commit. */
+function sharedBase(dir: string): StackJson | null {
+  const source = sourceOf(dir);
+  if (source) return source.base;
+  try {
+    const text = execFileSync('git', ['-C', dir, 'show', 'HEAD:./stack.json'], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    });
+    return JSON.parse(text) as StackJson;
+  } catch {
+    return null;
+  }
+}
+
+/** The cards this stack adds or changes that the shared one does not have yet. */
+export function stackChanges(dir: string) {
+  const base = sharedBase(dir);
+  const now = copyIn(dir);
+  return base && now ? cardChanges(base, now) : {};
 }
 
 export function linkedStatus(dir: string) {
