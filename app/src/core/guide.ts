@@ -51,6 +51,7 @@ export function guide(stack: Stack): string {
     const app = stack.apps[id];
     if (!app) continue;
     out.push(`### ${app.name}`, '', `${kindOf(app, stack).label}${app.slug ? `, in \`${app.slug}\`` : ''}.`);
+    if (app.description) out.push('', app.description);
     const rows: [string, Card[]][] = [
       ['Calls', links.filter(l => l.kind === 'call' && l.from === id && l.sure === 'confirmed').map(l => l.to)],
       ['Called by', links.filter(l => l.kind === 'call' && l.to === id && l.sure === 'confirmed').map(l => l.from)],
