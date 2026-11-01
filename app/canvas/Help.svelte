@@ -15,6 +15,8 @@
   <dl>
     <dt><kbd>F</kbd></dt>
     <dd>Fit the whole board in view</dd>
+    <dt><kbd>/</kbd>, or <kbd>Cmd</kbd> or <kbd>Ctrl</kbd> + <kbd>K</kbd></dt>
+    <dd>Find a card on Discover's map, by name</dd>
     <dt><kbd>P</kbd>, <kbd>Esc</kbd> to stop</dt>
     <dd>Present: the board alone, full screen</dd>
     <dt><kbd>D</kbd> / <kbd>E</kbd> / <kbd>L</kbd></dt>

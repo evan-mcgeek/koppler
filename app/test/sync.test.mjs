@@ -423,3 +423,18 @@ test('Two apps from one clone: neither reports the other\'s address, or the othe
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("A clone's main branch is the one its remote starts from, and none when the remote does not say.", async () => {
+  const { mainOf } = await import('../dist/engine/repos.js');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-main-'));
+  const g = (cwd, ...args) => execFileSync('git', args, { cwd, encoding: 'utf8' });
+  const origin = path.join(dir, 'origin');
+  fs.mkdirSync(origin);
+  g(origin, 'init', '-q', '-b', 'trunk');
+  g(origin, '-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-q', '--allow-empty', '-m', 'one');
+  g(dir, 'clone', '-q', origin, 'clone');
+  const clone = path.join(dir, 'clone');
+  g(clone, 'switch', '-q', '-c', 'feat/refunds');
+  assert.equal(mainOf(clone), 'trunk');
+  assert.equal(mainOf(origin), null);
+});

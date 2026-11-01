@@ -34,6 +34,23 @@ const via = (use: unknown): string | undefined => {
   return typeof said === 'string' && said ? said : undefined;
 };
 
+/** What a clone has that its repo's main branch does not: its branch, and how many files it changed. Empty when none. */
+export function changedNote(clone: { branch?: string | null; main?: string | null; dirty?: number }): string {
+  const branch = clone.branch && clone.main && clone.branch !== clone.main ? clone.branch : '';
+  const dirty = clone.dirty ? `${String(clone.dirty)} changed` : '';
+  return [branch, dirty].filter(Boolean).join(', ');
+}
+
+/** Where in the caller's clone a call is: the file, at its line when known. A GitHub copy's line is no file here. */
+export function sourceOf(facts: Facts, link: Link): { file: string; line?: number } | undefined {
+  if (link.kind !== 'call') return undefined;
+  const call = facts.apps[link.from]?.consumes?.[link.to];
+  const at = /^([^:\s][^:]*):(\d+)(?::|$)/.exec(link.via ?? '');
+  if (at?.[1]) return { file: at[1], line: Number(at[2]) };
+  if (call?.file) return { file: call.file, ...(/^\d+$/.test(call.key ?? '') && { line: Number(call.key) }) };
+  return undefined;
+}
+
 const ACCESS = { read: 'reads', write: 'writes', both: 'both' } as const;
 
 /** Every link the stack knows: its calls, the calls found in the code, its queues, databases and resources. */

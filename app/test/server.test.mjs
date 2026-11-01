@@ -135,7 +135,8 @@ test('The state folder does not exist yet, as on a machine where Koppler never r
     {
       const run = { tag: 'koppler', text: 'Run on QA: Orders', data: { id: 'refused1', env: 'qa', mode: 'auto', nodes: [{ id: 'orders', run: 'cli' }], edges: [] } };
       assert.equal((await call('POST', `/prompt?token=${token}`, json, JSON.stringify(run))).status, 204);
-      const shown = () => JSON.parse(status().slice(status().indexOf('{'), status().lastIndexOf('}') + 1)).messages ?? [];
+      // One read: the server can rewrite the file between two.
+      const shown = () => { const text = status(); return JSON.parse(text.slice(text.indexOf('{'), text.lastIndexOf('}') + 1)).messages ?? []; };
       await until('the refusal on the canvas', () => shown().length > 0);
       const [refusal] = shown();
       assert.equal(refusal.kind, 'failure');

@@ -37,6 +37,8 @@ export interface LeanData extends Record<string, unknown> {
   deadEnd: boolean;
   /** Added or changed here and not in the shared stack yet: what to tag it with, and what changed. */
   edited: { tag: 'New' | 'Changed'; says: string } | null;
+  /** Its clone's branch and changed files, when the repo's main branch does not have them. */
+  changed: string;
 }
 
 export const CARD = { w: 200, h: 64 };
@@ -80,6 +82,15 @@ class Discovered {
   phase = $state<number | null>(null);
   /** The step picked by its number on the map: its row in the panel is marked. */
   step = $state<string | null>(null);
+  /** The picked step, while the feature still has it. */
+  current = $derived(this.step === null ? undefined : [...this.steps.values()].find(one => one.number === this.step));
+  /** Picks the step `by` places on from the picked one, or the first or last when none is; it stops at either end. */
+  walk(by: 1 | -1) {
+    const all = [...this.steps.values()].map(one => one.number);
+    if (!all.length) return;
+    const at = this.current ? all.indexOf(this.current.number) : by > 0 ? -1 : all.length;
+    this.step = all[Math.min(all.length - 1, Math.max(0, at + by))] ?? null;
+  }
   /** The last card picked, whose links the panel lists. */
   last = $state<Card | null>(null);
   picked = $state<Card[]>([]);
@@ -119,6 +130,7 @@ class Discovered {
       deadEnd: this.#dead.has(card),
       repo,
       edited,
+      changed: '',
     };
     if (card.startsWith('queue:')) {
       const queue = facts?.queues?.[card.slice(6)];
@@ -161,6 +173,7 @@ class Discovered {
       meta: app?.cloned ? '' : 'On GitHub',
       cloned: !!app?.cloned,
       app: !!app?.cloned,
+      changed: app?.changed ?? '',
     };
   }
 

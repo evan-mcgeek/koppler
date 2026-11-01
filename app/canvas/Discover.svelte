@@ -3,7 +3,11 @@
   // lists a card's links; Plan a run with these takes the picked apps to Plan. Nothing here runs or changes the board.
   import Sparkle from '@lucide/svelte/icons/sparkle';
   import X from '@lucide/svelte/icons/x';
+  import GitBranch from '@lucide/svelte/icons/git-branch';
   import Laptop from '@lucide/svelte/icons/laptop';
+  import { untrack } from 'svelte';
+  import ChevronLeft from '@lucide/svelte/icons/chevron-left';
+  import ChevronRight from '@lucide/svelte/icons/chevron-right';
   import {
     SvelteFlow,
     Background,
@@ -16,12 +20,13 @@
   import { around, facing, SIDES, type Box } from '../src/core/cables.ts';
   import { along, layOut, routePath } from '../src/core/layout.ts';
   import { engine } from './elk.ts';
-  import type { Card, Link } from '../src/core/discover.ts';
+  import { linksOf, sourceOf, type Card, type Link } from '../src/core/discover.ts';
   import { isLight, appearance } from './appearance.svelte.ts';
   import { board } from './board.svelte.ts';
   import { CARD, discovered, linkKey, type LeanData } from './discover.svelte.ts';
   import FeaturePanel from './FeaturePanel.svelte';
   import FeatureStart from './FeatureStart.svelte';
+  import FindCard from './FindCard.svelte';
   import { heldKeys } from './held-keys.ts';
   import LeanCard from './LeanCard.svelte';
   import BoardTools from './BoardTools.svelte';
@@ -31,6 +36,20 @@
 
   const flow = useSvelteFlow();
   const map = $derived(discovered.map);
+  // A step picked is brought into view, both its cards, without zooming in.
+  $effect(() => {
+    const step = discovered.current?.step;
+    if (step)
+      untrack(
+        () =>
+          void flow.fitView({
+            nodes: [{ id: step.from }, { id: step.to }],
+            duration: 200,
+            maxZoom: flow.getZoom(),
+            padding: 0.3,
+          }),
+      );
+  });
   // The map refits when it gains cards or the panel takes or gives back its room.
   const shape = $derived(`${String(map.cards.length)}:${String(!!discovered.last)}`);
   $effect(() => {
@@ -124,22 +143,30 @@
           label: link.kind === 'bucket' && !step ? link.via : undefined,
           faded:
             (!!near && !(discovered.picked.includes(link.from) || discovered.picked.includes(link.to))) ||
-            (phase !== null && step?.phase !== phase),
+            (phase !== null && step?.phase !== phase) ||
+            (!!discovered.current && step?.number !== discovered.current.number),
         },
       ];
     });
   });
-  /** Each phase's name, above the card its first step leaves. */
+  /** Each phase's name, over the card its first step leaves, above every card of the phase so its links pass below. */
   const phases = $derived(
     (board.feature?.phases ?? []).flatMap((phase, at) => {
       const first = phase.steps[0];
       const where = first && box(first.from);
-      return where ? [{ at, name: phase.name, x: where.x, y: where.y - 34 }] : [];
+      const tops = phase.steps.flatMap(step => [box(step.from), box(step.to)]).flatMap(one => (one ? [one.y] : []));
+      return where ? [{ at, name: phase.name, x: where.x, y: Math.min(...tops) - 34 }] : [];
     }),
   );
   const proposals = $derived(discovered.proposals);
   const proposedCards = $derived(map.cards.filter(({ card }) => discovered.data(card, false, 0).proposed).length);
   const name = (card: Card) => discovered.data(card, false, 0).name;
+  /** Where a call is in the caller's clone, as a link the editor opens. */
+  const editorLink = (link: Link) => {
+    const at = board.facts && sourceOf(board.facts, link);
+    const clone = board.app(link.from)?.path;
+    return at && clone ? `vscode://file${encodeURI(`${clone}/${at.file}`)}${at.line ? `:${String(at.line)}` : ''}` : '';
+  };
   const tag = (card: Card) => discovered.data(card, false, 0).tag;
   /** The picked card's links, by what they do, as the panel lists them. */
   const groups = $derived.by(() => {
@@ -195,6 +222,20 @@
   });
   const lastApp = $derived(discovered.last ? board.app(discovered.last) : undefined);
   const lastEdited = $derived(discovered.last ? discovered.data(discovered.last, false, 0).edited : null);
+  /** Who calls the picked card, by name, on the map or not. */
+  const callers = $derived(
+    discovered.last
+      ? [
+          ...new Set(
+            (board.facts ? linksOf(board.facts) : [])
+              .filter(link => link.kind === 'call' && link.to === discovered.last)
+              .map(link => name(link.from)),
+          ),
+        ]
+      : [],
+  );
+  const list = (names: string[]) =>
+    names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${String(names.at(-1))}` : (names[0] ?? '');
   const lastStack = $derived(discovered.last ? board.facts?.apps[discovered.last] : undefined);
   /** Brings a card to the middle of the map and picks it. */
   const show = (card: Card) => {
@@ -202,6 +243,22 @@
     discovered.last = card;
     void flow.fitView({ nodes: [{ id: card }], duration: 200, maxZoom: flow.getZoom(), minZoom: flow.getZoom() });
   };
+  let finding = $state(false);
+  /** A card found that was not on the map: shown once the layout has placed it. */
+  let bringing = $state<Card | null>(null);
+  const found = (card: Card) => {
+    if (map.cards.some(one => one.card === card)) show(card);
+    else {
+      bringing = card;
+      discovered.open(card);
+    }
+  };
+  $effect(() => {
+    if (bringing && placeOf(bringing)) {
+      show(bringing);
+      bringing = null;
+    }
+  });
   // The layout is worked out again whenever the map or the chosen layout changes; the same input, the same layout.
   $effect(() => {
     const { cards, links, key, measured } = discovered.layoutInput;
@@ -251,7 +308,10 @@
     if (document.querySelector('dialog[open], :popover-open')) return;
     const key = ev.key.toLowerCase();
     if (ev.metaKey || ev.ctrlKey) {
-      if (key === 'a') {
+      if (key === 'k') {
+        ev.preventDefault();
+        finding = true;
+      } else if (key === 'a') {
         ev.preventDefault();
         pick(map.cards.map(one => one.card));
       } else if (key === 'z') {
@@ -261,12 +321,19 @@
       }
       return;
     }
-    if (key === 'e') board.goEdit();
+    if (key === '/') {
+      ev.preventDefault();
+      finding = true;
+    } else if (key === 'e') board.goEdit();
     else if (key === 'l') board.goLive();
     else if (key === 'f') void fit();
     else if (key === 'p') void presentMap();
-    else if (key === 'escape') {
-      if (board.present) void presentMap();
+    else if (board.feature && (key === 'arrowright' || key === 'arrowleft')) {
+      ev.preventDefault();
+      discovered.walk(key === 'arrowright' ? 1 : -1);
+    } else if (key === 'escape') {
+      if (discovered.current) discovered.step = null;
+      else if (board.present) void presentMap();
       else pick([]);
     }
   };
@@ -419,6 +486,8 @@
                 class:faded={discovered.phase !== null && discovered.phase !== phase.at}
                 transform="translate({phase.x} {phase.y})"
               >
+                <!-- On the desk's colour, so a link passing under the label does not run through its words. -->
+                <rect class="plate" x="-4" y="-3" width={phase.name.length * 8.5 + 38} height="24" />
                 <rect width="18" height="18" />
                 <text class="at" x="9" y="13" text-anchor="middle">{phase.at + 1}</text>
                 <text class="name" x="26" y="14">{phase.name}</text>
@@ -502,7 +571,42 @@
         >
       </div>
 
-      {#if discovered.picked.length}
+      {#if discovered.current}
+        {@const { step, number } = discovered.current}
+        <div class="pickbar stepbar" role="status" aria-label="Step {number}">
+          <span class="said">
+            <strong>{number}</strong>
+            {name(step.from)} → {name(step.to)}{#if step.note}<span class="note">{step.note}</span>{/if}
+          </span>
+          <button
+            class="icon"
+            type="button"
+            aria-label="Previous step"
+            title="Previous step (←)"
+            onclick={() => {
+              discovered.walk(-1);
+            }}><ChevronLeft size={16} /></button
+          >
+          <button
+            class="icon"
+            type="button"
+            aria-label="Next step"
+            title="Next step (→)"
+            onclick={() => {
+              discovered.walk(1);
+            }}><ChevronRight size={16} /></button
+          >
+          <button
+            class="icon"
+            type="button"
+            aria-label="Stop"
+            title="Stop (Esc)"
+            onclick={() => {
+              discovered.step = null;
+            }}><X size={16} /></button
+          >
+        </div>
+      {:else if discovered.picked.length}
         <div class="pickbar" role="status">
           <span
             ><strong>{discovered.picked.length} picked{discovered.picked.length > 2 ? '.' : ':'}</strong>
@@ -553,7 +657,11 @@
         </span>
         {#if lastApp?.cloned}<span class="where"
             ><Laptop size={14} aria-hidden="true" />Cloned here{lastApp.current ? ` · ${lastApp.current}` : ''}</span
-          >{:else if lastStack && !lastStack.outside}<span class="where">On GitHub</span>{/if}
+          >{#if lastApp.changed}<span class="where changed"
+              ><GitBranch size={14} aria-hidden="true" />{lastApp.changed}{callers.length
+                ? `. ${list(callers)} ${callers.length === 1 ? 'calls' : 'call'} it.`
+                : ''}</span
+            >{/if}{:else if lastStack && !lastStack.outside}<span class="where">On GitHub</span>{/if}
         {#if lastStack?.slug}<span class="slug">{lastStack.slug}</span>{/if}
         {#if lastEdited}<span class="edited">{lastEdited.says}</span>{/if}
       </header>
@@ -600,6 +708,15 @@
                 {:else if link.unsourced}<span class="detail"><span>No source yet</span></span>{:else if link.via}<span
                     class="detail"><span>{link.via}</span></span
                   >{/if}
+                {#if editorLink(link)}
+                  <span class="detail"
+                    ><a
+                      class="text"
+                      href={editorLink(link)}
+                      title="Opens in VS Code, or the editor that takes vscode:// links">Open in editor</a
+                    ></span
+                  >
+                {/if}
               </div>
             {/each}
           {:else}
@@ -633,6 +750,13 @@
   {:else if board.feature && map.cards.length}
     <FeaturePanel feature={board.feature} />
   {/if}
+  <FindCard
+    open={finding}
+    onpick={found}
+    onclose={() => {
+      finding = false;
+    }}
+  />
 </div>
 
 <style>
@@ -760,6 +884,9 @@
   .phase rect {
     fill: var(--ink);
   }
+  .phase .plate {
+    fill: var(--desk);
+  }
   .phase .at {
     fill: var(--desk);
     font: 600 11px var(--mono);
@@ -862,6 +989,40 @@
     white-space: nowrap;
     transform: translateX(-50%);
   }
+  /* A step's note can be long: it wraps, the bar keeps to the map's width. */
+  .stepbar {
+    gap: 4px;
+    max-width: min(640px, calc(100% - 32px));
+    white-space: normal;
+  }
+  .stepbar .said {
+    display: grid;
+    flex: 1;
+    gap: 2px;
+    margin-right: 10px;
+  }
+  .stepbar strong {
+    font: 600 12px var(--mono);
+  }
+  .stepbar .note {
+    color: var(--ink-muted);
+    font-size: 12px;
+  }
+  .stepbar button.icon {
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--ink);
+    cursor: pointer;
+  }
+  .stepbar button.icon:hover {
+    background: var(--desk);
+  }
   .nothing {
     padding: 8px 14px;
     border: 1px dashed var(--line-strong);
@@ -876,7 +1037,8 @@
     font: 600 13px var(--sans);
     cursor: pointer;
   }
-  button.text {
+  button.text,
+  a.text {
     padding: 0;
     border: 0;
     background: none;
@@ -967,6 +1129,16 @@
     color: var(--ink);
     font: 400 12px/1.5 var(--sans);
   }
+  .where.changed {
+    align-items: flex-start;
+    color: var(--ink-muted);
+    font-size: 12px;
+    line-height: 1.5;
+  }
+  .where.changed :global(svg) {
+    flex: none;
+    margin-top: 2px;
+  }
   .slug {
     color: var(--ink-muted);
     font: 400 12px var(--mono);
@@ -1032,7 +1204,8 @@
     flex: 1;
     min-width: 0;
   }
-  .detail button.text {
+  .detail button.text,
+  .detail a.text {
     font-size: 12px;
   }
   .none {
