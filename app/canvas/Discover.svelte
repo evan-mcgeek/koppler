@@ -393,6 +393,7 @@
         edges={[]}
         fitView
         fitViewOptions={{ maxZoom: 1, padding: 0.15 }}
+        selectNodesOnDrag={false}
         {...dragging(panning)}
         nodesDraggable={!panning}
         nodesConnectable={false}

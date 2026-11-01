@@ -106,9 +106,13 @@ test.describe('a board with an app', () => {
     await page.mouse.move(from.x + 40, from.y + 20);
     await page.mouse.down();
     await page.mouse.move(from.x + 40, from.y + 160, { steps: 8 });
-    const now = await web.boundingBox();
-    if (!now) throw new Error('no Web Shop card');
-    expect(now.y).toBeGreaterThan(from.y + 100);
+    // The card is under the pointer, drawn a frame after it moved; dragging it opens no panel that would move the map.
+    const under = async () => {
+      const box = await web.boundingBox();
+      return !!box && box.y <= from.y + 160 && from.y + 160 <= box.y + box.height;
+    };
+    await expect.poll(under).toBe(true);
+    await expect(page.getByRole('complementary')).toHaveCount(0);
     // Where its link leaves it, on the page: on the card's edge as it is now, still held. On a slow machine the link
     // is drawn a frame after the card, so it is given those frames to catch up.
     const leaves = () =>
