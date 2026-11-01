@@ -192,12 +192,13 @@
             style:left="{place.x}px"
             style:top="{place.y}px"
             role="img"
-            aria-label="{card.name}, {card.kind}"
+            aria-label="{card.name}, {card.description ?? card.kind}"
+            title={card.description}
             onpointerdown={event => {
               drag(event, card.id);
             }}
           >
-            <b>{card.name}</b><span>{card.kind}</span>
+            <b>{card.name}</b><span>{card.description ?? card.kind}</span>
           </div>
         {/if}
       {/each}
@@ -467,8 +468,12 @@
     text-overflow: ellipsis;
   }
   .card span {
+    display: block;
+    overflow: hidden;
     color: var(--ink-muted);
     font-size: 13px;
+    white-space: nowrap;
+    text-overflow: ellipsis;
   }
   .card.dim {
     opacity: 0.3;

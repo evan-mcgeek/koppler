@@ -12,6 +12,7 @@ const stack = {
     web: { name: 'Web Shop', kind: 'web', slug: 'acme/web-shop', consumes: { orders: { env: 'ORDERS_URL' } } },
     orders: {
       name: 'Orders API',
+      description: 'Keeps every order',
       kind: 'dotnet',
       slug: 'acme/orders-api',
       publishes: { events: {} },
@@ -43,10 +44,10 @@ const stack = {
 
 describe('guide', () => {
   const page = guide(stack);
-  it('lists each app with what it calls and is called by, its queues and data', () => {
+  it('lists each app with what it does, what it calls and is called by, its queues and data', () => {
     expect(page).toContain('# Acme Shop\n\n- Orders are paid through the payment provider.\n\nEnvironments: qa, prod.');
     expect(page).toContain(
-      '### Orders API\n\n.NET, in `acme/orders-api`.\n\n- Calls Payment provider.\n- Called by Web Shop.',
+      '### Orders API\n\n.NET, in `acme/orders-api`.\n\nKeeps every order\n\n- Calls Payment provider.\n- Called by Web Shop.',
     );
     expect(page).toContain('- Sends to Order events.\n- Uses Orders.');
     expect(page).toContain('### Payments API\n\nNode, in `acme/payments`.\n\n- Reads Order events.\n');

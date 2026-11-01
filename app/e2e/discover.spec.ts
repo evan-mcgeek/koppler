@@ -10,6 +10,7 @@ const stack = {
   apps: {
     ...STACK.apps,
     search: { ...STACK.apps.payments, name: 'Search API', slug: 'acme/search-api' },
+    orders: { ...STACK.apps.orders, description: 'Keeps every order' },
   },
   found: { catalog: { search: 'src/search.ts:12' } },
 };
@@ -99,6 +100,14 @@ test.describe('a board with an app', () => {
     await page.reload();
     await discover(page);
     await expect.poll(layout).toBe(arranged);
+  });
+
+  test("an app's description shows quietly in its panel", async ({ page }) => {
+    await discover(page);
+    await card(page, 'orders').click();
+    const panel = page.getByRole('complementary', { name: 'Orders API' });
+    await expect(panel.locator('.about')).toHaveText('Keeps every order');
+    await panel.screenshot({ path: 'test-results/discover-description.png' });
   });
 
   test('a card being dragged keeps its links on it, before it is let go', async ({ page }) => {

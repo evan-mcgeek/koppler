@@ -424,3 +424,16 @@ test('an app is set to run to completion, and to start after another app picked 
   await expect(panel.getByRole('status')).toHaveText('Saved');
   expect(read().apps['orders']?.['after']).toEqual(['payments']);
 });
+
+test("an app's description is set in its settings, in Identity beside its name", async ({ page, canvas }) => {
+  const read = stackFile(canvas.dir);
+  await (await actions(page, 'orders')).getByRole('button', { name: 'Settings for Orders API' }).click();
+  const panel = page.getByRole('dialog', { name: 'Orders API' });
+  await tabOf(page, 'Identity').click();
+  const description = panel.getByLabel('Description', { exact: true });
+  await description.fill('Keeps every order');
+  await description.press('Tab');
+  await panel.getByRole('button', { name: 'Save' }).click();
+  await expect(panel.getByRole('status')).toHaveText('Saved');
+  expect(read().apps['orders']?.['description']).toBe('Keeps every order');
+});

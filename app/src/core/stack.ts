@@ -257,6 +257,11 @@ const MockResponse = z.looseObject(
 const App = z.looseObject(
   {
     name: required.describe('Its name on the canvas'),
+    description: z
+      .string()
+      .max(200, 'at most 200 characters')
+      .optional()
+      .describe('What it does, in a few words, for someone who does not build it'),
     kind: required.describe('What it is built with: dotnet, node, web, flutter, lambda, other'),
     /** Its repo: owner/repo, or host/path/to/repo. An outside system has none. */
     slug: matching(SLUG, 'owner/repo, or host/path/to/repo').optional().describe('Its repo: owner/repo'),

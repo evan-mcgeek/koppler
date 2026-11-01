@@ -176,7 +176,7 @@ export interface Tab {
   view?: 'envs' | 'apps';
 }
 /** An app's settings: what it is first; then how it runs here, where it is deployed, and the rest. */
-export const APP_HEAD = ['name', 'kind', 'slug'];
+export const APP_HEAD = ['name', 'description', 'kind', 'slug'];
 const ENVS_ABOUT = 'What it uses differently per environment';
 export const OTHER_ABOUT = 'Fields with no tab of their own';
 /** The fields for how one kind of app starts; an app is shown its own kind's, the others are a click away. */

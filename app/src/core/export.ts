@@ -9,6 +9,8 @@ export interface FlowCard {
   name: string;
   /** What it is, for someone who does not build it. */
   kind: string;
+  /** What it does, when the stack says. */
+  description?: string;
 }
 export interface Flow {
   name: string;
@@ -45,6 +47,7 @@ function cardOf(stack: Stack, id: Card): FlowCard {
     id,
     name: app?.name ?? id,
     kind: app?.outside ? 'Outside service' : (KIND_WORDS[app?.kind ?? ''] ?? 'Service'),
+    ...(app?.description && { description: app.description }),
   };
 }
 

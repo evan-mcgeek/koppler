@@ -14,6 +14,7 @@ const stack = {
     }),
     orders: app('Orders API', {
       kind: 'dotnet',
+      description: 'Keeps every order',
       secrets: ['ORDERS_DB'],
       consumes: { psp: { how: 'env', env: 'PSP_URL' } },
     }),
@@ -77,7 +78,7 @@ describe('flowsOf', () => {
       ],
       cards: [
         { id: 'shop', name: 'Mobile App', kind: 'Mobile app' },
-        { id: 'orders', name: 'Orders API', kind: 'Service' },
+        { id: 'orders', name: 'Orders API', kind: 'Service', description: 'Keeps every order' },
         { id: 'queue:events', name: 'Order events', kind: 'Queue' },
       ],
       at: { shop: { x: 0, y: 0 }, orders: { x: 300, y: 0 }, 'queue:events': { x: 600, y: 0 } },

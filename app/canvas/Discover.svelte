@@ -672,6 +672,7 @@
             }}><X size={16} /></button
           >
         </span>
+        {#if lastStack?.description}<p class="about">{lastStack.description}</p>{/if}
         {#if lastApp?.cloned}<span class="where"
             ><Laptop size={14} aria-hidden="true" />Cloned here{lastApp.current ? ` · ${lastApp.current}` : ''}</span
           >{#if lastApp.changed}<span class="where changed"
@@ -1159,6 +1160,11 @@
   .slug {
     color: var(--ink-muted);
     font: 400 12px var(--mono);
+  }
+  .about {
+    margin: 0;
+    color: var(--ink-muted);
+    font-size: 13px;
   }
   section {
     display: flex;

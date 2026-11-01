@@ -11,6 +11,7 @@ const entry = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'dis
 const step = (from: string, to: string, note?: string) => ({ from, to, kind: 'call', ...(note && { note }) });
 const stack = {
   ...STACK,
+  apps: { ...STACK.apps, orders: { ...STACK.apps.orders, description: 'Keeps every order' } },
   presets: [
     {
       name: 'Checkout',
@@ -73,6 +74,8 @@ test('the exported page shows the flows, walks their steps, and lets cards be mo
   const flows = page.getByRole('navigation', { name: 'Flows' });
   await expect(flows.getByRole('button')).toHaveText([/Checkout\s*2 steps/, /Browse\s*1 step/]);
   await expect(page.getByRole('img', { name: 'Web Shop, Service' })).toBeVisible();
+  // An app's description, when the stack has one, says what it does in place of its kind.
+  await expect(page.getByRole('img', { name: 'Orders API, Keeps every order' })).toBeVisible();
   // The agent's proposal is no step of the flow, and its card is not drawn.
   await expect(page.locator('.card')).toHaveCount(3);
   const steps = page.getByRole('complementary', { name: 'Steps' });
