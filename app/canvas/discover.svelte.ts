@@ -77,6 +77,15 @@ class Discovered {
   phase = $state<number | null>(null);
   /** The step picked by its number on the map: its row in the panel is marked. */
   step = $state<string | null>(null);
+  /** The picked step, while the feature still has it. */
+  current = $derived(this.step === null ? undefined : [...this.steps.values()].find(one => one.number === this.step));
+  /** Picks the step `by` places on from the picked one, or the first or last when none is; it stops at either end. */
+  walk(by: 1 | -1) {
+    const all = [...this.steps.values()].map(one => one.number);
+    if (!all.length) return;
+    const at = this.current ? all.indexOf(this.current.number) : by > 0 ? -1 : all.length;
+    this.step = all[Math.min(all.length - 1, Math.max(0, at + by))] ?? null;
+  }
   /** The last card picked, whose links the panel lists. */
   last = $state<Card | null>(null);
   picked = $state<Card[]>([]);
