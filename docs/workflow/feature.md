@@ -65,7 +65,8 @@ Fix each finding you can confirm in the code; say why you skipped the others.
 ## 8. Ship
 
 Commit, push, and open the PR with the `pr` skill: `Closes #<issue>`, what changed, how it was tested.
-Give the user the merge command.
+Wait for the PR's CI (`gh pr checks <n> --watch`); give the user the merge command only when every check passed.
+A failed check, even a flake, is fixed first (`docs/workflow/bugs.md`).
 After the merge, move the card to Testing, and check the change in the user's running canvas (`koppler-merged-canvas-change-live-check`).
 
 When the user said to build several features, run this file for each in turn and report once at the end on a `lavish` page: one row per PR with a screenshot of the change, and what to try together.

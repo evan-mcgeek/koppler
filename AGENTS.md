@@ -8,6 +8,7 @@ Before fixing a bug or a flaky test, follow `docs/workflow/bugs.md`.
 - Decisions are the user's; facts are yours to find. Ask only what you cannot look up, one round at a time, each question with your recommended answer.
 - Show proposals and questions as a page the user can annotate, with the `lavish` skill: feature proposals, ideas borrowed from other tools, a grill round whose answers have options to compare, and plans. Their notes come back to you through it.
 - The user merges. One branch and one PR per issue, off `origin/main`; give the user the merge command.
+- CI must pass before a merge: check the PR's runs (`gh pr checks <n>`) and give the merge command only when every one is green. A red or flaky run is fixed first.
 - Issues and tickets are drafted and shown first, then filed on the user's yes, onto the project board in their column.
 - Examples use the Acme Shop stack. Real stack names, hosts and apps stay out of the repo.
 - Any lint error, test failure or flake you see is yours to fix, in the same PR.
