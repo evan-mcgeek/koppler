@@ -437,3 +437,35 @@ test("an app's description is set in its settings, in Identity beside its name",
   await expect(panel.getByRole('status')).toHaveText('Saved');
   expect(read().apps['orders']?.['description']).toBe('Keeps every order');
 });
+
+test('a view picked while the board reads the saved stack again stays picked', async ({ page, canvas }) => {
+  stackFile(canvas.dir);
+  await (await actions(page, 'orders')).getByRole('button', { name: 'Settings for Orders API' }).click();
+  const panel = page.getByRole('dialog', { name: 'Orders API' });
+  await tabOf(page, 'Identity').click();
+  const description = panel.getByLabel('Description', { exact: true });
+  await description.fill('Keeps every order');
+  await description.press('Tab');
+  await panel.getByRole('button', { name: 'Save' }).click();
+  await expect(panel.getByRole('status')).toHaveText('Saved');
+  // The stack comes back slowly, as on a busy machine; Discover is picked meanwhile.
+  let answer = () => {};
+  const held = new Promise<void>(resolve => (answer = resolve));
+  let asked = false;
+  await page.route('**/data/registry.json', async route => {
+    asked = true;
+    await held;
+    await route.continue();
+  });
+  await panel.getByRole('button', { name: 'Close' }).click();
+  await expect.poll(() => asked).toBe(true);
+  await page
+    .locator('label')
+    .filter({ hasText: /^Discover$/ })
+    .click();
+  await expect(page.getByRole('radio', { name: 'Discover' })).toBeChecked();
+  answer();
+  await page.waitForResponse('**/data/registry.json');
+  await page.waitForTimeout(300);
+  await expect(page.getByRole('radio', { name: 'Discover' })).toBeChecked();
+});

@@ -1677,16 +1677,18 @@ class Board {
     };
   }
 
-  /** Puts the board the server kept on screen: the stack's apps where they were left, and their cables. */
   /** The stack read again after it changed (Settings saved), in place: the page, and full screen, stay. */
   async reload(): Promise<void> {
     this.commit();
     await save(this.saved());
     const loaded = await load();
-    if (loaded) this.open(loaded);
+    // The board as it is when the stack arrives: what changed on it meanwhile (the view picked) is kept.
+    this.commit();
+    if (loaded) this.open({ ...loaded, saved: this.saved() });
   }
   /** Why the stack cannot be read in this Koppler's format: it is from a newer one. */
   formatError = $state('');
+  /** Puts the board the server kept on screen: the stack's apps where they were left, and their cables. */
   open({ stack: written, clones, roots, saved: kept }: Loaded): void {
     // Read in this Koppler's format, which the server has written the files in already.
     const migrated = migrateStack(written);
