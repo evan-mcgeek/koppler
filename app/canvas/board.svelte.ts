@@ -1677,16 +1677,25 @@ class Board {
     };
   }
 
-  /** Puts the board the server kept on screen: the stack's apps where they were left, and their cables. */
   /** The stack read again after it changed (Settings saved), in place: the page, and full screen, stay. */
   async reload(): Promise<void> {
     this.commit();
     await save(this.saved());
+    const [dir, asked] = [this.dir, this.#looking()];
     const loaded = await load();
-    if (loaded) this.open(loaded);
+    if (!loaded) return;
+    const now = this.#looking();
+    this.open(loaded);
+    // A view picked while the stack was read again stays picked, unless another stack came back.
+    if (this.dir !== dir || JSON.stringify(now) === JSON.stringify(asked)) return;
+    this.view = now.view;
+    if (now.discovering) this.goDiscover();
+    else this.discovering = false;
   }
+  #looking = () => ({ discovering: this.discovering, view: this.view });
   /** Why the stack cannot be read in this Koppler's format: it is from a newer one. */
   formatError = $state('');
+  /** Puts the board the server kept on screen: the stack's apps where they were left, and their cables. */
   open({ stack: written, clones, roots, saved: kept }: Loaded): void {
     // Read in this Koppler's format, which the server has written the files in already.
     const migrated = migrateStack(written);
