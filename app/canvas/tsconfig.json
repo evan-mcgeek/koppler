@@ -1,5 +1,5 @@
 {
   "extends": "../tsconfig.json",
   "compilerOptions": { "module": "ESNext", "moduleResolution": "Bundler", "types": ["vite/client"] },
-  "include": ["*.ts", "*.svelte"]
+  "include": ["*.ts", "*.svelte", "viewer/*.ts", "viewer/*.svelte"]
 }

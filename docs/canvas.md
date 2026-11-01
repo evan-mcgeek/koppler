@@ -152,6 +152,11 @@ The panel on the right holds the request and the steps: pick a phase to dim the 
 
 <img alt="A feature board, Checkout: its steps numbered in two phases on the map and in the panel, and one step the agent proposed, dashed, with Accept and Drop" src="images/feature-board.png">
 
+To show the flows to people who never run Koppler, such as a product team, share the feature boards with the team, then run `koppler export`.
+It writes one page that opens in any browser with nothing to install or load: pick a flow, move its cards about, and walk its steps.
+It holds each flow's request, steps and app names, and nothing else of the stack: no addresses, settings or code.
+Run in the stack repo's CI (`koppler export site/index.html --stack .`), it stays as current as the stack, behind your company's own sign-in.
+
 **Plan** shows every field of a card; **Live** shows what runs, with short cards.
 
 <img alt="The Live view: short cards with their state, every app running" src="images/live.png">

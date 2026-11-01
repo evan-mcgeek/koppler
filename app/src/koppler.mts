@@ -17,6 +17,7 @@ import { APPROVE, stackCommands } from './engine/checks.ts';
 import { deployed } from './engine/deployed.ts';
 import { awsCheck } from './engine/aws-check.ts';
 import { discoverCommand } from './engine/discover.ts';
+import { exportCommand } from './engine/export.ts';
 import { down } from './engine/down.ts';
 import { investigate } from './engine/investigate.ts';
 import { discardChanges, linkStack, linkedStatus, proposeChanges, updateStack } from './engine/linked.ts';
@@ -437,6 +438,14 @@ const COMMANDS: Command[] = [
       process.stdout.write(guide(loaded()));
     },
     example: 'koppler guide > GUIDE.md',
+  },
+  {
+    name: 'export',
+    who: 'you',
+    args: '[<file>] [--stack <dir>]',
+    about: "the team's feature boards as one page to read, for people who never run Koppler: flows, steps, app names",
+    run: exportCommand,
+    example: 'koppler export site/index.html --stack .',
   },
   {
     name: 'db',
