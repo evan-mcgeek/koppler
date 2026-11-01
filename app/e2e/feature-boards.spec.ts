@@ -46,7 +46,11 @@ const stackFile = (dir: string) => {
 const kept = (temp: string) =>
   (
     JSON.parse(fs.readFileSync(path.join(temp, 'state.json'), 'utf8')) as {
-      presets?: { name: string; feature?: { request: string; phases: { steps: unknown[] }[] } }[];
+      presets?: {
+        name: string;
+        feature?: { request: string; phases: { steps: unknown[] }[] };
+        discover?: { at?: Record<string, { x: number; y: number }> };
+      }[];
     }
   ).presets?.find(one => one.name === 'New feature');
 const newFeature = async (page: Page) => {
@@ -247,4 +251,38 @@ test("a step's number on the map picks its row in the panel", async ({ page, can
   expect(box?.height).toBeGreaterThan(8 * 20);
   expect(await request.evaluate(el => getComputedStyle(el).resize)).toBe('none');
   await page.screenshot({ path: 'test-results/feature-request-grows.png' });
+});
+
+test('a feature board shared with the team keeps its steps and where its cards sit', async ({ page, canvas }) => {
+  const read = stackFile(canvas.dir) as unknown as () => {
+    presets?: { name: string; feature?: { request?: string }; discover?: { at: Record<string, { x: number }> } }[];
+  };
+  await newFeature(page);
+  await page.getByLabel('Describe the feature').fill('Customers pay for an order.');
+  await page.getByRole('button', { name: 'Hand it to the agent' }).click();
+  await expect.poll(() => kept(canvas.temp)?.feature?.request).toBe('Customers pay for an order.');
+  koppler(canvas, 'board', 'edit', 'New feature', '--phase', 'Pay', '--step', 'web:orders');
+  await expect(page.locator('.links .number text')).toHaveText(['1.1']);
+  const orders = card(page, 'orders');
+  const box = await orders.boundingBox();
+  if (!box) throw new Error('no Orders API card');
+  await page.mouse.move(box.x + 40, box.y + 12);
+  await page.mouse.down();
+  await page.mouse.move(box.x + 40, box.y + 152, { steps: 8 });
+  await page.mouse.up();
+  await expect.poll(() => kept(canvas.temp)?.discover?.at?.['orders']).toBeTruthy();
+  const placed = kept(canvas.temp)?.discover?.at?.['orders'];
+  await page.getByRole('button', { name: /^Board: / }).click();
+  await page
+    .getByRole('dialog', { name: 'Boards' })
+    .getByRole('button', { name: 'Share New feature with the team' })
+    .click();
+  await page
+    .getByRole('dialog', { name: 'Share New feature with the team' })
+    .getByRole('button', { name: 'Add to team boards' })
+    .click();
+  await expect
+    .poll(() => read().presets?.find(one => one.name === 'New feature')?.feature?.request)
+    .toBe('Customers pay for an order.');
+  expect(read().presets?.find(one => one.name === 'New feature')?.discover?.at['orders']).toEqual(placed);
 });

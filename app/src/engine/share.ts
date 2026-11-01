@@ -61,7 +61,7 @@ export function teamBoard(preset: StoredPreset): { board: StoredPreset; error?: 
   const checked = migrate(preset);
   if (checked.error !== undefined) return { error: checked.error };
   const { name, version, nodes, edges } = checked.preset;
-  const { layout, outside } = preset;
+  const { layout, outside, feature, discover } = preset;
   return {
     board: {
       name,
@@ -70,6 +70,9 @@ export function teamBoard(preset: StoredPreset): { board: StoredPreset; error?: 
       edges,
       ...(layout ? { layout } : {}),
       ...(outside ? { outside } : {}),
+      // A feature board's steps, and where its cards sit on Discover's map.
+      ...(feature ? { feature } : {}),
+      ...(discover ? { discover } : {}),
     },
   };
 }
