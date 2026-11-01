@@ -50,10 +50,24 @@
           }),
       );
   });
+  // From when a refit is due until its motion ends: the map says so (data-moving), for whoever waits for it to be still.
+  let moving = $state(0);
+  const motion = (wait: (go: () => void) => void, move: () => Promise<unknown>) => {
+    moving++;
+    wait(() => {
+      void move().finally(() => moving--);
+    });
+  };
   // The map refits when it gains cards or the panel takes or gives back its room.
   const shape = $derived(`${String(map.cards.length)}:${String(!!discovered.last)}`);
   $effect(() => {
-    if (shape) setTimeout(() => void flow.fitView({ duration: 200, maxZoom: 1, padding: 0.15 }), 80);
+    if (shape)
+      untrack(() => {
+        motion(
+          go => setTimeout(go, 80),
+          () => flow.fitView({ duration: 200, maxZoom: 1, padding: 0.15 }),
+        );
+      });
   });
   const near = $derived.by(() => {
     const picked = discovered.picked;
@@ -286,7 +300,9 @@
   $effect(() => {
     if (!discovered.layout || !fitWhenLaid) return;
     fitWhenLaid = false;
-    requestAnimationFrame(() => void fit());
+    untrack(() => {
+      motion(requestAnimationFrame, fit);
+    });
   });
   /** An area is being dragged over the map: on its way it covers one card alone, which is still no click. */
   let selecting = false;
@@ -363,7 +379,7 @@
 />
 
 <div class="discover">
-  <div class="map" aria-label="Discover map">
+  <div class="map" aria-label="Discover map" data-moving={moving > 0 || undefined}>
     {#if board.feature && !map.cards.length}
       <FeatureStart />
     {:else if !board.nodes.length && !board.feature}
