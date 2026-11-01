@@ -163,6 +163,15 @@ export function branchList(refs: string): string[] {
   return [...seen].slice(0, MAX_BRANCHES);
 }
 
+/** The branch the repo's remote starts from (origin/HEAD), or null when it does not say. */
+export const mainOf = (repo: string): string | null => {
+  try {
+    return git(repo, 'symbolic-ref', '--short', 'refs/remotes/origin/HEAD').replace(/^origin\//, '') || null;
+  } catch {
+    return null;
+  }
+};
+
 export const branchesOf = (repo: string) => {
   try {
     return branchList(

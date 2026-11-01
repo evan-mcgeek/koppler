@@ -656,3 +656,20 @@ test.describe('a Lambda in the repo of another app', () => {
     await card(page, 'changes').screenshot({ path: 'test-results/part-card.png' });
   });
 });
+
+test.describe('an app with changes in its clone', () => {
+  test.use({
+    dirty: ['orders'],
+    board: { env: 'qa', mode: 'auto', zoom: 1, pan: { x: 60, y: 60 }, nodes: { web: at(0, 0) }, edges: [] },
+  });
+
+  test('says so on its card, and its panel names who calls it', async ({ page }) => {
+    await discover(page);
+    await expect(card(page, 'orders')).toContainText('3 changed');
+    await expect(card(page, 'web')).toContainText('Cloned here');
+    await card(page, 'orders').click();
+    const panel = page.getByRole('complementary', { name: 'Orders API' });
+    await expect(panel).toContainText('3 changed. Web Shop calls it.');
+    await page.screenshot({ path: 'test-results/discover-changed.png' });
+  });
+});

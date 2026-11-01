@@ -3,6 +3,7 @@
   // lists a card's links; Plan a run with these takes the picked apps to Plan. Nothing here runs or changes the board.
   import Sparkle from '@lucide/svelte/icons/sparkle';
   import X from '@lucide/svelte/icons/x';
+  import GitBranch from '@lucide/svelte/icons/git-branch';
   import Laptop from '@lucide/svelte/icons/laptop';
   import { untrack } from 'svelte';
   import ChevronLeft from '@lucide/svelte/icons/chevron-left';
@@ -19,7 +20,7 @@
   import { around, facing, SIDES, type Box } from '../src/core/cables.ts';
   import { along, layOut, routePath } from '../src/core/layout.ts';
   import { engine } from './elk.ts';
-  import { sourceOf, type Card, type Link } from '../src/core/discover.ts';
+  import { linksOf, sourceOf, type Card, type Link } from '../src/core/discover.ts';
   import { isLight, appearance } from './appearance.svelte.ts';
   import { board } from './board.svelte.ts';
   import { CARD, discovered, linkKey, type LeanData } from './discover.svelte.ts';
@@ -220,6 +221,20 @@
     return resource?.type === 'sfn' ? (resource.steps ?? []) : undefined;
   });
   const lastApp = $derived(discovered.last ? board.app(discovered.last) : undefined);
+  /** Who calls the picked card, by name, on the map or not. */
+  const callers = $derived(
+    discovered.last
+      ? [
+          ...new Set(
+            (board.facts ? linksOf(board.facts) : [])
+              .filter(link => link.kind === 'call' && link.to === discovered.last)
+              .map(link => name(link.from)),
+          ),
+        ]
+      : [],
+  );
+  const list = (names: string[]) =>
+    names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${String(names.at(-1))}` : (names[0] ?? '');
   const lastStack = $derived(discovered.last ? board.facts?.apps[discovered.last] : undefined);
   /** Brings a card to the middle of the map and picks it. */
   const show = (card: Card) => {
@@ -641,7 +656,11 @@
         </span>
         {#if lastApp?.cloned}<span class="where"
             ><Laptop size={14} aria-hidden="true" />Cloned here{lastApp.current ? ` · ${lastApp.current}` : ''}</span
-          >{:else if lastStack && !lastStack.outside}<span class="where">On GitHub</span>{/if}
+          >{#if lastApp.changed}<span class="where changed"
+              ><GitBranch size={14} aria-hidden="true" />{lastApp.changed}{callers.length
+                ? `. ${list(callers)} ${callers.length === 1 ? 'calls' : 'call'} it.`
+                : ''}</span
+            >{/if}{:else if lastStack && !lastStack.outside}<span class="where">On GitHub</span>{/if}
         {#if lastStack?.slug}<span class="slug">{lastStack.slug}</span>{/if}
       </header>
       {#each groups as group (group.title)}
@@ -1103,6 +1122,16 @@
     align-items: center;
     gap: 8px;
     font: 400 13px var(--sans);
+  }
+  .where.changed {
+    align-items: flex-start;
+    color: var(--ink-muted);
+    font-size: 12px;
+    line-height: 1.5;
+  }
+  .where.changed :global(svg) {
+    flex: none;
+    margin-top: 2px;
   }
   .slug {
     color: var(--ink-muted);
