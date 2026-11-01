@@ -11,6 +11,7 @@ import { actionsCommand, stepCommand } from './cli/records.ts';
 import { fail, Failure } from './failure.ts';
 import { canvas, logs, restart, status, stop } from './cli/running.ts';
 import { readData, readStack } from './data.ts';
+import { completion, SHELLS, type Shell } from './core/completion.ts';
 import { guide } from './core/guide.ts';
 import { switchCommand } from './engine/branch.ts';
 import { APPROVE, stackCommands } from './engine/checks.ts';
@@ -426,7 +427,7 @@ const COMMANDS: Command[] = [
   {
     name: 'use',
     who: 'you',
-    args: '[stack] [--boards] [--json]',
+    args: '[<stack>] [--boards] [--json]',
     about: 'list the stacks on this Mac (* is in use), switch to one, or list its boards',
     run: use,
     example: 'koppler use "Shop"',
@@ -440,6 +441,18 @@ const COMMANDS: Command[] = [
       process.stdout.write(guide(loaded()));
     },
     example: 'koppler guide > GUIDE.md',
+  },
+  {
+    name: 'completion',
+    who: 'you',
+    args: 'zsh|bash|fish',
+    about: "teach your shell koppler's commands and flags: Tab completes them",
+    run: args => {
+      const [shell] = positional(args);
+      if (!SHELLS.includes(shell as Shell)) fail('usage: koppler completion zsh|bash|fish');
+      process.stdout.write(completion(shell as Shell, COMMANDS));
+    },
+    example: "echo 'source <(koppler completion zsh)' >> ~/.zshrc",
   },
   {
     name: 'export',
@@ -716,7 +729,7 @@ const COMMANDS: Command[] = [
   {
     name: 'recipes',
     who: 'agent',
-    args: '[app] | --remember <app> --why "<why>" [--when ...] [--any-os] [--private] | --apply <app...> [--env <env>]',
+    args: '[<app>] | --remember <app> --why "<why>" [--when ...] [--any-os] [--private] | --apply <app...> [--env <env>]',
     about: 'remembered code changes: list, keep the last edit, apply the matching ones',
     run: recipes,
     example: 'koppler recipes orders-api',

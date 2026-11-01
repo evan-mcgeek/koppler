@@ -580,3 +580,34 @@ test('Boards made from the terminal at the same time are all kept.', async () =>
   const kept = JSON.parse(fs.readFileSync(path.join(dir, 'state.json'), 'utf8')).presets.map(one => one.name);
   assert.deepEqual(kept.sort(), names);
 });
+
+test('koppler completion teaches bash and zsh its commands, subcommands and flags', async () => {
+  const { spawnSync } = await import('node:child_process');
+  const fs = await import('node:fs'), os = await import('node:os'), path = await import('node:path'), { fileURLToPath } = await import('node:url');
+  const entry = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'dist', 'koppler.mjs');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-completion-'));
+  const script = shell => {
+    const made = spawnSync('node', [entry, 'completion', shell], { encoding: 'utf8' });
+    assert.equal(made.status, 0, made.stderr);
+    const file = path.join(dir, shell);
+    fs.writeFileSync(file, made.stdout);
+    return file;
+  };
+  // What bash offers for the words typed so far, the last one being completed.
+  const bash = (...typed) => {
+    const words = ['koppler', ...typed].map(word => `'${word}'`).join(' ');
+    const run = spawnSync('bash', ['--norc', '-c', `source ${script('bash')}; COMP_WORDS=(${words}); COMP_CWORD=${typed.length}; _koppler; echo "\${COMPREPLY[*]}"`], { encoding: 'utf8' });
+    assert.equal(run.status, 0, run.stderr);
+    return run.stdout.trim().split(' ');
+  };
+  assert.deepEqual(bash('can'), ['canvas']);
+  for (const word of ['new', 'edit', 'share', 'open', 'delete', '--add']) assert.ok(bash('board', '').includes(word), word);
+  assert.deepEqual(bash('doctor', '--ap'), ['--approve']);
+  assert.deepEqual(bash('completion', 'z'), ['zsh']);
+  // zsh reads it, and knows the function once its completion system is on.
+  const zsh = spawnSync('zsh', ['-fc', `autoload -U compinit && compinit -u -d ${path.join(dir, 'zcompdump')} && source ${script('zsh')} && whence -w _koppler`], { encoding: 'utf8' });
+  assert.equal(zsh.status, 0, zsh.stderr);
+  assert.match(zsh.stdout, /_koppler: function/);
+  assert.match(spawnSync('node', [entry, 'completion', 'tcsh'], { encoding: 'utf8' }).stderr, /usage: koppler completion zsh\|bash\|fish/);
+  fs.rmSync(dir, { recursive: true, force: true });
+});
