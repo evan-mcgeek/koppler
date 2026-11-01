@@ -41,14 +41,25 @@
       )
       .slice(0, 8);
   });
+  // The close event comes a task later, after a / may have opened the finder again.
+  const shut = () => {
+    dialog?.close();
+    onclose();
+  };
   const pick = (card: Card | undefined) => {
     if (!card) return;
-    dialog?.close();
+    shut();
     onpick(card);
   };
 </script>
 
-<dialog bind:this={dialog} aria-label="Find a card" {onclose}>
+<dialog
+  bind:this={dialog}
+  aria-label="Find a card"
+  onclose={() => {
+    if (!dialog?.open) onclose();
+  }}
+>
   <input
     type="search"
     aria-label="Find a card"
@@ -66,7 +77,7 @@
       } else if (ev.key === 'Escape') {
         // A search field would only clear itself.
         ev.preventDefault();
-        dialog?.close();
+        shut();
       } else if (ev.key === 'Enter') {
         ev.preventDefault();
         pick(found[at]?.card);
