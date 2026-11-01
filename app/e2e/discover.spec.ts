@@ -310,6 +310,22 @@ test.describe('a board with an app', () => {
     await expect(find).toBeHidden();
   });
 
+  test('/ pressed right after a card is picked opens the finder again', async ({ page }) => {
+    await discover(page);
+    await page.keyboard.press('/');
+    const find = page.getByRole('dialog', { name: 'Find a card' });
+    await find.getByRole('searchbox').fill('orders');
+    // The pick and the next / in one go, before the dialog's close event comes.
+    await find
+      .getByRole('option')
+      .first()
+      .evaluate(option => {
+        option.querySelector('button')?.click();
+        document.body.dispatchEvent(new KeyboardEvent('keydown', { key: '/', bubbles: true }));
+      });
+    await expect(find).toBeVisible();
+  });
+
   test('Plan a run with these puts the cloned apps on the board and lists the rest', async ({ page }) => {
     await discover(page);
     await page.getByRole('button', { name: 'Show 1 more link of Catalog API' }).click();
