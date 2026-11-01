@@ -26,6 +26,9 @@ const settled = async (page: Page) => {
     })
     .toBe(true);
 };
+/** Where a card sits on the map itself, which the view moving about does not change. */
+const onMap = async (page: Page, id: string) =>
+  Number(/translate\([^,]+,\s*(-?[\d.]+)px/.exec((await card(page, id).getAttribute('style')) ?? '')?.[1]);
 const discover = async (page: Page) => {
   await expect(card(page, 'web')).toBeVisible();
   await page.keyboard.press('d');
@@ -160,16 +163,13 @@ test.describe('a board with an app', () => {
     await settled(page);
     const [web, orders] = [await card(page, 'web').boundingBox(), await card(page, 'orders').boundingBox()];
     if (!web || !orders) throw new Error('no cards');
-    // Where each card sits on the map itself, which the view moving about does not change.
-    const onMap = async (id: string) =>
-      Number(/translate\([^,]+,\s*(-?[\d.]+)px/.exec((await card(page, id).getAttribute('style')) ?? '')?.[1]);
-    const [webWas, ordersWas] = [await onMap('web'), await onMap('orders')];
+    const [webWas, ordersWas] = [await onMap(page, 'web'), await onMap(page, 'orders')];
     await page.mouse.move(web.x + 40, web.y + 20);
     await page.mouse.down();
     await page.mouse.move(web.x + 40, web.y + 140, { steps: 8 });
     await page.mouse.up();
-    await expect.poll(() => onMap('web')).toBeGreaterThan(webWas + 60);
-    expect(Math.abs((await onMap('orders')) - ordersWas)).toBeLessThan(1);
+    await expect.poll(() => onMap(page, 'web')).toBeGreaterThan(webWas + 60);
+    expect(Math.abs((await onMap(page, 'orders')) - ordersWas)).toBeLessThan(1);
     const map = page.locator('.svelte-flow__pane');
     const box = await map.boundingBox();
     if (!box) throw new Error('no map');
@@ -192,13 +192,14 @@ test.describe('a board with an app', () => {
     );
     await card(page, 'orders').click();
     await settled(page);
-    const [web, orders] = [await card(page, 'web').boundingBox(), await card(page, 'orders').boundingBox()];
-    if (!web || !orders) throw new Error('no cards');
+    const web = await card(page, 'web').boundingBox();
+    if (!web) throw new Error('no Web Shop card');
+    const ordersWas = await onMap(page, 'orders');
     await page.mouse.move(web.x + 40, web.y + 20);
     await page.mouse.down();
     await page.mouse.move(web.x + 40, web.y + 140, { steps: 8 });
     await page.mouse.up();
-    expect(Math.abs(((await card(page, 'orders').boundingBox())?.y ?? 0) - orders.y)).toBeLessThan(3);
+    expect(Math.abs((await onMap(page, 'orders')) - ordersWas)).toBeLessThan(1);
     const box = await page.locator('.svelte-flow__pane').boundingBox();
     if (!box) throw new Error('no map');
     // Pointed at first, as a person does: the map takes the click once it has caught up with the pointer.
