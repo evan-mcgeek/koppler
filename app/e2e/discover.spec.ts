@@ -266,6 +266,11 @@ test.describe('a board with an app', () => {
     const calls = panel.locator('section').filter({ has: page.getByRole('heading', { name: 'Calls' }) });
     await expect(calls).toContainText('Search API');
     await expect(calls).toContainText('Found in code, not confirmed');
+    // Where it was found opens in the editor, in the caller's clone, at its line.
+    await expect(calls.getByRole('link', { name: 'Open in editor' })).toHaveAttribute(
+      'href',
+      `vscode://file${encodeURI(path.join(canvas.dir, 'clones', 'catalog', 'src', 'search.ts'))}:12`,
+    );
     // The map makes room for the panel and keeps every card in view, none under the panel.
     const inMap = async (id: string) => {
       const [map, box] = [await page.locator('.map').boundingBox(), await card(page, id).boundingBox()];
@@ -278,6 +283,31 @@ test.describe('a board with an app', () => {
     await expect
       .poll(() => (JSON.parse(fs.readFileSync(file, 'utf8')) as typeof STACK).apps['catalog']?.['consumes'])
       .toMatchObject({ search: { found: 'src/search.ts:12' } });
+  });
+
+  test('/ or ⌘K finds a card by name, and brings one not on the map onto it', async ({ page }) => {
+    await discover(page);
+    await expect(card(page, 'search')).toHaveCount(0);
+    await page.keyboard.press('/');
+    const find = page.getByRole('dialog', { name: 'Find a card' });
+    await find.getByRole('searchbox').fill('sea');
+    await expect(find.getByRole('option')).toHaveText(['Search API .NET Show']);
+    await page.screenshot({ path: 'test-results/discover-find.png' });
+    await page.keyboard.press('Enter');
+    await expect(find).toBeHidden();
+    await expect(card(page, 'search')).toBeInViewport();
+    await expect(page.getByRole('complementary', { name: 'Search API' })).toBeVisible();
+
+    await page.keyboard.press('ControlOrMeta+k');
+    await find.getByRole('searchbox').fill('orders');
+    await expect(find.getByRole('option').first()).toContainText('On the map');
+    await find.getByRole('option').first().click();
+    await expect(page.getByRole('complementary', { name: 'Orders API' })).toBeVisible();
+    await page.keyboard.press('/');
+    await find.getByRole('searchbox').fill('nothing like it');
+    await expect(find).toContainText('No card is called that');
+    await page.keyboard.press('Escape');
+    await expect(find).toBeHidden();
   });
 
   test('Plan a run with these puts the cloned apps on the board and lists the rest', async ({ page }) => {

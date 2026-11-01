@@ -168,6 +168,8 @@ export interface StackApp {
   /** Its repository, as owner/name. */
   slug: string;
   cloned: boolean;
+  /** Its clone's folder, when cloned. */
+  path: string;
   /** Why it does not run on this machine. */
   outside?: string;
   /** The apps the stack says it calls, and the calls found in its code. */
@@ -1709,6 +1711,7 @@ class Board {
       kindLabel: kindOf(app, stack).label,
       slug: app.slug ?? '',
       cloned: !!clones[id],
+      path: clones[id]?.path ?? '',
       calls: [...new Set([...Object.keys(app.consumes ?? {}), ...Object.keys(stack.found?.[id] ?? {})])],
       known: Object.keys(app.consumes ?? {}),
       answers:

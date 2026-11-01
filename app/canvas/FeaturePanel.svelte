@@ -64,6 +64,16 @@
     Uses {recorded} of the stack's links{steps.length > recorded
       ? `; ${String(steps.length - recorded)} not in it yet`
       : ''}.
+    {#if steps.length}
+      <button
+        class="text walk"
+        type="button"
+        title="Then → and ← to step, Esc to stop"
+        onclick={() => {
+          discovered.step = steps[0]?.number ?? null;
+        }}>Walk through the steps</button
+      >
+    {/if}
   </p>
 
   {#each feature.phases as one, at (one.name)}
@@ -235,6 +245,10 @@
     border-bottom: 1px solid var(--line);
     color: var(--ink-muted);
     font: 400 12px var(--sans);
+  }
+  button.walk {
+    display: block;
+    margin-top: 10px;
   }
   section {
     padding-top: 14px;
