@@ -73,6 +73,20 @@ await buildPage({
   customLogger: logger,
   build: { outDir: path.join(next, 'page'), emptyOutDir: true },
 });
+// The page `koppler export` fills in: its fonts inlined, so the one file it writes needs nothing beside it.
+await buildPage({
+  root: path.join(app, 'canvas', 'viewer'),
+  configFile: path.join(app, 'canvas', 'vite.config.ts'),
+  base: './',
+  logLevel: 'warn',
+  customLogger: logger,
+  build: {
+    outDir: path.join(next, 'viewer'),
+    emptyOutDir: true,
+    assetsInlineLimit: () => true,
+    modulePreload: false,
+  },
+});
 if (warnings.length) {
   fs.rmSync(next, { recursive: true, force: true });
   console.error(warnings.join('\n'));
