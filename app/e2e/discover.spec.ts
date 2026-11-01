@@ -266,6 +266,11 @@ test.describe('a board with an app', () => {
     const calls = panel.locator('section').filter({ has: page.getByRole('heading', { name: 'Calls' }) });
     await expect(calls).toContainText('Search API');
     await expect(calls).toContainText('Found in code, not confirmed');
+    // Where it was found opens in the editor, in the caller's clone, at its line.
+    await expect(calls.getByRole('link', { name: 'Open in editor' })).toHaveAttribute(
+      'href',
+      `vscode://file${encodeURI(path.join(canvas.dir, 'clones', 'catalog', 'src', 'search.ts'))}:12`,
+    );
     // The map makes room for the panel and keeps every card in view, none under the panel.
     const inMap = async (id: string) => {
       const [map, box] = [await page.locator('.map').boundingBox(), await card(page, id).boundingBox()];
