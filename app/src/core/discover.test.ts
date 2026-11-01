@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { deadEnds, linksOf, mapOf, type Facts } from './discover.ts';
+import { changedNote, deadEnds, linksOf, mapOf, sourceOf, type Facts } from './discover.ts';
 
 const app = (name: string, extra: object = {}) => ({ name, kind: 'node', slug: `acme/${name}`, ...extra });
 const facts = {
@@ -121,5 +121,48 @@ describe('mapOf on a feature board', () => {
       { card: 'orders', onBoard: true, hidden: 3 },
     ]);
     expect(mapOf(facts, ['web', 'orders'], ['orders'], false).cards).toHaveLength(5);
+  });
+});
+
+describe('changedNote', () => {
+  it("says the clone's branch when it is not the main one, and how many files it changed", () => {
+    expect(changedNote({ branch: 'feat/refunds', main: 'main', dirty: 3 })).toBe('feat/refunds, 3 changed');
+    expect(changedNote({ branch: 'feat/refunds', main: 'main', dirty: 0 })).toBe('feat/refunds');
+    expect(changedNote({ branch: 'main', main: 'main', dirty: 2 })).toBe('2 changed');
+  });
+  it('says nothing for a clean main branch, or a branch whose main the remote does not name', () => {
+    expect(changedNote({ branch: 'main', main: 'main', dirty: 0 })).toBe('');
+    expect(changedNote({ branch: 'develop', main: null, dirty: 0 })).toBe('');
+    expect(changedNote({})).toBe('');
+  });
+});
+
+describe('sourceOf', () => {
+  const at = (from: string, to: string) => {
+    const link = linksOf(facts).find(one => one.from === from && one.to === to);
+    if (!link) throw new Error(`no link ${from}>${to}`);
+    return sourceOf(facts, link);
+  };
+  it('reads the file and line a call was found at, as git grep gives them', () => {
+    expect(at('reports', 'payments')).toEqual({ file: 'src/pay.ts', line: 3 });
+    const found = { ...facts, found: { orders: { payments: 'src/clients/pay.ts:42:  const url = "https://pay"' } } };
+    const link = linksOf(found).find(one => one.from === 'orders' && one.to === 'payments');
+    expect(link && sourceOf(found, link)).toEqual({ file: 'src/clients/pay.ts', line: 42 });
+  });
+  it("reads the call's settings file, at its line when the key is one", () => {
+    const filed = (key: string) =>
+      ({
+        apps: { web: app('Web', { consumes: { orders: { file: 'appsettings.json', key } } }), orders: app('O') },
+      }) as unknown as Facts;
+    const link = { from: 'web', to: 'orders', kind: 'call', sure: 'confirmed' } as const;
+    expect(sourceOf(filed('Orders:Url'), link)).toEqual({ file: 'appsettings.json' });
+    expect(sourceOf(filed('12'), link)).toEqual({ file: 'appsettings.json', line: 12 });
+  });
+  it('has none for a call read from a GitHub copy, a setting alone, or a link that is no call', () => {
+    const copy = { ...facts, found: { orders: { payments: 'GitHub acme/orders: src/pay.ts:3:x' } } };
+    const link = linksOf(copy).find(one => one.from === 'orders' && one.to === 'payments');
+    expect(link && sourceOf(copy, link)).toBeUndefined();
+    expect(at('web', 'orders')).toBeUndefined();
+    expect(at('orders', 'queue:events')).toBeUndefined();
   });
 });

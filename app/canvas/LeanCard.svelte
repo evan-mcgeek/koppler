@@ -1,6 +1,7 @@
 <script lang="ts">
   // A card on the Discover map: its name, its kind, and where its code is or what it is. On the board it is solid;
   // one step away it is drawn back. A +N chip on it brings in the links it leaves out.
+  import GitBranch from '@lucide/svelte/icons/git-branch';
   import Laptop from '@lucide/svelte/icons/laptop';
   import type { NodeProps } from '@xyflow/svelte';
   import { discovered, type LeanData } from './discover.svelte.ts';
@@ -24,10 +25,13 @@
   {#if data.repo}<span class="repo">{data.repo} /</span>{/if}
   <span class="top">
     <span class="name">{data.name}</span>
+    {#if data.edited}<span class="edited" title={data.edited.says}>{data.edited.tag}</span>{/if}
     <span class="tag">{data.tag}</span>
   </span>
   <span class="meta">
-    {#if data.cloned}<Laptop size={12} aria-hidden="true" /><span class="here">Cloned here</span>{:else}<span
+    {#if data.changed}<GitBranch size={12} aria-hidden="true" /><span class="here changed" title={data.changed}
+        >{data.changed}</span
+      >{:else if data.cloned}<Laptop size={12} aria-hidden="true" /><span class="here">Cloned here</span>{:else}<span
         class="what"
         title={data.meta}>{data.meta}</span
       >{/if}
@@ -159,6 +163,15 @@
     text-transform: uppercase;
     white-space: nowrap;
   }
+  /* Solid, unlike its kind: something here the shared stack does not have yet. */
+  .edited {
+    flex: none;
+    padding: 1px 5px;
+    background: var(--ink);
+    color: var(--desk);
+    font: 600 10px var(--sans);
+    white-space: nowrap;
+  }
   .meta {
     display: flex;
     align-items: center;
@@ -168,7 +181,8 @@
     white-space: nowrap;
   }
   /* A long description stays inside its card. */
-  .what {
+  .what,
+  .changed {
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;

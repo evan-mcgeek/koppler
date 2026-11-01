@@ -132,6 +132,9 @@ The chip opens the agent's messages; with no agent listening, or one gone quiet,
 Nothing on it runs or changes the board.
 Its tools are the board's: Select and Hand, Undo, Arrange (each press the next layout), Fit, zoom and Present, with the same keys; dragging over the map picks the cards in it, and the overview sits in the corner.
 A card's **+N** brings in the links it leaves out; a dashed link was found in the code and is not in the stack yet, and **Confirm** in the panel keeps it there.
+A card added or changed in your stack and not in the shared one yet (not committed in the stack's repo, or for a stack linked from GitHub, not merged there) is tagged **New** or **Changed**; its panel says which fields changed.
+An app whose clone is on another branch than its repo's main one, or has files changed, says so on its card (`feat/refunds, 3 changed`); its panel names the apps that call it, which would meet those changes.
+A call whose place in the code is known (where it was found, or the settings file the stack names) has **Open in editor**, which opens that file in the caller's clone, at its line, in VS Code or any editor that takes `vscode://` links.
 A **?** on a link means the stack records the call without saying where it comes from (no setting, file or place in the code): **No source yet**.
 Resources are what the stack's `resources` name: an S3 bucket's link says whether the app **reads**, **writes** or **both**; an API Gateway's panel lists its routes and what each hands to; a Step Functions panel lists what starts it and its steps in order.
 **Read again** reads the code once more: your clones, and, with your `gh` login, the repos not cloned here, from a copy Koppler keeps for reading only (`koppler sync --github`).
@@ -145,6 +148,7 @@ A **feature board** (New feature board in the boards menu) is for one feature: t
 Describe the feature and **Hand it to the agent**: its proposals show dashed, each with Accept and Drop, until you accept them; accepting a link the stack does not have yet records it there.
 Or start from an app, and add a picked card's links with **Add as a step**.
 The panel on the right holds the request and the steps: pick a phase to dim the others, rename it, or take a step off.
+**Walk through the steps**, or click a step's number on the map, to follow the feature one step at a time: → and ← move on and back, each step brought into view with its note, and Esc stops.
 
 <img alt="A feature board, Checkout: its steps numbered in two phases on the map and in the panel, and one step the agent proposed, dashed, with Accept and Drop" src="images/feature-board.png">
 
@@ -163,6 +167,7 @@ Zoomed out below 60%, cards are short in Plan too: pick one and its fields open 
 | `D` / `E` / `L`                            | Discover, Plan, Live                                                                                             |
 | `P`, then `Esc`                            | Present, and back                                                                                                |
 | `F`                                        | Fit the board in the window                                                                                      |
+| `/`, or `Ctrl+K` (`Cmd` on a Mac)          | Find a card on Discover's map by name; one the map does not show yet is brought onto it                          |
 | `V` / `H`, or hold `Space`                 | Select by dragging, or move around: while moving around, a click or drag never picks, lets go of or moves a card |
 | `Ctrl+Z` / `Shift+Ctrl+Z` (`Cmd` on a Mac) | Undo, redo                                                                                                       |
 | `Tab`, arrows                              | Move between cards, and move the picked card                                                                     |
