@@ -53,6 +53,21 @@
   import { toasts } from './toast.svelte.ts';
 
   // A board file can be dropped anywhere on the page, which shows where it will land.
+  // A newer Koppler installed: the server restarts the canvas, and the page loads again once it answers anew.
+  let restarting = $state<string | null>(null);
+  const update = $derived(live.status?.restart);
+  const restartCanvas = async () => {
+    restarting = live.status?.startedAt ?? '';
+    const said = await post('restart-canvas');
+    if ('error' in said) {
+      restarting = null;
+      toasts.show(`Could not restart the canvas. ${said.error}`, 'warning');
+    }
+  };
+  $effect(() => {
+    const started = live.status?.startedAt;
+    if (restarting !== null && started && started !== restarting) location.reload();
+  });
   let dropping = $state(false);
   let reading = $state(false);
   const readAgain = async () => {
@@ -648,6 +663,19 @@
   </div>
   <div class="frame" aria-hidden="true"></div>
 {/if}
+{#if update}
+  <div class="update" role="alert">
+    <p>
+      {update.installed && update.installed !== update.running
+        ? `Koppler ${update.installed} is installed, and this canvas still runs ${update.running || 'an older one'}.`
+        : 'This canvas runs older code than is installed, so some buttons may fail.'}
+      Restarting it keeps your apps and tunnels running.
+    </p>
+    <button type="button" disabled={restarting !== null} onclick={() => void restartCanvas()}
+      >{restarting !== null ? 'Restarting…' : 'Restart canvas'}</button
+    >
+  </div>
+{/if}
 <div class="work">
   {#if loading}
     <div class="loading" role="status">
@@ -860,6 +888,33 @@
   }
   .spacer {
     flex: 1;
+  }
+  .update {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 8px 14px;
+    padding: 8px 16px;
+    border-bottom: 1px solid var(--line);
+    background: var(--panel);
+    color: var(--ink);
+    font: 400 13px var(--sans);
+  }
+  .update p {
+    margin: 0;
+  }
+  .update button {
+    padding: 6px 12px;
+    border: 0;
+    border-radius: 8px;
+    background: var(--cable);
+    color: var(--on-accent);
+    font: 600 13px var(--sans);
+    cursor: pointer;
+  }
+  .update button:disabled {
+    cursor: progress;
+    opacity: 0.7;
   }
   .banner {
     display: flex;

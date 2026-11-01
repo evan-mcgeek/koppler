@@ -408,10 +408,11 @@ const COMMANDS: Command[] = [
   {
     name: 'canvas',
     who: 'you',
-    args: '[start] [--board "<name>"] [--no-open] [--new-address] | stop',
-    about: 'start the canvas if needed and open it, on a board when one is named; stop stops it',
+    args: '[start] [--board "<name>"] [--no-open] [--new-address] | stop | restart',
+    about:
+      'start the canvas if needed and open it, on a board when one is named; stop stops it, restart starts it again',
     run: canvas,
-    example: 'koppler canvas stop && koppler canvas start',
+    example: 'koppler canvas restart',
     forms: [
       [
         '[start] [--board "<name>"] [--no-open]',
@@ -419,6 +420,7 @@ const COMMANDS: Command[] = [
       ],
       ['--new-address', 'give the canvas a new address: every address given out before stops working'],
       ['stop', 'stop the canvas; apps and tunnels keep running'],
+      ['restart', 'stop the canvas and start it again, on the Koppler installed now; apps and tunnels keep running'],
     ],
   },
   {

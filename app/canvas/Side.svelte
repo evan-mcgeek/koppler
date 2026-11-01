@@ -5,7 +5,6 @@
   import Plus from '@lucide/svelte/icons/plus';
   import Trash from '@lucide/svelte/icons/trash';
   import X from '@lucide/svelte/icons/x';
-  import Command from './Command.svelte';
   import BoardPicker from './BoardPicker.svelte';
   import Needs from './Needs.svelte';
   import Summary from './Summary.svelte';
@@ -283,12 +282,6 @@
     {#if board.unsaved}
       <p class="unsaved" role="alert">Not saved: the canvas server is not answering. Changes stay on this page.</p>
     {/if}
-    {#if live.status?.restart}
-      <div class="warn">
-        The canvas server runs older code, so some buttons fail until it restarts. Run this in your terminal:
-        <Command command={live.status.restart} label="Copy restart command" />
-      </div>
-    {/if}
     {#if notCloned.length}
       <div class="clone" role="note" aria-label="Not cloned">
         <p>
@@ -518,15 +511,6 @@
     padding: 0 8px;
     color: var(--warn);
     font-weight: 600;
-  }
-  footer .warn {
-    margin: 0;
-    padding: 0 8px;
-    color: var(--warn);
-    font-size: 12.5px;
-  }
-  footer .warn :global(.cmd) {
-    margin-top: 6px;
   }
   .clone {
     display: grid;

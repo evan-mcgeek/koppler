@@ -187,6 +187,7 @@ As the window narrows it gives them up one step at a time: Settings drops its wo
 Run, Stop, the view switch and the environment keep their words at every width.
 The mark opens the shortcuts and legend, as `?` does.
 Discover runs nothing, so its bar has no status, Activity, Stop or Run, and it shows the board's name, since Discover has no side pane.
+Once a newer Koppler is installed (`npm i -g koppler`), a line under the bar names both versions, and **Restart canvas** starts the canvas again on the new one; apps and tunnels keep running.
 
 ## Side panels
 
