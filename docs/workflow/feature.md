@@ -52,10 +52,11 @@ Done when: every new behaviour has a test that went red, then green.
 
 - Run the local CI gate (`koppler-local-ci-gate`). Green means every step passed and the e2e summary shows no failed or flaky test.
 - Run each new e2e test with `--repeat-each 4`.
+- Run the whole e2e suite once more under load, as slow as CI's runners: `npx playwright test --workers 16`. A test that fails only there is a flake, fixed before the push.
 - Screenshot each changed screen and look at it, in light and dark. Fix what looks off, including misses next to the change.
 - Run `npm run screenshots`; keep the images this feature changed, and restore the rest.
 
-Done when: the gate is green and you have looked at every changed screen.
+Done when: the gate is green, also under load, and you have looked at every changed screen.
 
 ## 7. Review
 
@@ -64,8 +65,8 @@ Fix each finding you can confirm in the code; say why you skipped the others.
 
 ## 8. Ship
 
-Commit, push, and open the PR with the `pr` skill: `Closes #<issue>`, what changed, how it was tested.
-Wait for the PR's CI (`gh pr checks <n> --watch`); give the user the merge command only when every check passed.
+Commit, push, and open the PR with the `pr` skill: `Closes #<issue>`, what changed, how it was tested, and a line per step of this file with its result (or why it was skipped).
+Wait for the PR's CI (`gh pr checks <n> --watch`); merge, or give the user the merge command, only when every check passed and step 7 is done.
 A failed check, even a flake, is fixed first (`docs/workflow/bugs.md`).
 After the merge, move the card to Testing, and check the change in the user's running canvas (`koppler-merged-canvas-change-live-check`).
 

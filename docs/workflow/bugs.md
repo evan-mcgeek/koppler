@@ -45,7 +45,7 @@ The red check goes green; keep it as the regression test.
 
 ## 7. Verify, review, ship
 
-Run steps 6 to 8 of `docs/workflow/feature.md`: the gate, screenshots of any screen it touches, `code-review`, the PR with `Closes #<issue>`, the merge command, and the card to Testing after the merge.
+Run steps 6 to 8 of `docs/workflow/feature.md`: the gate, also under load, screenshots of any screen it touches, `code-review`, the PR with `Closes #<issue>` and a line per step, the merge once CI and the review are done, and the card to Testing after the merge.
 
 ## 8. Prevent
 
