@@ -80,3 +80,15 @@ test('a stack that is not on GitHub keeps the board in its file here, to commit'
   assert.match(koppler('board', 'share', 'Nope').stderr, /Nope is not one of your boards/);
   fs.rmSync(dir, { recursive: true, force: true });
 });
+
+test('a feature board is shared with its request, phases, steps and where its cards sit on the map', () => {
+  const { dir, stack, koppler } = sandbox({ github: false });
+  const feature = { request: 'A customer pays', phases: [{ name: 'Pay', steps: [{ from: 'web', to: 'web', kind: 'call', note: 'Sends it' }] }] };
+  const discover = { open: ['web'], at: { web: { x: 40, y: 220 } }, layout: 1 };
+  fs.writeFileSync(path.join(dir, 'state', 'state.json'), JSON.stringify({ presets: [{ name: 'Checkout', version: 1, nodes: {}, edges: [], feature, discover }] }));
+  const shared = koppler('board', 'share', 'Checkout');
+  assert.equal(shared.status, 0, shared.stderr);
+  const kept = JSON.parse(fs.readFileSync(path.join(stack, 'stack.json'), 'utf8')).presets.find(one => one.name === 'Checkout');
+  assert.deepEqual([kept.feature, kept.discover], [feature, discover]);
+  fs.rmSync(dir, { recursive: true, force: true });
+});

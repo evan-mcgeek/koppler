@@ -1475,14 +1475,15 @@ class Board {
     const out = this.openBoard(first);
     return out.error === undefined ? { notes: out.notes, name: first.name } : out;
   }
-  /** One of the user's boards as text for the stack's presets: what runs and the cables, without its places. */
-  /** The board as a team board of the stack, placed as it is: the name, the apps and cables, and where they sit. */
+  /** The board as a team board of the stack, placed as it is: the apps and cables, a feature's steps, and where they sit. */
   forTeam(preset: StoredPreset): StoredPreset {
-    const { layout, outside } = preset;
+    const { layout, outside, feature, discover } = preset;
     return {
       ...(JSON.parse(this.asShared(preset)) as StoredPreset),
       ...(layout ? { layout } : {}),
       ...(outside ? { outside } : {}),
+      ...(feature ? { feature } : {}),
+      ...(discover ? { discover } : {}),
     };
   }
   /** A board just kept among the stack's team boards, shown as one without loading the stack again. */
