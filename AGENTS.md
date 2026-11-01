@@ -13,6 +13,20 @@ Before fixing a bug or a flaky test, follow `docs/workflow/bugs.md`.
 - Any lint error, test failure or flake you see is yours to fix, in the same PR.
 - Write plain dashes, never em dashes. Commits and PR bodies carry no agent attribution.
 
+## Agent skills
+
+### Issue tracker
+
+Issues live in GitHub Issues on `evan-mcgeek/koppler`, each one a card on the project board. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+The five default triage roles, each label named after its role. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: one `GLOSSARY.md` and `docs/adr/` at the repo root. See `docs/agents/domain.md`.
+
 ## Golden rule: nobody edits JSON by hand
 
 Nobody writes a Koppler JSON file directly: not `stack.json`, not the state files, not a board.
