@@ -6,7 +6,7 @@ import { describeEdit, editPreset, migrate, VERSION, type BoardEdit, type Stored
 import { canvas } from '../cli/running.ts';
 import { fetchPresets } from '../server/sanitize.ts';
 import type { Edge } from '../core/plan.ts';
-import { readClones, readData, readStack, writeData } from '../data.ts';
+import { changeData, readClones, readData, readStack, writeData } from '../data.ts';
 import { fail } from '../failure.ts';
 import { appendMessage } from './messages.ts';
 import { alive, readRecord } from './processes.ts';
@@ -78,15 +78,16 @@ function deleteBoard(name: string): void {
   const board =
     ownBoard(name) ??
     fail(`${name} is not one of your boards; koppler use --boards lists them (a team board is kept in the stack)`);
-  const state = readData('state') ?? {};
-  const own = (state['presets'] ?? []) as StoredPreset[];
-  const trash = (state['trash'] ?? []) as unknown[];
-  const { preset: onScreen, ...rest } = state;
-  writeData('state', {
-    ...rest,
-    ...(onScreen !== board.name && { preset: onScreen }),
-    presets: own.filter(one => one.name !== board.name),
-    trash: [{ ...board, deleted: new Date().toISOString() }, ...trash].slice(0, 20),
+  changeData('state', state => {
+    const own = (state['presets'] ?? []) as StoredPreset[];
+    const trash = (state['trash'] ?? []) as unknown[];
+    const { preset: onScreen, ...rest } = state;
+    return {
+      ...rest,
+      ...(onScreen !== board.name && { preset: onScreen }),
+      presets: own.filter(one => one.name !== board.name),
+      trash: [{ ...board, deleted: new Date().toISOString() }, ...trash].slice(0, 20),
+    };
   });
   enqueue({ board: board.name, edit: {}, delete: true });
   console.log(`DELETED ${board.name}; Recently deleted in the board picker brings it back.`);
@@ -194,9 +195,10 @@ async function openBoard(where: string, quiet: boolean): Promise<void> {
   if (!first || !checked || checked.error !== undefined) fail(checked?.error ?? 'No board found in it.');
   // Kept as the plain board it was read as.
   const board = JSON.parse(JSON.stringify({ ...first, name: first.name.trim().slice(0, 80), source })) as StoredPreset;
-  const state = readData('state') ?? {};
-  const own = (state['presets'] ?? []) as StoredPreset[];
-  writeData('state', { ...state, presets: [...own.filter(one => one.name !== board.name), board] });
+  changeData('state', state => {
+    const own = (state['presets'] ?? []) as StoredPreset[];
+    return { ...state, presets: [...own.filter(one => one.name !== board.name), board] };
+  });
   enqueue({ board: board.name, edit: {}, preset: board });
   console.log(`OPENED ${board.name} from ${source}`);
   if (quiet) console.log(`An open canvas shows it; or: koppler canvas --board "${board.name}"`);
@@ -289,10 +291,11 @@ export function changeBoard(name: string, edit: BoardEdit, create: boolean, prop
       'The user answers in the canvas inbox; the answer comes back as a koppler-reply prompt.',
     ];
   }
-  const mine = own.some(one => one.name === board.name);
-  writeData('state', {
-    ...state,
-    presets: mine ? own.map(one => (one.name === board.name ? changed : one)) : [...own, changed],
+  // Written over the file as it is now: a board the canvas saved meanwhile stays.
+  changeData('state', now => {
+    const kept = (now['presets'] ?? []) as StoredPreset[];
+    const mine = kept.some(one => one.name === board.name);
+    return { ...now, presets: mine ? kept.map(one => (one.name === board.name ? changed : one)) : [...kept, changed] };
   });
   enqueue({ board: board.name, edit, ...(create && { create: true as const }) });
   const canvas = readRecord('canvas');

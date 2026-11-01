@@ -7,7 +7,7 @@ import { records } from '../engine/processes.ts';
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { readData, readStack, writeData } from '../data.ts';
+import { changeData, readStack } from '../data.ts';
 import { applyFindings, current as currentFindingsStack, discover } from '../engine/discover.ts';
 import { editDone } from '../engine/boards.ts';
 import { discardChanges, linkStack, proposeChanges, updateStack } from '../engine/linked.ts';
@@ -108,7 +108,11 @@ const secret =
  * The page's state, with the boards of your own it has never had kept from the server's copy: made in the terminal
  * since the page loaded them. A page that does not say what it has seen replaces them, as before.
  */
-function keepUnseen(layout: Record<string, unknown>, seen: unknown): Record<string, unknown> {
+function keepUnseen(
+  layout: Record<string, unknown>,
+  seen: unknown,
+  now: Record<string, unknown>,
+): Record<string, unknown> {
   if (!Array.isArray(seen)) return layout;
   const list = (value: unknown): unknown[] => (Array.isArray(value) ? (value as unknown[]) : []);
   const nameOf = (one: unknown) => (one as { name?: unknown } | null)?.name;
@@ -117,7 +121,7 @@ function keepUnseen(layout: Record<string, unknown>, seen: unknown): Record<stri
       name => typeof name === 'string',
     ),
   );
-  const missed = list(readData('state')?.['presets']).filter(one => {
+  const missed = list(now['presets']).filter(one => {
     const name = nameOf(one);
     return typeof name === 'string' && !known.has(name);
   });
@@ -133,7 +137,7 @@ export const ROUTES: Record<string, Route> = {
       return { status: 409 };
     const layout = sanitizeLayout(body);
     if (!layout) return { status: 400 };
-    writeData('state', keepUnseen(layout, body['seen']));
+    changeData('state', now => keepUnseen(layout, body['seen'], now));
     return { status: 204 };
   },
   // `koppler canvas` with a page open already: that page shows what was asked, and no other tab opens.

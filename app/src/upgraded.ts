@@ -19,6 +19,12 @@ export function readUpgraded(
   if (!isRaw(raw)) return { value: null };
   const done = upgrade(raw);
   if (done.error !== undefined) return done;
-  if (JSON.stringify(done.value) !== JSON.stringify(raw) && keep(raw, done.value)) writeJson(file, done.value);
+  // Written back only over the file as it was read: another process may have saved a newer one since.
+  if (
+    JSON.stringify(done.value) !== JSON.stringify(raw) &&
+    keep(raw, done.value) &&
+    JSON.stringify(readJson(file)) === JSON.stringify(raw)
+  )
+    writeJson(file, done.value);
   return { value: done.value };
 }

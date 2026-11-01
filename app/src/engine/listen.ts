@@ -11,7 +11,7 @@ import path from 'node:path';
 import { tempDir } from '../paths.ts';
 import { Failure } from '../failure.ts';
 import type { Prompt } from './history.ts';
-import { writeJson } from '../json-files.ts';
+import { locked as lockedFile, writeJson } from '../json-files.ts';
 import { claudeTitle } from './claude-title.ts';
 
 /** Who is connected to the canvas, as temp/listener.json has it. */
@@ -98,7 +98,6 @@ export async function listen(argv: string[]): Promise<void> {
   const inbox = path.join(temp, 'prompts.jsonl');
   const taking = inbox + '.taking';
   const listener = path.join(temp, 'listener.json');
-  const lock = listener + '.lock';
   /** The session's name and agent: read now, or kept from when it connected. */
   const who = (current: Listener | null): Pick<Listener, 'name' | 'agent' | 'agentSession'> => {
     const kept = takeOver ? undefined : current;
@@ -120,25 +119,7 @@ export async function listen(argv: string[]): Promise<void> {
     writeJson(listener, record);
   };
   // Who is connected changes in one step at a time: a session being replaced cannot undo what the new one just wrote.
-  function locked<T>(work: () => T): T {
-    fs.mkdirSync(temp, { recursive: true });
-    for (let tries = 0; ; tries++) {
-      try {
-        fs.mkdirSync(lock);
-        break;
-      } catch {
-        // A lock left by a process that died is taken over.
-        const age = Date.now() - (fs.statSync(lock, { throwIfNoEntry: false })?.mtimeMs ?? 0);
-        if (tries > 200 || age > 5000) fs.rmSync(lock, { recursive: true, force: true });
-        else Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 10);
-      }
-    }
-    try {
-      return work();
-    } finally {
-      fs.rmSync(lock, { recursive: true, force: true });
-    }
-  }
+  const locked = <T>(work: () => T): T => lockedFile(listener, work);
 
   if (argv[0] === 'stop') {
     const was = locked(() => {
