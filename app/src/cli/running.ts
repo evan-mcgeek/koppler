@@ -54,7 +54,7 @@ export async function restart(args: string[]): Promise<void> {
   const [name = ''] = positional(args);
   if (!name) fail('usage: koppler restart <name>');
   if (!NAME.test(name)) fail(notAName(name));
-  if (name === 'canvas') fail('to restart the canvas: koppler canvas stop && koppler canvas');
+  if (name === 'canvas') fail('to restart the canvas: koppler canvas restart');
   const record = readRecord(name) ?? fail(`${name} is not started by koppler`);
   try {
     console.log(await restartOne(record));
@@ -82,6 +82,12 @@ async function shownInOpenPage(urlFile: string, hash: string): Promise<boolean> 
 export async function canvas(args: string[]): Promise<void> {
   if (args[0] === 'stop') {
     await stop(['canvas']);
+    return;
+  }
+  // Apps and tunnels keep running: only the canvas server stops, then starts on the code installed now.
+  if (args[0] === 'restart') {
+    if (readRecord('canvas')) await stop(['canvas']);
+    await canvas(['--no-open']);
     return;
   }
   const record = readRecord('canvas');

@@ -70,7 +70,7 @@ test('what the stack needs on this Mac is listed with its commands, and missing 
     },
   ];
   await page.route('**/data/status.json', route =>
-    route.fulfill({ json: { apps: {}, checks, restart: 'koppler canvas stop && koppler canvas start' } }),
+    route.fulfill({ json: { apps: {}, checks, restart: { running: '0.3.6', installed: '0.3.6' } } }),
   );
   const open = page.getByRole('button', {
     name: '1 missing on this Mac, 1 check waits for your approval, 1 PROD fact missing from the stack',
@@ -92,9 +92,8 @@ test('what the stack needs on this Mac is listed with its commands, and missing 
   await page.getByRole('button', { name: 'Hide the side pane' }).click();
   await page.getByRole('button', { name: 'This stack needs something on this Mac' }).click();
   await expect(open).toBeVisible();
-  // A server running older code than is on disk says how to restart it.
-  await expect(page.getByRole('complementary')).toContainText('The canvas server runs older code');
-  await expect(page.getByRole('complementary').locator('.warn code')).toHaveText(/koppler/);
-  await expect(page.getByRole('button', { name: 'Copy restart command' })).toBeVisible();
-  await page.getByRole('complementary').locator('.warn').first().screenshot({ path: 'test-results/next-restart.png' });
+  // A server running older code than is on disk, of the same version (a build from source), offers to restart.
+  const update = page.getByRole('alert').filter({ hasText: 'older code' });
+  await expect(update).toContainText('This canvas runs older code than is installed');
+  await expect(update.getByRole('button', { name: 'Restart canvas' })).toBeVisible();
 });

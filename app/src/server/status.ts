@@ -17,7 +17,7 @@ import { reloadable } from '../engine/reload.ts';
 import { runningEnvs, runningNames } from '../engine/runs.ts';
 import { live, notes, runs } from '../engine/history.ts';
 import { currentStack, LOADING, stacksHere } from '../engine/stacks.ts';
-import { CODE, logsDir, stateDir, tempDir } from '../paths.ts';
+import { APP, CODE, logsDir, stateDir, tempDir } from '../paths.ts';
 import { redact } from '../scrub.ts';
 import { tail } from './logs.ts';
 import { mobileState, refreshMobile, type MobileApp } from './mobile.ts';
@@ -70,6 +70,14 @@ const codeVersion = () => {
   }
 };
 const STARTED_CODE = codeVersion();
+const packageVersion = () => {
+  try {
+    return (JSON.parse(fs.readFileSync(path.join(APP, 'package.json'), 'utf8')) as { version?: string }).version ?? '';
+  } catch {
+    return '';
+  }
+};
+const STARTED_VERSION = packageVersion();
 const STARTED_AT = new Date().toISOString();
 // Run from its source folder rather than an installed plugin: Koppler itself is being worked on, so the debug log stays on.
 const DEV = !fs.realpathSync(CODE).split(path.sep).join('/').includes('/plugins/cache/');
@@ -322,7 +330,7 @@ async function snapshot(serving: boolean): Promise<Status> {
   status['startedAt'] = STARTED_AT;
   if (DEV) status['dev'] = true;
   status['start'] = 'koppler canvas';
-  if (codeVersion() > STARTED_CODE) status['restart'] = 'koppler canvas stop && koppler canvas start';
+  if (codeVersion() > STARTED_CODE) status['restart'] = { running: STARTED_VERSION, installed: packageVersion() };
   return status;
 }
 

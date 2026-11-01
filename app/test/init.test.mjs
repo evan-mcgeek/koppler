@@ -139,3 +139,31 @@ test('koppler init --new refused while a run has changes to undo creates no stac
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test('the canvas restarts itself when its page asks: a new server on the same address, and the page still opens', async () => {
+  const { freePorts, until } = await import('./helpers.mjs');
+  const [port] = await freePorts(1);
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-restart-'));
+  const env = { ...process.env, HOME: dir, KOPPLER_STATE: path.join(dir, 'state'), KOPPLER_CONFIG_DIR: path.join(dir, 'config'), KOPPLER_PORT: String(port) };
+  const koppler = (...args) => spawnSync('node', [entry, ...args], { encoding: 'utf8', env });
+  const run = path.join(dir, 'state', 'run');
+  const url = () => fs.readFileSync(path.join(run, 'canvas-url'), 'utf8').trim();
+  const pid = () => JSON.parse(fs.readFileSync(path.join(dir, 'state', 'procs', 'canvas.json'), 'utf8')).pid;
+  try {
+    assert.equal(koppler('canvas', '--no-open').status, 0);
+    const [address, before] = [url(), pid()];
+    const page = new URL(address);
+    const asked = await fetch(`${page.origin}/restart-canvas?token=${page.pathname.split('/')[2]}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', origin: page.origin },
+      body: '{}',
+    });
+    assert.equal(asked.status, 200);
+    await until('a new canvas server', () => { try { return pid() !== before; } catch { return false; } }, 20000);
+    await until('the page answering again', async () => (await fetch(address).catch(() => null))?.status === 200, 20000);
+    assert.equal(url(), address);
+  } finally {
+    koppler('canvas', 'stop');
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});

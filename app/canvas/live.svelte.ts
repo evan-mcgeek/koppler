@@ -168,8 +168,8 @@ interface Status {
   checks?:
     | { name: string; state: string; detail?: string; for?: string[]; app?: string; env?: string; kind?: string }[]
     | null;
-  /** The command that restarts the canvas server, when it runs older code than is on disk. */
-  restart?: string;
+  /** The canvas server runs older code than is on disk: the version it started with, and the one installed now. */
+  restart?: { running: string; installed: string };
   /** Koppler runs from its source folder: it is being worked on. */
   dev?: boolean;
   /** The command that starts the canvas again. */

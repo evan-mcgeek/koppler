@@ -146,6 +146,14 @@ export const ROUTES: Record<string, Route> = {
       typeof body['hash'] === 'string' && /^(#pick|#board=[^\s]{1,200})?$/.test(body['hash']) ? body['hash'] : '';
     return { status: 200, body: { shown: showPages(hash) } };
   },
+  // On its own, so it outlives this server: the canvas stops and starts again on the code installed now.
+  '/restart-canvas': () => {
+    spawn(process.execPath, [path.join(CODE, 'koppler.mjs'), 'canvas', 'restart'], {
+      detached: true,
+      stdio: 'ignore',
+    }).unref();
+    return { status: 200, body: { ok: true } };
+  },
   '/board-edit-done': body => {
     editDone(body['id']);
     return { status: 204 };
