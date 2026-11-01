@@ -2,7 +2,7 @@
 // its version: there is nothing to run or click to update a file.
 import type { Upgrade } from './core/migrations/files.ts';
 import type { Raw } from './core/migrations/run.ts';
-import { readJson, writeJson } from './json-files.ts';
+import { locked, readJson, writeJson } from './json-files.ts';
 
 const isRaw = (value: unknown): value is Raw => typeof value === 'object' && value !== null && !Array.isArray(value);
 
@@ -19,12 +19,10 @@ export function readUpgraded(
   if (!isRaw(raw)) return { value: null };
   const done = upgrade(raw);
   if (done.error !== undefined) return done;
-  // Written back only over the file as it was read: another process may have saved a newer one since.
-  if (
-    JSON.stringify(done.value) !== JSON.stringify(raw) &&
-    keep(raw, done.value) &&
-    JSON.stringify(readJson(file)) === JSON.stringify(raw)
-  )
-    writeJson(file, done.value);
+  // Written back under the lock, and only over the file as it was read: another process may have saved a newer one.
+  if (JSON.stringify(done.value) !== JSON.stringify(raw) && keep(raw, done.value))
+    locked(file, () => {
+      if (JSON.stringify(readJson(file)) === JSON.stringify(raw)) writeJson(file, done.value);
+    });
   return { value: done.value };
 }

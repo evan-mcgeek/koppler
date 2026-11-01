@@ -21,11 +21,13 @@ export function writeJson(file: string, value: unknown): void {
   fs.renameSync(beside, file);
 }
 
-/** Runs `work` while no other process does so for `file`: one read-change-write at a time. */
+const held = new Set<string>();
+/** Runs `work` while no other process does so for `file`: one read-change-write at a time. Taken again inside, it is held already. */
 export function locked<T>(file: string, work: () => T): T {
   const lock = `${file}.lock`;
+  if (held.has(lock)) return work();
   fs.mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 });
-  for (let tries = 0; ; tries++) {
+  for (;;) {
     try {
       fs.mkdirSync(lock);
       break;
@@ -33,13 +35,15 @@ export function locked<T>(file: string, work: () => T): T {
       if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
       // A lock left by a process that died is taken over.
       const age = Date.now() - (fs.statSync(lock, { throwIfNoEntry: false })?.mtimeMs ?? 0);
-      if (tries > 200 || age > 5000) fs.rmSync(lock, { recursive: true, force: true });
+      if (age > 5000) fs.rmSync(lock, { recursive: true, force: true });
       else Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 10);
     }
   }
+  held.add(lock);
   try {
     return work();
   } finally {
+    held.delete(lock);
     fs.rmSync(lock, { recursive: true, force: true });
   }
 }
