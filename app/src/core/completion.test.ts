@@ -66,11 +66,15 @@ describe('completion', () => {
   it('gives each shell the commands, their subcommands and flags, with quotes and colons kept safe', () => {
     const zsh = completion('zsh', commands);
     expect(zsh).toContain("'canvas:start it; it'\\''s the canvas\\: open'");
-    expect(zsh).toContain('canvas) opts=(start stop --no-open) ;;');
+    expect(zsh).toContain('canvas) subs=(start stop) flags=(--no-open) ;;');
     expect(zsh).not.toContain('guide)');
-    expect(completion('bash', commands)).toContain('canvas) words="start stop --no-open" ;;');
+    expect(completion('bash', commands)).toContain('canvas) subs="start stop" flags="--no-open" ;;');
+  });
+  it('tells fish the command by its first word, and offers subcommands only right after it', () => {
+    // Any later word naming a command (`koppler canvas stop`) must not bring that command's flags.
     const fish = completion('fish', commands);
-    expect(fish).toContain("complete -c koppler -n '__fish_seen_subcommand_from canvas' -a 'start stop'");
-    expect(fish).toContain("complete -c koppler -n '__fish_seen_subcommand_from canvas' -l no-open");
+    expect(fish).not.toContain('__fish_seen_subcommand_from');
+    expect(fish).toContain("complete -c koppler -n '__koppler_next canvas' -a 'start stop'");
+    expect(fish).toContain("complete -c koppler -n '__koppler_in canvas' -l no-open");
   });
 });

@@ -603,12 +603,17 @@ test('koppler completion teaches bash and zsh its commands, subcommands and flag
   assert.deepEqual(bash('can'), ['canvas']);
   for (const word of ['new', 'edit', 'share', 'open', 'delete', '--add']) assert.ok(bash('board', '').includes(word), word);
   assert.deepEqual(bash('doctor', '--ap'), ['--approve']);
+  // A subcommand is typed once: after it come only the command's flags.
+  assert.deepEqual(bash('canvas', 'stop', ''), bash('canvas', '--'));
   assert.deepEqual(bash('completion', 'z'), ['zsh']);
   // zsh reads it, and knows the function once its completion system is on; a machine without zsh (CI on Linux) skips this.
   if (!spawnSync('zsh', ['--version']).error) {
     const zsh = spawnSync('zsh', ['-fc', `autoload -U compinit && compinit -u -d ${path.join(dir, 'zcompdump')} && source ${script('zsh')} && whence -w _koppler`], { encoding: 'utf8' });
     assert.equal(zsh.status, 0, zsh.stderr);
     assert.match(zsh.stdout, /_koppler: function/);
+    // Sourced from a ~/.zshrc that never turned the completion system on, it turns it on.
+    const bare = spawnSync('zsh', ['-fc', `HOME=${dir}; source ${script('zsh')} && whence -w _koppler`], { encoding: 'utf8' });
+    assert.equal(bare.status, 0, bare.stderr);
   }
   assert.match(spawnSync('node', [entry, 'completion', 'tcsh'], { encoding: 'utf8' }).stderr, /usage: koppler completion zsh\|bash\|fish/);
   fs.rmSync(dir, { recursive: true, force: true });
