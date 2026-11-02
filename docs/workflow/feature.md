@@ -52,7 +52,7 @@ Done when: every new behaviour has a test that went red, then green.
 
 - Run the local CI gate (`koppler-local-ci-gate`). Green means every step passed and the e2e summary shows no failed or flaky test.
 - Run each new e2e test with `--repeat-each 4`.
-- Run the whole e2e suite once more under load, as slow as CI's runners: `npx playwright test --workers 16`. A test that fails only there is a flake, fixed before the push.
+- Run the whole e2e suite once more under load, as slow as CI's runners: `npx playwright test --workers 8`. A test that fails only there is a flake, fixed before the push.
 - Screenshot each changed screen and look at it, in light and dark. Fix what looks off, including misses next to the change.
 - Run `npm run screenshots`; keep the images this feature changed, and restore the rest.
 
