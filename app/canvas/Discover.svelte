@@ -60,13 +60,15 @@
   };
   // The map refits when it gains cards or the panel takes or gives back its room; a map not shown never answers.
   const shown = $derived(board.feature ? map.cards.length > 0 : board.nodes.length > 0);
+  // Read when the refit is due, after the wait, not as it was asked.
+  const stillShown = () => shown;
   const shape = $derived(`${String(map.cards.length)}:${String(!!discovered.last)}`);
   $effect(() => {
     if (shape && shown)
       untrack(() => {
         motion(
           go => setTimeout(go, 80),
-          () => (shown ? flow.fitView({ duration: 200, maxZoom: 1, padding: 0.15 }) : Promise.resolve()),
+          () => (stillShown() ? flow.fitView({ duration: 200, maxZoom: 1, padding: 0.15 }) : Promise.resolve()),
         );
       });
   });
