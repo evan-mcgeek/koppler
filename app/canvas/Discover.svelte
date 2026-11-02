@@ -66,7 +66,7 @@
       untrack(() => {
         motion(
           go => setTimeout(go, 80),
-          () => flow.fitView({ duration: 200, maxZoom: 1, padding: 0.15 }),
+          () => (shown ? flow.fitView({ duration: 200, maxZoom: 1, padding: 0.15 }) : Promise.resolve()),
         );
       });
   });
