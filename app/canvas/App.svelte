@@ -52,15 +52,20 @@
   import { live } from './live.svelte.ts';
   import { toasts } from './toast.svelte.ts';
 
-  // A board file can be dropped anywhere on the page, which shows where it will land.
   // A newer Koppler installed: the server restarts the canvas, and the page loads again once it answers anew.
   let restarting = $state<string | null>(null);
+  // Nothing on the page can start a server that is gone, so after half a minute it says how to.
+  let lost = $state(false);
+  let giveUp: ReturnType<typeof setTimeout> | undefined;
   const update = $derived(live.status?.restart);
   const restartCanvas = async () => {
     restarting = live.status?.startedAt ?? '';
+    giveUp = setTimeout(() => (lost = true), 30_000);
     const said = await post('restart-canvas');
     if ('error' in said) {
+      clearTimeout(giveUp);
       restarting = null;
+      lost = false;
       toasts.show(`Could not restart the canvas. ${said.error}`, 'warning');
     }
   };
@@ -68,6 +73,7 @@
     const started = live.status?.startedAt;
     if (restarting !== null && started && started !== restarting) location.reload();
   });
+  // A board file can be dropped anywhere on the page, which shows where it will land.
   let dropping = $state(false);
   let reading = $state(false);
   const readAgain = async () => {
@@ -665,15 +671,19 @@
 {/if}
 {#if update}
   <div class="update" role="alert">
-    <p>
-      {update.installed && update.installed !== update.running
-        ? `Koppler ${update.installed} is installed, and this canvas still runs ${update.running || 'an older one'}.`
-        : 'This canvas runs older code than is installed, so some buttons may fail.'}
-      Restarting it keeps your apps and tunnels running.
-    </p>
-    <button type="button" disabled={restarting !== null} onclick={() => void restartCanvas()}
-      >{restarting !== null ? 'Restarting…' : 'Restart canvas'}</button
-    >
+    {#if lost}
+      <p>The canvas did not come back. Start it again in a terminal: koppler canvas</p>
+    {:else}
+      <p>
+        {update.installed && update.installed !== update.running
+          ? `Koppler ${update.installed} is installed, and this canvas still runs ${update.running || 'an older one'}.`
+          : 'This canvas runs older code than is installed, so some buttons may fail.'}
+        Restarting it keeps your apps and tunnels running.
+      </p>
+      <button type="button" disabled={restarting !== null} onclick={() => void restartCanvas()}
+        >{restarting !== null ? 'Restarting…' : 'Restart canvas'}</button
+      >
+    {/if}
   </div>
 {/if}
 <div class="work">

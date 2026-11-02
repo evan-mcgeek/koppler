@@ -32,3 +32,28 @@ test('a newer Koppler installed: the canvas says so, and its button restarts the
   await expect(card(page, 'web')).toBeVisible();
   await expect(page.getByRole('alert').filter({ hasText: 'is installed' })).toHaveCount(0);
 });
+
+test('a canvas that does not come back after a restart says so, instead of restarting forever', async ({ page }) => {
+  await page.clock.install();
+  let down = false;
+  await page.route('**/data/status.json', route =>
+    down
+      ? route.abort()
+      : route.fulfill({
+          json: { apps: {}, startedAt: '2026-11-01T10:00:00.000Z', restart: { running: '0.3.6', installed: '0.3.7' } },
+        }),
+  );
+  await page.route('**/restart-canvas?*', route => route.fulfill({ json: { ok: true } }));
+  await page.reload();
+  await expect(card(page, 'web')).toBeVisible();
+  const notice = page.getByRole('alert').filter({ hasText: 'Koppler 0.3.7' });
+  await notice.getByRole('button', { name: 'Restart canvas' }).click();
+  await expect(notice).toContainText('Restarting');
+  down = true;
+  await page.clock.fastForward('00:31');
+  const lost = page.getByRole('alert').filter({ hasText: 'did not come back' });
+  await expect(lost).toHaveText('The canvas did not come back. Start it again in a terminal: koppler canvas');
+  await expect(lost.getByRole('button')).toHaveCount(0);
+  await expect(page.getByRole('alert').filter({ hasText: 'is installed' })).toHaveCount(0);
+  await page.screenshot({ path: 'test-results/update-lost.png' });
+});
