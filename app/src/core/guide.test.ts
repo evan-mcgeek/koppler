@@ -26,7 +26,7 @@ const stack = {
       envs: { prod: { prereqs: [{ sso: 'acme-prod' }], secrets: [] } },
     },
     payments: { name: 'Payments API', kind: 'node', slug: 'acme/payments', reads: { events: {} } },
-    psp: { name: 'Payment provider', kind: 'other', outside: 'a hosted service' },
+    psp: { name: 'Payment provider', kind: 'other', outside: 'a hosted service', description: 'Takes card payments' },
   },
   presets: [
     {
@@ -60,7 +60,7 @@ describe('guide', () => {
     expect(page).not.toContain('To run it here on qa:\n\n- Signed in to AWS with the profile `acme-prod`');
   });
   it('puts outside systems apart, and walks each feature board in its phases', () => {
-    expect(page).toContain('## Outside systems\n\n- Payment provider: a hosted service');
+    expect(page).toContain('## Outside systems\n\n- Payment provider: a hosted service. Takes card payments');
     expect(page).toContain(
       '### Checkout\n\n> A customer pays for an order.\n\n1. Pay\n   - 1.1 Web Shop → Orders API: POST /orders',
     );

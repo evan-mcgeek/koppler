@@ -260,6 +260,7 @@ const App = z.looseObject(
     description: z
       .string()
       .max(200, 'at most 200 characters')
+      .regex(/^(?=.*\S)[^\r\n]*$/, 'one line of words')
       .optional()
       .describe('What it does, in a few words, for someone who does not build it'),
     kind: required.describe('What it is built with: dotnet, node, web, flutter, lambda, other'),

@@ -423,7 +423,7 @@
           void save(typed === '' ? undefined : Number.isFinite(Number(typed)) ? Number(typed) : typed);
         }}
       />
-    {:else if kind === 'text' && !(typeof value === 'string' && (value.length > 60 || value.includes('\n')) && !bare)}
+    {:else if kind === 'text' && (schema.pattern || !(typeof value === 'string' && (value.length > 60 || value.includes('\n')) && !bare))}
       <input
         {id}
         disabled={locked}

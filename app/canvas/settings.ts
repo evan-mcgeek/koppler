@@ -19,6 +19,8 @@ export interface Schema {
   items?: Schema;
   anyOf?: Schema[];
   enum?: unknown[];
+  /** A text with a pattern is one line. */
+  pattern?: string;
   required?: string[];
 }
 /** What a field asks of the panel it is in. */

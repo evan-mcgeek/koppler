@@ -436,6 +436,14 @@ test("an app's description is set in its settings, in Identity beside its name",
   await panel.getByRole('button', { name: 'Save' }).click();
   await expect(panel.getByRole('status')).toHaveText('Saved');
   expect(read().apps['orders']?.['description']).toBe('Keeps every order');
+  // A long one is still one line: the field stays a line to type in, where Enter adds no line break.
+  const long = 'Keeps every order a customer places, from the basket to the refund, for the shop and support';
+  await description.fill(long);
+  await description.press('Tab');
+  await panel.getByRole('button', { name: 'Save' }).click();
+  await expect(panel.getByRole('status')).toHaveText('Saved');
+  expect(read().apps['orders']?.['description']).toBe(long);
+  await expect(description).toHaveJSProperty('tagName', 'INPUT');
 });
 
 test('a view picked while the board reads the saved stack again stays picked', async ({ page, canvas }) => {

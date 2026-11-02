@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fileNameOf, flowsOf, placeRest } from './export.ts';
+import { fileNameOf, flowsOf, lineOf, placeRest } from './export.ts';
 import type { Stack } from './stack.ts';
 
 const app = (name: string, extra: object = {}) => ({ name, kind: 'node', slug: `acme/${name}`, ...extra });
@@ -116,5 +116,17 @@ describe('fileNameOf', () => {
   it('names the page after the stack, in plain letters', () => {
     expect(fileNameOf('Acme Shop')).toBe('acme-shop-flows.html');
     expect(fileNameOf('  ** ')).toBe('stack-flows.html');
+  });
+});
+
+describe('lineOf', () => {
+  it('says what a card does in place of its kind, and an outside service stays one', () => {
+    expect(lineOf({ id: 'orders', name: 'Orders API', kind: 'Service', description: 'Keeps every order' })).toBe(
+      'Keeps every order',
+    );
+    expect(lineOf({ id: 'web', name: 'Web Shop', kind: 'Website' })).toBe('Website');
+    expect(lineOf({ id: 'psp', name: 'Payments', kind: 'Outside service', description: 'Takes card payments' })).toBe(
+      'Outside service',
+    );
   });
 });

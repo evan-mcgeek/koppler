@@ -79,8 +79,8 @@ export function guide(stack: Stack): string {
     out.push('## Outside systems', '');
     for (const id of outside) {
       const app = stack.apps[id];
-      const what = typeof app?.outside === 'string' ? `: ${app.outside}` : '';
-      out.push(`- ${name(id)}${what}`);
+      const said = [typeof app?.outside === 'string' ? app.outside : '', app?.description ?? ''].filter(Boolean);
+      out.push(`- ${name(id)}${said.length ? `: ${said.join('. ')}` : ''}`);
     }
     out.push('');
   }

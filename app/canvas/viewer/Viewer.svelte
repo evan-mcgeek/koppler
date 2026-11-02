@@ -1,7 +1,7 @@
 <script lang="ts">
   // The flows a team shared, to read: pick one, move its cards and the map about, and walk its steps. Nothing is kept.
   import type { Point } from '../../src/core/arrange.ts';
-  import { CARD, type Exported, type Flow } from '../../src/core/export.ts';
+  import { CARD, lineOf, type Exported, type Flow } from '../../src/core/export.ts';
 
   const { data }: { data: Exported } = $props();
   const W = CARD.w;
@@ -192,13 +192,13 @@
             style:left="{place.x}px"
             style:top="{place.y}px"
             role="img"
-            aria-label="{card.name}, {card.description ?? card.kind}"
+            aria-label="{card.name}, {lineOf(card)}"
             title={card.description}
             onpointerdown={event => {
               drag(event, card.id);
             }}
           >
-            <b>{card.name}</b><span>{card.description ?? card.kind}</span>
+            <b>{card.name}</b><span>{lineOf(card)}</span>
           </div>
         {/if}
       {/each}
