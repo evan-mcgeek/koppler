@@ -36,16 +36,20 @@ export function flagsOf(command: Completable): string[] {
 
 const quoted = (text: string) => `'${text.replaceAll("'", `'\\''`)}'`;
 
+/** Each command's subcommands and flags, as one shell `case` row per command that has any. */
+const cases = (commands: Completable[], row: (name: string, subs: string, flags: string) => string) =>
+  commands.flatMap(one => {
+    const [subs, flags] = [commandsOf(one), flagsOf(one)];
+    return subs.length || flags.length ? [`    ${row(one.name, subs.join(' '), flags.join(' '))}`] : [];
+  });
+
+// Subcommands are offered only right after the command; its flags anywhere after it.
 function zsh(commands: Completable[]): string {
   const described = commands.map(one => `    ${quoted(`${one.name}:${one.about.replaceAll(':', '\\:')}`)}`);
-  const cases = commands.flatMap(one => {
-    const words = [...commandsOf(one), ...flagsOf(one)];
-    return words.length ? [`    ${one.name}) opts=(${words.join(' ')}) ;;`] : [];
-  });
   return [
     '#compdef koppler',
     '_koppler() {',
-    '  local -a cmds opts',
+    '  local -a cmds subs flags',
     '  cmds=(',
     ...described,
     '  )',
@@ -54,32 +58,32 @@ function zsh(commands: Completable[]): string {
     '    return',
     '  fi',
     '  case ${words[2]} in',
-    ...cases,
+    ...cases(commands, (name, subs, flags) => `${name}) subs=(${subs}) flags=(${flags}) ;;`),
     '  esac',
-    '  compadd -- $opts',
+    '  (( CURRENT == 3 )) && compadd -- $subs',
+    '  compadd -- $flags',
     '  _files',
     '}',
+    // A ~/.zshrc without the completion system on yet gets it here.
+    '(( $+functions[compdef] )) || { autoload -U compinit && compinit }',
     'compdef _koppler koppler',
     '',
   ].join('\n');
 }
 
 function bash(commands: Completable[]): string {
-  const cases = commands.flatMap(one => {
-    const words = [...commandsOf(one), ...flagsOf(one)];
-    return words.length ? [`    ${one.name}) words="${words.join(' ')}" ;;`] : [];
-  });
   return [
     '_koppler() {',
-    '  local cur=${COMP_WORDS[COMP_CWORD]} words=""',
+    '  local cur=${COMP_WORDS[COMP_CWORD]} subs="" flags=""',
     '  if [ "$COMP_CWORD" -eq 1 ]; then',
     `    COMPREPLY=($(compgen -W "${commands.map(one => one.name).join(' ')} --help --version" -- "$cur"))`,
     '    return',
     '  fi',
     '  case ${COMP_WORDS[1]} in',
-    ...cases,
+    ...cases(commands, (name, subs, flags) => `${name}) subs="${subs}" flags="${flags}" ;;`),
     '  esac',
-    '  COMPREPLY=($(compgen -W "$words" -- "$cur"))',
+    '  [ "$COMP_CWORD" -eq 2 ] || subs=""',
+    '  COMPREPLY=($(compgen -W "$subs $flags" -- "$cur"))',
     '}',
     'complete -o default -F _koppler koppler',
     '',
@@ -88,13 +92,15 @@ function bash(commands: Completable[]): string {
 
 function fish(commands: Completable[]): string {
   return [
+    // The command is the first word after koppler; `next` is right after it, before anything else is typed.
+    'function __koppler_in; set -l w (commandline -opc); test (count $w) -ge 2; and test $w[2] = $argv[1]; end',
+    'function __koppler_next; set -l w (commandline -opc); test (count $w) -eq 2; and test $w[2] = $argv[1]; end',
     ...commands.map(one => `complete -c koppler -n __fish_use_subcommand -a ${one.name} -d ${quoted(one.about)}`),
     ...commands.flatMap(one => {
-      const when = `-n '__fish_seen_subcommand_from ${one.name}'`;
       const subs = commandsOf(one);
       return [
-        ...(subs.length ? [`complete -c koppler ${when} -a ${quoted(subs.join(' '))}`] : []),
-        ...flagsOf(one).map(flag => `complete -c koppler ${when} -l ${flag.slice(2)}`),
+        ...(subs.length ? [`complete -c koppler -n '__koppler_next ${one.name}' -a ${quoted(subs.join(' '))}`] : []),
+        ...flagsOf(one).map(flag => `complete -c koppler -n '__koppler_in ${one.name}' -l ${flag.slice(2)}`),
       ];
     }),
     '',

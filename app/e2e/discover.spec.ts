@@ -441,6 +441,8 @@ test.describe('an empty board', () => {
   test('says where to start', async ({ page }) => {
     await page.getByRole('radio', { name: 'Discover' }).check();
     await expect(page.getByRole('status').filter({ hasText: 'No apps on this board' })).toBeVisible();
+    // With no map to fit, nothing is moving.
+    await expect(page.locator('.map[data-moving]')).toHaveCount(0);
     await page.getByRole('button', { name: 'Add apps' }).click();
     await expect(page.getByRole('radio', { name: 'Plan' })).toBeChecked();
   });

@@ -58,14 +58,17 @@
       void move().finally(() => moving--);
     });
   };
-  // The map refits when it gains cards or the panel takes or gives back its room.
+  // The map refits when it gains cards or the panel takes or gives back its room; a map not shown never answers.
+  const shown = $derived(board.feature ? map.cards.length > 0 : board.nodes.length > 0);
+  // Read when the refit is due, after the wait, not as it was asked.
+  const stillShown = () => shown;
   const shape = $derived(`${String(map.cards.length)}:${String(!!discovered.last)}`);
   $effect(() => {
-    if (shape)
+    if (shape && shown)
       untrack(() => {
         motion(
           go => setTimeout(go, 80),
-          () => flow.fitView({ duration: 200, maxZoom: 1, padding: 0.15 }),
+          () => (stillShown() ? flow.fitView({ duration: 200, maxZoom: 1, padding: 0.15 }) : Promise.resolve()),
         );
       });
   });
@@ -380,9 +383,9 @@
 
 <div class="discover">
   <div class="map" aria-label="Discover map" data-moving={moving > 0 || undefined}>
-    {#if board.feature && !map.cards.length}
+    {#if !shown && board.feature}
       <FeatureStart />
-    {:else if !board.nodes.length && !board.feature}
+    {:else if !shown}
       <div class="empty" role="status">
         <h2>No apps on this board</h2>
         <p>Discover starts from a board's apps and shows what is one step away. Add an app in Plan.</p>
