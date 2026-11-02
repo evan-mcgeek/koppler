@@ -73,6 +73,7 @@ test('whatever it is given, it answers with reasons and never throws', () => {
 test('each part is named where it is wrong', () => {
   const cases: [object, string][] = [
     [web({ prereqs: [{ tunnel: 'db; rm -rf ~', port: 5432 }] }), 'apps.web.prereqs[0].tunnel: a host name'],
+    [web({ description: 'Keeps orders\n## Not a heading' }), 'apps.web.description: one line'],
     [web({ prereqs: [{ port: '5432' }] }), 'apps.web.prereqs[0].port: a port number from 1 to 65535'],
     [
       web({ envs: { prod: { prereqs: [{ port: 70000 }] } } }),

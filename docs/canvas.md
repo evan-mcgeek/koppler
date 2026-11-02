@@ -134,6 +134,7 @@ Its tools are the board's: Select and Hand, Undo, Arrange (each press the next l
 A card's **+N** brings in the links it leaves out; a dashed link was found in the code and is not in the stack yet, and **Confirm** in the panel keeps it there.
 A card added or changed in your stack and not in the shared one yet (not committed in the stack's repo, or for a stack linked from GitHub, not merged there) is tagged **New** or **Changed**; its panel says which fields changed.
 An app whose clone is on another branch than its repo's main one, or has files changed, says so on its card (`feat/refunds, 3 changed`); its panel names the apps that call it, which would meet those changes.
+An app's panel opens with its description, when its settings have one: a line on what it does, which `koppler guide` and the exported page also show.
 A call whose place in the code is known (where it was found, or the settings file the stack names) has **Open in editor**, which opens that file in the caller's clone, at its line, in VS Code or any editor that takes `vscode://` links.
 A **?** on a link means the stack records the call without saying where it comes from (no setting, file or place in the code): **No source yet**.
 Resources are what the stack's `resources` name: an S3 bucket's link says whether the app **reads**, **writes** or **both**; an API Gateway's panel lists its routes and what each hands to; a Step Functions panel lists what starts it and its steps in order.

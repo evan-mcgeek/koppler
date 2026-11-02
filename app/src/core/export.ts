@@ -36,6 +36,11 @@ const KIND_WORDS: Record<string, string> = {
   lambda: 'Function',
 };
 
+const OUTSIDE = 'Outside service';
+
+/** What a card says under its name: what it does, else its kind; an outside service always says so. */
+export const lineOf = (card: FlowCard): string => (card.kind === OUTSIDE ? OUTSIDE : (card.description ?? card.kind));
+
 function cardOf(stack: Stack, id: Card): FlowCard {
   if (id.startsWith('queue:')) return { id, name: stack.queues?.[id.slice(6)]?.name ?? id.slice(6), kind: 'Queue' };
   if (id.startsWith('database:'))
@@ -46,7 +51,7 @@ function cardOf(stack: Stack, id: Card): FlowCard {
   return {
     id,
     name: app?.name ?? id,
-    kind: app?.outside ? 'Outside service' : (KIND_WORDS[app?.kind ?? ''] ?? 'Service'),
+    kind: app?.outside ? OUTSIDE : (KIND_WORDS[app?.kind ?? ''] ?? 'Service'),
     ...(app?.description && { description: app.description }),
   };
 }
