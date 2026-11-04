@@ -97,6 +97,11 @@ describe('mergeStacks', () => {
     expect(mergeStacks(a, b).conflicts.map(one => one.path)).toEqual(['envs', 'envAliases["qa.eu"]']);
   });
 
+  it('keeps every board of ours, even two with one name', () => {
+    const twice = { ...ours, presets: [ours.presets[0], { ...ours.presets[0], nodes: {} }] };
+    expect((mergeStacks(twice, theirs, { prefer: 'ours' }).stack as typeof ours).presets).toHaveLength(3);
+  });
+
   it('finds nothing to do for the same stack', () => {
     expect(mergeStacks(ours, structuredClone(ours))).toEqual({ stack: ours, added: [], conflicts: [] });
   });

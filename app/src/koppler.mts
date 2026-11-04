@@ -359,6 +359,10 @@ function merge(want: string | undefined, args: string[]): void {
     const kept = one.locked ? ' - locked, keeps ours' : one.kept ? ` - keeps ${one.kept}` : '';
     console.log(`${one.path}: ours ${shown(one.ours)}, theirs ${shown(one.theirs)}${kept}`);
   }
+  if (!added.length && conflicts.every(one => one.locked)) {
+    console.log('Nothing else to merge: what still differs is locked.');
+    return;
+  }
   const count = (n: number, one: string) => `${String(n)} ${one}${n === 1 ? '' : 's'}`;
   if (apply) {
     console.log(
@@ -369,11 +373,9 @@ function merge(want: string | undefined, args: string[]): void {
   }
   const open = conflicts.filter(one => !one.kept).length;
   console.log(
-    !added.length && conflicts.every(one => one.locked)
-      ? 'Nothing else to merge: what still differs is locked.'
-      : open
-        ? `${count(open, 'conflict')} to settle: --keep <path>=ours|theirs for one, --prefer ours|theirs for the rest; then --apply.`
-        : 'Every conflict is settled: add --apply to make the change.',
+    open
+      ? `${count(open, 'conflict')} to settle: --keep <path>=ours|theirs for one, --prefer ours|theirs for the rest; then --apply.`
+      : 'Every conflict is settled: add --apply to make the change.',
   );
 }
 

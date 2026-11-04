@@ -37,9 +37,7 @@ const pathText = (parts: Path) =>
     )
     .join('');
 
-/** Team boards by name, in their order. */
-const boards = (list: unknown[]) =>
-  new Map(list.map((board, at) => [isObject(board) ? String(board['name']) : `#${String(at)}`, board]));
+const boardName = (board: unknown) => (isObject(board) ? String(board['name']) : '');
 
 /**
  * `theirs` folded into `ours`. Each conflict is settled by its path in `keep`, else by `prefer`; one left unsettled
@@ -78,13 +76,19 @@ export function mergeStacks(
   const merge = (a: unknown, b: unknown, at: Path): unknown => {
     if (same(a, b)) return a;
     if (at.length === 1 && at[0] === 'presets' && Array.isArray(a) && Array.isArray(b)) {
-      const mine = boards(a);
-      const other = boards(b);
+      // Team boards are told apart by name: every one of ours stays, in its place.
+      const ourBoards: unknown[] = a;
+      const theirBoards: unknown[] = b;
+      const mine = new Set(ourBoards.map(boardName));
+      const other = new Map(theirBoards.map(board => [boardName(board), board]));
       return [
-        ...[...mine].map(([name, board]) => (other.has(name) ? merge(board, other.get(name), [...at, name]) : board)),
-        ...[...other]
-          .filter(([name]) => !mine.has(name))
-          .map(([name, board]) => differ(undefined, board, [...at, name])),
+        ...ourBoards.map(board => {
+          const name = boardName(board);
+          return other.has(name) ? merge(board, other.get(name), [...at, name]) : board;
+        }),
+        ...theirBoards
+          .filter(board => !mine.has(boardName(board)))
+          .map(board => differ(undefined, board, [...at, boardName(board)])),
       ].filter(board => board !== undefined);
     }
     // A board is taken whole, as a list is.
