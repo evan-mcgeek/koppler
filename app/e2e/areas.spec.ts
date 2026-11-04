@@ -13,10 +13,7 @@ test.use({
       payments: { ...apps['payments'], areas: ['payments'] },
       catalog: { ...apps['catalog'], areas: ['shipping'] },
     },
-    presets: [
-      ...(STACK.presets ?? []),
-      { name: 'Smoke test', version: 1, nodes: { web: { run: 'cli' } }, edges: [] },
-    ],
+    presets: [...(STACK.presets ?? []), { name: 'Smoke test', version: 1, nodes: { web: { run: 'cli' } }, edges: [] }],
   } as typeof STACK,
   board: {
     env: 'qa',
@@ -49,7 +46,10 @@ test('the Apps list shows the chosen areas, then apps in none; an app in two lis
   // Kept on this Mac, and the board menu shows the same choice.
   await page.reload();
   await expect(panel(page).getByRole('button', { name: 'Areas: Payments' })).toBeVisible();
-  await page.getByRole('banner').getByRole('button', { name: /^Board:/ }).click();
+  await page
+    .getByRole('banner')
+    .getByRole('button', { name: /^Board:/ })
+    .click();
   const menu = page.getByRole('dialog', { name: 'Boards' });
   await expect(menu.getByRole('button', { name: 'Areas: Payments' })).toBeVisible();
   await page.keyboard.press('Escape');
