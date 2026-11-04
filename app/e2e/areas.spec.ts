@@ -1,6 +1,6 @@
 // Areas: one person's choice of the stack's parts, shared by the Apps list and the board menu, and kept on this Mac.
 import type { Page } from '@playwright/test';
-import { card, expect, STACK, test } from './canvas.ts';
+import { card, expect, overlapping, STACK, test } from './canvas.ts';
 
 const apps = STACK.apps as Record<string, object>;
 test.use({
@@ -164,6 +164,46 @@ test('Discover leaves out the apps outside the areas, and says so on the cards t
   await expect(page.locator('.svelte-flow__node.unplaced')).toHaveCount(0);
   await expect(page.locator('.map[data-moving]')).toHaveCount(0);
   await expect.poll(() => throughCards(page)).toEqual([]);
+});
+
+/** Where a card sits on the map itself, whatever the view. */
+const onMap = async (page: Page, id: string) => {
+  const [, x, y] =
+    /translate\((-?[\d.]+)px,\s*(-?[\d.]+)px/.exec((await card(page, id).getAttribute('style')) ?? '') ?? [];
+  return { x: Number(x), y: Number(y) };
+};
+
+test('an app Show all brings back never lands on a card moved by hand', async ({ page }) => {
+  await discover(page);
+  const spot = await onMap(page, 'catalog');
+  await page
+    .getByRole('banner')
+    .getByRole('button', { name: /^Board:/ })
+    .click();
+  await only(page, page.getByRole('dialog', { name: 'Boards' }), 'Payments');
+  await page.keyboard.press('Escape');
+  await expect(card(page, 'catalog')).toHaveCount(0);
+  await expect(page.locator('.map[data-moving]')).toHaveCount(0);
+  // Orders API, moved by hand to where the layout of every app puts Catalog API.
+  const from = await card(page, 'orders').boundingBox();
+  const scale = Number(
+    /scale\(([\d.]+)\)/.exec((await page.locator('.svelte-flow__viewport').getAttribute('style')) ?? '')?.[1] ?? 1,
+  );
+  const was = await onMap(page, 'orders');
+  if (!from) throw new Error('no Orders API card');
+  await page.mouse.move(from.x + 40, from.y + 20);
+  await page.mouse.down();
+  await page.mouse.move(from.x + 40 + (spot.x - was.x) * scale, from.y + 20 + (spot.y - was.y) * scale, {
+    steps: 8,
+  });
+  await page.mouse.up();
+  await expect.poll(async () => Math.abs((await onMap(page, 'orders')).y - spot.y)).toBeLessThan(20);
+  await page.getByRole('region', { name: 'Hidden by your areas' }).getByRole('button', { name: 'Show all' }).click();
+  await expect(card(page, 'catalog')).toBeVisible();
+  await expect(page.locator('.svelte-flow__node.unplaced')).toHaveCount(0);
+  await expect(page.locator('.map[data-moving]')).toHaveCount(0);
+  expect(await overlapping(page)).toEqual([]);
+  await page.screenshot({ path: 'test-results/areas-back-beside.png' });
 });
 
 test.describe('a board with an app in two areas', () => {

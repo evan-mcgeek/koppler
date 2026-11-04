@@ -305,6 +305,16 @@
       bringing = null;
     }
   });
+  // Apps a new choice of areas brings back take a free place, when the others were moved by hand.
+  let choice = '';
+  $effect(() => {
+    const now = chosen.ids.join();
+    if (now === choice) return;
+    choice = now;
+    untrack(() => {
+      discovered.placeReturning();
+    });
+  });
   // The layout is worked out again whenever the map or the chosen layout changes; the same input, the same layout.
   $effect(() => {
     const { cards, links, key, measured } = discovered.layoutInput;

@@ -3,7 +3,7 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Page } from '@playwright/test';
-import { at, card, expect, fromMenu, saveSettles, STACK, test } from './canvas.ts';
+import { at, card, expect, fromMenu, overlapping, saveSettles, STACK, test } from './canvas.ts';
 
 const stack = {
   ...STACK,
@@ -56,15 +56,7 @@ test.describe('a board with an app', () => {
     await page.getByRole('button', { name: 'Show 1 more link of Orders API' }).click();
     await expect(card(page, 'payments')).toBeVisible();
     // Beside the card it came from, never on top of another.
-    const [payments, catalog] = [await card(page, 'payments').boundingBox(), await card(page, 'catalog').boundingBox()];
-    expect(
-      !!payments &&
-        !!catalog &&
-        (payments.y >= catalog.y + catalog.height ||
-          catalog.y >= payments.y + payments.height ||
-          payments.x >= catalog.x + catalog.width ||
-          catalog.x >= payments.x + payments.width),
-    ).toBe(true);
+    expect(await overlapping(page)).toEqual([]);
     await expect(page.getByRole('button', { name: 'Show 1 more link of Orders API' })).toHaveCount(0);
     // A card moved by hand stays where it was put, after a reload too.
     await page.getByRole('button', { name: 'Fit', exact: true }).click();

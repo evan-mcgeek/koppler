@@ -36,8 +36,9 @@
       >{:else if data.cloned}<Laptop size={12} aria-hidden="true" /><span class="here">Cloned here</span>{:else}<span
         class="what"
         title={data.meta}>{data.meta}</span
-      >{/if}{#if data.areas}<span class="areas" title={data.areas}>{data.areas}</span>{/if}
+      >{/if}
   </span>
+  {#if data.areas}<span class="areas" title={data.areas}>{data.areas}</span>{/if}
   {#if data.deadEnd}
     <span class="dead">Dead end · no readers</span>
     <!-- Where its links would go on: they stop here. -->
@@ -189,12 +190,10 @@
     font: 600 10px var(--sans);
     white-space: nowrap;
   }
-  /* Its areas follow on the same line, or wrap to the next where they do not fit. */
   .meta {
     display: flex;
-    flex-wrap: wrap;
     align-items: center;
-    gap: 4px 6px;
+    gap: 6px;
     color: var(--ink-muted);
     font: 400 12px var(--sans);
     white-space: nowrap;
@@ -301,10 +300,12 @@
   .lean.roomy {
     padding-bottom: 14px;
   }
+  /* Its areas, on a line of their own under where it is. */
   .areas {
-    min-width: 0;
     overflow: hidden;
+    color: var(--ink-muted);
     font: 400 11px var(--mono);
+    white-space: nowrap;
     text-overflow: ellipsis;
   }
 </style>

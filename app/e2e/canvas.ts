@@ -220,6 +220,23 @@ export const fromList = async (page: Page, name: string) => {
 };
 /** An app's card on the board. */
 export const card = (page: Page, id: string) => page.locator(`.svelte-flow__node[data-id="${id}"]`);
+/** Each pair of cards on the map drawn on top of each other, by their ids. */
+export const overlapping = (page: Page) =>
+  page.locator('.svelte-flow__node').evaluateAll(nodes => {
+    const boxes = nodes.map(node => ({ id: (node as HTMLElement).dataset['id'], box: node.getBoundingClientRect() }));
+    return boxes.flatMap((one, at) =>
+      boxes
+        .slice(at + 1)
+        .filter(
+          ({ box }) =>
+            one.box.left < box.right &&
+            box.left < one.box.right &&
+            one.box.top < box.bottom &&
+            box.top < one.box.bottom,
+        )
+        .map(other => `${String(one.id)} on ${String(other.id)}`),
+    );
+  });
 /** A card's place on a saved board, run by Koppler on main. */
 export const at = (x: number, y: number) => ({ x, y, run: 'cli', branch: 'main' });
 /** The next save of the board the server takes. */

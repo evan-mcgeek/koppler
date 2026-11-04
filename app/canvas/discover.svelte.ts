@@ -260,17 +260,36 @@ class Discovered {
     // Laid out and not moved since, or not placed yet: the layout places the new cards with the rest and routes every link.
     if (laidOut) board.discover = { ...board.discover, at: {} };
     if (laidOut || ![...before].every(id => at[id])) return;
-    const from = at[card] ?? { x: 0, y: 0 };
-    const fresh = this.map.cards.map(one => one.card).filter(id => !before.has(id));
-    const x = from.x + CARD.w + 120;
-    const taken = (y: number) =>
+    this.#beside(
+      at,
+      this.map.cards.map(one => one.card).filter(id => !before.has(id)),
+      () => card,
+    );
+  }
+  /** Puts each of `fresh` in the first free place right of the card `next` gives, or of the map's corner, and keeps them. */
+  #beside(at: Record<Card, Point>, fresh: Card[], next: (card: Card) => Card | undefined): void {
+    const taken = (x: number, y: number) =>
       Object.values(at).some(spot => Math.abs(spot.x - x) < CARD.w + 40 && Math.abs(spot.y - y) < CARD.h + 36);
-    let y = from.y;
     for (const id of fresh) {
-      while (taken(y)) y += CARD.h + 36;
+      const from = at[next(id) ?? ''] ?? { x: 0, y: 0 };
+      const x = from.x + CARD.w + 120;
+      let y = from.y;
+      while (taken(x, y)) y += CARD.h + 36;
       at[id] = { x, y };
     }
     board.discover = { ...board.discover, at };
+  }
+  /** Cards back on the map while the rest were moved by hand: each beside a card it links to, never on one. */
+  placeReturning(): void {
+    const at = { ...board.discover.at };
+    if (!Object.keys(at).length) return;
+    const fresh = this.map.cards.map(one => one.card).filter(id => !at[id]);
+    if (!fresh.length) return;
+    const linked = (id: Card) =>
+      this.map.links
+        .flatMap(link => (link.from === id ? [link.to] : link.to === id ? [link.from] : []))
+        .find(other => at[other]);
+    this.#beside(at, fresh, linked);
   }
   /** Moved by hand: kept with the board. */
   moved(card: Card, to: Point): void {
