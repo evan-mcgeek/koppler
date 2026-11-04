@@ -15,6 +15,16 @@ The same is `koppler board share "<name>"` in the terminal.
 A board file can also be opened, dropped on the page or linked from GitHub.
 `koppler board new "<name>"` makes a board from the terminal, and `koppler board edit "<name>"` changes one, even one open on the canvas.
 
+### Areas
+
+A big stack can name its parts as areas, such as Payments or Shipping, and each app the areas it is in (`koppler stack set apps.<id>.areas '["payments"]'`).
+**Areas**, above the Apps list and under **Find a board** in the board menu, picks the areas you want to see; your choice is kept on this Mac, per stack, and both places show the same one.
+With some areas picked, the Apps list groups its apps under them, then the apps in no area, which always show; the apps on the board always show too, under **On this board** when they are outside your areas.
+An app in two areas lists once, with "also" and the other one under its name, and a dashed line says how many apps your areas hide, with **Show all**.
+The board menu groups the team boards under their area, the one most of their apps are in unless it was set by hand, with **No area** last; your own boards stay one list, each with its area.
+**Find a board** looks through every board: one your areas hide shows under **In other areas**, and opening it leaves your choice as it is, with its area beside its name in the bar.
+Areas are a view only: what runs, the environments and the secrets stay the same.
+
 ## Cards
 
 <img alt="One feature, Checkout, worked on across four apps: the mobile app and web shop cabled to a local Orders API, which calls a local Payments API; each runs its feature/checkout branch, Orders API has its deployed QA database and a local SQS queue, two apps carry a note for the agent, and everything runs" src="images/board.png">

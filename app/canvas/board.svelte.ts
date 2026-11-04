@@ -170,6 +170,8 @@ export interface StackApp {
   kindLabel: string;
   /** Its repository, as owner/name. */
   slug: string;
+  /** The parts of the stack it is in, by id; none shows it in every area. */
+  areas: string[];
   cloned: boolean;
   /** Its clone's folder, when cloned. */
   path: string;
@@ -397,6 +399,10 @@ class Board {
   );
   /** The stack as written, with its expressions resolved; the board reads it with each database folded into its apps. */
   #resolved = $state.raw<Registry | undefined>();
+  /** The stack's areas, by id, in its order. */
+  get areas(): Record<string, { name: string }> {
+    return this.#resolved?.areas ?? {};
+  }
   // A database on this Mac brings no tunnel or hosts entry.
   /** The stack's facts, as Discover reads them. */
   get facts() {
@@ -1752,6 +1758,7 @@ class Board {
       kind: app.kind,
       kindLabel: kindOf(app, stack).label,
       slug: app.slug ?? '',
+      areas: app.areas ?? [],
       cloned: !!clones[id],
       path: clones[id]?.path ?? '',
       calls: [...new Set([...Object.keys(app.consumes ?? {}), ...Object.keys(stack.found?.[id] ?? {})])],

@@ -1,10 +1,14 @@
 <script lang="ts">
   import Icon from './Icon.svelte';
+  import EyeOff from '@lucide/svelte/icons/eye-off';
   import X from '@lucide/svelte/icons/x';
   // The board on screen, by name: a menu of the team's boards and the user's own, to open, rename, copy, share or
   // delete one, start a new one, or open one from a file or a link.
   import type { StoredPreset } from '../src/core/presets.ts';
   import { bar } from './bar.svelte.ts';
+  import { boardArea, boardGroups } from '../src/core/areas.ts';
+  import AreaFilter from './AreaFilter.svelte';
+  import { chosen as areaChoice } from './areas.svelte.ts';
   import { board } from './board.svelte.ts';
   import { ago, openBoard, openFile, openLink } from './boards.ts';
   import { post } from './data.ts';
@@ -22,6 +26,35 @@
   /** The bar too narrow for the stack's name: it is the menu's first row instead. */
   const stackRow = $derived(bar.stackOut);
   const shows = (preset: StoredPreset) => preset.name.toLowerCase().includes(query.trim().toLowerCase());
+  const hasAreas = $derived(Object.keys(board.areas).length > 0);
+  const facts = $derived({
+    areas: board.areas,
+    apps: Object.fromEntries(board.apps.map(app => [app.id, { areas: app.areas }])),
+  });
+  const areaOf = (preset: StoredPreset) =>
+    boardArea(facts, { nodes: preset.nodes, ...(typeof preset['area'] === 'string' && { area: preset['area'] }) });
+  /** Team boards by area, those the chosen areas hide counted; a search looks through every board. */
+  const teams = $derived(boardGroups(facts, board.team.filter(shows), areaChoice.ids));
+  const shownTeams = $derived(new Set(teams.groups.flatMap(group => group.boards.map(one => one.name))));
+  const hiddenMatches = $derived(board.team.filter(one => shows(one) && !shownTeams.has(one.name)));
+  /** The board on screen, kept at the top while the chosen areas hide it. */
+  const pinned = $derived(
+    !query.trim() && board.name && !shownTeams.has(board.name)
+      ? board.team.find(one => one.name === board.name)
+      : undefined,
+  );
+  /** The board on screen's area, when the chosen areas leave it out. */
+  const outside = $derived.by(() => {
+    if (!hasAreas || !areaChoice.narrows) return undefined;
+    const here = [...board.own, ...board.team].find(one => one.name === board.name);
+    const id = here && areaOf(here).id;
+    return id && !areaChoice.ids.includes(id) ? (board.areas[id]?.name ?? id) : undefined;
+  });
+  /** "Shipping, Notifications and Accounts". */
+  const joined = (names: string[]) =>
+    names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names.at(-1) ?? ''}` : (names[0] ?? '');
+  /** What the areas hide besides the board on screen, pinned above them. */
+  const hiddenCount = $derived(teams.hidden.count - (pinned ? 1 : 0));
   /** "(local)" or "(mine)" after a board's name: set apart, so a long name keeps it. */
   const SUFFIX = / \((local|mine)\)$/;
   let open = $state(false);
@@ -158,6 +191,64 @@
   };
 </script>
 
+<!-- eslint-disable @typescript-eslint/no-confusing-void-expression -- {@render} of a snippet returns nothing -->
+{#snippet boardRow(preset: StoredPreset, mine: boolean, elsewhere = false, under = '')}
+  {@const area = hasAreas ? areaOf(preset) : undefined}
+  <div class="row" class:elsewhere>
+    <button
+      type="button"
+      aria-current={preset.name === board.name}
+      title={typeof preset['source'] === 'string'
+        ? `Opened from ${preset['source']}`
+        : elsewhere
+          ? 'Hidden by your areas. Opening it leaves them as they are.'
+          : undefined}
+      onclick={() => {
+        choose(preset);
+      }}
+    >
+      <span class="here" aria-hidden="true"></span><span class="what"
+        ><span class="line"
+          ><span class="name">{preset.name.replace(SUFFIX, '')}</span>{#if SUFFIX.test(preset.name)}<span class="suffix"
+              >{SUFFIX.exec(preset.name)?.[0]}</span
+            >{/if}</span
+        >{#if under}<span class="under">{under}</span>{/if}</span
+      >
+      {#if area?.by === 'hand' && !mine}<span class="meta">set by hand</span>{/if}
+      {#if hasAreas && (mine || elsewhere || under) && area?.id}<span class="area">{board.areas[area.id]?.name}</span
+        >{:else if !hasAreas}<span class="meta">{size(preset)}</span>{/if}
+    </button>
+    {#if mine && typeof preset['source'] === 'string' && /^(https?:|\/)/.test(preset['source'])}
+      {@const from = preset['source']}
+      <button
+        class="act"
+        type="button"
+        aria-label="Reload {preset.name}"
+        title="Read it again from {from}"
+        onclick={() => void reload(from, preset.name)}>Reload</button
+      >
+    {/if}
+    {#if mine}
+      <button
+        class="act"
+        type="button"
+        aria-label="Share {preset.name} with the team"
+        title="Propose it as a team board of the stack: a pull request on the stack's repo"
+        onclick={() => void share(preset)}>Share with team</button
+      >
+      <button
+        class="act"
+        type="button"
+        aria-label="Delete {preset.name}"
+        title="Delete"
+        onclick={() => {
+          askDelete(preset);
+        }}><Icon of={X} size={14} /></button
+      >
+    {/if}
+  </div>
+{/snippet}
+
 <button
   bind:this={picker}
   class="picker"
@@ -176,6 +267,7 @@
   <span class="name">{label.replace(SUFFIX, '')}</span>
   {#if SUFFIX.test(label)}<span class="suffix" title="Changed on this Mac">{SUFFIX.exec(label)?.[0]}</span>{/if}
   {#if board.feature}<span class="kind">Feature board</span>{/if}
+  {#if outside}<span class="out-area" title="Outside the areas you chose; nothing on it is hidden">{outside}</span>{/if}
 </button>
 <div
   bind:this={list}
@@ -214,53 +306,53 @@
     autocomplete="off"
     spellcheck="false"
   />
-  {#each [['Team boards', board.team.filter(shows)], ['Your boards', board.own.filter(shows)]] as const as [title, group] (title)}
-    {#if group.length}<p>{title}</p>{/if}
-    {#each group as preset (preset.name)}
-      <div class="row">
-        <button
+  {#if hasAreas}
+    <div class="area-row">
+      <AreaFilter />
+      {#if areaChoice.narrows}<button
+          class="show-all"
           type="button"
-          aria-current={preset.name === board.name}
-          title={typeof preset['source'] === 'string' ? `Opened from ${preset['source']}` : undefined}
           onclick={() => {
-            choose(preset);
-          }}
-        >
-          <span class="here" aria-hidden="true"></span><span class="name">{preset.name.replace(SUFFIX, '')}</span
-          >{#if SUFFIX.test(preset.name)}<span class="suffix">{SUFFIX.exec(preset.name)?.[0]}</span>{/if}<span
-            class="meta">{size(preset)}</span
-          >
-        </button>
-        {#if title === 'Your boards' && typeof preset['source'] === 'string' && /^(https?:|\/)/.test(preset['source'])}
-          {@const from = preset['source']}
-          <button
-            class="act"
-            type="button"
-            aria-label="Reload {preset.name}"
-            title="Read it again from {from}"
-            onclick={() => void reload(from, preset.name)}>Reload</button
-          >
-        {/if}
-        {#if title === 'Your boards'}
-          <button
-            class="act"
-            type="button"
-            aria-label="Share {preset.name} with the team"
-            title="Propose it as a team board of the stack: a pull request on the stack's repo"
-            onclick={() => void share(preset)}>Share with team</button
-          >
-          <button
-            class="act"
-            type="button"
-            aria-label="Delete {preset.name}"
-            title="Delete"
-            onclick={() => {
-              askDelete(preset);
-            }}><Icon of={X} size={14} /></button
-          >
-        {/if}
-      </div>
+            areaChoice.set([]);
+          }}>Show all</button
+        >{/if}
+    </div>
+  {/if}
+  {#if pinned}
+    <p>Current board</p>
+    {@render boardRow(pinned, false, false, 'Outside your areas')}
+  {/if}
+  {#if !hasAreas && teams.groups.length}<p>Team boards</p>{/if}
+  {#each teams.groups as group, n (group.title)}
+    {#if hasAreas}<p class="sub">{n === 0 ? `Team boards · ${group.title}` : group.title}</p>{/if}
+    {#each group.boards.filter(one => one !== pinned) as preset (preset.name)}
+      {@render boardRow(preset, false)}
     {/each}
+  {/each}
+  {#if query.trim() && hiddenMatches.length}
+    <p>Hidden by your areas</p>
+    {#each hiddenMatches as preset (preset.name)}
+      {@render boardRow(preset, false, true, 'Opening it shows it; your areas stay as they are')}
+    {/each}
+  {:else if !query.trim() && hiddenCount}
+    <p class="hidden-line">
+      <Icon of={EyeOff} size={13} /><span class="said"
+        >{hiddenCount}
+        {pinned ? 'more ' : ''}{hiddenCount === 1 ? 'team board' : 'team boards'}{teams.hidden.areas.length <= 3
+          ? ` in ${joined(teams.hidden.areas)}`
+          : ''}</span
+      >
+      <button
+        type="button"
+        onclick={() => {
+          areaChoice.set([]);
+        }}>Show all</button
+      >
+    </p>
+  {/if}
+  {#if board.own.some(shows)}<p>Your boards</p>{/if}
+  {#each board.own.filter(shows) as preset (preset.name)}
+    {@render boardRow(preset, true)}
   {/each}
   {#if !board.team.length && !board.own.length}
     <p class="none">No boards yet. A board is kept as soon as it has an app.</p>
@@ -459,6 +551,73 @@
     width: auto;
     font-weight: 500;
     font-size: 12px;
+  }
+  /* Dashed: the system's mark for what is not in your view. */
+  .out-area {
+    flex: none;
+    padding: 1px 6px;
+    border: 1px dashed var(--line-strong);
+    color: var(--ink-muted);
+    font: 400 11px var(--mono);
+  }
+  .area-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin: 0 0 4px;
+    padding: 2px 2px 6px;
+  }
+  .show-all,
+  .hidden-line button {
+    width: auto !important;
+    padding: 0 !important;
+    color: var(--ink) !important;
+    font: 400 12px var(--sans) !important;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+  .menu p.sub {
+    padding-top: 4px;
+    color: var(--ink-muted);
+    font-weight: 500;
+  }
+  .menu p.hidden-line {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin: 4px 0;
+    padding: 8px 10px;
+    border-top: 1px dashed var(--line-strong);
+    border-bottom: 1px dashed var(--line-strong);
+    font-weight: 400;
+    font-size: 12px;
+  }
+  .what {
+    display: grid;
+    flex: 1;
+    min-width: 0;
+  }
+  .line {
+    display: flex;
+    gap: 6px;
+    min-width: 0;
+  }
+  .under {
+    color: var(--ink-muted);
+    font: 400 11px var(--sans);
+  }
+  .menu p.hidden-line .said {
+    flex: 1;
+  }
+  .area {
+    flex: none;
+    color: var(--ink-muted);
+    font: 400 11px var(--mono);
+  }
+  .elsewhere .name {
+    color: var(--ink-muted);
   }
   .find {
     width: 100%;
