@@ -517,6 +517,8 @@ test('Areas from the terminal: each board lists with its area, --area keeps one 
   assert.match(koppler('board', 'edit', 'Carrier timeouts', '--area', 'auto').out, /took its area from its apps/);
   assert.equal(read('state').presets[0].area, undefined);
   assert.match(koppler('board', 'edit', 'Carrier timeouts', '--area', 'billing').out, /billing is not an area of the stack: payments, shipping/);
+  assert.match(koppler('board', 'edit', 'Carrier timeouts', '--area').out, /--area needs an area, or auto/);
+  assert.match(koppler('use', '--area', 'payments').out, /--area lists the boards of one area: koppler use --boards --area <area>/);
   fs.rmSync(dir, { recursive: true });
 });
 

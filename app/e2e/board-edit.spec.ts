@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { at, card, expect, test } from './canvas.ts';
+import { at, card, expect, saved, STACK, test } from './canvas.ts';
 
 const layout = { nodes: { web: { x: 0, y: 0 }, orders: { x: 420, y: 0 } } };
 test.use({
@@ -229,4 +229,35 @@ test('a board deleted from the terminal goes to Recently deleted on an open canv
   await expect.poll(() => own().some(one => one.name === 'Shop')).toBe(false);
   await page.getByRole('button', { name: /^Board:/ }).click();
   await expect(page.getByText('Recently deleted (1)')).toBeVisible();
+});
+
+test.describe('in a stack with areas', () => {
+  test.use({ stack: { ...STACK, areas: { payments: { name: 'Payments' } } } as typeof STACK });
+
+  test('an area set from the terminal on the board on screen is kept through its next save', async ({
+    page,
+    canvas,
+  }) => {
+    await expect(card(page, 'web')).toBeVisible();
+    const area = () => (state(canvas.temp).presets.find(one => one.name === 'Shop') as { area?: string }).area;
+    // A change made on the canvas saves the board as it holds it.
+    const move = async () => {
+      const box = await card(page, 'web').boundingBox();
+      if (!box) throw new Error('no card');
+      const save = saved(page);
+      await page.mouse.move(box.x + 80, box.y + 14);
+      await page.mouse.down();
+      await page.mouse.move(box.x + 80, box.y + 120, { steps: 6 });
+      await page.mouse.up();
+      await save;
+    };
+    koppler(canvas, 'board', 'edit', 'Shop', '--area', 'payments');
+    await expect.poll(() => waiting(canvas.temp)).toBe(0);
+    await move();
+    expect(area()).toBe('payments');
+    koppler(canvas, 'board', 'edit', 'Shop', '--area', 'auto');
+    await expect.poll(() => waiting(canvas.temp)).toBe(0);
+    await move();
+    expect(area()).toBeUndefined();
+  });
 });

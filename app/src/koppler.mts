@@ -142,6 +142,7 @@ function use(args: string[]): void {
       }
     return;
   }
+  if (args.includes('--area')) fail('--area lists the boards of one area: koppler use --boards --area <area>');
   const wanted = positional(args);
   if (!wanted.length) {
     stacksCommand(args);

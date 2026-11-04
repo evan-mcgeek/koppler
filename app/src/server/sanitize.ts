@@ -41,6 +41,7 @@ export interface Preset {
   cardNotes?: Record<string, string>;
   discover?: { open: string[]; at: Record<string, Point> };
   feature?: Feature;
+  area?: string;
 }
 /** A prompt from the page, on its way to Koppler or the agent. */
 export interface Prompt {
@@ -80,6 +81,9 @@ const discoverOf = (given: unknown): { open: string[]; at: Record<string, Point>
   const laid = typeof layout === 'number' && Number.isInteger(layout) && layout >= 0 && layout < 100 ? { layout } : {};
   return open.length || Object.keys(at).length || 'layout' in laid ? { open, at, ...laid } : undefined;
 };
+/** An area id, as the stack names them. */
+const areaOf = (given: unknown) =>
+  typeof given === 'string' && /^[a-z0-9-]{1,64}$/.test(given) ? { area: given } : undefined;
 const cardNotes = (given: unknown): Record<string, string> =>
   Object.fromEntries(
     Object.entries(isMap(given) ? given : {})
@@ -191,6 +195,7 @@ export function sanitizePresets(list: unknown): Preset[] {
         ...(Object.keys(cardNotes(preset['cardNotes'])).length && { cardNotes: cardNotes(preset['cardNotes']) }),
         ...(discover && { discover }),
         ...(feature && { feature }),
+        ...areaOf(preset['area']),
       };
     });
 }
@@ -346,6 +351,7 @@ export function sanitizeLayout(input: unknown): Loose | null {
     ...(Object.keys(notes).length && { cardNotes: notes }),
     ...(discover && { discover }),
     ...(feature && { feature }),
+    ...areaOf(input['area']),
     ...(Object.keys(hiddenLogs).length && { hiddenLogs }),
     ...(Object.keys(logAliases).length && { logAliases }),
     ...(ids(input['outside']).length && { outside: ids(input['outside']) }),

@@ -127,15 +127,15 @@ export function boardCommand(args: string[]): void | Promise<void> {
     note: Object.fromEntries(pairs('--note', '=')),
     ...(args.includes('--arrange') && { arrange: true }),
     ...(featureEdit(args) ?? {}),
-    ...areaEdit(values('--area')),
+    ...(args.includes('--area') && areaEdit(values('--area'))),
   };
   for (const line of changeBoard(name, edit, create, args.includes('--propose'))) console.log(line);
 }
 
 /** A board's area set by hand, or `auto` to take it from its apps again. */
-function areaEdit(given: string[]): { area?: string | null } {
+function areaEdit(given: string[]): { area: string | null } {
   const [area, ...more] = given;
-  if (area === undefined) return {};
+  if (!area || area.startsWith('-')) fail(`--area needs an area, or auto\n${USAGE}`);
   if (more.length) fail(`--area once\n${USAGE}`);
   if (area === 'auto') return { area: null };
   const areas = Object.keys(readStack()?.areas ?? {});
