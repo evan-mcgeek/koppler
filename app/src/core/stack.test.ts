@@ -150,6 +150,27 @@ test('each part is named where it is wrong', () => {
   for (const [bad, problem] of cases) expect(validateStack(bad), problem).toContain(problem);
 });
 
+test('areas: an app and a board name areas the stack defines, each once', () => {
+  const areas = { payments: { name: 'Payments' }, shipping: { name: 'Shipping' } };
+  const board = { name: 'Checkout', version: 1, nodes: { orders: {} }, area: 'payments' };
+  expect(
+    validateStack(stack({ areas, presets: [board], apps: { orders: { ...app, areas: ['payments', 'shipping'] } } })),
+  ).toEqual([]);
+  expect(validateStack(stack({ areas, apps: { orders: { ...app, areas: ['billing'] } } }))).toContain(
+    'apps.orders.areas[0]: no such area under "areas"',
+  );
+  expect(validateStack(stack({ areas, apps: { orders: { ...app, areas: ['payments', 'payments'] } } }))).toContain(
+    'apps.orders.areas[1]: payments is already in the list',
+  );
+  expect(validateStack(stack({ presets: [{ ...board, area: 'billing' }] }))).toContain(
+    'presets[0].area: no such area under "areas"',
+  );
+  expect(validateStack(stack({ areas: { Payments: { name: 'Payments' } } }))).toContain(
+    'areas.Payments: id must be lowercase letters, digits and dashes',
+  );
+  expect(validateStack(stack({ areas: { payments: {} } }))).toContain('areas.payments.name: required');
+});
+
 test('a stack declares its own sign-ins, and an app names one that exists', () => {
   const azure = { what: 'Azure', check: 'az account show', login: 'az login', env: { AZURE_TENANT_ID: 'acme' } };
   const using = (name: string, signIns: object = { 'acme-dev': azure }) =>

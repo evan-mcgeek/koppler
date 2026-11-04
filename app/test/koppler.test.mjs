@@ -477,6 +477,51 @@ test('A board is changed from the terminal: kept at once, queued for an open can
   fs.rmSync(dir, { recursive: true });
 });
 
+test('Areas from the terminal: each board lists with its area, --area keeps one area, and a board takes an area by hand or from its apps.', async () => {
+  const { spawnSync } = await import('node:child_process');
+  const fs = await import('node:fs'), os = await import('node:os'), path = await import('node:path'), { fileURLToPath } = await import('node:url');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-areas-'));
+  const env = { ...process.env, KOPPLER_STATE: dir, KOPPLER_TEMP: dir, KOPPLER_CONFIG_DIR: dir };
+  const entry = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'dist', 'koppler.mjs');
+  const koppler = (...args) => { const r = spawnSync('node', [entry, ...args], { encoding: 'utf8', env }); return { out: (r.stdout + r.stderr).trim(), code: r.status }; };
+  const write = (name, value) => fs.writeFileSync(path.join(dir, `${name}.json`), JSON.stringify(value));
+  const read = name => JSON.parse(fs.readFileSync(path.join(dir, `${name}.json`), 'utf8'));
+  write('registry', {
+    name: 'Acme',
+    envs: ['qa'],
+    areas: { payments: { name: 'Payments' }, shipping: { name: 'Shipping' } },
+    apps: { web: { name: 'Web' }, pay: { name: 'Pay', areas: ['payments'] }, ship: { name: 'Ship', areas: ['shipping'] } },
+    presets: [
+      { name: 'Checkout', nodes: { web: { run: 'cli' }, pay: { run: 'cli' } }, edges: [] },
+      { name: 'Smoke test', nodes: { web: { run: 'cli' } }, edges: [] },
+    ],
+  });
+  write('local', { apps: { web: { path: '/w' }, pay: { path: '/p' }, ship: { path: '/s' } } });
+  write('state', { presets: [{ name: 'Carrier timeouts', version: 1, nodes: { ship: { run: 'cli' } }, edges: [] }] });
+
+  const all = koppler('use', '--boards');
+  assert.equal(all.code, 0, all.out);
+  assert.equal(all.out, 'Checkout  (team preset, Payments)\nSmoke test  (team preset)\nCarrier timeouts  (your board, Shipping)');
+  assert.equal(koppler('use', '--boards', '--area', 'shipping').out, 'Carrier timeouts  (your board, Shipping)');
+  assert.deepEqual(JSON.parse(koppler('use', '--boards', '--area', 'payments', '--json').out), [
+    { name: 'Checkout', from: 'team', area: 'payments', areaBy: 'apps' },
+  ]);
+  assert.match(koppler('use', '--boards', '--area', 'billing').out, /--area needs one of the stack's areas: payments, shipping/);
+
+  // Set by hand, it stays whatever its apps are; auto takes it from its apps again.
+  const set = koppler('board', 'edit', 'Carrier timeouts', '--area', 'payments');
+  assert.equal(set.code, 0, set.out);
+  assert.match(set.out, /CHANGED Carrier timeouts: set its area to payments/);
+  assert.equal(read('state').presets[0].area, 'payments');
+  assert.match(koppler('use', '--boards').out, /Carrier timeouts {2}\(your board, Payments \(set by hand\)\)/);
+  assert.match(koppler('board', 'edit', 'Carrier timeouts', '--area', 'auto').out, /took its area from its apps/);
+  assert.equal(read('state').presets[0].area, undefined);
+  assert.match(koppler('board', 'edit', 'Carrier timeouts', '--area', 'billing').out, /billing is not an area of the stack: payments, shipping/);
+  assert.match(koppler('board', 'edit', 'Carrier timeouts', '--area').out, /--area needs an area, or auto/);
+  assert.match(koppler('use', '--area', 'payments').out, /--area lists the boards of one area: koppler use --boards --area <area>/);
+  fs.rmSync(dir, { recursive: true });
+});
+
 test('A feature board from the terminal: its request, phases and steps; the agent proposes steps, and a card the stack lacks is refused.', async () => {
   const { spawnSync } = await import('node:child_process');
   const fs = await import('node:fs'), os = await import('node:os'), path = await import('node:path'), { fileURLToPath } = await import('node:url');
@@ -527,8 +572,10 @@ test('A request that was no run (filling in settings, an answer) is finished wit
   const after = JSON.parse(fs.readFileSync(listener, 'utf8'));
   assert.equal(after.busy, undefined);
   assert.equal(after.session, 'abcd1234');
-  // Nothing taken and no run waiting: said so.
-  assert.match(koppler('history', 'done').out, /no run is waiting to be applied/);
+  // Nothing taken and no run waiting, as after listening again first: said so, and no failure.
+  const again = koppler('history', 'done');
+  assert.equal(again.code, 0, again.out);
+  assert.match(again.out, /Nothing is open/);
   fs.rmSync(dir, { recursive: true });
 });
 
