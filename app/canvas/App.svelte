@@ -5,7 +5,7 @@
   import Cog from './Cog.svelte';
   import Command from './Command.svelte';
   import { SvelteFlowProvider } from '@xyflow/svelte';
-  import { tick, untrack } from 'svelte';
+  import { untrack } from 'svelte';
   import Agent from './Agent.svelte';
   import Board from './Board.svelte';
   import Credentials from './Credentials.svelte';
@@ -273,6 +273,15 @@
   });
 
   const keys = (ev: KeyboardEvent) => {
+    // B opens the board menu, unless typing or something is open over the board.
+    const free =
+      !(ev.target as Element).closest('input, select, textarea, [contenteditable]') &&
+      !document.querySelector('dialog[open], :popover-open');
+    if (ev.key.toLowerCase() === 'b' && !ev.metaKey && !ev.ctrlKey && !ev.altKey && free && !board.present) {
+      ev.preventDefault();
+      document.querySelector<HTMLButtonElement>('header button[aria-label^="Board:"]')?.click();
+      return;
+    }
     if (!(ev.metaKey || ev.ctrlKey) || ev.key !== 'Enter' || !board.nodes.length || runs.review) return;
     ev.preventDefault();
     runs.start();
@@ -304,7 +313,7 @@
   const runWaits = $derived(!!live.status?.runs?.some(run => run.state === 'waiting'));
   // A full top bar drops its words: nothing moves out of it.
   let bar: HTMLElement | undefined = $state();
-  const STEPS = ['l1', 'l2', 'l3', 'l4', 'l5', 'compact'];
+  const STEPS = ['l1', 'l2', 'l3', 'l4', 'l5', 'l6', 'l7', 'compact'];
   const fitBar = () => {
     if (!bar) return;
     const el = bar;
@@ -370,11 +379,15 @@
       window.removeEventListener('gesturestart', gesture);
     };
   });
-  const openSide = async (at?: 'board') => {
-    toggleSide();
-    if (!at) return;
-    await tick();
-    document.querySelector<HTMLElement>('aside button[aria-label^="Board:"]')?.focus();
+  const openSide = (at?: 'board') => {
+    if (at !== 'board') {
+      toggleSide();
+      return;
+    }
+    // The board menu is in the bar: the rail's board button opens it there.
+    const picker = document.querySelector<HTMLButtonElement>('header button[aria-label^="Board:"]');
+    picker?.focus();
+    picker?.click();
   };
 </script>
 
@@ -418,10 +431,8 @@
   >
   {#if board.stack}
     <span class="names"><StackPicker /></span>
-    {#if board.discovering}
-      <span class="slash" aria-hidden="true">/</span>
-      <span class="boards"><BoardPicker /></span>
-    {/if}
+    <span class="slash board-slash" aria-hidden="true">/</span>
+    <span class="boards"><BoardPicker /></span>
     <div
       class="seg views"
       role="radiogroup"
@@ -771,7 +782,11 @@
     align-items: center;
     gap: 10px;
   }
-  /* The board's name reads as the stack's does: a name in the bar, not a field. */
+  /* Stack and board read as one path: the stack muted, the board on screen in ink. */
+  header .names :global(.picker) {
+    color: var(--ink-muted);
+    font-weight: 500;
+  }
   .boards {
     max-width: 360px;
   }
@@ -780,7 +795,7 @@
     max-width: 360px;
     margin-left: -8px;
     border-color: transparent;
-    border-radius: 7px;
+    border-radius: 0;
     background: none;
     color: var(--ink);
     font: 600 14px var(--sans);
@@ -854,8 +869,16 @@
   header:global(.l3) .chips > :global(*:first-child) {
     border-right-width: 0;
   }
-  header:global(.l5) :global(:is(.names, .boards) .picker) {
-    max-width: 130px;
+  /* 5: the stack's name shortens; 6: the stack leaves the bar for the board menu's first row; 7: the board's name
+     shortens, keeping "(local)". */
+  header:global(.l5) .names :global(.picker) {
+    max-width: 100px;
+  }
+  header:global(.l6) .names {
+    display: none;
+  }
+  header:global(.l7) .boards :global(.picker .name) {
+    max-width: 120px;
   }
   .word {
     font: 600 17px var(--display);

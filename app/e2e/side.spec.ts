@@ -2,7 +2,7 @@
 import type { Page } from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
-import { card, expect, nextEdit, test } from './canvas.ts';
+import { card, expect, nextEdit, test, fromList } from './canvas.ts';
 
 const rows = (page: Page) => page.getByRole('complementary').getByRole('listitem');
 test.use({
@@ -19,7 +19,7 @@ test.use({
 
 test('the apps on the board come first, then the rest, with what can be done with each', async ({ page }) => {
   await expect(page.getByText('2 of 4 on the board')).toBeVisible();
-  await expect(rows(page)).toHaveText([/Orders API/, /Web Shop/, /Catalog API/, /Payments API\s*not cloned/]);
+  await expect(rows(page)).toHaveText([/Orders API/, /Web Shop/, /Catalog API/, /Payments API\s*Not cloned/]);
   await page.screenshot({ path: 'test-results/next-side.png' });
   await page.getByRole('button', { name: /Sorted by name/ }).click();
   // In the order they were added: to the board, then to the stack.
@@ -29,7 +29,7 @@ test('the apps on the board come first, then the rest, with what can be done wit
 test('an app is added from the list to a free spot, shown from the list, and removed with its cables', async ({
   page,
 }) => {
-  await page.getByRole('button', { name: 'Add Catalog API to the board', exact: true }).first().click();
+  await (await fromList(page, 'Catalog API')).getByRole('button', { name: 'Add Catalog API to the board' }).click();
   await expect(card(page, 'catalog')).toBeVisible();
   await expect(page.getByText('3 of 4 on the board')).toBeVisible();
   const boxes = await Promise.all(['web', 'orders', 'catalog'].map(id => card(page, id).boundingBox()));
@@ -45,8 +45,7 @@ test('an app is added from the list to a free spot, shown from the list, and rem
 
   await page.getByRole('button', { name: 'Web Shop', exact: true }).click();
   await expect(card(page, 'web')).toHaveClass(/selected/);
-  await rows(page).filter({ hasText: 'Web Shop' }).hover();
-  await page.getByRole('button', { name: 'Remove Web Shop from the board' }).click();
+  await (await fromList(page, 'Web Shop')).getByRole('button', { name: 'Remove Web Shop from the board' }).click();
   await expect(card(page, 'web')).toHaveCount(0);
   await expect(page.locator('.svelte-flow__edge')).toHaveCount(0);
   await expect(page.getByText('2 of 4 on the board')).toBeVisible();
@@ -64,7 +63,7 @@ test('the list is filtered by a name or a kind, and an app that is not cloned of
   await expect(page.getByText('No app matches.')).toBeVisible();
   await search.fill('pay');
   await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
-  await page.getByRole('complementary').getByRole('button', { name: 'Payments API', exact: true }).click();
+  await page.getByRole('complementary').getByRole('button', { name: /^Payments API/ }).click();
   await expect(page.getByRole('complementary').getByRole('status')).toHaveText(
     'Clone command for Payments API copied.',
   );
@@ -174,7 +173,8 @@ test('an app is removed from the stack after a question', async ({ page }) => {
     asked.push(route.request().postDataJSON());
     await route.fulfill({ json: { removed: 'catalog' } });
   });
-  await page.getByRole('button', { name: 'Remove Catalog API from the stack' }).click();
+  await (await fromList(page, 'Catalog API')).getByRole('button', { name: 'More for Catalog API' }).click();
+  await page.getByRole('menuitem', { name: 'Remove from the stack…' }).click();
   const ask = page.getByRole('dialog').filter({ hasText: 'Remove Catalog API from the stack?' });
   await expect(ask).toContainText('The repo stays on your Mac.');
   await ask.getByRole('button', { name: 'Remove from stack' }).click();
@@ -183,7 +183,7 @@ test('an app is removed from the stack after a question', async ({ page }) => {
 
 test('an app runs alone on a board of its own, with the board before one click back', async ({ page, canvas }) => {
   await nextEdit(page);
-  await page.getByRole('button', { name: 'Run Catalog API alone' }).click();
+  await (await fromList(page, 'Catalog API')).getByRole('button', { name: 'Run Catalog API alone' }).click();
   const review = page.getByRole('dialog').filter({ hasText: 'Run on QA' });
   await expect(review).toContainText('Catalog API');
   await expect(review).not.toContainText('Orders API');
@@ -208,9 +208,11 @@ test('in a narrow window the side pane folds by itself and the top bar drops its
   await expect(pane).toBeVisible();
   await page.setViewportSize({ width: 900, height: 720 });
   await expect(rail).toBeVisible();
-  // The rail's board button opens the pane on the board picker.
+  // The rail's board button opens the board menu, in the bar.
   await rail.getByRole('button', { name: /Board and environment/ }).click();
-  await expect(page.getByRole('button', { name: /^Board:/ })).toBeFocused();
+  await expect(page.getByRole('dialog', { name: 'Boards' })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await rail.getByRole('button', { name: /^Apps/ }).click();
   await page.getByRole('button', { name: 'Hide the side pane' }).click();
   // Folded by hand, it stays folded when the window grows; folded by the window, it comes back.
   await page.setViewportSize({ width: 1280, height: 720 });

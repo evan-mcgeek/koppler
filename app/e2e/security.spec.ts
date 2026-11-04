@@ -2,7 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Page } from '@playwright/test';
-import { test, expect, STACK } from './canvas.ts';
+import { test, expect, STACK, fromList } from './canvas.ts';
 
 const card = (page: Page, id: string) => page.locator(`.svelte-flow__node-app[data-id="${id}"]`);
 
@@ -35,7 +35,7 @@ test.describe('a stack whose tunnel port carries markup', () => {
   };
   test.use({ stack: { ...STACK, apps: { ...STACK.apps, orders } } });
   test('runs nothing in the page, and the canvas still works', async ({ page }) => {
-    await page.getByRole('button', { name: 'Add Orders API to the board', exact: true }).first().click();
+    await (await fromList(page, 'Orders API')).getByRole('button', { name: 'Add Orders API to the board' }).click();
     await expect(card(page, 'orders')).toBeVisible();
     expect(await page.evaluate(() => (window as { __ran?: number }).__ran)).toBeUndefined();
     await expect(page.locator('img[src="x"]')).toHaveCount(0);
