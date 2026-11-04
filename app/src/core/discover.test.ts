@@ -114,6 +114,33 @@ describe('mapOf', () => {
   });
 });
 
+describe('mapOf with areas chosen', () => {
+  const zoned = {
+    apps: {
+      web: app('Web Shop', { consumes: { orders: {}, mail: {} } }),
+      orders: app('Orders API', { areas: ['payments', 'shipping'], consumes: { pay: {} } }),
+      pay: app('Payments API', { areas: ['payments'] }),
+      mail: app('Mail', { areas: ['notifications'] }),
+      ship: app('Shipping API', { areas: ['shipping'], consumes: { carrier: {} } }),
+      carrier: app('Carrier Gateway', { areas: ['shipping'] }),
+    },
+  } as unknown as Facts;
+
+  it("leaves out the apps outside them with their links, but the board's own, and says which each card links to", () => {
+    const { cards, links } = mapOf(zoned, ['web', 'ship'], ['mail'], true, ['payments']);
+    expect(cards).toEqual([
+      { card: 'web', onBoard: true, hidden: 0, outside: ['mail'] },
+      { card: 'ship', onBoard: true, hidden: 0, outside: ['carrier'] },
+      { card: 'orders', onBoard: false, hidden: 1 },
+    ]);
+    expect(links).toEqual([{ from: 'web', to: 'orders', kind: 'call', sure: 'confirmed', unsourced: true }]);
+  });
+
+  it('shows every app with no choice', () => {
+    expect(mapOf(zoned, ['web'], [], true, []).cards.map(one => one.card)).toEqual(['web', 'orders', 'mail']);
+  });
+});
+
 describe('mapOf on a feature board', () => {
   it('shows only its own cards until one is opened', () => {
     expect(mapOf(facts, ['web', 'orders'], [], false).cards).toEqual([

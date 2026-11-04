@@ -87,10 +87,21 @@ export function appGroups(
     })),
     { title: 'No area', apps: ids.filter(id => !appAreas(stack, id).length).map(id => ({ id, also: [] })) },
   ];
-  const hidden = Object.keys(stack.apps).filter(
-    id => appAreas(stack, id).length && !home(id) && !onBoard.includes(id),
-  ).length;
-  return { groups: groups.filter(group => group.apps.length), hidden };
+  return { groups: groups.filter(group => group.apps.length), hidden: hiddenBy(stack, chosen, onBoard).apps.length };
+}
+
+/** The apps a choice of areas hides, but those in `keep`, and the names of the areas they are in, in the stack's order. */
+export function hiddenBy(
+  stack: Stack,
+  chosen: readonly string[] | undefined,
+  keep: readonly string[],
+): { apps: string[]; areas: string[] } {
+  if (!narrows(stack, chosen)) return { apps: [], areas: [] };
+  const apps = Object.keys(stack.apps).filter(
+    id => !keep.includes(id) && !inAreas({ areas: appAreas(stack, id) }, chosen),
+  );
+  const areas = Object.keys(stack.areas ?? {}).filter(area => apps.some(id => appAreas(stack, id).includes(area)));
+  return { apps, areas: areas.map(area => nameOf(stack, area)) };
 }
 
 /**

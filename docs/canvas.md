@@ -23,6 +23,10 @@ With some areas picked, the Apps list groups its apps under them, then the apps 
 An app in two areas lists once, with "also" and the other one under its name, and a dashed line says how many apps your areas hide, with **Show all**.
 The board menu groups the team boards under their area, the one most of their apps are in unless it was set by hand, with **No area** last; your own boards stay one list, each with its area.
 **Find a board** looks through every board: one your areas hide shows under **In other areas**, and opening it leaves your choice as it is, with its area beside its name in the bar.
+A card in Discover says its areas on its second line; in Plan and Live it does so after its kind, only while your areas hide some.
+Discover leaves the apps outside your areas off the map, with their links, but never the board's own.
+A card that links to one keeps a dashed **+N hidden**, which names them and their areas and opens the Areas checklist; the solid **+N** still brings in what is one step out.
+A dashed line under the map says which areas it shows and how many apps it hides, with **Areas** and **Show all**, and a picked card's panel still lists its hidden links, muted, each with its area.
 Areas are a view only: what runs, the environments and the secrets stay the same.
 
 ## Cards

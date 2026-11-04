@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { appGroups, boardArea, boardGroups, inAreas } from './areas.ts';
+import { appGroups, boardArea, boardGroups, hiddenBy, inAreas } from './areas.ts';
 
 const areas = { payments: { name: 'Payments' }, shipping: { name: 'Shipping' }, accounts: { name: 'Accounts' } };
 const apps = {
@@ -112,4 +112,11 @@ test('team boards group under their area in the stack order, no area last; a cho
     ['No area', ['Smoke test']],
   ]);
   expect(chosen.hidden).toEqual({ count: 3, areas: ['Shipping', 'Accounts'] });
+});
+
+test("a choice hides the apps outside it but the board's own, and says the areas they are in", () => {
+  expect(hiddenBy(shop, ['payments'], ['signup'])).toEqual({ apps: ['ship'], areas: ['Shipping'] });
+  expect(hiddenBy(shop, ['payments'], [])).toEqual({ apps: ['ship', 'signup'], areas: ['Shipping', 'Accounts'] });
+  expect(hiddenBy(shop, ['payments', 'shipping', 'accounts'], [])).toEqual({ apps: [], areas: [] });
+  expect(hiddenBy(shop, undefined, [])).toEqual({ apps: [], areas: [] });
 });

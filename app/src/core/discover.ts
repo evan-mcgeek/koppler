@@ -1,5 +1,6 @@
 // Discover: how the stack fits together, read from its facts. The board's apps, everything one step away from them, and
 // one step further from each card whose hidden links were brought in.
+import { inAreas } from './areas.ts';
 import type { Call, Stack } from './stack.ts';
 
 /**
@@ -126,11 +127,14 @@ export interface MapCard {
   onBoard: boolean;
   /** Links to cards not on the map: the +N chip that brings them in. */
   hidden: number;
+  /** The apps it links to that the chosen areas leave out. */
+  outside?: Card[];
 }
 
 /**
  * What Discover shows for a board: its apps, the cards one step from them, and one step from each card in `open`;
- * the links between the cards shown, and how many each card leaves out.
+ * the links between the cards shown, and how many each card leaves out. Apps outside the chosen `areas` are left out,
+ * but the board's own.
  */
 export function mapOf(
   facts: Facts,
@@ -138,8 +142,11 @@ export function mapOf(
   open: readonly Card[] = [],
   /** The cards one step from the board too; a feature board shows only its own until one is opened. */
   around = true,
+  areas?: readonly string[],
 ): { cards: MapCard[]; links: Link[] } {
-  const all = linksOf(facts);
+  const away = (card: Card) => !board.includes(card) && !!facts.apps[card] && !inAreas(facts.apps[card], areas);
+  const every = linksOf(facts);
+  const all = every.filter(link => !away(link.from) && !away(link.to));
   const near = (card: Card) =>
     all.flatMap(link => (link.from === card ? [link.to] : link.to === card ? [link.from] : []));
   const exists = (card: Card) =>
@@ -152,7 +159,7 @@ export function mapOf(
           : !!facts.apps[card];
   const onBoard = board.filter(exists);
   const shown = new Set<Card>(onBoard);
-  for (const card of [...(around ? onBoard : []), ...open.filter(exists)]) {
+  for (const card of [...(around ? onBoard : []), ...open.filter(card => exists(card) && !away(card))]) {
     shown.add(card);
     for (const other of near(card)) shown.add(other);
   }
@@ -160,10 +167,18 @@ export function mapOf(
   // A queue, database or resource a board app uses is the board's own too: it is drawn with them, not drawn back.
   const own = (card: Card) =>
     onBoard.includes(card) || (card.includes(':') && near(card).some(other => onBoard.includes(other)));
-  const cards = [...shown].map(card => ({
-    card,
-    onBoard: own(card),
-    hidden: new Set(near(card).filter(other => !shown.has(other))).size,
-  }));
+  const cards = [...shown].map(card => {
+    const outside = [
+      ...new Set(
+        every.flatMap(link => (link.from === card ? [link.to] : link.to === card ? [link.from] : [])).filter(away),
+      ),
+    ];
+    return {
+      card,
+      onBoard: own(card),
+      hidden: new Set(near(card).filter(other => !shown.has(other))).size,
+      ...(outside.length && { outside }),
+    };
+  });
   return { cards, links };
 }

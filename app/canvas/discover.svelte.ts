@@ -12,6 +12,7 @@ import {
   type FeatureEdit,
   type Numbered,
 } from '../src/core/feature.ts';
+import { areaNames, chosen } from './areas.svelte.ts';
 import { board } from './board.svelte.ts';
 import { post } from './data.ts';
 import { live } from './live.svelte.ts';
@@ -27,6 +28,10 @@ export interface LeanData extends Record<string, unknown> {
   cloned: boolean;
   onBoard: boolean;
   hidden: number;
+  /** The apps it links to that the chosen areas leave out, each with its areas. */
+  outside: string[];
+  /** The areas it is in, joined. */
+  areas: string;
   /** An app that can run here. */
   app: boolean;
   /** On a feature board, proposed by the agent and not accepted yet. */
@@ -42,6 +47,8 @@ export interface LeanData extends Record<string, unknown> {
 }
 
 export const CARD = { w: 200, h: 64 };
+/** The Areas checklist under the map, for a card's +N hidden to open. */
+export const AREAS = 'discover-areas';
 /** A link's name on the map: who, to whom, how. */
 export const linkKey = (link: Link) => `${link.from}>${link.to}>${link.kind}`;
 const QUEUE_TAGS: Record<string, [string, string]> = {
@@ -62,8 +69,9 @@ class Discovered {
     const facts = board.facts;
     if (!facts) return { cards: [], links: [] as Link[] };
     const feature = board.feature;
-    if (!feature) return mapOf(facts, this.#own, board.discover.open);
-    const shown = mapOf(facts, [...featureCards(feature), ...this.#own], board.discover.open, false);
+    const areas = chosen.narrows ? chosen.ids : undefined;
+    if (!feature) return mapOf(facts, this.#own, board.discover.open, true, areas);
+    const shown = mapOf(facts, [...featureCards(feature), ...this.#own], board.discover.open, false, areas);
     // A step the stack has no link for yet is drawn as found, until it is accepted and recorded.
     const missing = numbered(feature)
       .map(({ step }) => step)
@@ -106,8 +114,10 @@ class Discovered {
       return count;
     }, {}),
   );
+  /** An app's name, and its areas in brackets. */
+  #withAreas = (card: Card) => `${board.nameOf(card)} (${areaNames(card).join(', ')})`;
   /** What a card shows. */
-  data(card: Card, onBoard: boolean, hidden: number): LeanData {
+  data(card: Card, onBoard: boolean, hidden: number, outside: Card[] = []): LeanData {
     const facts = board.facts;
     const proposed = !!board.feature && proposedCard(board.feature, card);
     const slug = facts?.apps[card]?.slug ?? '';
@@ -124,6 +134,8 @@ class Discovered {
     const base = {
       onBoard,
       hidden,
+      outside: outside.map(this.#withAreas),
+      areas: '',
       cloned: false,
       app: false,
       proposed,
@@ -169,6 +181,7 @@ class Discovered {
     return {
       ...base,
       name: stack?.name ?? card,
+      areas: areaNames(card).join(' · '),
       tag: app?.kindLabel ?? stack?.kind ?? '',
       meta: app?.cloned ? '' : 'On GitHub',
       cloned: !!app?.cloned,

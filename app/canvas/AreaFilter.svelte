@@ -5,7 +5,9 @@
   import { chosen } from './areas.svelte.ts';
   import { board } from './board.svelte.ts';
 
-  const id = $props.id();
+  const own = $props.id();
+  /** `id`: the checklist's, for another button to open it by. */
+  const { id = own }: { id?: string } = $props();
   let button = $state<HTMLButtonElement>();
   let list = $state<HTMLDivElement>();
   let open = $state(false);
@@ -20,7 +22,9 @@
   const place = () => {
     const at = button?.getBoundingClientRect();
     if (!at || !list) return;
-    list.style.top = `${String(at.bottom + 4)}px`;
+    // Below the button, or above it where the window has no room.
+    const below = at.bottom + 4 + list.offsetHeight <= innerHeight;
+    list.style.top = `${String(below ? at.bottom + 4 : Math.max(8, at.top - 4 - list.offsetHeight))}px`;
     list.style.left = `${String(Math.max(8, Math.min(at.left, innerWidth - 268)))}px`;
     list.querySelector<HTMLInputElement>('input')?.focus();
   };

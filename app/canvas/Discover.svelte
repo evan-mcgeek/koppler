@@ -3,6 +3,7 @@
   // lists a card's links; Plan a run with these takes the picked apps to Plan. Nothing here runs or changes the board.
   import Sparkle from '@lucide/svelte/icons/sparkle';
   import X from '@lucide/svelte/icons/x';
+  import EyeOff from '@lucide/svelte/icons/eye-off';
   import GitBranch from '@lucide/svelte/icons/git-branch';
   import Laptop from '@lucide/svelte/icons/laptop';
   import { untrack } from 'svelte';
@@ -21,9 +22,12 @@
   import { along, layOut, routePath } from '../src/core/layout.ts';
   import { engine } from './elk.ts';
   import { linksOf, sourceOf, type Card, type Link } from '../src/core/discover.ts';
+  import { hiddenBy } from '../src/core/areas.ts';
+  import AreaFilter from './AreaFilter.svelte';
+  import { areaNames, chosen } from './areas.svelte.ts';
   import { isLight, appearance } from './appearance.svelte.ts';
   import { board } from './board.svelte.ts';
-  import { CARD, discovered, linkKey, type LeanData } from './discover.svelte.ts';
+  import { AREAS, CARD, discovered, linkKey, type LeanData } from './discover.svelte.ts';
   import FeaturePanel from './FeaturePanel.svelte';
   import FeatureStart from './FeatureStart.svelte';
   import FindCard from './FindCard.svelte';
@@ -88,12 +92,12 @@
   const placeOf = (card: Card) => (flowState[card]?.dragging && flowState[card].position) || discovered.positions[card];
   const nodes = $derived(
     // A card without its place yet is drawn hidden, so it is measured before the layout places it.
-    map.cards.map(({ card, onBoard, hidden }): Node<LeanData> => ({
+    map.cards.map(({ card, onBoard, hidden, outside }): Node<LeanData> => ({
       id: card,
       type: 'lean',
       ...(flowState[card]?.measured && { measured: flowState[card].measured }),
       position: placeOf(card) ?? { x: 0, y: 0 },
-      data: discovered.data(card, onBoard, hidden),
+      data: discovered.data(card, onBoard, hidden, outside),
       selected: discovered.picked.includes(card),
       class: [
         !placeOf(card) && 'unplaced',
@@ -199,8 +203,15 @@
   const groups = $derived.by(() => {
     const card = discovered.last;
     if (!card) return [];
+    // Its links to apps the chosen areas leave out are listed too, after the rest.
+    const outside = new Set(map.cards.find(one => one.card === card)?.outside);
+    const hidden = board.facts
+      ? linksOf(board.facts).filter(link => outside.has(link.from === card ? link.to : link.from))
+      : [];
     const of = (test: (link: Link) => boolean, other: (link: Link) => Card) =>
-      map.links.filter(test).map(link => ({ link, other: other(link) }));
+      [...map.links, ...hidden]
+        .filter(test)
+        .map(link => ({ link, other: other(link), outside: outside.has(other(link)) }));
     const into = (kind: Link['kind']) => (link: Link) => link.kind === kind && link.to === card;
     const out = (kind: Link['kind']) => (link: Link) => link.kind === kind && link.from === card;
     const queue = card.startsWith('queue:');
@@ -264,6 +275,14 @@
   const list = (names: string[]) =>
     names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${String(names.at(-1))}` : (names[0] ?? '');
   const lastStack = $derived(discovered.last ? board.facts?.apps[discovered.last] : undefined);
+  /** What the chosen areas leave off the map, but the board's own. */
+  const hiding = $derived(
+    hiddenBy({ areas: board.areas, apps: board.facts?.apps ?? {} }, chosen.narrows ? chosen.ids : undefined, [
+      ...board.nodes.map(node => node.id),
+      ...board.pinned,
+    ]),
+  );
+  const chosenNames = $derived(chosen.ids.map(id => board.areas[id]?.name ?? id));
   /** Brings a card to the middle of the map and picks it. */
   const show = (card: Card) => {
     discovered.picked = [card];
@@ -392,7 +411,12 @@
 />
 
 <div class="discover">
-  <div class="map" aria-label="Discover map" data-moving={moving > 0 || undefined}>
+  <div
+    class="map"
+    class:narrowed={shown && hiding.apps.length > 0}
+    aria-label="Discover map"
+    data-moving={moving > 0 || undefined}
+  >
     {#if !shown && board.feature}
       <FeatureStart />
     {:else if !shown}
@@ -601,6 +625,30 @@
         >
       </div>
 
+      {#if hiding.apps.length}
+        <div class="hiding" role="region" aria-label="Hidden by your areas">
+          <EyeOff size={14} aria-hidden="true" />
+          <span class="said"
+            >Showing {#each chosenNames as one, at (one)}<strong>{one}</strong>{at < chosenNames.length - 1
+                ? ', '
+                : ''}{/each} and apps with no area.
+            <span class="count"
+              >{hiding.apps.length}
+              {hiding.apps.length === 1 ? 'app' : 'apps'} in {list(hiding.areas)}
+              {hiding.apps.length === 1 ? 'is' : 'are'} hidden.</span
+            ></span
+          >
+          <AreaFilter id={AREAS} />
+          <button
+            class="text"
+            type="button"
+            onclick={() => {
+              chosen.set([]);
+            }}>Show all</button
+          >
+        </div>
+      {/if}
+
       {#if discovered.current}
         {@const { step, number } = discovered.current}
         <div class="pickbar stepbar" role="status" aria-label="Step {number}">
@@ -700,21 +748,27 @@
         <section>
           <h3>{group.title}</h3>
           {#if group.rows.length}
-            {#each group.rows as { link, other } (`${link.from}>${link.to}>${link.kind}`)}
-              <div class="item">
+            {#each group.rows as { link, other, outside } (`${link.from}>${link.to}>${link.kind}`)}
+              <div class="item" class:out={outside}>
                 <span class="line">
                   <svg width="18" height="8" aria-hidden="true"
-                    ><path d="M0 4H18" class:dash={link.sure === 'found'} /></svg
+                    ><path d="M0 4H18" class:dash={link.sure === 'found' || outside} /></svg
                   >
                   <span class="tag">{tag(other)}</span>
-                  <button
-                    class="name"
-                    type="button"
-                    onclick={() => {
-                      show(other);
-                    }}>{name(other)}</button
-                  >
-                  <span class="source">{link.sure === 'found' ? 'Code' : 'Stack'}</span>
+                  {#if outside}
+                    <!-- Hidden by the chosen areas: named, with its areas, not shown on the map. -->
+                    <span class="name" title="Not in your areas">{name(other)}</span>
+                    <span class="area">{areaNames(other).join(' · ')}</span>
+                  {:else}
+                    <button
+                      class="name"
+                      type="button"
+                      onclick={() => {
+                        show(other);
+                      }}>{name(other)}</button
+                    >
+                    <span class="source">{link.sure === 'found' ? 'Code' : 'Stack'}</span>
+                  {/if}
                 </span>
                 {#if board.feature}
                   {@const step = discovered.stepOf(link)}
@@ -798,11 +852,57 @@
     height: 100%;
   }
   .map {
+    --strip: 0px;
     position: relative;
     flex: 1;
     min-width: 0;
     background: var(--desk);
     container-type: inline-size;
+  }
+  /* The line on what the areas hide takes the bottom of the map; what sits there moves up over it. */
+  .map.narrowed {
+    --strip: 56px;
+  }
+  .map.narrowed :global(.svelte-flow__panel.bottom) {
+    margin-bottom: calc(15px + var(--strip));
+  }
+  .hiding {
+    position: absolute;
+    right: 16px;
+    bottom: 16px;
+    left: 16px;
+    z-index: 5;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 44px;
+    box-sizing: border-box;
+    padding: 6px 12px;
+    border: 1px dashed var(--line-strong);
+    background: var(--desk);
+    color: var(--ink);
+    font: 400 13px var(--sans);
+  }
+  .hiding .said {
+    flex: 1;
+    min-width: 0;
+  }
+  .hiding strong {
+    font-weight: 600;
+  }
+  .hiding .count {
+    color: var(--ink-muted);
+  }
+  .item.out .name {
+    color: var(--ink-muted);
+    font-weight: 400;
+    text-decoration: none;
+    cursor: default;
+  }
+  .area {
+    color: var(--ink-muted);
+    font: 400 11px var(--mono);
+    white-space: nowrap;
   }
   /* Too narrow for the legend beside the pick bar: it goes to the top. */
   @container (width < 900px) {
@@ -975,7 +1075,7 @@
   .legend {
     position: absolute;
     left: 16px;
-    bottom: 16px;
+    bottom: calc(16px + var(--strip));
     z-index: 5;
     display: grid;
     gap: 6px;
@@ -1007,7 +1107,7 @@
   .pickbar {
     position: absolute;
     left: 50%;
-    bottom: 64px;
+    bottom: calc(64px + var(--strip));
     z-index: 5;
     display: flex;
     align-items: center;

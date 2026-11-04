@@ -1,6 +1,6 @@
 // Areas: one person's choice of the stack's parts, shared by the Apps list and the board menu, and kept on this Mac.
 import type { Page } from '@playwright/test';
-import { expect, STACK, test } from './canvas.ts';
+import { card, expect, STACK, test } from './canvas.ts';
 
 const apps = STACK.apps as Record<string, object>;
 test.use({
@@ -90,4 +90,98 @@ test('with every area on, unticking one hides only that one', async ({ page }) =
   // Searching within the areas says so.
   await panel(page).getByRole('searchbox').fill('pay');
   await expect(panel(page)).toContainText('Searched within Payments and apps with no area.');
+});
+
+/** Every cable on the Discover map that runs through a card other than its two ends. */
+const throughCards = (page: Page) =>
+  page.evaluate(() => {
+    const boxes = [...document.querySelectorAll<HTMLElement>('.svelte-flow__node')].map(node => ({
+      id: node.dataset['id'] ?? '',
+      box: node.getBoundingClientRect(),
+    }));
+    return [...document.querySelectorAll<SVGPathElement>('[data-link] .wire')].flatMap(wire => {
+      const key = wire.parentElement?.getAttribute('data-link') ?? '';
+      const [from, to] = key.split('>');
+      const length = wire.getTotalLength();
+      const matrix = wire.getScreenCTM() ?? new DOMMatrix();
+      for (let at = 0; at <= length; at += 4) {
+        const { x, y } = wire.getPointAtLength(at).matrixTransform(matrix);
+        const hit = boxes.find(
+          ({ id, box }) =>
+            id !== from && id !== to && x > box.left + 2 && x < box.right - 2 && y > box.top + 2 && y < box.bottom - 2,
+        );
+        if (hit) return [`${key} through ${hit.id}`];
+      }
+      return [];
+    });
+  });
+/** Discover, every card placed and the view still. */
+const discover = async (page: Page) => {
+  await expect(card(page, 'web')).toBeVisible();
+  await page.keyboard.press('d');
+  await expect(page.locator('.svelte-flow__node-lean').first()).toBeVisible();
+  await expect(page.locator('.svelte-flow__node.unplaced')).toHaveCount(0);
+  await expect(page.locator('.map[data-moving]')).toHaveCount(0);
+};
+
+test('Discover leaves out the apps outside the areas, and says so on the cards that link to them and under the map', async ({
+  page,
+}) => {
+  await only(page, panel(page), 'Payments');
+  await discover(page);
+  await expect(card(page, 'orders')).toBeVisible();
+  await expect(card(page, 'catalog')).toHaveCount(0);
+  await expect(page.locator('[data-link*="catalog"]')).toHaveCount(0);
+  // Each card says its areas; one in none says nothing.
+  await expect(card(page, 'orders').locator('.areas')).toHaveText('Payments · Shipping');
+  await expect(card(page, 'web').locator('.areas')).toHaveCount(0);
+  // A dashed +N hidden, apart from the solid +N that brings in what is one step out.
+  const chip = card(page, 'web').getByRole('button', { name: '1 link of Web Shop hidden by your areas' });
+  await expect(chip).toHaveText('+1 hidden');
+  await expect(chip).toHaveAttribute('title', 'Not in your areas: Catalog API (Shipping)');
+  await expect(card(page, 'orders').getByRole('button', { name: 'Show 1 more link of Orders API' })).toBeVisible();
+  const strip = page.getByRole('region', { name: 'Hidden by your areas' });
+  await expect(strip.locator('.said')).toHaveText(
+    'Showing Payments and apps with no area. 1 app in Shipping is hidden.',
+  );
+  expect(await throughCards(page)).toEqual([]);
+  await page.screenshot({ path: 'test-results/areas-discover.png' });
+  // The chip opens the Areas checklist.
+  await chip.click();
+  await expect(page.getByRole('dialog', { name: 'Areas to see' })).toBeVisible();
+  await page.keyboard.press('Escape');
+  // A picked card's panel still lists its hidden links, muted, with their area.
+  await card(page, 'orders').click();
+  const side = page.getByRole('complementary', { name: 'Orders API' });
+  await expect(side.locator('.item.out')).toHaveText(/Catalog API\s*Shipping/);
+  await expect(side.getByRole('button', { name: 'Catalog API' })).toHaveCount(0);
+  await side.screenshot({ path: 'test-results/areas-discover-panel.png' });
+  // Show all brings them back.
+  await strip.getByRole('button', { name: 'Show all' }).click();
+  await expect(card(page, 'catalog')).toBeVisible();
+  await expect(strip).toHaveCount(0);
+  await expect(chip).toHaveCount(0);
+  await expect(page.locator('.svelte-flow__node.unplaced')).toHaveCount(0);
+  await expect(page.locator('.map[data-moving]')).toHaveCount(0);
+  await expect.poll(() => throughCards(page)).toEqual([]);
+});
+
+test.describe('a board with an app in two areas', () => {
+  test.use({
+    board: {
+      env: 'qa',
+      mode: 'auto',
+      nodes: { web: { x: 0, y: 0, run: 'cli' }, orders: { x: 420, y: 0, run: 'cli' } },
+      edges: [],
+    },
+  });
+
+  test('a card says its areas in Plan only while the choice narrows', async ({ page }) => {
+    await expect(card(page, 'orders')).toBeVisible();
+    await expect(card(page, 'orders').locator('.areas')).toHaveCount(0);
+    await only(page, panel(page), 'Payments');
+    await expect(card(page, 'orders').locator('.areas')).toHaveText('Payments · Shipping');
+    await expect(card(page, 'web').locator('.areas')).toHaveCount(0);
+    await card(page, 'orders').screenshot({ path: 'test-results/areas-card.png' });
+  });
 });
