@@ -80,6 +80,18 @@ test('stack merge lists what it adds and each conflict, changes nothing until ev
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
+test('stack merge refuses while a stack has two team boards with one name, which it could not tell apart', () => {
+  const { dir, shop, koppler, read, write } = sandbox();
+  const ours = read(path.join(shop, 'stack.json'));
+  write(path.join(shop, 'stack.json'), { ...ours, presets: [...ours.presets, { ...ours.presets[0], nodes: { orders: { run: 'cli' } } }] });
+  const before = fs.readFileSync(path.join(shop, 'stack.json'), 'utf8');
+  const refused = koppler('stack', 'merge', 'Acme Shop QA', '--prefer', 'theirs', '--apply');
+  assert.equal(refused.status, 1);
+  assert.match(refused.stderr, /Acme Shop has more than one team board called Team checkout: give each its own name first/);
+  assert.equal(fs.readFileSync(path.join(shop, 'stack.json'), 'utf8'), before);
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
 test('stack merge keeps nothing that breaks the stack: the result is checked as a whole, and nothing is written', () => {
   const { dir, shop, qa, koppler, read, write } = sandbox();
   // Fine on its own, but its app's prod settings need the prod it has and this stack does not, and ours is kept.
@@ -96,7 +108,7 @@ test('stack merge keeps nothing that breaks the stack: the result is checked as 
 
 test('board copy takes a board as it is to another stack, refusing the apps that stack lacks unless told to drop them', () => {
   const { dir, temp, qa, koppler, read, write } = sandbox();
-  const mine = { name: 'Checkout', version: 1, nodes: { web: { run: 'cli' }, orders: { run: 'docker', branch: 'feature/refunds' } }, edges: [{ from: 'web', to: 'orders' }], layout: { nodes: { web: { x: 0, y: 0 }, orders: { x: 340, y: 0 } } } };
+  const mine = { name: 'Checkout', version: 1, area: 'checkout', nodes: { web: { run: 'cli' }, orders: { run: 'docker', branch: 'feature/refunds' } }, edges: [{ from: 'web', to: 'orders' }], layout: { nodes: { web: { x: 0, y: 0 }, orders: { x: 340, y: 0 } } } };
   write(path.join(temp, 'state.json'), { preset: 'Checkout', presets: [mine] });
   const shelf = path.join(temp, 'stacks', crypto.createHash('sha1').update(path.resolve(qa)).digest('hex').slice(0, 12), 'state.json');
 
@@ -112,6 +124,8 @@ test('board copy takes a board as it is to another stack, refusing the apps that
   assert.deepEqual(board.nodes, { orders: { run: 'docker', branch: 'feature/refunds' } });
   assert.deepEqual(board.edges, []);
   assert.deepEqual(board.layout.nodes.orders, { x: 340, y: 0 });
+  // An area the other stack does not have is left off: the board takes the area of its apps there.
+  assert.equal(board.area, undefined);
   assert.match(koppler('board', 'copy', 'Checkout', '--to', 'Acme Shop QA', '--drop-missing').stderr, /Acme Shop QA already has a board called Checkout/);
 
   // From the other stack into the one in use: one of its team boards, run modes and cables as they are.
@@ -125,6 +139,12 @@ test('board copy takes a board as it is to another stack, refusing the apps that
   write(shelf, { presets: [{ name: 'QA smoke', version: 1, nodes: { orders: { run: 'cli' } }, edges: [] }] });
   assert.equal(koppler('board', 'copy', 'QA smoke', '--from', 'Acme Shop QA').status, 0);
   assert.ok(read(path.join(temp, 'state.json')).presets.some(one => one.name === 'QA smoke'));
+  // A feature board holds no app that runs here, and still copies.
+  const feature = { request: 'Refund an order', phases: [{ name: 'Refund', steps: [{ from: 'pay', to: 'orders' }] }] };
+  write(shelf, { presets: [{ name: 'Refunds flow', version: 1, nodes: {}, edges: [], feature }] });
+  const flow = koppler('board', 'copy', 'Refunds flow', '--from', 'Acme Shop QA');
+  assert.equal(flow.status, 0, flow.stderr);
+  assert.deepEqual(read(path.join(temp, 'state.json')).presets.find(one => one.name === 'Refunds flow').feature, feature);
 
   assert.match(koppler('board', 'copy', 'Nope', '--to', 'Acme Shop QA').stderr, /no board called Nope/);
   assert.match(koppler('board', 'copy', 'Checkout').stderr, /koppler board copy "<name>" --to\|--from <stack>/);
@@ -133,32 +153,63 @@ test('board copy takes a board as it is to another stack, refusing the apps that
 });
 
 test('stack publish moves the private stack in use into a folder of a clone and uses it from there, never committing', () => {
-  const { dir, config, shop, koppler, read } = sandbox();
-  const repo = path.join(dir, 'acme-stacks');
+  const { dir, config, temp, shop, koppler, read, write } = sandbox();
+  const real = fs.realpathSync(dir);
+  const repo = path.join(dir, 'acme-stacks'), bare = path.join(dir, 'no-remote');
   fs.mkdirSync(path.join(repo, 'stacks', 'taken'), { recursive: true });
   fs.writeFileSync(path.join(repo, 'stacks', 'taken', 'stack.json'), '{}');
   execFileSync('git', ['init', '-q', repo]);
+  execFileSync('git', ['-C', repo, 'remote', 'add', 'origin', 'git@github.com:acme/stacks.git']);
+  execFileSync('git', ['init', '-q', bare]);
+  // The stack runs a check of its own, approved for its file where it is now.
+  write(path.join(shop, 'stack.json'), { ...read(path.join(shop, 'stack.json')), checks: [{ name: 'Docker', run: 'docker info' }] });
   const stack = fs.readFileSync(path.join(shop, 'stack.json'), 'utf8');
   assert.equal(koppler('stack', 'lock', 'apps.web.url').status, 0);
+  write(path.join(temp, 'state.json'), { presets: [{ name: 'Checkout', version: 1, nodes: { web: { run: 'cli' } }, edges: [] }] });
+  write(path.join(temp, 'board-edits.json'), { edits: [{ id: 'e1', at: new Date().toISOString(), stack: shop, board: 'Checkout', edit: {} }] });
 
   assert.match(koppler('stack', 'publish', path.join(dir, 'elsewhere', 'shop')).stderr, /is not inside a git clone/);
   assert.match(koppler('stack', 'publish', path.join(repo, 'stacks', 'taken')).stderr, /already holds a stack\.json/);
   assert.match(koppler('stack', 'publish', path.join(repo, 'docs')).stderr, /<clone>\/stacks\/<name> or <clone>\/\.koppler/);
+  assert.match(koppler('stack', 'publish', path.join(bare, 'stacks', 'acme-shop')).stderr, /has no remote: git -C .*no-remote remote add origin <its address>/);
   assert.equal(fs.readFileSync(path.join(shop, 'stack.json'), 'utf8'), stack);
 
+  // A step that fails half-way leaves everything as it was: the copy goes, the lock and the queued edit stay.
   const target = path.join(repo, 'stacks', 'acme-shop');
+  fs.chmodSync(shop, 0o500);
+  const failed = koppler('stack', 'publish', target);
+  fs.chmodSync(shop, 0o700);
+  assert.equal(failed.status, 1);
+  assert.match(failed.stderr, /could not publish .*; nothing changed/);
+  assert.equal(fs.existsSync(path.join(target, 'stack.json')), false);
+  assert.equal(fs.readFileSync(path.join(shop, 'stack.json'), 'utf8'), stack);
+  assert.equal(read(path.join(config, 'config.json')).stack, shop);
+  assert.match(koppler('stack', 'locks').stdout, /apps\.web\.url/);
+  assert.equal(read(path.join(temp, 'board-edits.json')).edits[0].stack, shop);
+
   const published = koppler('stack', 'publish', target);
   assert.equal(published.status, 0, published.stderr);
   assert.match(published.stdout, /PUBLISHED Acme Shop to .*stacks\/acme-shop\/stack\.json; it is the stack in use from there/);
   assert.match(published.stdout, /git -C .*acme-stacks add stacks\/acme-shop\/stack\.json/);
   assert.match(published.stdout, /git -C .*acme-stacks commit -m 'Add the Acme Shop stack'/);
   assert.match(published.stdout, /git -C .*acme-stacks push/);
+  assert.match(published.stdout, /Its own commands need approving again where it is now: koppler doctor --approve, in your own terminal/);
   assert.equal(fs.readFileSync(path.join(target, 'stack.json'), 'utf8'), stack);
   assert.equal(fs.existsSync(shop), false);
-  assert.equal(read(path.join(config, 'config.json')).stack, target);
+  const now = read(path.join(config, 'config.json')).stack;
+  assert.equal(fs.realpathSync(now), path.join(real, 'acme-stacks', 'stacks', 'acme-shop'));
+  assert.equal(read(path.join(temp, 'board-edits.json')).edits[0].stack, now);
   // Nothing committed: the user does that.
   assert.equal(spawnSync('git', ['-C', repo, 'rev-parse', 'HEAD']).status, 128);
   assert.match(koppler('stack', 'locks').stdout, /apps\.web\.url/);
   assert.match(koppler('stack', 'publish', path.join(repo, 'stacks', 'again')).stderr, /not a private stack/);
+
+  // Koppler finds it where it is now, also after a rescan: listed, and switched away from and back to with its boards.
+  assert.equal(koppler('sync', '--rescan').status, 0);
+  assert.match(koppler('use').stdout, /\* Acme Shop {2}\(shared/);
+  assert.equal(koppler('use', 'Acme Shop QA').status, 0);
+  const back = koppler('use', 'Acme Shop');
+  assert.equal(back.status, 0, back.stderr);
+  assert.deepEqual(read(path.join(temp, 'state.json')).presets.map(one => one.name), ['Checkout']);
   fs.rmSync(dir, { recursive: true, force: true });
 });

@@ -38,6 +38,13 @@ const pathText = (parts: Path) =>
     .join('');
 
 const boardName = (board: unknown) => (isObject(board) ? String(board['name']) : '');
+const teamBoards = (stack: Loose): unknown[] => (Array.isArray(stack['presets']) ? stack['presets'] : []);
+
+/** The names more than one of the stack's team boards go by: a merge tells boards apart by name. */
+export function sameNamedBoards(stack: Loose): string[] {
+  const names = teamBoards(stack).map(boardName);
+  return [...new Set(names.filter((name, at) => names.indexOf(name) !== at))];
+}
 
 /**
  * `theirs` folded into `ours`. Each conflict is settled by its path in `keep`, else by `prefer`; one left unsettled
@@ -52,7 +59,15 @@ export function mergeStacks(
     locked = [],
   }: { keep?: Record<string, Side>; prefer?: Side | undefined; locked?: string[] } = {},
 ): Merged {
-  const locks = locked.map(parsePath).filter((parts): parts is Path => Array.isArray(parts));
+  // A lock on a team board by its place names the board there, as the merge does.
+  const locks = locked
+    .map(parsePath)
+    .filter((parts): parts is Path => Array.isArray(parts))
+    .map((parts): Path =>
+      parts[0] === 'presets' && typeof parts[1] === 'number'
+        ? ['presets', boardName(teamBoards(ours)[parts[1]]), ...parts.slice(2)]
+        : parts,
+    );
   const under = (outer: Path, inner: Path) =>
     outer.length <= inner.length && outer.every((part, n) => part === inner[n]);
   const isLocked = (at: Path) => locks.some(lock => under(lock, at) || under(at, lock));

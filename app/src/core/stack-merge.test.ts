@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { mergeStacks } from './stack-merge.ts';
+import { mergeStacks, sameNamedBoards } from './stack-merge.ts';
 
 const ours = {
   name: 'Shop',
@@ -100,6 +100,35 @@ describe('mergeStacks', () => {
   it('keeps every board of ours, even two with one name', () => {
     const twice = { ...ours, presets: [ours.presets[0], { ...ours.presets[0], nodes: {} }] };
     expect((mergeStacks(twice, theirs, { prefer: 'ours' }).stack as typeof ours).presets).toHaveLength(3);
+  });
+
+  it('reads a lock written by place in the team boards as the board in that place', () => {
+    const merged = mergeStacks(ours, theirs, { prefer: 'theirs', locked: ['presets[0].nodes'] });
+    expect(merged.conflicts.find(one => one.path === 'presets["Checkout"]')).toMatchObject({
+      kept: 'ours',
+      locked: true,
+    });
+    expect((merged.stack as typeof ours).presets[0]).toEqual(ours.presets[0]);
+  });
+
+  it('names the team boards a stack has more than one of', () => {
+    expect(sameNamedBoards(ours)).toEqual([]);
+    expect(
+      sameNamedBoards({ presets: [...theirs.presets, { ...theirs.presets[1] }, { ...theirs.presets[1] }] }),
+    ).toEqual(['Payments']);
+  });
+
+  it('brings in the areas and the areas its apps are in', () => {
+    const a = { ...ours, areas: { checkout: { name: 'Checkout' } } };
+    const b = {
+      ...theirs,
+      areas: { checkout: { name: 'Checkout' }, payments: { name: 'Payments' } },
+      apps: { ...theirs.apps, pay: { ...theirs.apps.pay, areas: ['payments'] } },
+    };
+    const merged = mergeStacks(a, b, { prefer: 'ours' });
+    expect(merged.added).toContain('areas.payments');
+    expect((merged.stack as typeof b).areas).toEqual(b.areas);
+    expect((merged.stack as typeof b).apps.pay.areas).toEqual(['payments']);
   });
 
   it('finds nothing to do for the same stack', () => {

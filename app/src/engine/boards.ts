@@ -107,8 +107,14 @@ function copyBoard(name: string, args: string[]): void {
     fail(
       `${names[taker]} has no ${missing.map(id => `${named(id)} (${id})`).join(', ')}; --drop-missing leaves ${missing.length === 1 ? 'it' : 'them'} off the copy`,
     );
-  const [copy] = withoutMissingApps({ apps: apps[taker], presets: [board] }).presets;
-  if (!copy || !Object.keys(copy.nodes).length) fail(`${names[taker]} has none of the apps on ${board.name}`);
+  const [kept] = withoutMissingApps({ apps: apps[taker], presets: [board] }).presets;
+  // A feature board needs no app that runs here; any other needs one.
+  if (!kept || (!Object.keys(kept.nodes).length && !kept['feature']))
+    fail(`${names[taker]} has none of the apps on ${board.name}`);
+  // An area the other stack lacks is left off: there the board takes the area its apps are in.
+  const areas = (to ? (theirs as { areas?: unknown }).areas : ours.areas) ?? {};
+  const { area, ...arealess } = kept;
+  const copy: StoredPreset = typeof area === 'string' && !Object.hasOwn(areas, area) ? arealess : kept;
   if (to)
     locked(shelf, () => {
       const now = (readJson(shelf) ?? {}) as Record<string, unknown>;

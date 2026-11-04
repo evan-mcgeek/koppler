@@ -398,6 +398,9 @@ function publish(folder: string | undefined): void {
     ].join('\n'),
   );
   sync([]);
+  // An approval holds for the file where it was approved, never carried to another.
+  if (stackCommands(readStack()).length)
+    console.log(`\nIts own commands need approving again where it is now: ${APPROVE}, in your own terminal.`);
 }
 
 /** One field of the stack in use: read it, set it or take it out, checked against the stack's rules. */
