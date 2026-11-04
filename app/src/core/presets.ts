@@ -151,8 +151,15 @@ export function check(input: unknown, stack: StackFacts): Checked {
           ? `None of its apps are in this stack (${unknown.join(', ')}).`
           : `None of its apps are cloned here (${uncloned.join(', ')}).`,
     };
-  if (unknown.length > 0) notes.push(`not in this stack: ${unknown.join(', ')}`);
-  if (uncloned.length > 0) notes.push(`not cloned: ${uncloned.map(name).join(', ')}`);
+  const one = (ids: string[]) => ids.length === 1;
+  if (unknown.length > 0)
+    notes.push(
+      `${unknown.join(', ')} ${one(unknown) ? 'is' : 'are'} not in this stack, kept on the board and hidden until the stack has ${one(unknown) ? 'it' : 'them'}`,
+    );
+  if (uncloned.length > 0)
+    notes.push(
+      `${uncloned.map(name).join(', ')} ${one(uncloned) ? 'is' : 'are'} not cloned here, kept on the board and hidden until ${one(uncloned) ? 'it is' : 'they are'} cloned`,
+    );
 
   const nodes = Object.fromEntries(ids.map(id => [id, openNode(id, preset.nodes[id] ?? {}, stack, name(id), notes)]));
   const edges: Edge[] = [];
@@ -166,7 +173,7 @@ export function check(input: unknown, stack: StackFacts): Checked {
     } else if (!stack.canCall(from, to)) notes.push(`${name(from)} does not call ${name(to)}, cable left out`);
     else edges.push({ from, to });
   }
-  if (dropped > 0) notes.push(`${String(dropped)} ${dropped === 1 ? 'cable' : 'cables'} left out with their apps`);
+  if (dropped > 0) notes.push(`${String(dropped)} ${dropped === 1 ? 'cable' : 'cables'} hidden with them`);
   // A preset without a version already has its note above.
   if (migrated.migratedFrom !== null && migrated.migratedFrom !== '0.0.0')
     notes.push(`updated from the Koppler ${migrated.migratedFrom} format`);
@@ -179,6 +186,43 @@ export function check(input: unknown, stack: StackFacts): Checked {
   };
   if (preset['source']) opened.source = preset['source'];
   return { preset: opened, notes };
+}
+
+/**
+ * The board on screen as it is kept: what is on screen, and the apps of the board as it was stored that this stack
+ * cannot show yet, with their cables and places, so a board opened with apps left out loses none of them.
+ */
+export function withHidden(
+  stored: StoredPreset | undefined,
+  now: StoredPreset,
+  showable: (id: string) => boolean,
+): StoredPreset {
+  const hidden = Object.keys(stored?.nodes ?? {}).filter(id => !Object.hasOwn(now.nodes, id) && !showable(id));
+  if (!stored || !hidden.length) return now;
+  const only = (all: unknown, keys: string[]) =>
+    Object.fromEntries(Object.entries(isObject(all) ? all : {}).filter(([key]) => keys.includes(key)));
+  const kept = (id: string) => hidden.includes(id) || Object.hasOwn(now.nodes, id);
+  const edges = stored.edges
+    .filter(isEdge)
+    .filter(({ from, to }) => (hidden.includes(from) || hidden.includes(to)) && kept(from) && kept(to));
+  const before = isObject(stored['layout']) ? stored['layout'] : {};
+  const layout = isObject(now['layout']) ? now['layout'] : {};
+  return {
+    ...now,
+    nodes: { ...now.nodes, ...Object.fromEntries(Object.entries(stored.nodes).filter(([id]) => hidden.includes(id))) },
+    edges: [...now.edges, ...edges.map(({ from, to }) => ({ from, to }))],
+    layout: {
+      ...layout,
+      nodes: { ...(isObject(layout['nodes']) ? layout['nodes'] : {}), ...only(before['nodes'], hidden) },
+      sides: {
+        ...(isObject(layout['sides']) ? layout['sides'] : {}),
+        ...only(
+          before['sides'],
+          edges.map(({ from, to }) => `${from}>${to}`),
+        ),
+      },
+    },
+  };
 }
 
 /** A change made to a board from the terminal: apps on and off it, cables, and an app's branch or note. */

@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { at, card, expect, test } from './canvas.ts';
+import { at, card, expect, saveSettles, test } from './canvas.ts';
 
 const layout = { nodes: { web: { x: 0, y: 0 }, orders: { x: 420, y: 0 } } };
 test.use({
@@ -213,6 +213,101 @@ test('a board opened from a file in the terminal shows on the canvas, and Reload
   await page.getByRole('button', { name: 'Reload Payments flow' }).click();
   await expect(card(page, 'payments')).toBeVisible();
   await expect(page.getByRole('status').filter({ hasText: 'Reloaded Payments flow' })).toBeVisible();
+});
+
+/** The stack as a sync leaves it with a new app, Shipping API, cloned here and called by Orders API. */
+const withShipping = ({ dir, temp }: { dir: string; temp: string }) => {
+  type Apps = Record<string, Record<string, unknown>>;
+  const file = (name: string) => path.join(temp, `${name}.json`);
+  const read = (name: string) => JSON.parse(fs.readFileSync(file(name), 'utf8')) as { apps: Apps };
+  const registry = read('registry');
+  const orders = registry.apps['orders'] as { consumes: Record<string, unknown> };
+  orders.consumes['shipping'] = { how: 'env', env: 'Shipping__Url' };
+  registry.apps['shipping'] = {
+    name: 'Shipping API',
+    kind: 'dotnet',
+    slug: 'acme/shipping-api',
+    url: 'http://localhost:5004',
+  };
+  fs.writeFileSync(file('registry'), JSON.stringify(registry));
+  const local = read('local');
+  local.apps['shipping'] = { ...local.apps['orders'], path: path.join(dir, 'clones', 'shipping') };
+  fs.writeFileSync(file('local'), JSON.stringify(local));
+};
+const shippingFlow = (dir: string) => {
+  const file = path.join(dir, 'shipping.json');
+  fs.writeFileSync(
+    file,
+    JSON.stringify({
+      name: 'Shipping flow',
+      version: 1,
+      nodes: { web: { run: 'cli' }, orders: { run: 'cli' }, shipping: { run: 'cli' } },
+      edges: [
+        { from: 'web', to: 'orders' },
+        { from: 'orders', to: 'shipping' },
+      ],
+    }),
+  );
+  return file;
+};
+/** The board as the page kept it, once the page has kept it. */
+const keptFlow = async (temp: string) => {
+  await expect.poll(() => (state(temp) as { preset?: string }).preset).toBe('Shipping flow');
+  const flow = state(temp).presets.find(one => one.name === 'Shipping flow') as
+    { nodes: Record<string, unknown>; edges: { from: string; to: string }[] } | undefined;
+  return { apps: Object.keys(flow?.nodes ?? {}).sort(), cables: flow?.edges.map(({ from, to }) => `${from}>${to}`) };
+};
+
+test('a board opened from the terminal after the stack changed shows every app of it', async ({ page, canvas }) => {
+  await expect(card(page, 'web')).toBeVisible();
+  withShipping(canvas);
+  koppler(canvas, 'board', 'open', shippingFlow(canvas.dir), '--no-open');
+  await expect(page.getByRole('status').filter({ hasText: 'Opened Shipping flow from the terminal.' })).toBeVisible();
+  await expect(card(page, 'shipping')).toBeVisible();
+  await expect(page.locator('.svelte-flow__node-app')).toHaveCount(3);
+  await expect(page.locator('.svelte-flow__edge')).toHaveCount(2);
+  expect(await keptFlow(canvas.temp)).toEqual({
+    apps: ['orders', 'shipping', 'web'],
+    cables: ['web>orders', 'orders>shipping'],
+  });
+});
+
+test('a board keeps an app the stack does not have, says so, and shows it once the stack has it', async ({
+  page,
+  canvas,
+}) => {
+  await expect(card(page, 'web')).toBeVisible();
+  koppler(canvas, 'board', 'open', shippingFlow(canvas.dir), '--no-open');
+  const said = page.getByRole('status').filter({ hasText: 'Opened Shipping flow from the terminal' });
+  await expect(said).toContainText(
+    'shipping is not in this stack, kept on the board and hidden until the stack has it',
+  );
+  await expect(page.locator('.svelte-flow__node-app')).toHaveCount(2);
+  await page.screenshot({ path: 'test-results/board-kept-hidden.png' });
+  // Hidden, not lost: the board as kept still has it and its cable.
+  expect(await keptFlow(canvas.temp)).toEqual({
+    apps: ['orders', 'shipping', 'web'],
+    cables: ['web>orders', 'orders>shipping'],
+  });
+
+  withShipping(canvas);
+  koppler(canvas, 'refresh', '--no-sync');
+  await expect(card(page, 'shipping')).toBeVisible();
+  await expect(page.locator('.svelte-flow__edge[data-id="orders>shipping"]')).toHaveCount(1);
+});
+
+test('an app kept hidden on the board on screen comes off it when the terminal removes it', async ({
+  page,
+  canvas,
+}) => {
+  await expect(card(page, 'web')).toBeVisible();
+  koppler(canvas, 'board', 'open', shippingFlow(canvas.dir), '--no-open');
+  expect((await keptFlow(canvas.temp)).apps).toEqual(['orders', 'shipping', 'web']);
+  koppler(canvas, 'board', 'edit', 'Shipping flow', '--remove', 'shipping');
+  await expect(page.getByRole('status')).toContainText('The agent changed Shipping flow: removed shipping.');
+  await expect.poll(() => waiting(canvas.temp)).toBe(0);
+  await saveSettles(page);
+  expect(await keptFlow(canvas.temp)).toEqual({ apps: ['orders', 'web'], cables: ['web>orders'] });
 });
 
 test('a board deleted from the terminal goes to Recently deleted on an open canvas, which says so', async ({

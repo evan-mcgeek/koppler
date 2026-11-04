@@ -22,6 +22,7 @@ import {
   type BoardEdit,
   type StackFacts,
   type StoredPreset,
+  withHidden,
 } from '../src/core/presets.ts';
 import type { Registry } from '../src/data.ts';
 import { load, save, type Loaded, type SavedBoard } from './data.ts';
@@ -1308,8 +1309,16 @@ class Board {
       },
     };
   }
-  /** The board on screen as a board to keep: what runs and how, and the cables. */
+  /** The board on screen as a board to keep, where its cards sit, and the apps of it this stack cannot show yet. */
   #asPreset(name: string): StoredPreset {
+    return withHidden(
+      [...this.own, ...this.team].find(one => one.name === this.name),
+      { ...this.#onScreen(name), layout: this.#layout() },
+      id => !!this.app(id)?.cloned,
+    );
+  }
+  /** What is on screen as a board: what runs and how, and the cables. */
+  #onScreen(name: string): StoredPreset {
     return {
       name,
       version: PRESET_VERSION,
@@ -1371,7 +1380,7 @@ class Board {
   /** Keeps the board on screen among the user's boards; a team board that is changed becomes their own copy. */
   #keep(): void {
     const put = (name: string) => {
-      const now = { ...this.own.find(one => one.name === name), ...this.#asPreset(name), layout: this.#layout() };
+      const now = { ...this.own.find(one => one.name === name), ...this.#asPreset(name) };
       const next = this.own.some(one => one.name === name)
         ? this.own.map(one => (one.name === name ? now : one))
         : [...this.own, now];
@@ -1394,7 +1403,7 @@ class Board {
         (key, value: unknown) => (key === 'followsClone' ? undefined : value),
       );
     const asOpened = team && check(team, this.#facts()).preset;
-    if (team && asOpened && told(this.#asPreset(team.name) as never) === told(asOpened)) return;
+    if (team && asOpened && told(this.#onScreen(team.name) as never) === told(asOpened)) return;
     // One copy per team board: changing it again updates that copy.
     const copy =
       team && this.own.find(one => one.name === `${team.name} (local)` || one.name === `${team.name} (mine)`);
@@ -1432,7 +1441,7 @@ class Board {
     this.#keep();
     const first = this.nodes[0]?.data.name ?? 'Untitled';
     const name = this.uniqueName(`${this.name ?? first} copy`);
-    this.own = [...this.own, { ...this.#asPreset(name), layout: this.#layout() }];
+    this.own = [...this.own, this.#asPreset(name)];
     this.name = name;
   }
   /** Moves one of the user's boards to the recently deleted; the board on screen empties when it is that one. */
@@ -1776,8 +1785,30 @@ class Board {
     this.pinned = (Array.isArray(saved?.['outside']) ? saved['outside'] : []) as string[];
     const { zoom, pan } = saved ?? {};
     this.view = zoom && pan ? { x: pan.x, y: pan.y, zoom } : undefined;
+    this.#unhide();
     // After the view: a new card goes on a spot that is on screen.
     this.syncInfra((saved?.infra ?? {}) as Record<string, Point | undefined>);
+  }
+  /** Puts back the apps of the board on screen it was kept with, hidden, that the stack can show now. */
+  #unhide(): void {
+    const stored = [...this.own, ...this.team].find(one => one.name === this.name);
+    // An emptied board is left empty.
+    if (!stored || !this.nodes.length) return;
+    const back = Object.keys(stored.nodes).filter(
+      id => this.app(id)?.cloned && !this.nodes.some(node => node.id === id),
+    );
+    const places = ((stored['layout'] ?? {}) as { nodes?: Record<string, Partial<Point> | undefined> }).nodes ?? {};
+    for (const id of back) {
+      const app = this.app(id);
+      const { x, y } = places[id] ?? {};
+      if (app && typeof x === 'number' && typeof y === 'number')
+        this.nodes = [...this.nodes, this.#card(app, { x, y })];
+      else this.add(id);
+    }
+    const on = (id: string) => this.nodes.some(node => node.id === id);
+    for (const { from, to } of stored.edges as { from: string; to: string }[])
+      if ((back.includes(from) || back.includes(to)) && on(from) && on(to) && this.#facts().canCall(from, to))
+        this.connect(from, to);
   }
 
   /** Keeps the board on screen among the user's boards (a changed team board becomes their copy), before it is saved. */
@@ -2052,6 +2083,11 @@ class Board {
     }
     const before = this.content();
     const on = (id: string) => this.cards.some(node => node.id === id);
+    // An app kept hidden on the board is taken off where the board is kept.
+    const hidden = (change.remove ?? []).filter(
+      id => !on(id) && this.own.some(one => one.name === name && one.nodes[id]),
+    );
+    if (hidden.length) this.own = this.own.map(one => (one.name === name ? editPreset(one, { remove: hidden }) : one));
     for (const id of change.remove ?? []) this.remove(id);
     for (const id of change.add ?? []) this.add(id);
     for (const [id, branch] of Object.entries(change.branch ?? {})) this.set(id, { branch });
@@ -2062,7 +2098,7 @@ class Board {
     // Laid out once the cards have their sizes, as a board opened with no places is.
     if (change.arrange) this.opened = 'arrange';
     if (change.feature) this.feature = editFeature(this.feature, change.feature);
-    return this.content() !== before || !!change.arrange;
+    return this.content() !== before || !!change.arrange || hidden.length > 0;
   }
 
   #arranged = { key: '', version: 0 };
