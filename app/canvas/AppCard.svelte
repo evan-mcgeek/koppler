@@ -21,6 +21,7 @@
   import { logs } from './logs.svelte.ts';
   import { runs } from './run.svelte.ts';
   import { dialogs } from './dialogs.svelte.ts';
+  import { areaNames, chosen } from './areas.svelte.ts';
 
   const { id, data, selected, dragging }: NodeProps<CardNode> = $props();
   // The action bar shows while the card or the bar is pointed at, and stays a moment as the pointer crosses the gap.
@@ -48,6 +49,8 @@
     if (!brief && width) fullWidth = width;
   });
   const app = $derived(board.app(id));
+  /** Its areas, said only while the choice of areas narrows. */
+  const areas = $derived(areaNames(id).join(' · '));
   const current = $derived(app?.current || 'current branch');
   const tunnels = $derived(board.tunnelsOf(id));
   const queues = $derived(board.queuesOf(id));
@@ -263,6 +266,7 @@
       <span class="name" title={data.name}>{data.name}</span>
       <span class="tags">
         <span class="kind">{data.kindLabel}</span>
+        {#if chosen.narrows && areas.length}<span class="areas" title="Areas: {areas}">{areas}</span>{/if}
         {#if data.watch && data.run === 'cli'}<span
             class="watch"
             role="img"
@@ -443,6 +447,14 @@
     display: flex;
     align-items: center;
     gap: 6px;
+  }
+  .areas {
+    min-width: 0;
+    overflow: hidden;
+    color: var(--ink-muted);
+    font: 400 11px var(--mono);
+    white-space: nowrap;
+    text-overflow: ellipsis;
   }
   /* Two lines, then an ellipsis; a name with no spaces breaks anywhere. Its title holds it whole. */
   .name {

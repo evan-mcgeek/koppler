@@ -45,3 +45,7 @@ class Chosen {
   }
 }
 export const chosen = new Chosen();
+
+/** The names of the areas an app is in, in its order. */
+export const areaNames = (app: string): string[] =>
+  (board.facts?.apps[app]?.areas ?? []).flatMap(id => board.areas[id]?.name ?? []);

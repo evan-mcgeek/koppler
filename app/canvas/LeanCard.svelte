@@ -1,10 +1,11 @@
 <script lang="ts">
   // A card on the Discover map: its name, its kind, and where its code is or what it is. On the board it is solid;
-  // one step away it is drawn back. A +N chip on it brings in the links it leaves out.
+  // one step away it is drawn back. A +N chip on it brings in the links it leaves out; a dashed +N hidden counts those
+  // the chosen areas leave out, and opens the Areas checklist.
   import GitBranch from '@lucide/svelte/icons/git-branch';
   import Laptop from '@lucide/svelte/icons/laptop';
   import type { NodeProps } from '@xyflow/svelte';
-  import { discovered, type LeanData } from './discover.svelte.ts';
+  import { AREAS, discovered, type LeanData } from './discover.svelte.ts';
 
   const { id, data, selected }: NodeProps & { data: LeanData } = $props();
   let height = $state(0);
@@ -19,6 +20,7 @@
   class:ring={!data.onBoard}
   class:proposed={data.proposed}
   class:picked={selected}
+  class:roomy={data.outside.length > 0 && discovered.direction !== 'DOWN'}
   title={data.name}
   bind:offsetHeight={height}
 >
@@ -36,6 +38,7 @@
         title={data.meta}>{data.meta}</span
       >{/if}
   </span>
+  {#if data.areas}<span class="areas" title={data.areas}>{data.areas}</span>{/if}
   {#if data.deadEnd}
     <span class="dead">Dead end · no readers</span>
     <!-- Where its links would go on: they stop here. -->
@@ -76,6 +79,21 @@
         ev.stopPropagation();
         discovered.open(id);
       }}>+{data.hidden}</button
+    >
+  {/if}
+  {#if data.outside.length}
+    <button
+      class="away nodrag"
+      class:down={discovered.direction === 'DOWN'}
+      type="button"
+      title="Not in your areas: {data.outside.join(', ')}"
+      aria-label="{data.outside.length} {data.outside.length === 1
+        ? 'link'
+        : 'links'} of {data.name} hidden by your areas"
+      popovertarget={AREAS}
+      onclick={ev => {
+        ev.stopPropagation();
+      }}>+{data.outside.length} hidden</button
     >
   {/if}
 </div>
@@ -254,8 +272,40 @@
     cursor: pointer;
   }
   .more:hover,
-  .more:focus-visible {
+  .more:focus-visible,
+  .away:hover,
+  .away:focus-visible {
     border-color: var(--ink);
     outline: none;
+  }
+  /* Dashed: not in your view. It sits on an edge no link leaves from: under the card, or left of it laid out down. */
+  .away {
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    padding: 0 5px;
+    border: 1px dashed var(--line-strong);
+    background: var(--desk);
+    color: var(--ink);
+    font: 600 11px/16px var(--mono);
+    white-space: nowrap;
+    transform: translate(-50%, -50%);
+    cursor: pointer;
+  }
+  .away.down {
+    top: 50%;
+    left: 14px;
+    transform: translate(-100%, -50%);
+  }
+  .lean.roomy {
+    padding-bottom: 14px;
+  }
+  /* Its areas, on a line of their own under where it is. */
+  .areas {
+    overflow: hidden;
+    color: var(--ink-muted);
+    font: 400 11px var(--mono);
+    white-space: nowrap;
+    text-overflow: ellipsis;
   }
 </style>

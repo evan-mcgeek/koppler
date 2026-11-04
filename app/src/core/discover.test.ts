@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { changedNote, deadEnds, linksOf, mapOf, sourceOf, type Facts } from './discover.ts';
+import { changedNote, deadEnds, linksOf, mapOf, placesOf, sourceOf, type Facts } from './discover.ts';
 
 const app = (name: string, extra: object = {}) => ({ name, kind: 'node', slug: `acme/${name}`, ...extra });
 const facts = {
@@ -114,6 +114,33 @@ describe('mapOf', () => {
   });
 });
 
+describe('mapOf with areas chosen', () => {
+  const zoned = {
+    apps: {
+      web: app('Web Shop', { consumes: { orders: {}, mail: {} } }),
+      orders: app('Orders API', { areas: ['payments', 'shipping'], consumes: { pay: {} } }),
+      pay: app('Payments API', { areas: ['payments'] }),
+      mail: app('Mail', { areas: ['notifications'] }),
+      ship: app('Shipping API', { areas: ['shipping'], consumes: { carrier: {} } }),
+      carrier: app('Carrier Gateway', { areas: ['shipping'] }),
+    },
+  } as unknown as Facts;
+
+  it("leaves out the apps outside them with their links, but the board's own, and says which each card links to", () => {
+    const { cards, links } = mapOf(zoned, ['web', 'ship'], ['mail'], true, ['payments']);
+    expect(cards).toEqual([
+      { card: 'web', onBoard: true, hidden: 0, outside: ['mail'] },
+      { card: 'ship', onBoard: true, hidden: 0, outside: ['carrier'] },
+      { card: 'orders', onBoard: false, hidden: 1 },
+    ]);
+    expect(links).toEqual([{ from: 'web', to: 'orders', kind: 'call', sure: 'confirmed', unsourced: true }]);
+  });
+
+  it('shows every app with no choice', () => {
+    expect(mapOf(zoned, ['web'], [], true, []).cards.map(one => one.card)).toEqual(['web', 'orders', 'mail']);
+  });
+});
+
 describe('mapOf on a feature board', () => {
   it('shows only its own cards until one is opened', () => {
     expect(mapOf(facts, ['web', 'orders'], [], false).cards).toEqual([
@@ -164,5 +191,17 @@ describe('sourceOf', () => {
     expect(link && sourceOf(copy, link)).toBeUndefined();
     expect(at('web', 'orders')).toBeUndefined();
     expect(at('orders', 'queue:events')).toBeUndefined();
+  });
+});
+
+describe('placesOf', () => {
+  it('places a card left nowhere by the layout, and keeps where cards not on the map were left', () => {
+    const kept = { web: { x: 0, y: 0 }, mail: { x: 300, y: 200 } };
+    expect(placesOf(kept, ['web', 'orders'], { web: { x: 9, y: 9 }, orders: { x: 300, y: 0 } })).toEqual({
+      web: { x: 0, y: 0 },
+      orders: { x: 300, y: 0 },
+      mail: { x: 300, y: 200 },
+    });
+    expect(placesOf(kept, ['web'], {})).toBe(kept);
   });
 });

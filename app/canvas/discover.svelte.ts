@@ -2,7 +2,8 @@
 // board; it keeps only which cards were opened and where its cards sit, per board.
 import type { Point } from '../src/core/arrange.ts';
 import { DIRECTIONS, type Direction, type Laid } from '../src/core/layout.ts';
-import { deadEnds, linksOf, mapOf, type Card, type Link } from '../src/core/discover.ts';
+import { hiddenBy } from '../src/core/areas.ts';
+import { deadEnds, linksOf, mapOf, placesOf, type Card, type Link } from '../src/core/discover.ts';
 import {
   editFeature,
   featureCards,
@@ -12,6 +13,7 @@ import {
   type FeatureEdit,
   type Numbered,
 } from '../src/core/feature.ts';
+import { areaNames, chosen } from './areas.svelte.ts';
 import { board } from './board.svelte.ts';
 import { post } from './data.ts';
 import { live } from './live.svelte.ts';
@@ -27,6 +29,10 @@ export interface LeanData extends Record<string, unknown> {
   cloned: boolean;
   onBoard: boolean;
   hidden: number;
+  /** The apps it links to that the chosen areas leave out, each with its areas. */
+  outside: string[];
+  /** The areas it is in, joined. */
+  areas: string;
   /** An app that can run here. */
   app: boolean;
   /** On a feature board, proposed by the agent and not accepted yet. */
@@ -42,6 +48,8 @@ export interface LeanData extends Record<string, unknown> {
 }
 
 export const CARD = { w: 200, h: 64 };
+/** The Areas checklist under the map, for a card's +N hidden to open. */
+export const AREAS = 'discover-areas';
 /** A link's name on the map: who, to whom, how. */
 export const linkKey = (link: Link) => `${link.from}>${link.to}>${link.kind}`;
 const QUEUE_TAGS: Record<string, [string, string]> = {
@@ -58,12 +66,23 @@ class Discovered {
   /** The map: the board's apps, what they touch, and what was brought in from each opened card. */
   /** The board's own cards: its apps, and the outside systems put on it by hand. */
   #own = $derived([...board.nodes.map(node => node.id), ...board.pinned]);
+  /** What the map always shows, whatever the areas: the board's own cards, and a feature's. */
+  #always = $derived(board.feature ? [...featureCards(board.feature), ...this.#own] : this.#own);
+  /** The apps the chosen areas leave off the map, and the areas they are in. */
+  hiding = $derived(
+    hiddenBy(
+      { areas: board.areas, apps: board.facts?.apps ?? {} },
+      chosen.narrows ? chosen.ids : undefined,
+      this.#always,
+    ),
+  );
   map = $derived.by(() => {
     const facts = board.facts;
     if (!facts) return { cards: [], links: [] as Link[] };
     const feature = board.feature;
-    if (!feature) return mapOf(facts, this.#own, board.discover.open);
-    const shown = mapOf(facts, [...featureCards(feature), ...this.#own], board.discover.open, false);
+    const areas = chosen.narrows ? chosen.ids : undefined;
+    if (!feature) return mapOf(facts, this.#own, board.discover.open, true, areas);
+    const shown = mapOf(facts, this.#always, board.discover.open, false, areas);
     // A step the stack has no link for yet is drawn as found, until it is accepted and recorded.
     const missing = numbered(feature)
       .map(({ step }) => step)
@@ -106,8 +125,10 @@ class Discovered {
       return count;
     }, {}),
   );
+  /** An app's name, and its areas in brackets. */
+  #withAreas = (card: Card) => `${board.nameOf(card)} (${areaNames(card).join(', ')})`;
   /** What a card shows. */
-  data(card: Card, onBoard: boolean, hidden: number): LeanData {
+  data(card: Card, onBoard: boolean, hidden: number, outside: Card[] = []): LeanData {
     const facts = board.facts;
     const proposed = !!board.feature && proposedCard(board.feature, card);
     const slug = facts?.apps[card]?.slug ?? '';
@@ -124,6 +145,8 @@ class Discovered {
     const base = {
       onBoard,
       hidden,
+      outside: outside.map(this.#withAreas),
+      areas: '',
       cloned: false,
       app: false,
       proposed,
@@ -169,6 +192,7 @@ class Discovered {
     return {
       ...base,
       name: stack?.name ?? card,
+      areas: areaNames(card).join(' · '),
       tag: app?.kindLabel ?? stack?.kind ?? '',
       meta: app?.cloned ? '' : 'On GitHub',
       cloned: !!app?.cloned,
@@ -197,19 +221,14 @@ class Discovered {
   }
 
   /** Where each card sits: where it was left, else where the layout puts it. */
-  positions = $derived.by((): Record<Card, Point> => {
-    const kept = board.discover.at;
-    const ids = this.map.cards.map(one => one.card);
-    if (ids.every(id => kept[id])) return kept;
-    // While a new layout is worked out, the cards stay where the last one put them.
-    const laid = (this.layout ?? this.laid)?.at ?? {};
-    return Object.fromEntries(
-      ids.flatMap(id => {
-        const at = kept[id] ?? laid[id];
-        return at ? [[id, at] as const] : [];
-      }),
-    );
-  });
+  // While a new layout is worked out, the cards stay where the last one put them.
+  positions = $derived(
+    placesOf(
+      board.discover.at,
+      this.map.cards.map(one => one.card),
+      (this.layout ?? this.laid)?.at ?? {},
+    ),
+  );
   /** A link's route from the layout, while both its cards are where the layout put them (`place`: where each is now). */
   routeOf(link: Link, place: (card: Card) => Point | undefined): Point[] | undefined {
     const layout = this.layout;
@@ -247,17 +266,36 @@ class Discovered {
     // Laid out and not moved since, or not placed yet: the layout places the new cards with the rest and routes every link.
     if (laidOut) board.discover = { ...board.discover, at: {} };
     if (laidOut || ![...before].every(id => at[id])) return;
-    const from = at[card] ?? { x: 0, y: 0 };
-    const fresh = this.map.cards.map(one => one.card).filter(id => !before.has(id));
-    const x = from.x + CARD.w + 120;
-    const taken = (y: number) =>
+    this.#beside(
+      at,
+      this.map.cards.map(one => one.card).filter(id => !before.has(id)),
+      () => card,
+    );
+  }
+  /** Puts each of `fresh` in the first free place right of the card `next` gives, or of the map's corner, and keeps them. */
+  #beside(at: Record<Card, Point>, fresh: Card[], next: (card: Card) => Card | undefined): void {
+    const taken = (x: number, y: number) =>
       Object.values(at).some(spot => Math.abs(spot.x - x) < CARD.w + 40 && Math.abs(spot.y - y) < CARD.h + 36);
-    let y = from.y;
     for (const id of fresh) {
-      while (taken(y)) y += CARD.h + 36;
+      const from = at[next(id) ?? ''] ?? { x: 0, y: 0 };
+      const x = from.x + CARD.w + 120;
+      let y = from.y;
+      while (taken(x, y)) y += CARD.h + 36;
       at[id] = { x, y };
     }
     board.discover = { ...board.discover, at };
+  }
+  /** Cards back on the map while the rest were moved by hand: each beside a card it links to, never on one. */
+  placeReturning(): void {
+    const at = { ...board.discover.at };
+    if (!Object.keys(at).length) return;
+    const fresh = this.map.cards.map(one => one.card).filter(id => !at[id]);
+    if (!fresh.length) return;
+    const linked = (id: Card) =>
+      this.map.links
+        .flatMap(link => (link.from === id ? [link.to] : link.to === id ? [link.from] : []))
+        .find(other => at[other]);
+    this.#beside(at, fresh, linked);
   }
   /** Moved by hand: kept with the board. */
   moved(card: Card, to: Point): void {
