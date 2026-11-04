@@ -25,6 +25,12 @@ export function setLock(source: string, at: string, on: boolean): { error?: stri
   return {};
 }
 
+/** The locks of a stack file that moved go with it. */
+export function moveLocks(from: string, to: string): void {
+  const { [from]: moved, ...rest } = all();
+  if (moved?.length) writeJson(locksFile(), { ...rest, [to]: moved });
+}
+
 /** The first locked field the change would alter, or null when it leaves every one as it was. */
 export function brokenLock(source: string, before: unknown, after: unknown): string | null {
   for (const at of lockedPaths(source)) {

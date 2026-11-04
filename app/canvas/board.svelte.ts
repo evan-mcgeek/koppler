@@ -19,6 +19,7 @@ import {
   editPreset,
   migrate,
   VERSION as PRESET_VERSION,
+  withoutNotes,
   type BoardEdit,
   type OpenedNode,
   type StackFacts,
@@ -334,6 +335,8 @@ class Board {
   discover = $state.raw<DiscoverState>({ open: [], at: {} });
   /** A feature board's request, phases and steps; null on any other board. */
   feature = $state.raw<Feature | null>(null);
+  /** The area the board was put in by hand, by id; null when its apps say. */
+  handArea = $state<string | null>(null);
   /** The outside systems put on the board by hand: Discover draws them as the board's own. */
   pinned = $state.raw<string[]>([]);
   infraBoxes = $derived(
@@ -1263,6 +1266,7 @@ class Board {
       hiddenOutside: this.hiddenOutside,
       pinned: this.pinned,
       feature: this.feature,
+      area: this.handArea,
       cardNotes: this.cardNotes,
       discover: this.discover,
       edges: this.edges.map(({ id, source, target, type, data }) => ({ id, source, target, type, data })),
@@ -1282,6 +1286,7 @@ class Board {
       hiddenOutside,
       pinned,
       feature,
+      area,
       cardNotes,
       discover,
     } = JSON.parse(back) as {
@@ -1295,10 +1300,12 @@ class Board {
       hiddenOutside: Record<string, true>;
       pinned: string[];
       feature?: Feature | null;
+      area?: string | null;
       cardNotes?: Record<string, string>;
       discover?: DiscoverState;
     };
     this.name = name;
+    this.handArea = area ?? null;
     this.discover = discoverOf(discover);
     this.pinned = pinned;
     this.feature = featureOf(feature);
@@ -1381,6 +1388,7 @@ class Board {
       ...(Object.keys(this.cardNotes).length && { cardNotes: this.cardNotes }),
       ...(discoverKept(this.discover) && { discover: this.discover }),
       ...(this.feature && { feature: this.feature }),
+      ...(this.handArea && { area: this.handArea }),
     };
   }
   /** Where the cards sit and which sides the cables use, kept with a board so it opens as it was left. */
@@ -1416,7 +1424,8 @@ class Board {
   /** Keeps the board on screen among the user's boards; a team board that is changed becomes their own copy. */
   #keep(): void {
     const put = (name: string) => {
-      const now = { ...this.own.find(one => one.name === name), ...this.#asPreset(name) };
+      const { area: _, ...was }: Partial<StoredPreset> = this.own.find(one => one.name === name) ?? {};
+      const now = { ...was, ...this.#asPreset(name) };
       const next = this.own.some(one => one.name === name)
         ? this.own.map(one => (one.name === name ? now : one))
         : [...this.own, now];
@@ -1522,12 +1531,13 @@ class Board {
   }
   /** The board as a team board of the stack, placed as it is: the apps and cables, a feature's steps, and where they sit. */
   forTeam(preset: StoredPreset): StoredPreset {
-    const { layout, outside, feature, discover } = preset;
+    const { layout, outside, feature, discover, area } = preset;
     return {
       ...(JSON.parse(this.asShared(preset)) as StoredPreset),
       ...(layout ? { layout } : {}),
       ...(outside ? { outside } : {}),
       ...(feature ? { feature } : {}),
+      ...(typeof area === 'string' ? { area } : {}),
       ...(discover ? { discover } : {}),
     };
   }
@@ -1540,7 +1550,7 @@ class Board {
   asShared(preset: StoredPreset): string {
     const { name, nodes, edges } = preset;
     const version = migrate(preset).preset?.version ?? PRESET_VERSION;
-    return JSON.stringify({ name, version, koppler: BOARD_FORMAT.version, nodes, edges }, null, 2);
+    return JSON.stringify({ name, version, koppler: BOARD_FORMAT.version, nodes: withoutNotes(nodes), edges }, null, 2);
   }
 
   /** The notes about this board the user dismissed. */
@@ -1579,6 +1589,7 @@ class Board {
     this.cardNotes = {};
     this.discover = { open: [], at: {} };
     this.feature = null;
+    this.handArea = null;
     this.pinned = [];
   }
   /**
@@ -1591,6 +1602,7 @@ class Board {
       this.name = given.name;
       this.discover = discoverOf(given['discover']);
       this.feature = featureOf(given['feature']);
+      this.handArea = typeof given['area'] === 'string' ? given['area'] : null;
       return { notes: [] };
     }
     const checked = check(given, this.#facts());
@@ -1618,6 +1630,7 @@ class Board {
     this.cardNotes = notesOf(given['cardNotes']);
     this.discover = discoverOf(given['discover']);
     this.feature = featureOf(given['feature']);
+    this.handArea = typeof given['area'] === 'string' ? given['area'] : null;
     this.pinned = Array.isArray(given['outside'])
       ? (given['outside'] as unknown[]).filter((id): id is string => typeof id === 'string')
       : [];
@@ -1792,6 +1805,7 @@ class Board {
     this.cardNotes = notesOf(saved?.['cardNotes']);
     this.discover = discoverOf(saved?.['discover']);
     this.feature = featureOf(saved?.['feature']);
+    this.handArea = typeof saved?.['area'] === 'string' ? saved['area'] : null;
     this.pinned = (Array.isArray(saved?.['outside']) ? saved['outside'] : []) as string[];
     const { zoom, pan } = saved ?? {};
     this.view = zoom && pan ? { x: pan.x, y: pan.y, zoom } : undefined;
@@ -1880,6 +1894,7 @@ class Board {
       this.cardNotes,
       this.discover,
       this.feature,
+      this.handArea,
       this.pinned,
     ];
   }
@@ -1959,6 +1974,7 @@ class Board {
       cardNotes: Object.keys(this.cardNotes).length ? this.cardNotes : undefined,
       discover: discoverKept(this.discover) ? this.discover : undefined,
       feature: this.feature ?? undefined,
+      area: this.handArea ?? undefined,
       outside: this.pinned.length ? this.pinned : undefined,
       infra: Object.fromEntries(
         this.infra.map(({ id, position }) => [id, { x: Math.round(position.x), y: Math.round(position.y) }]),
@@ -2132,6 +2148,7 @@ class Board {
     // Laid out once the cards have their sizes, as a board opened with no places is.
     if (change.arrange) this.opened = 'arrange';
     if (change.feature) this.feature = editFeature(this.feature, change.feature);
+    if (change.area !== undefined) this.handArea = change.area;
     return this.content() !== before || !!change.arrange || hidden.length > 0;
   }
 

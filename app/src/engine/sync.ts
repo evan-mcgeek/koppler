@@ -26,7 +26,16 @@ import {
   slugMatches,
   findStacks,
 } from './repos.ts';
-import { currentStack, knownStacks, LOADING, setStack, useStack, writeSetup, privateStacks } from './stacks.ts';
+import {
+  currentStack,
+  knownStacks,
+  LOADING,
+  setStack,
+  stackNamed,
+  useStack,
+  writeSetup,
+  privateStacks,
+} from './stacks.ts';
 
 interface Flags {
   roots: string[];
@@ -227,17 +236,9 @@ export function stacksCommand(args: string[] = []): void {
 /** `koppler use <name or folder>`: switch to one (it must not have anything running). */
 export function useCommand(args: string[]): void {
   const want = args.join(' ').trim();
-  const list = knownStacks(readIndex());
   if (!want) fail('usage: koppler use <stack name or folder>');
-  const folder = path.resolve(expand(want));
-  const matches = list.filter(stack => stack.dir === folder || stack.name.toLowerCase() === want.toLowerCase());
-  const [match] = matches;
-  if (!match || matches.length !== 1)
-    fail(
-      matches.length
-        ? `several stacks are called ${want}; use its folder: koppler use`
-        : `no stack called ${want}; see: koppler use`,
-    );
+  const match = stackNamed(want);
+  if ('error' in match) fail(match.error);
   const result = useStack(match.dir);
   if (result.error !== undefined) fail(result.error);
   console.log(`USING ${match.name} (${match.path})`);

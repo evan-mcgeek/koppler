@@ -204,6 +204,8 @@ const clocked = new WeakSet<Page>();
 export async function nextEdit(page: Page): Promise<void> {
   if (!clocked.has(page)) {
     clocked.add(page);
+    // The board opened first: what it does as it opens is not a step of the test's to undo.
+    await expect(page.locator('main:not([inert]) :is(.stage, .empty)').first()).toBeVisible();
     await page.clock.install();
   }
   await page.clock.fastForward(800);

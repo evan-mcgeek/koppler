@@ -11,6 +11,7 @@ import { actionsCommand, stepCommand } from './cli/records.ts';
 import { fail, Failure } from './failure.ts';
 import { canvas, logs, restart, status, stop } from './cli/running.ts';
 import { readData, readStack } from './data.ts';
+import { boardArea } from './core/areas.ts';
 import { completion, SHELLS, type Shell } from './core/completion.ts';
 import { guide } from './core/guide.ts';
 import { switchCommand } from './engine/branch.ts';
@@ -35,10 +36,21 @@ import { findCommand } from './engine/research.ts';
 import { run } from './engine/run.ts';
 import { appliedCommand, historyCommand, planCommand, runningNames, sessionCommand } from './engine/runs.ts';
 import { updateClones } from './engine/clones.ts';
-import { readIndex } from './engine/config.ts';
+import { readIndex, tilde } from './engine/config.ts';
 import { candidateRepos } from './engine/repos.ts';
-import { addApps, addOutside, editStack, stackSource, readStackAt, removeApp } from './engine/stack-file.ts';
-import { createStack, currentStack } from './engine/stacks.ts';
+import {
+  addApps,
+  addOutside,
+  editStack,
+  mergeStack,
+  publishStack,
+  stackSource,
+  readStackAt,
+  removeApp,
+} from './engine/stack-file.ts';
+import { createStack, currentStack, stackNamed } from './engine/stacks.ts';
+import { quote } from './core/launch.ts';
+import type { Side } from './core/stack-merge.ts';
 import { init as initStack, stacksCommand, sync, useCommand } from './engine/sync.ts';
 import { up } from './engine/up.ts';
 import { wait } from './cli/wait.ts';
@@ -112,18 +124,36 @@ function refresh(args: string[]): void {
 /** Stacks on this Mac, or switch to one; --boards lists the boards of the stack in use (the team's presets and your own). */
 function use(args: string[]): void {
   if (args.includes('--boards')) {
-    const own = (readData('state')?.['presets'] ?? []) as { name: string }[];
+    const stack = loaded();
+    const wanted = args.includes('--area') ? args[args.indexOf('--area') + 1] : undefined;
+    if (args.includes('--area') && (!wanted || !Object.hasOwn(stack.areas ?? {}, wanted)))
+      fail(`--area needs one of the stack's areas: ${Object.keys(stack.areas ?? {}).join(', ') || 'it has none'}`);
+    const own = (readData('state')?.['presets'] ?? []) as {
+      name: string;
+      nodes?: Record<string, unknown>;
+      area?: string;
+    }[];
     const boards = [
-      ...(loaded().presets ?? []).map(preset => ({ name: preset.name, from: 'team' })),
-      ...own.map(preset => ({ name: preset.name, from: 'yours' })),
-    ];
+      ...(stack.presets ?? []).map(preset => ({ ...preset, from: 'team' })),
+      ...own.map(preset => ({ ...preset, from: 'yours' })),
+    ]
+      .map(board => {
+        const area = boardArea(stack, { nodes: board.nodes ?? {}, ...(board.area && { area: board.area }) });
+        return { name: board.name, from: board.from, ...(area.id && { area: area.id, areaBy: area.by }) };
+      })
+      .filter(board => !wanted || board.area === wanted);
     if (args.includes('--json')) console.log(JSON.stringify(boards, null, 2));
-    else if (!boards.length) console.log('No boards yet: build one on the canvas.');
+    else if (!boards.length) console.log(wanted ? `No board in ${wanted}.` : 'No boards yet: build one on the canvas.');
     else
-      for (const board of boards)
-        console.log(`${board.name}  (${board.from === 'team' ? 'team preset' : 'your board'})`);
+      for (const board of boards) {
+        const area = board.area
+          ? `, ${stack.areas?.[board.area]?.name ?? board.area}${board.areaBy === 'hand' ? ' (set by hand)' : ''}`
+          : '';
+        console.log(`${board.name}  (${board.from === 'team' ? 'team preset' : 'your board'}${area})`);
+      }
     return;
   }
+  if (args.includes('--area')) fail('--area lists the boards of one area: koppler use --boards --area <area>');
   const wanted = positional(args);
   if (!wanted.length) {
     stacksCommand(args);
@@ -296,6 +326,83 @@ function add(args: string[]): void {
   sync([]);
 }
 
+const MERGE_USAGE =
+  'usage: koppler stack merge <stack> [--keep <path>=ours|theirs]... [--prefer ours|theirs] [--apply]';
+/** `koppler stack merge`: what another stack adds and where the two differ, one line each; --apply keeps the result. */
+function merge(want: string | undefined, args: string[]): void {
+  if (!want || want.startsWith('-')) fail(MERGE_USAGE);
+  const other = stackNamed(want);
+  if ('error' in other) fail(other.error);
+  if (path.resolve(other.dir) === path.resolve(currentStack() ?? '')) fail(`${other.name} is the stack in use`);
+  const keep: Record<string, Side> = {};
+  for (const given of args.filter((_, at) => args[at - 1] === '--keep')) {
+    const at = given.lastIndexOf('=');
+    const side = given.slice(at + 1);
+    if (at < 1 || (side !== 'ours' && side !== 'theirs')) fail(`--keep ${given}: expected <path>=ours|theirs`);
+    keep[given.slice(0, at)] = side;
+  }
+  const prefer = flagValue(args, '--prefer');
+  if (prefer !== undefined && prefer !== 'ours' && prefer !== 'theirs')
+    fail(`--prefer is ours or theirs\n${MERGE_USAGE}`);
+  const here = readStack()?.name ?? 'the stack in use';
+  const apply = args.includes('--apply');
+  const done = mergeStack(other.dir, { keep, prefer, apply });
+  if (done.error !== undefined) fail(done.error);
+  const { added, conflicts } = done.merged;
+  if (!added.length && !conflicts.length) {
+    console.log(`Nothing to merge: ${here} has everything ${other.name} has.`);
+    return;
+  }
+  const shown = (value: unknown) => (value === undefined ? '(none)' : JSON.stringify(value));
+  for (const at of added) console.log(`ADD ${at}`);
+  for (const one of conflicts) {
+    const kept = one.locked ? ' - locked, keeps ours' : one.kept ? ` - keeps ${one.kept}` : '';
+    console.log(`${one.path}: ours ${shown(one.ours)}, theirs ${shown(one.theirs)}${kept}`);
+  }
+  if (!added.length && conflicts.every(one => one.locked)) {
+    console.log('Nothing else to merge: what still differs is locked.');
+    return;
+  }
+  const count = (n: number, one: string) => `${String(n)} ${one}${n === 1 ? '' : 's'}`;
+  if (apply) {
+    console.log(
+      `MERGED ${other.name} into ${here}: ${String(added.length)} added, ${count(conflicts.length, 'conflict')} settled.`,
+    );
+    sync([]);
+    return;
+  }
+  const open = conflicts.filter(one => !one.kept).length;
+  console.log(
+    open
+      ? `${count(open, 'conflict')} to settle: --keep <path>=ours|theirs for one, --prefer ours|theirs for the rest; then --apply.`
+      : 'Every conflict is settled: add --apply to make the change.',
+  );
+}
+
+/** `koppler stack publish`: the private stack in use moves into a clone; the user commits and pushes it. */
+function publish(folder: string | undefined): void {
+  if (!folder || folder.startsWith('-')) fail('usage: koppler stack publish <folder in a git clone>');
+  const done = publishStack(folder);
+  if (done.error !== undefined) fail(done.error);
+  const git = `git -C ${quote(done.top)}`;
+  console.log(
+    `PUBLISHED ${done.name} to ${tilde(path.join(done.dir, 'stack.json'))}; it is the stack in use from there.`,
+  );
+  console.log(
+    [
+      'Nothing is committed or pushed. To share it with your team:',
+      `  ${git} add ${quote(done.file)}`,
+      `  ${git} commit -m ${quote(`Add the ${done.name} stack`)}`,
+      `  ${git} push`,
+      'From then on, koppler stack propose sends your changes to it as a pull request.',
+    ].join('\n'),
+  );
+  sync([]);
+  // An approval holds for the file where it was approved, never carried to another.
+  if (stackCommands(readStack()).length)
+    console.log(`\nIts own commands need approving again where it is now: ${APPROVE}, in your own terminal.`);
+}
+
 /** One field of the stack in use: read it, set it or take it out, checked against the stack's rules. */
 async function stackCommand(args: string[]): Promise<void> {
   const [what, at, ...rest] = args;
@@ -317,6 +424,14 @@ async function stackCommand(args: string[]): Promise<void> {
   }
   if (what === 'propose') {
     await proposeStack();
+    return;
+  }
+  if (what === 'merge') {
+    merge(at, rest);
+    return;
+  }
+  if (what === 'publish') {
+    publish(at);
     return;
   }
   if (what === 'get') {
@@ -345,7 +460,7 @@ async function stackCommand(args: string[]): Promise<void> {
   }
   if ((what !== 'set' && what !== 'unset') || !at || (what === 'set' && !rest.length))
     fail(
-      'usage: koppler stack get [<path>] | set <path> <value> | unset <path> | lock <path> | unlock <path> | locks | check [<file>] | schema | propose',
+      'usage: koppler stack get [<path>] | set <path> <value> | unset <path> | lock <path> | unlock <path> | locks | check [<file>] | schema | propose | merge <stack> | publish <folder>',
     );
   const raw = rest.join(' ');
   // Typed in a terminal, 5001 may be a port or a name: whichever keeps the stack valid, JSON first.
@@ -427,8 +542,8 @@ const COMMANDS: Command[] = [
   {
     name: 'use',
     who: 'you',
-    args: '[<stack>] [--boards] [--json]',
-    about: 'list the stacks on this Mac (* is in use), switch to one, or list its boards',
+    args: '[<stack>] [--boards [--area <area>]] [--json]',
+    about: 'list the stacks on this Mac (* is in use), switch to one, or list its boards, with their area',
     run: use,
     example: 'koppler use "Shop"',
   },
@@ -750,7 +865,7 @@ const COMMANDS: Command[] = [
   {
     name: 'board',
     who: 'agent',
-    args: 'new|edit "<name>" [--add <app,...>] [--remove <app,...>] [--cable <caller>:<callee>]... [--uncable <caller>:<callee>]... [--branch <app>=<branch>]... [--note <app>="<note>"]... [--arrange] [--propose] [--request "<words>"] [--phase "<name>"] [--step|--propose-step <from>:<to>[="<note>"]]... [--unstep <from>:<to>]...',
+    args: 'new|edit "<name>" [--add <app,...>] [--remove <app,...>] [--cable <caller>:<callee>]... [--uncable <caller>:<callee>]... [--branch <app>=<branch>]... [--note <app>="<note>"]... [--arrange] [--propose] [--request "<words>"] [--phase "<name>"] [--step|--propose-step <from>:<to>[="<note>"]]... [--unstep <from>:<to>]... [--area <area>|auto]',
     forms: [
       [
         'new "<name>" [--add <app,...>] [--cable <caller>:<callee>]...',
@@ -763,6 +878,7 @@ const COMMANDS: Command[] = [
       ['edit "<name>" [--cable <caller>:<callee>]... [--uncable <caller>:<callee>]...', 'add or take off cables'],
       ['edit "<name>" [--branch <app>=<branch>]... [--note <app>="<note>"]...', "set an app's branch or note"],
       ['new|edit "<name>" ... --arrange', 'lay the board out afresh, as Arrange on the canvas does'],
+      ['edit "<name>" --area <area>|auto', 'set the area its menu groups it under, or take it from its apps again'],
       [
         'new|edit "<name>" [--request "<words>"] [--phase "<name>"] [--step <from>:<to>[="<note>"]]...',
         "make it a feature board: the request it came from, and the stack's links it uses as numbered steps, each in the phase named before it",
@@ -781,15 +897,19 @@ const COMMANDS: Command[] = [
         'open a board from a file or a GitHub link: it joins your boards and the canvas shows it; Reload reads it again',
       ],
       ['delete "<name>"', 'move one of your boards to Recently deleted, where the board picker can bring it back'],
+      [
+        'copy "<name>" --to|--from <stack> [--drop-missing]',
+        "copy a board as it is into another stack's boards, or one of its boards into yours; --drop-missing leaves off the apps the other lacks",
+      ],
     ],
-    about: 'make, change or share a board, even one open on the canvas, which shows the change',
+    about: 'make, change, share or copy a board, even one open on the canvas, which shows the change',
     run: boardCommand,
     example: 'koppler board edit "Checkout" --add orders-api --cable web:orders-api',
   },
   {
     name: 'stack',
     who: 'agent',
-    args: 'get [<path>] | set <path> <value> | unset <path> | lock <path> | unlock <path> | locks | check [<file>] | schema | propose',
+    args: 'get [<path>] | set <path> <value> | unset <path> | lock <path> | unlock <path> | locks | check [<file>] | schema | propose | merge <stack> [--keep <path>=ours|theirs]... [--prefer ours|theirs] [--apply] | publish <folder>',
     forms: [
       ['get [<path>]', 'print a field of the stack in use, or the whole stack, as JSON'],
       ['set <path> <value>', 'set a field: text, or JSON for a number, a list or an object; checked before it is kept'],
@@ -800,6 +920,14 @@ const COMMANDS: Command[] = [
       ['check [<file>]', "every check the stack must pass, for the team repo's CI; fails with each problem"],
       ['schema', "the JSON Schema of stack.json, for an editor's $schema"],
       ['propose', "a pull request on the stack's repo with what this copy changed since its last commit"],
+      [
+        'merge <stack> [--keep <path>=ours|theirs]... [--prefer ours|theirs] [--apply]',
+        'fold another stack on this Mac into this one: prints what it adds and each conflict; --apply keeps it once every conflict is settled',
+      ],
+      [
+        'publish <folder>',
+        'move the private stack in use into <clone>/stacks/<name> or <clone>/.koppler and use it from there; prints the git commands to share it',
+      ],
     ],
     about: 'read and change any field of the stack, the only way to change stack.json',
     run: stackCommand,

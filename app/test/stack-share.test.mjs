@@ -66,6 +66,23 @@ test('stack check passes a good stack file and fails a bad one with each problem
   fs.rmSync(repo, { recursive: true, force: true });
 });
 
+test('stack check reports each field the format does not know, with what replaced it and how to take it out', () => {
+  const { dir, koppler } = sandbox();
+  const old = path.join(dir, 'old.json');
+  const orders = { name: 'Orders API', kind: 'dotnet', slug: 'acme/orders-api', url: 'http://localhost:5000', run: { cli: 'dotnet run' }, config: 'Settings from SSM', note: 'A free-text remark' };
+  fs.writeFileSync(old, JSON.stringify({ $schema: './stack.schema.json', name: 'Shop', envs: ['qa', 'prod'], apps: { 'orders-api': orders } }));
+  const checked = koppler('stack', 'check', old);
+  assert.equal(checked.status, 1, checked.stdout);
+  assert.deepEqual(checked.stderr.trim().split('\n').slice(1), [
+    '  apps.orders-api.run: not a field Koppler knows, start replaced it; take it out with koppler stack unset apps.orders-api.run',
+    "  apps.orders-api.config: not a field Koppler knows, description or the stack's notes replaced it; take it out with koppler stack unset apps.orders-api.config",
+    "  apps.orders-api.note: not a field Koppler knows, description or the stack's notes replaced it; take it out with koppler stack unset apps.orders-api.note",
+  ]);
+  // An editor holds the stack to the same rule.
+  assert.equal(JSON.parse(koppler('stack', 'schema').stdout).properties.apps.additionalProperties.additionalProperties, false);
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
 test("stack propose opens a pull request with this copy's changes, made on the stack as the team has it now", () => {
   const { repo, koppler, calls } = sandbox();
   assert.match(koppler('stack', 'propose').stderr, /Nothing to propose/);
