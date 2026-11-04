@@ -180,7 +180,7 @@ test('an outside system in the side panel opens in Discover, picked', async ({ p
   await page
     .getByRole('listitem')
     .filter({ hasText: 'Billing' })
-    .getByRole('button', { name: 'Billing', exact: true })
+    .getByRole('button', { name: /^Billing/ })
     .click();
   await expect(page.getByRole('radio', { name: 'Discover' })).toBeChecked();
   await expect(page.getByRole('complementary', { name: 'Billing' })).toBeVisible();

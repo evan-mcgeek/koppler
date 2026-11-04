@@ -4,6 +4,7 @@
   // The board on screen, by name: a menu of the team's boards and the user's own, to open, rename, copy, share or
   // delete one, start a new one, or open one from a file or a link.
   import type { StoredPreset } from '../src/core/presets.ts';
+  import { bar } from './bar.svelte.ts';
   import { board } from './board.svelte.ts';
   import { ago, openBoard, openFile, openLink } from './boards.ts';
   import { post } from './data.ts';
@@ -11,10 +12,18 @@
   import { toasts } from './toast.svelte.ts';
 
   const OPEN_HINT = 'Or drop a board .json file anywhere on the page.';
+  const WIDTH = 340;
   const id = $props.id();
   let picker = $state<HTMLButtonElement>();
   let list = $state<HTMLDivElement>();
   let file = $state<HTMLInputElement>();
+  let find = $state<HTMLInputElement>();
+  let query = $state('');
+  /** The bar too narrow for the stack's name: it is the menu's first row instead. */
+  const stackRow = $derived(bar.stackOut);
+  const shows = (preset: StoredPreset) => preset.name.toLowerCase().includes(query.trim().toLowerCase());
+  /** "(local)" or "(mine)" after a board's name: set apart, so a long name keeps it. */
+  const SUFFIX = / \((local|mine)\)$/;
   let open = $state(false);
   let named = $state('');
   let link = $state('');
@@ -36,18 +45,29 @@
     const at = picker?.getBoundingClientRect();
     if (!at || !list) return;
     list.style.top = `${String(at.bottom + 4)}px`;
-    list.style.left = `${String(at.left)}px`;
-    list.style.width = `${String(Math.max(at.width, Math.min(400, innerWidth - at.left - 12)))}px`;
-    (list.querySelector<HTMLButtonElement>('[aria-current="true"]') ?? options()[0])?.focus();
+    // Its left edge on the board's name, shifted left when that would run past the window.
+    list.style.left = `${String(Math.max(8, Math.min(at.left, innerWidth - WIDTH - 8)))}px`;
+    find?.focus();
   };
   // Before it shows, not after: what is typed next must not be wiped by a late reset.
   const fresh = (ev: ToggleEvent) => {
     if (ev.newState !== 'open') return;
+    query = '';
     named = board.name ?? '';
     link = '';
     hint = { text: OPEN_HINT, warn: false };
   };
   const step = (ev: KeyboardEvent) => {
+    if (ev.key === 'ArrowDown' && ev.target === find) {
+      ev.preventDefault();
+      options()[0]?.focus();
+      return;
+    }
+    if (ev.key === 'ArrowUp' && ev.target === options()[0]) {
+      ev.preventDefault();
+      find?.focus();
+      return;
+    }
     if ((ev.key !== 'ArrowDown' && ev.key !== 'ArrowUp') || (ev.target as Element).matches('input')) return;
     ev.preventDefault();
     const all = options();
@@ -153,7 +173,8 @@
       : 'Saved as soon as it has an app'}
   popovertarget={id}
 >
-  <span class="name">{label}</span>
+  <span class="name">{label.replace(SUFFIX, '')}</span>
+  {#if SUFFIX.test(label)}<span class="suffix" title="Changed on this Mac">{SUFFIX.exec(label)?.[0]}</span>{/if}
   {#if board.feature}<span class="kind">Feature board</span>{/if}
 </button>
 <div
@@ -171,7 +192,29 @@
     if (open) place();
   }}
 >
-  {#each [['Team boards', board.team], ['Your boards', board.own]] as const as [title, group] (title)}
+  {#if stackRow}
+    <div class="stack-row">
+      <span class="label">Stack</span><span class="name">{board.stack}</span>
+      <button
+        type="button"
+        onclick={() => {
+          close();
+          document.querySelector<HTMLElement>('[popover][aria-label="Stacks"]')?.showPopover();
+        }}>Switch stack</button
+      >
+    </div>
+  {/if}
+  <input
+    bind:this={find}
+    bind:value={query}
+    class="find"
+    type="search"
+    aria-label="Find a board"
+    placeholder="Find a board"
+    autocomplete="off"
+    spellcheck="false"
+  />
+  {#each [['Team boards', board.team.filter(shows)], ['Your boards', board.own.filter(shows)]] as const as [title, group] (title)}
     {#if group.length}<p>{title}</p>{/if}
     {#each group as preset (preset.name)}
       <div class="row">
@@ -183,9 +226,12 @@
             choose(preset);
           }}
         >
-          <span class="name">{preset.name}</span><span class="meta">{size(preset)}</span>
+          <span class="here" aria-hidden="true"></span><span class="name">{preset.name.replace(SUFFIX, '')}</span
+          >{#if SUFFIX.test(preset.name)}<span class="suffix">{SUFFIX.exec(preset.name)?.[0]}</span>{/if}<span
+            class="meta">{size(preset)}</span
+          >
         </button>
-        {#if group === board.own && typeof preset['source'] === 'string' && /^(https?:|\/)/.test(preset['source'])}
+        {#if title === 'Your boards' && typeof preset['source'] === 'string' && /^(https?:|\/)/.test(preset['source'])}
           {@const from = preset['source']}
           <button
             class="act"
@@ -195,7 +241,7 @@
             onclick={() => void reload(from, preset.name)}>Reload</button
           >
         {/if}
-        {#if group === board.own}
+        {#if title === 'Your boards'}
           <button
             class="act"
             type="button"
@@ -218,6 +264,8 @@
   {/each}
   {#if !board.team.length && !board.own.length}
     <p class="none">No boards yet. A board is kept as soon as it has an app.</p>
+  {:else if query.trim() && !board.team.some(shows) && !board.own.some(shows)}
+    <p class="none">No board is called that.</p>
   {/if}
   <div class="strip">
     <div class="acts">
@@ -307,7 +355,7 @@
     height: 32px;
     padding: 0 30px 0 10px;
     border: 1px solid var(--line);
-    border-radius: 7px;
+    border-radius: 0;
     background: var(--paper);
     color: var(--muted);
     font: 600 13px var(--sans);
@@ -343,15 +391,21 @@
     color: var(--ink-muted);
     font: 400 12px var(--sans);
   }
+  .suffix {
+    flex: none;
+    color: var(--ink-muted);
+    font: 400 13px var(--sans);
+  }
   .menu {
     position: fixed;
     inset: auto;
+    width: 340px;
     max-height: min(480px, calc(100vh - 120px));
     margin: 0;
     padding: 4px;
     overflow-y: auto;
     border: 1px solid var(--line);
-    border-radius: 10px;
+    border-radius: 0;
     background: var(--surface);
     box-shadow: var(--lift);
   }
@@ -373,7 +427,7 @@
     width: 100%;
     padding: 7px 10px;
     border: 0;
-    border-radius: 7px;
+    border-radius: 0;
     background: none;
     color: var(--ink);
     font: 600 13px var(--sans);
@@ -385,8 +439,48 @@
     background: color-mix(in oklab, var(--ink) 7%, transparent);
     outline: none;
   }
-  .menu [aria-current='true'] {
-    background: color-mix(in oklab, var(--cable) 12%, transparent);
+  .stack-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 4px;
+    padding: 4px 4px 8px 10px;
+    border-bottom: 1px solid var(--line);
+  }
+  .stack-row .label {
+    color: var(--muted);
+    font: 600 11px var(--sans);
+  }
+  .stack-row .name {
+    flex: 1;
+    font: 600 13px var(--sans);
+  }
+  .menu .stack-row button {
+    width: auto;
+    font-weight: 500;
+    font-size: 12px;
+  }
+  .find {
+    width: 100%;
+    height: 30px;
+    margin: 0 0 4px;
+    padding: 0 10px;
+    border: 1px solid var(--line);
+    background: var(--paper);
+    color: var(--ink);
+    font: 13px var(--sans);
+  }
+  .find::placeholder {
+    color: var(--muted);
+  }
+  /* The board on screen: a filled square before its name. */
+  .here {
+    flex: none;
+    width: 8px;
+    height: 8px;
+  }
+  [aria-current='true'] .here {
+    background: var(--ink);
   }
   .menu .name {
     flex: 1;
@@ -435,7 +529,7 @@
     height: 28px;
     padding: 0 10px;
     border: 1px solid var(--line);
-    border-radius: 6px;
+    border-radius: 0;
     font-size: 12px;
   }
   .menu .strip button:disabled {
@@ -448,7 +542,7 @@
     height: 28px;
     padding: 0 8px;
     border: 1px solid var(--line);
-    border-radius: 6px;
+    border-radius: 0;
     background: var(--paper);
     color: var(--ink);
     font: 13px var(--sans);

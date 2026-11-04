@@ -42,7 +42,9 @@
   ]);
   const options = () => [...(list?.querySelectorAll<HTMLButtonElement>('button:not(:disabled)') ?? [])];
   const place = () => {
-    const at = picker?.getBoundingClientRect();
+    // Out of a narrow bar, the stack's menu opens under the board's name, from the board menu's stack row.
+    const shown = picker?.getBoundingClientRect();
+    const at = shown?.width ? shown : document.querySelector('header .boards')?.getBoundingClientRect();
     if (!at || !list) return;
     list.style.top = `${String(at.bottom + 4)}px`;
     list.style.left = `${String(at.left)}px`;
@@ -133,7 +135,7 @@
     margin-left: -8px;
     padding: 0 26px 0 8px;
     border: 1px solid transparent;
-    border-radius: 7px;
+    border-radius: 0;
     background: none;
     color: var(--ink);
     font: 600 14px var(--sans);
@@ -173,7 +175,7 @@
     margin: 0;
     padding: 4px;
     border: 1px solid var(--line);
-    border-radius: 10px;
+    border-radius: 0;
     background: var(--surface);
     box-shadow: var(--lift);
   }
@@ -185,7 +187,7 @@
     width: 100%;
     padding: 8px 10px;
     border: 0;
-    border-radius: 7px;
+    border-radius: 0;
     background: none;
     color: var(--ink);
     font: 600 13px var(--sans);

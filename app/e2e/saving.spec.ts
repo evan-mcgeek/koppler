@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { Page } from '@playwright/test';
-import { actions, at, card, expect, saved, test } from './canvas.ts';
+import { actions, at, card, expect, saved, test, fromList } from './canvas.ts';
 
 const entry = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'dist', 'koppler.mjs');
 const view = (page: Page) => page.locator('.svelte-flow__viewport').evaluate(el => getComputedStyle(el).transform);
@@ -39,7 +39,7 @@ test('what is changed on the board comes back after a reload', async ({ page, ca
   await card(page, 'orders').getByRole('radio', { name: 'Me' }).check();
   await card(page, 'web').getByRole('button', { name: 'Add a note for the agent' }).click();
   await card(page, 'web').getByLabel('Note for the agent').fill('use the test account');
-  await page.getByRole('button', { name: 'Add Catalog API to the board', exact: true }).first().click();
+  await (await fromList(page, 'Catalog API')).getByRole('button', { name: 'Add Catalog API to the board' }).click();
   const menu = card(page, 'web').getByLabel('Add or remove a cable from Web Shop');
   await menu.focus();
   const kept = saved(page);

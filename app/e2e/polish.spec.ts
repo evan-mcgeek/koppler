@@ -151,21 +151,22 @@ test('the keyboard: Space presses the focused button, and shortcuts stay off und
   await expect(live).toBeChecked();
 });
 
-test('the top bar keeps its words at 1280, gives them up one step at a time as it narrows, and takes them back', async ({
+test('the top bar keeps its words at 1440, gives them up one step at a time as it narrows, and takes them back', async ({
   page,
 }) => {
   const bar = page.locator('header').first();
   const word = (menu: string) => bar.getByRole('button', { name: menu, exact: true }).locator('.words');
   const fits = () => bar.evaluate(el => el.scrollWidth <= el.clientWidth + 1);
-  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.setViewportSize({ width: 1440, height: 800 });
   await expect(word('Settings')).toBeVisible();
   await expect(word('Activity')).toBeVisible();
   expect(await fits()).toBe(true);
-  // Settings gives up its word first, Activity later; Run, Stop and the views keep theirs.
-  await page.setViewportSize({ width: 1140, height: 800 });
+  // With the board's name in the bar, Settings gives up its word at 1280, Activity later; Run, Stop and the views keep
+  // theirs.
+  await page.setViewportSize({ width: 1280, height: 800 });
   await expect(word('Settings')).toBeHidden();
   await expect(word('Activity')).toBeVisible();
-  await page.setViewportSize({ width: 960, height: 800 });
+  await page.setViewportSize({ width: 1040, height: 800 });
   await expect(word('Activity')).toBeHidden();
   await expect(bar.getByRole('button', { name: 'Run', exact: true })).toHaveText('Run');
   await expect(bar.getByRole('radio', { name: 'Discover' })).toBeVisible();

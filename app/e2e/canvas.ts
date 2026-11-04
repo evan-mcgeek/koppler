@@ -212,6 +212,12 @@ export async function nextEdit(page: Page): Promise<void> {
 }
 /** Long enough for a change to have been saved, or to be sure none was: a save waits for 0.4 seconds of stillness. */
 export const saveSettles = (page: Page) => page.waitForTimeout(800);
+/** An app's row in the side panel, hovered as a person would to reach its actions. */
+export const fromList = async (page: Page, name: string) => {
+  const row = page.getByRole('complementary').getByRole('listitem').filter({ hasText: name }).first();
+  await row.hover();
+  return row;
+};
 /** An app's card on the board. */
 export const card = (page: Page, id: string) => page.locator(`.svelte-flow__node[data-id="${id}"]`);
 /** A card's place on a saved board, run by Koppler on main. */
