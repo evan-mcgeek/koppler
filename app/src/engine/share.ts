@@ -4,7 +4,7 @@
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { migrate, type StoredPreset } from '../core/presets.ts';
+import { migrate, withoutNotes, type StoredPreset } from '../core/presets.ts';
 import { validateStack } from '../core/stack.ts';
 import { fileUrl, proposeFile, readFile, gh, type GithubFile } from '../github.ts';
 import { sourceOf } from './linked.ts';
@@ -66,7 +66,7 @@ export function teamBoard(preset: StoredPreset): { board: StoredPreset; error?: 
     board: {
       name,
       ...(version !== undefined && { version }),
-      nodes,
+      nodes: withoutNotes(nodes),
       edges,
       ...(layout ? { layout } : {}),
       ...(outside ? { outside } : {}),
