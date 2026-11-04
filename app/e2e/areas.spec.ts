@@ -241,6 +241,25 @@ test('a picked card the areas hide is picked no more', async ({ page }) => {
   await expect(page.locator('.svelte-flow__node.dimmed')).toHaveCount(0);
 });
 
+test('a picked card the areas hide on a map laid out down is picked no more', async ({ page }) => {
+  await discover(page);
+  const layout = () =>
+    page.locator('.svelte-flow__node').evaluateAll(all => all.map(one => one.style.transform).join());
+  const was = await layout();
+  await page.getByRole('button', { name: 'Arrange', exact: true }).click();
+  await expect.poll(layout).not.toBe(was);
+  await expect(page.locator('.map[data-moving]')).toHaveCount(0);
+  // Laid out down: Orders API under Web Shop.
+  expect((await onMap(page, 'orders')).y).toBeGreaterThan((await onMap(page, 'web')).y + 64);
+  await card(page, 'catalog').click();
+  await expect(page.getByRole('complementary', { name: 'Catalog API' })).toBeVisible();
+  await onlyInMenu(page, 'Payments');
+  await expect(card(page, 'catalog')).toHaveCount(0);
+  await expect(page.getByRole('complementary', { name: 'Catalog API' })).toHaveCount(0);
+  await expect(page.getByRole('status').filter({ hasText: '1 picked' })).toHaveCount(0);
+  await expect(page.locator('.svelte-flow__node.dimmed')).toHaveCount(0);
+});
+
 test.describe('a feature board whose steps reach outside the areas', () => {
   test.use({
     board: {
