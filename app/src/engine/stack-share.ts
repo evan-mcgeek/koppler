@@ -4,7 +4,7 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import * as z from 'zod';
-import { StackSchema, stackProblems, validateStack } from '../core/stack.ts';
+import { StackSchema, checkStack, validateStack } from '../core/stack.ts';
 import { fail } from '../failure.ts';
 import { proposeFile, readFile } from '../github.ts';
 import { changes, proposeChanges, sourceOf, type StackJson } from './linked.ts';
@@ -15,8 +15,14 @@ type Loose = Record<string, unknown>;
 const isObject = (value: unknown): value is Loose =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
-/** The JSON Schema of stack.json, for editors (`$schema`) and the settings panels. */
-export const stackSchema = () => z.toJSONSchema(StackSchema, { unrepresentable: 'any', io: 'input' });
+/** The JSON Schema of stack.json, for editors (`$schema`) and the settings panels: an app holds only its known fields. */
+export function stackSchema() {
+  const schema = z.toJSONSchema(StackSchema, { unrepresentable: 'any', io: 'input' });
+  const app = (schema.properties?.['apps'] as { additionalProperties?: Record<string, unknown> } | undefined)
+    ?.additionalProperties;
+  if (app) app['additionalProperties'] = false;
+  return schema;
+}
 
 /** The stack file's problems, every check `koppler stack set` makes; none when it is fine. */
 export function checkStackFile(file: string): string[] {
@@ -26,7 +32,7 @@ export function checkStackFile(file: string): string[] {
   } catch (error) {
     return [`${file} cannot be read as JSON: ${(error as Error).message}`];
   }
-  return stackProblems(data);
+  return checkStack(data);
 }
 
 /**

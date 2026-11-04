@@ -792,6 +792,18 @@ export function stackProblems(raw: unknown): string[] {
   return migrated.error === undefined ? validateStack(migrated.value) : [migrated.error];
 }
 
+/** Every problem `koppler stack check` reports: the stack's own, and each field its format does not know. */
+export function checkStack(raw: unknown): string[] {
+  const migrated = isObject(raw) ? migrateStack(raw) : { value: raw, error: undefined };
+  if (migrated.error !== undefined) return [migrated.error];
+  return [
+    ...validateStack(migrated.value),
+    ...unknownFields(migrated.value).map(
+      where => `${unknownField(where)}; take it out with koppler stack unset ${where}`,
+    ),
+  ];
+}
+
 type Shape = {
   properties?: Record<string, Shape>;
   propertyNames?: unknown;
@@ -835,7 +847,23 @@ export function unknownFields(raw: unknown): string[] {
     }
   };
   walk(raw, stackShape(), '');
-  return found;
+  // An editor's `$schema` is no field of the stack.
+  return found.filter(where => where !== '$schema');
+}
+
+const NOTES = "description or the stack's notes";
+/** The app fields an older format had, and what took their place. */
+const REPLACED = new Map([
+  ['run', 'start'],
+  ['note', NOTES],
+  ['config', NOTES],
+]);
+
+/** A field the format does not know, as a problem: with what replaced it, when it is an app's old field. */
+export function unknownField(where: string): string {
+  const field = /^apps\.[^.]+\.(?:envs\.[^.]+\.)?([^.[]+)$/.exec(where)?.[1];
+  const instead = field && REPLACED.get(field);
+  return `${where}: not a field Koppler knows${instead ? `, ${instead} replaced it` : ''}`;
 }
 
 /** An app as an environment has it: that environment's fields replace the app's own, a list whole. */

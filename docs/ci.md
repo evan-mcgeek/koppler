@@ -11,6 +11,7 @@ npx -y koppler stack check stack.json
 
 It prints `stack.json: OK`, or each problem with where it is, and exits 1.
 It runs every check: the shape of each field, the apps a call names, the environments, the queues, the kinds, and settings that would make an app load other code.
+A field the format does not know is a problem too, named with what replaced it when it is an old one (`run` by `start`), and taken out with `koppler stack unset <path>`.
 
 ## On GitHub
 

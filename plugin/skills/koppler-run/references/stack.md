@@ -2,6 +2,7 @@
 
 Nobody writes this file directly. Change any field with `koppler stack set <path> <value>` or `koppler stack unset <path>` (read one with `koppler stack get <path>`); paths look like `apps.orders.url`, `apps.orders.prereqs[0].port` or `apps.orders.envs.prod.start`. Each change is checked against the rules below before it is kept.
 A field the format does not know is refused (`koppler stack schema` lists every one); anything else worth knowing goes in the stack's `notes`.
+`koppler stack check` reports each one an older stack still holds, with what replaced it (`run` by `start`, `note` and `config` by `description` or `notes`); take it out with `koppler stack unset <path>`.
 
 One file per stack, in the team's repo, reviewed through PRs.
 It holds facts about the apps, never secret values.
