@@ -267,7 +267,8 @@ test('a board of your own is shared with the team: it joins the stack as a team 
   await boards(page).getByRole('button', { name: 'Share Web Shop with the team' }).click();
   // The stack is not in a repo on GitHub: the review says the board is kept in its file here, to commit.
   const review = page.getByRole('dialog', { name: 'Share Web Shop with the team' });
-  await expect(review).toContainText('not on GitHub');
+  // The review waits on the server asking git where the stack lives, which a busy machine can take seconds to answer.
+  await expect(review).toContainText('not on GitHub', { timeout: 15_000 });
   await review.getByRole('button', { name: 'Add to team boards' }).click();
   await expect(page.getByRole('status').filter({ hasText: 'Web Shop is a team board now' })).toContainText(
     "Commit the stack's repo",
