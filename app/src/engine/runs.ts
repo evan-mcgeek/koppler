@@ -179,10 +179,12 @@ export async function appliedCommand(args: string[]): Promise<void> {
     : all.findLast(one => one.state === 'waiting' || one.state === 'applying');
   if (!run && !given && !failed) {
     // A request that was no run (filling in settings, answering a question): done means the agent is no longer at it.
-    if (finishTaken()) {
-      console.log('The request is finished: the canvas no longer shows the agent as working.');
-      return;
-    }
+    console.log(
+      finishTaken()
+        ? 'The request is finished: the canvas no longer shows the agent as working.'
+        : 'Nothing is open: no run is waiting, and the canvas does not show the agent as working.',
+    );
+    return;
   }
   if (!run) fail(given ? `no run ${given} in the history` : 'no run is waiting to be applied');
   if (failed && !reason) fail('say why: koppler history done --failed "<what went wrong>"');
