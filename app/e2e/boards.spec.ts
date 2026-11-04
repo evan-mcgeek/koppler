@@ -1,6 +1,6 @@
 // The new canvas's boards: the one on screen is kept by name, and the team's and the user's own open from the picker.
 import type { Page } from '@playwright/test';
-import { card, expect, saveSettles, STACK, test } from './canvas.ts';
+import { card, expect, saveSettles, STACK, test, fromList } from './canvas.ts';
 
 const picker = (page: Page) => page.getByRole('button', { name: /^Board: / });
 const boards = (page: Page) => page.getByRole('dialog', { name: 'Boards' });
@@ -57,7 +57,7 @@ test('your own board comes back as you left it, and a new board starts empty', a
     .getByRole('button', { name: /^Browse/ })
     .click();
   await expect(page.locator('.svelte-flow__node-app')).toHaveCount(2);
-  await page.getByRole('button', { name: 'Add Payments API to the board', exact: true }).first().click();
+  await (await fromList(page, 'Payments API')).getByRole('button', { name: 'Add Payments API to the board' }).click();
   await expect(picker(page)).toHaveText('Browse (local)');
   await saveSettles(page);
   const where = await card(page, 'payments').boundingBox();
@@ -149,7 +149,7 @@ test.describe('a board asking for another branch than a clone with uncommitted c
     expect((await state())?.presets ?? []).toEqual([]);
     await page.reload();
     await expect(card(page, 'orders').getByLabel('Branch')).toHaveValue('main');
-    await page.getByRole('button', { name: 'Add Payments API to the board', exact: true }).first().click();
+    await (await fromList(page, 'Payments API')).getByRole('button', { name: 'Add Payments API to the board' }).click();
     await expect(picker(page)).toHaveText('Orders (local)');
     await expect
       .poll(async () => (await state())?.presets?.find(one => one.name === 'Orders (local)')?.nodes['orders']?.branch)
@@ -166,8 +166,8 @@ test.describe('a board asking for another branch than a clone with uncommitted c
 
 test('a board of your own is renamed, copied, shared, deleted and restored', async ({ page, canvas, context }) => {
   await context.grantPermissions(['clipboard-read', 'clipboard-write']);
-  await page.getByRole('button', { name: 'Add Web Shop to the board', exact: true }).first().click();
-  await page.getByRole('button', { name: 'Add Orders API to the board', exact: true }).first().click();
+  await (await fromList(page, 'Web Shop')).getByRole('button', { name: 'Add Web Shop to the board' }).click();
+  await (await fromList(page, 'Orders API')).getByRole('button', { name: 'Add Orders API to the board' }).click();
   // Named after its apps when it was first kept.
   await expect(picker(page)).toHaveText('Web Shop');
 
@@ -255,8 +255,8 @@ test('a board of your own is shared with the team: it joins the stack as a team 
     path.join(canvas.dir, 'config', 'config.json'),
     JSON.stringify({ stack: path.join(canvas.dir, 'stack') }),
   );
-  await page.getByRole('button', { name: 'Add Web Shop to the board', exact: true }).first().click();
-  await page.getByRole('button', { name: 'Add Orders API to the board', exact: true }).first().click();
+  await (await fromList(page, 'Web Shop')).getByRole('button', { name: 'Add Web Shop to the board' }).click();
+  await (await fromList(page, 'Orders API')).getByRole('button', { name: 'Add Orders API to the board' }).click();
   await expect(picker(page)).toHaveText('Web Shop');
   // A card's note is the user's own: it stays on this Mac.
   await card(page, 'web').getByRole('button', { name: 'Add a note for the agent' }).click();

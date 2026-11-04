@@ -19,6 +19,8 @@
     <dd>Find a card on Discover's map, by name</dd>
     <dt><kbd>P</kbd>, <kbd>Esc</kbd> to stop</dt>
     <dd>Present: the board alone, full screen</dd>
+    <dt><kbd>B</kbd></dt>
+    <dd>Open the board menu</dd>
     <dt><kbd>D</kbd> / <kbd>E</kbd> / <kbd>L</kbd></dt>
     <dd>Discover / Plan / Live</dd>
     <dt><kbd>V</kbd> / <kbd>H</kbd>, hold <kbd>Space</kbd></dt>

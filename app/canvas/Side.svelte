@@ -3,9 +3,9 @@
   import Icon from './Icon.svelte';
   import Play from '@lucide/svelte/icons/play';
   import Plus from '@lucide/svelte/icons/plus';
-  import Trash from '@lucide/svelte/icons/trash';
+  import Ellipsis from '@lucide/svelte/icons/ellipsis';
+  import { flushSync, tick } from 'svelte';
   import X from '@lucide/svelte/icons/x';
-  import BoardPicker from './BoardPicker.svelte';
   import Needs from './Needs.svelte';
   import Summary from './Summary.svelte';
   import Settings from './Settings.svelte';
@@ -41,7 +41,117 @@
     const off = (app: StackApp) => (onBoard.includes(app.id) ? 0 : 1);
     return board.apps.filter(matches).sort((a, b) => off(a) - off(b) || order(a, b));
   });
-  const firstOff = $derived(shown.find(app => !onBoard.includes(app.id)));
+  const groups = $derived([
+    { title: `On the board · ${String(onBoard.length)}`, apps: shown.filter(app => onBoard.includes(app.id)) },
+    { title: 'Not on the board', apps: shown.filter(app => !onBoard.includes(app.id)) },
+  ]);
+  /** A click on a name: its card shown, an outside system seen in Discover, a clone command copied, or the app added. */
+  const pick = (app: StackApp, on: boolean) => {
+    if (on) board.show(app.id);
+    else if (app.outside) {
+      board.goDiscover();
+      discovered.picked = [app.id];
+      discovered.last = app.id;
+    } else if (!app.cloned) void copyClone(app);
+    else board.add(app.id);
+  };
+  /** Added or taken off, the row moves to the other list: the keyboard stays on it. */
+  const move = async (id: string, on: boolean) => {
+    if (on) board.remove(id);
+    else board.add(id);
+    await tick();
+    document.querySelector<HTMLElement>(`aside .app[data-id="${id}"] .main`)?.focus();
+  };
+  const hintOf = (app: StackApp, on: boolean) =>
+    on
+      ? 'Click to show its card.'
+      : app.outside
+        ? `Does not run on this Mac: ${typeof app.outside === 'string' ? app.outside : 'an outside system'}. Click to see it in Discover, with what it talks to.`
+        : !app.cloned
+          ? `Not cloned under ${roots}. Click to copy the clone command.`
+          : 'Click or drag it onto the board to add it.';
+
+  // The panel's width: dragged by its edge or moved from the keyboard, kept on this Mac, and never so wide the board
+  // gets less than 640px.
+  const MIN = 280;
+  const MAX = 560;
+  const WIDE = 300;
+  const kept = () => {
+    try {
+      const n = Number(localStorage.getItem('koppler-side-width'));
+      return n >= MIN && n <= MAX ? n : WIDE;
+    } catch {
+      return WIDE;
+    }
+  };
+  let chosen = $state(kept());
+  let inner = $state(innerWidth);
+  const cap = $derived(Math.max(MIN, Math.min(MAX, inner - 640)));
+  const width = $derived(Math.min(chosen, cap));
+  let dragging = $state(false);
+  let from = { x: 0, width: 0 };
+  const choose = (n: number) => {
+    chosen = Math.round(Math.max(MIN, Math.min(cap, n)));
+    try {
+      localStorage.setItem('koppler-side-width', String(chosen));
+    } catch {
+      // Not remembered where the browser keeps nothing.
+    }
+  };
+  const grab = (ev: PointerEvent) => {
+    (ev.currentTarget as HTMLElement).setPointerCapture(ev.pointerId);
+    from = { x: ev.clientX, width };
+    dragging = true;
+  };
+  const drag = (ev: PointerEvent) => {
+    if (dragging) chosen = Math.round(Math.max(MIN, Math.min(cap, from.width + ev.clientX - from.x)));
+  };
+  const letGo = () => {
+    if (!dragging) return;
+    dragging = false;
+    choose(chosen);
+  };
+  const nudge = (ev: KeyboardEvent) => {
+    const by = ev.shiftKey ? 40 : 8;
+    if (ev.key === 'ArrowLeft') choose(width - by);
+    else if (ev.key === 'ArrowRight') choose(width + by);
+    else if (ev.key === 'Enter') choose(WIDE);
+    else return;
+    ev.preventDefault();
+  };
+
+  // Up and down move between the rows; Tab goes into a row's actions.
+  const rowStep = (ev: KeyboardEvent) => {
+    if (ev.key !== 'ArrowDown' && ev.key !== 'ArrowUp') return;
+    ev.preventDefault();
+    const row = ev.currentTarget as HTMLButtonElement;
+    const all = [...(row.closest('aside')?.querySelectorAll<HTMLButtonElement>('.app .main') ?? [])];
+    all[all.indexOf(row) + (ev.key === 'ArrowDown' ? 1 : -1)]?.focus();
+  };
+  let more = $state<HTMLDivElement>();
+  let moreFor = $state<{ app: StackApp; on: boolean } | null>(null);
+  let moreOpen = $state(false);
+  let edgeFocused = $state(false);
+  const openMore = (app: StackApp, on: boolean, from: HTMLElement) => {
+    moreFor = { app, on };
+    // Drawn for this app before it is placed and focused.
+    flushSync();
+    if (!more) return;
+    const at = from.getBoundingClientRect();
+    more.style.top = `${String(at.bottom + 4)}px`;
+    more.style.left = `${String(Math.max(8, at.right - 220))}px`;
+    more.showPopover();
+    const tall = more.getBoundingClientRect().height;
+    if (at.bottom + 4 + tall > innerHeight - 8) more.style.top = `${String(Math.max(8, at.top - 4 - tall))}px`;
+    more.querySelector<HTMLButtonElement>('button')?.focus();
+  };
+  const menuStep = (ev: KeyboardEvent) => {
+    if (ev.key !== 'ArrowDown' && ev.key !== 'ArrowUp') return;
+    ev.preventDefault();
+    const all = [...(more?.querySelectorAll<HTMLButtonElement>('button') ?? [])];
+    const at = all.indexOf(document.activeElement as HTMLButtonElement);
+    all[(at + (ev.key === 'ArrowDown' ? 1 : -1) + all.length) % all.length]?.focus();
+  };
   const sortHint = $derived(
     sort === 'name'
       ? 'Sorted by name. Click to sort by when each was added.'
@@ -113,10 +223,8 @@
   };
 </script>
 
-<aside aria-label="Board and apps" class:protected={board.protected}>
-  <div class="head">
-    <BoardPicker />
-  </div>
+<svelte:window bind:innerWidth={inner} />
+<aside id="side-apps" aria-label="Apps" class:protected={board.protected} style:width="{width}px">
   <section aria-labelledby="apps-title">
     <h2 id="apps-title">
       Apps
@@ -136,141 +244,90 @@
       autocomplete="off"
       spellcheck="false"
     />
-    <div class="apps" role="list">
-      {#each shown as app (app.id)}
-        {@const on = onBoard.includes(app.id)}
-        {@const missing = !!app.outside || !app.cloned}
-        <div class="app" class:on class:missing class:first-off={app === firstOff && app !== shown[0]} role="listitem">
-          <span class="kind">{app.outside ? 'Outside' : app.kindLabel}</span>
-          {#if on}
-            <button
-              class="main"
-              type="button"
-              title="Show its card"
-              onclick={() => {
-                board.show(app.id);
-              }}
-            >
-              <span class="name">{app.name}</span>
-            </button>
-            {@const up = live.up(app.id)}
-            {#if up !== null}
-              <span
-                class="led"
-                data-state={up ? 'running' : 'failed'}
-                role="img"
-                aria-label={up ? 'Running' : 'Not answering'}
-              ></span>
-            {/if}
-            <button
-              class="act remove"
-              type="button"
-              aria-label="Remove {app.name} from the board"
-              title="Remove from the board"
-              onclick={() => {
-                board.remove(app.id);
-              }}
-            >
-              <Icon of={X} size={11} />
-            </button>
-          {:else if app.outside}
-            <button
-              class="main"
-              type="button"
-              title="Does not run on this Mac: {app.outside}. Click to see it in Discover, with what it talks to."
-              onclick={() => {
-                board.goDiscover();
-                discovered.picked = [app.id];
-                discovered.last = app.id;
-              }}><span class="name">{app.name}</span></button
-            >
-            <span class="state">outside</span>
-            <button
-              class="act drop"
-              type="button"
-              aria-label="Remove {app.name} from the stack"
-              title="Remove from the stack (the repo stays on your Mac)"
-              onclick={() => {
-                askDrop(app);
-              }}
-            >
-              <Icon of={Trash} size={12} />
-            </button>
-          {:else if !app.cloned}
-            <button
-              class="main"
-              type="button"
-              title="Not cloned under {roots}. Click to copy the clone command."
-              onclick={() => copyClone(app)}
-            >
-              <span class="name">{app.name}</span>
-            </button>
-            <span class="state">not cloned</span>
-            <button
-              class="act drop"
-              type="button"
-              aria-label="Remove {app.name} from the stack"
-              title="Remove from the stack (the repo stays on your Mac)"
-              onclick={() => {
-                askDrop(app);
-              }}
-            >
-              <Icon of={Trash} size={12} />
-            </button>
-          {:else}
-            <button
-              class="main"
-              type="button"
-              title="Add {app.name} to the board: click, or drag it there"
-              draggable="true"
-              ondragstart={ev => {
-                ev.dataTransfer?.setData('text/app', app.id);
-              }}
-              onclick={() => {
-                board.add(app.id);
-              }}
-            >
-              <span class="name">{app.name}</span>
-            </button>
-            <button
-              class="act drop"
-              type="button"
-              aria-label="Remove {app.name} from the stack"
-              title="Remove from the stack (the repo stays on your Mac)"
-              onclick={() => {
-                askDrop(app);
-              }}
-            >
-              <Icon of={Trash} size={12} />
-            </button>
-            <button
-              class="act alone"
-              type="button"
-              aria-label="Run {app.name} alone"
-              title="Run alone: just this app and its tunnels, on a board of its own"
-              onclick={() => {
-                runs.alone(app.id);
-              }}
-            >
-              <Icon of={Play} size={12} filled />
-            </button>
-            <button
-              class="act add"
-              type="button"
-              aria-label="Add {app.name} to the board"
-              title="Add to the board"
-              onclick={() => {
-                board.add(app.id);
-              }}
-            >
-              <Icon of={Plus} size={12} />
-            </button>
-          {/if}
+    {#each groups as group (group.title)}
+      {#if group.apps.length}
+        <h3 class="group">{group.title}</h3>
+        <div class="apps" role="list" aria-label={group.title}>
+          {#each group.apps as app (app.id)}
+            {@const on = onBoard.includes(app.id)}
+            {@const runnable = !app.outside && app.cloned}
+            {@const up = on ? live.up(app.id) : null}
+            <div class="app" class:on role="listitem" data-id={app.id}>
+              <span class="kind">{app.kindLabel}</span>
+              <button
+                class="main"
+                type="button"
+                title="{app.name}. {hintOf(app, on)}"
+                draggable={runnable && !on}
+                onkeydown={rowStep}
+                ondragstart={ev => {
+                  ev.dataTransfer?.setData('text/app', app.id);
+                }}
+                onclick={() => {
+                  pick(app, on);
+                }}
+              >
+                <span class="name">{app.name}</span>
+                {#if app.outside}<span class="state">Outside</span>{:else if !app.cloned}<span class="state"
+                    >Not cloned</span
+                  >{/if}
+              </button>
+              <span class="light">
+                {#if on}
+                  <span
+                    class="led"
+                    data-state={up === true ? 'running' : up === false ? 'failed' : undefined}
+                    role="img"
+                    aria-label={up === true ? 'Running' : up === false ? 'Not answering' : 'Not running'}
+                  ></span>
+                {/if}
+              </span>
+              <span class="row-acts">
+                {#if runnable}
+                  <button
+                    class="alone"
+                    type="button"
+                    aria-label="Run {app.name} alone"
+                    title="Run alone: just this app and its tunnels, on a board of its own"
+                    onclick={() => {
+                      runs.alone(app.id);
+                    }}><Icon of={Play} size={11} />Run alone</button
+                  >
+                  {#if on}
+                    <button
+                      type="button"
+                      aria-label="Remove {app.name} from the board"
+                      title="Remove from the board"
+                      onclick={() => void move(app.id, true)}><Icon of={X} size={12} /></button
+                    >
+                  {:else}
+                    <button
+                      type="button"
+                      aria-label="Add {app.name} to the board"
+                      title="Add to the board"
+                      onclick={() => void move(app.id, false)}><Icon of={Plus} size={12} /></button
+                    >
+                  {/if}
+                {/if}
+                <button
+                  type="button"
+                  aria-label="More for {app.name}"
+                  aria-haspopup="menu"
+                  aria-expanded={moreOpen && moreFor?.app.id === app.id}
+                  title="More"
+                  onclick={ev => {
+                    openMore(app, on, ev.currentTarget);
+                  }}><Icon of={Ellipsis} size={13} /></button
+                >
+              </span>
+            </div>
+          {/each}
         </div>
-      {:else}
-        <p class="empty">{board.apps.length ? 'No app matches.' : 'No apps in this stack yet.'}</p>
-      {/each}
-    </div>
+      {/if}
+    {/each}
+    {#if !shown.length}
+      <p class="empty">{board.apps.length ? 'No app matches.' : 'No apps in this stack yet.'}</p>
+    {/if}
     <div class="adds">
       <button class="add-repos" type="button" onclick={() => void dialogs.repos?.open()}>Add repos…</button>
       <button class="add-repos" type="button" onclick={() => dialogs.outside?.open()}>Add outside system…</button>
@@ -303,32 +360,103 @@
     <Settings />
   </footer>
 </aside>
+<!-- A focusable separator is a window splitter (WAI-ARIA), a widget the checker takes for static. -->
+<!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
+<div
+  class="edge"
+  class:dragging
+  class:least={width <= MIN}
+  class:most={width >= cap}
+  role="separator"
+  aria-orientation="vertical"
+  aria-controls="side-apps"
+  aria-label="Side panel width"
+  aria-valuemin={MIN}
+  aria-valuemax={cap}
+  aria-valuenow={width}
+  tabindex="0"
+  onpointerdown={grab}
+  onpointermove={drag}
+  onpointerup={letGo}
+  onpointercancel={letGo}
+  ondblclick={() => {
+    choose(WIDE);
+  }}
+  onkeydown={nudge}
+  onfocus={ev => {
+    edgeFocused = (ev.currentTarget as HTMLElement).matches(':focus-visible');
+  }}
+  onblur={() => {
+    edgeFocused = false;
+  }}
+>
+  {#if dragging || edgeFocused}<span class="size">{width} px</span>{/if}
+</div>
+<div
+  bind:this={more}
+  class="more-menu"
+  popover
+  role="menu"
+  tabindex="-1"
+  aria-label="More"
+  onkeydown={menuStep}
+  ontoggle={ev => {
+    moreOpen = ev.newState === 'open';
+  }}
+>
+  {#if moreFor}
+    {@const app = moreFor.app}
+    {#if !app.outside && app.cloned}
+      <button
+        type="button"
+        role="menuitem"
+        onclick={() => {
+          more?.hidePopover();
+          runs.alone(app.id);
+        }}>Run alone</button
+      >
+      <button
+        type="button"
+        role="menuitem"
+        onclick={() => {
+          more?.hidePopover();
+          void move(app.id, !!moreFor?.on);
+        }}>{moreFor.on ? 'Remove from the board' : 'Add to the board'}</button
+      >
+    {/if}
+    <button
+      type="button"
+      role="menuitem"
+      onclick={() => {
+        more?.hidePopover();
+        void dialogs.settings?.open({ title: app.name, path: `apps.${app.id}` });
+      }}>Open settings</button
+    >
+    <button
+      type="button"
+      role="menuitem"
+      onclick={() => {
+        more?.hidePopover();
+        askDrop(app);
+      }}>Remove from the stack…</button
+    >
+  {/if}
+</div>
 
 <style>
   aside {
-    width: 324px;
     flex-shrink: 0;
+    min-width: 0;
     display: flex;
     flex-direction: column;
     gap: 18px;
     overflow: hidden auto;
     scrollbar-width: thin;
-    padding: 0 12px 14px;
+    padding: 16px 8px 14px;
     border-right: 1px solid var(--line);
     background: var(--panel);
     color: var(--ink);
     font: 13px/1.4 var(--sans);
-  }
-  .head {
-    display: grid;
-    gap: 8px;
-    position: sticky;
-    top: 0;
-    z-index: 2;
-    margin: 0 -12px;
-    padding: 12px;
-    border-bottom: 1px solid var(--line);
-    background: var(--panel);
   }
   h2 {
     display: flex;
@@ -359,12 +487,11 @@
     color: var(--ink);
   }
   .search {
-    width: 100%;
+    width: calc(100% - 16px);
     height: 32px;
-    margin: 0 0 8px;
+    margin: 0 8px 8px;
     padding: 0 10px;
     border: 1px solid var(--line);
-    border-radius: 7px;
     background: var(--paper);
     color: var(--ink);
     font: 13px var(--sans);
@@ -372,103 +499,203 @@
   .search::placeholder {
     color: var(--muted);
   }
+  .group {
+    margin: 10px 0 4px;
+    padding: 0 8px;
+    color: var(--ink-muted);
+    font: 600 11px var(--sans);
+  }
   .apps {
     display: flex;
     flex-direction: column;
-    gap: 1px;
   }
+  /* Kind | name | light, as the Design System's list draws it; the actions take no room until asked for. */
   .app {
     position: relative;
-    display: flex;
-    align-items: center;
+    display: grid;
+    grid-template-columns: 48px minmax(0, 1fr) 10px;
+    align-items: start;
     gap: 8px;
-    min-height: 34px;
-    padding: 3px 8px;
+    padding: 6px 8px;
     color: var(--ink-muted);
-    font-size: 14px;
+    font-size: 13.5px;
+  }
+  .app:hover,
+  .app:focus-within {
+    background: color-mix(in oklab, var(--ink) 6%, var(--panel));
+  }
+  .app:has(.main:focus-visible) {
+    outline: 2px solid var(--ink);
+    outline-offset: -2px;
+  }
+  .app.on {
+    color: var(--ink);
   }
   .kind {
-    flex: none;
-    width: 62px;
+    padding-top: 3px;
     overflow: hidden;
     color: var(--ink-muted);
-    font: 500 10px var(--mono);
+    font: 500 9.5px var(--mono);
     letter-spacing: 0.04em;
     text-overflow: ellipsis;
     text-transform: uppercase;
     white-space: nowrap;
   }
-  .app:hover {
-    background: color-mix(in oklab, var(--ink) 6%, transparent);
-  }
-  .app.on {
-    color: var(--ink);
-  }
-  .app.first-off {
-    margin-top: 7px;
-  }
-  .app.first-off::before {
-    content: '';
-    position: absolute;
-    left: 8px;
-    right: 8px;
-    top: -4px;
-    border-top: 1px solid var(--line);
-  }
+  /* As wide as the name, so the actions shown over the row's end leave it to click. */
   .main {
-    flex: 1;
+    display: grid;
+    justify-self: start;
+    max-width: 100%;
     min-width: 0;
-    min-height: 24px;
     padding: 0;
     border: 0;
     background: none;
     color: inherit;
     font: inherit;
     text-align: left;
-    align-content: center;
-  }
-  button.main {
     cursor: pointer;
   }
-  .on .main {
-    font-weight: 600;
+  .main:focus-visible {
+    outline: none;
   }
+  /* Two lines, then an ellipsis; a name with no spaces breaks anywhere. */
   .name {
-    display: block;
+    display: -webkit-box;
     overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    overflow-wrap: anywhere;
   }
   .state {
-    flex: none;
-    font-size: 12px;
+    color: var(--ink-muted);
+    font: 400 11px var(--sans);
   }
-  .act {
-    flex: none;
+  .light {
     display: grid;
     place-items: center;
-    width: 24px;
+    height: 19px;
+  }
+  .light .led {
+    width: 10px;
+    height: 10px;
+  }
+  /* Over the end of the name's first line, on the panel's colour, left of the light. */
+  .row-acts {
+    position: absolute;
+    top: 3px;
+    right: 34px;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding-left: 6px;
+    border-left: 1px solid var(--line);
+    background: color-mix(in oklab, var(--ink) 6%, var(--panel));
+    visibility: hidden;
+  }
+  .app:hover .row-acts,
+  .app:focus-within .row-acts {
+    visibility: visible;
+  }
+  .row-acts button {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
     height: 24px;
-    margin-right: -4px;
-    padding: 0;
+    min-width: 24px;
+    justify-content: center;
+    padding: 0 6px;
     border: 0;
-    border-radius: 5px;
     background: none;
-    color: var(--muted);
-    opacity: 0;
+    color: var(--ink);
+    font: 600 12px var(--sans);
     cursor: pointer;
   }
-  .app:hover .act,
-  .act:focus-visible {
-    opacity: 1;
-  }
-  .act:hover {
+  .row-acts button:hover {
     background: color-mix(in oklab, var(--ink) 10%, transparent);
-    color: var(--ink);
   }
-  .act.remove:hover,
-  .act.drop:hover {
-    color: var(--bad);
+  .row-acts button:focus-visible {
+    outline: 2px solid var(--ink);
+    outline-offset: -2px;
+  }
+  /* The panel's own hairline is the handle: an 8px hit area centred on it, brighter on hover, focus and drag. */
+  .edge {
+    position: relative;
+    z-index: 6;
+    flex: none;
+    width: 8px;
+    margin: 0 -4px;
+    cursor: col-resize;
+    outline: none;
+  }
+  .edge::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 3px;
+    width: 1px;
+  }
+  .edge:hover::after {
+    background: var(--ink);
+  }
+  .edge:focus-visible::after {
+    left: 2px;
+    width: 4px;
+    border: 1px solid var(--ink);
+  }
+  .edge.dragging::after {
+    width: 2px;
+    background: var(--ink);
+  }
+  .edge.least {
+    cursor: e-resize;
+  }
+  .edge.most {
+    cursor: w-resize;
+  }
+  .edge.least.most {
+    cursor: default;
+  }
+  .size {
+    position: absolute;
+    top: 12px;
+    left: 14px;
+    padding: 2px 6px;
+    border: 1px solid var(--line-strong);
+    background: var(--panel);
+    color: var(--ink);
+    font: 11px var(--mono);
+    white-space: nowrap;
+  }
+  .more-menu {
+    position: fixed;
+    inset: auto;
+    width: 220px;
+    margin: 0;
+    padding: 4px;
+    border: 1px solid var(--line-strong);
+    background: var(--surface);
+    box-shadow: var(--lift);
+  }
+  .more-menu button + button {
+    border-top: 1px solid var(--line);
+  }
+  .more-menu button {
+    display: block;
+    width: 100%;
+    padding: 7px 10px;
+    border: 0;
+    background: none;
+    color: var(--ink);
+    font: 400 13px var(--sans);
+    text-align: left;
+    cursor: pointer;
+  }
+  .more-menu button:hover,
+  .more-menu button:focus-visible {
+    background: color-mix(in oklab, var(--ink) 8%, transparent);
+    outline: none;
   }
   .adds {
     display: flex;
@@ -489,9 +716,6 @@
   }
   .add-repos:hover {
     color: var(--local);
-  }
-  .act.add {
-    color: var(--cable);
   }
   .empty,
   .note {

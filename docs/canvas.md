@@ -184,10 +184,13 @@ Zoomed out below 60%, cards are short in Plan too: pick one and its fields open 
 ## The top bar
 
 It keeps its words at 1280 pixels and wider.
-As the window narrows it gives them up one step at a time: Settings drops its word, then the wordmark, then the two chips join into one, then Activity drops its word, then the stack's name is cut short.
+As the window narrows it gives them up one step at a time: Settings drops its word, then the wordmark, then the two chips join into one, then Activity drops its word, then the stack's name is cut short, then the stack leaves the bar and is the first row of the board menu, and last the board's name is cut short, keeping "(local)".
 Run, Stop, the view switch and the environment keep their words at every width.
 The mark opens the shortcuts and legend, as `?` does.
-Discover runs nothing, so its bar has no status, Activity, Stop or Run, and it shows the board's name, since Discover has no side pane.
+The stack and the board read as one path after the mark, `Acme Shop / Checkout`, in every view; the board's name opens the board menu, with **Find a board** at its top.
+Discover runs nothing, so its bar has no status, Activity, Stop or Run.
+The side pane lists the stack's apps, those on the board first, each with its kind and its light; hovering a row shows **Run alone**, add or remove, and **More** (settings, and removing it from the stack).
+Its width is changed by dragging its right edge, from 280 to 560 pixels, or with the arrow keys once the edge has focus; a double-click or Enter puts it back to 300, and the width is kept on this Mac.
 Once a newer Koppler is installed (`npm i -g koppler`), a line under the bar names both versions, and **Restart canvas** starts the canvas again on the new one; apps and tunnels keep running.
 
 ## Side panels
