@@ -648,7 +648,8 @@ test('koppler completion teaches bash and zsh its commands, subcommands and flag
     return run.stdout.trim().split(' ');
   };
   assert.deepEqual(bash('can'), ['canvas']);
-  for (const word of ['new', 'edit', 'share', 'open', 'delete', '--add']) assert.ok(bash('board', '').includes(word), word);
+  for (const word of ['new', 'edit', 'share', 'open', 'delete', 'copy', '--add', '--drop-missing']) assert.ok(bash('board', '').includes(word), word);
+  for (const word of ['merge', 'publish', '--keep', '--prefer', '--apply']) assert.ok(bash('stack', '').includes(word), word);
   assert.deepEqual(bash('doctor', '--ap'), ['--approve']);
   // A subcommand is typed once: after it come only the command's flags.
   assert.deepEqual(bash('canvas', 'stop', ''), bash('canvas', '--'));

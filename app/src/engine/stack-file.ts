@@ -1,16 +1,30 @@
 // Changes to the stack file in use: adding and removing apps and outside systems, and setting any field.
 import { upgradeStack } from '../core/migrations/files.ts';
 import { readUpgraded } from '../upgraded.ts';
+import { execFileSync } from 'node:child_process';
+import fs from 'node:fs';
 import path from 'node:path';
 import { readJson, writeJson } from '../json-files.ts';
 import { kindsFor } from '../core/kinds.ts';
 import { unknownField, unknownFields, validateStack } from '../core/stack.ts';
 import { withoutMissingApps } from '../core/missing-apps.ts';
 import { getAt, parsePath, setAt } from '../core/stack-path.ts';
-import { brokenLock, LOCKED } from './locks.ts';
-import { readData, writeData } from '../data.ts';
-import { type Config, type Index, loadConfig, readIndex, type StackFile } from './config.ts';
-import { candidateRepos } from './repos.ts';
+import { mergeStacks, sameNamedBoards, type Merged, type Side } from '../core/stack-merge.ts';
+import { brokenLock, LOCKED, lockedPaths, moveLocks } from './locks.ts';
+import { changeData, readData, writeData } from '../data.ts';
+import {
+  type Config,
+  expand,
+  type Index,
+  loadConfig,
+  readIndex,
+  type Save,
+  saveConfig,
+  type StackFile,
+} from './config.ts';
+import { sourceOf } from './linked.ts';
+import { candidateRepos, DEFAULT_DEPTH, scan } from './repos.ts';
+import { privateStacks } from './stacks.ts';
 
 const NO_STACK = 'No stack is set up yet: koppler init';
 
@@ -234,4 +248,154 @@ export function removeApp(
   const broken = validateStack(next).filter(problem => !before.has(problem));
   if (broken.length) return { error: broken.slice(0, 5).join('; ') };
   return saveStack(source, readJson(source), next) ?? { removed: id, name };
+}
+
+/**
+ * Another stack folded into the one in use (see mergeStacks). With `apply` it is kept only when every conflict is
+ * settled and the whole result passes the stack's checks and locks; otherwise nothing is written.
+ */
+export function mergeStack(
+  dir: string,
+  { keep = {}, prefer, apply = false }: { keep?: Record<string, Side>; prefer?: Side | undefined; apply?: boolean },
+  { config = loadConfig() }: { config?: Config } = {},
+): { merged: Merged; error?: undefined } | { error: string } {
+  const used = stackInUse(config);
+  if (used.error !== undefined) return used;
+  const read = readStackFile(path.join(dir, 'stack.json'));
+  if (read.error !== undefined) return read;
+  if (!read.stack) return { error: `cannot read ${path.join(dir, 'stack.json')}` };
+  const ours = used.stack as unknown as Record<string, unknown>;
+  const theirs = read.stack as unknown as Record<string, unknown>;
+  for (const [stack, file] of [
+    [ours, used.source],
+    [theirs, path.join(dir, 'stack.json')],
+  ] as const) {
+    const twice = sameNamedBoards(stack);
+    if (twice.length)
+      return {
+        error: `${typeof stack['name'] === 'string' ? stack['name'] : file} has more than one team board called ${twice.join(', ')}: give each its own name first (koppler stack set presets[<n>].name in that stack)`,
+      };
+  }
+  const merged = mergeStacks(ours, theirs, { keep, prefer, locked: lockedPaths(used.source) });
+  const stray = Object.keys(keep).filter(at => !merged.conflicts.some(one => one.path === at));
+  if (stray.length) return { error: `${stray.join(', ')} is not a conflict of this merge` };
+  if (!apply) return { merged };
+  const open = merged.conflicts.filter(one => !one.kept).map(one => one.path);
+  if (open.length)
+    return {
+      error: `${String(open.length)} ${open.length === 1 ? 'conflict is' : 'conflicts are'} not settled: ${open.join(', ')}`,
+    };
+  if (JSON.stringify(merged.stack) === JSON.stringify(ours)) return { merged };
+  const problems = newProblems(ours, merged.stack);
+  if (problems.length) return { error: problems.slice(0, 5).join('; ') };
+  return saveStack(used.source, ours, merged.stack) ?? { merged };
+}
+
+const git = (dir: string, ...args: string[]) => {
+  try {
+    return execFileSync('git', ['-C', dir, ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+  } catch {
+    return '';
+  }
+};
+const real = (dir: string) => {
+  try {
+    return fs.realpathSync(dir);
+  } catch {
+    return path.resolve(dir);
+  }
+};
+
+/**
+ * The private stack in use moved into a folder of a git clone, where Koppler finds shared stacks, and used from there
+ * with its locks and the board edits waiting for an open canvas. The clone joins the repos Koppler scans, so `koppler
+ * use` keeps finding it. Nothing is committed: the user does that. A step that fails leaves everything as it was.
+ */
+export function publishStack(
+  folder: string,
+  { config = loadConfig(), save = saveConfig }: { config?: Config; save?: Save } = {},
+): { dir: string; top: string; file: string; name: string; error?: undefined } | { error: string } {
+  const used = stackInUse(config);
+  if (used.error !== undefined) return used;
+  const from = path.dirname(used.source);
+  if (!privateStacks().some(dir => path.resolve(dir) === path.resolve(from)) || sourceOf(from))
+    return { error: 'the stack in use is not a private stack: it is in a repo already (koppler stack propose)' };
+  const wanted = path.resolve(expand(folder));
+  let there = wanted;
+  while (!fs.existsSync(there)) there = path.dirname(there);
+  const top = git(there, 'rev-parse', '--show-toplevel');
+  if (!top) return { error: `${folder} is not inside a git clone` };
+  const inside = path.relative(top, path.join(real(there), path.relative(there, wanted)));
+  const file = [...inside.split(path.sep), 'stack.json'].join('/');
+  if (!/^(?:\.koppler|stacks\/[^/]+)\/stack\.json$/.test(file))
+    return { error: `Koppler finds a shared stack in <clone>/stacks/<name> or <clone>/.koppler; ${folder} is neither` };
+  if (fs.existsSync(path.join(wanted, 'stack.json'))) return { error: `${folder} already holds a stack.json` };
+  if (!git(top, 'remote')) return { error: `${top} has no remote: git -C ${top} remote add origin <its address>` };
+
+  // The clone stays where a rescan finds it: under one of the folders Koppler scans, or one of them itself.
+  const depth = config.depth ?? DEFAULT_DEPTH;
+  const reached = (config.roots ?? []).some(root => {
+    const below = path.relative(real(root), top);
+    return !below || (!below.startsWith('..') && !path.isAbsolute(below) && below.split(path.sep).length <= depth);
+  });
+  const roots = reached ? config.roots : [...(config.roots ?? []), top];
+  const indexed = () => readIndex()?.repos.find(repo => real(repo.path) === top);
+  if (!indexed() || !reached) scan(roots ?? [], depth);
+  const clone = indexed();
+  if (!clone) return { error: `Koppler cannot read ${top} as a clone with a remote; check git -C ${top} remote -v` };
+  // Spelled as the index has the clone, as knownStacks finds the stack.
+  const dir = path.join(clone.path, inside);
+  const target = path.join(dir, 'stack.json');
+
+  const undo: (() => void)[] = [];
+  const before = { ...config };
+  const restack = (at: string, to: string) => (data: Record<string, unknown>) => ({
+    ...data,
+    ...Object.fromEntries(
+      ['edits', 'proposals'].flatMap(key =>
+        Array.isArray(data[key])
+          ? [[key, (data[key] as { stack?: unknown }[]).map(one => (one.stack === at ? { ...one, stack: to } : one))]]
+          : [],
+      ),
+    ),
+  });
+  try {
+    const made = fs.mkdirSync(dir, { recursive: true });
+    if (made)
+      undo.push(() => {
+        fs.rmSync(made, { recursive: true, force: true });
+      });
+    fs.copyFileSync(used.source, target, fs.constants.COPYFILE_EXCL);
+    undo.push(() => {
+      fs.rmSync(target, { force: true });
+    });
+    save({ ...config, stack: dir, ...(roots && { roots }) });
+    undo.push(() => {
+      save(before);
+    });
+    moveLocks(used.source, target);
+    undo.push(() => {
+      moveLocks(target, used.source);
+    });
+    for (const name of ['board-edits', 'board-proposals'] as const) {
+      if (!readData(name)) continue;
+      changeData(name, restack(from, dir));
+      undo.push(() => {
+        changeData(name, restack(dir, from));
+      });
+    }
+    fs.rmSync(used.source);
+  } catch (error) {
+    for (const step of undo.reverse())
+      try {
+        step();
+      } catch {
+        // Each step is undone that can be.
+      }
+    return { error: `could not publish (${(error as Error).message}); nothing changed` };
+  }
+  Object.assign(config, { stack: dir, ...(roots && { roots }) });
+  // Anything else kept beside it stays where it was.
+  if (!fs.readdirSync(from).length) fs.rmdirSync(from);
+  return { dir, top, file, name: used.stack.name ?? path.basename(dir) };
 }

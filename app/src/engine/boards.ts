@@ -1,17 +1,23 @@
 // Changing a board from the terminal. The change goes into state.json at once, and waits in board-edits.json for an
 // open canvas to make it on its own copy too, so the canvas shows it and never saves its older copy over it.
 import path from 'node:path';
+import { flagValue } from '../cli/output.ts';
 import { inStack, kindBetween, type FeatureEdit } from '../core/feature.ts';
+import { upgradeBoardFile } from '../core/migrations/files.ts';
+import { withoutMissingApps } from '../core/missing-apps.ts';
 import { describeEdit, editPreset, migrate, VERSION, type BoardEdit, type StoredPreset } from '../core/presets.ts';
 import { canvas } from '../cli/running.ts';
 import { fetchPresets } from '../server/sanitize.ts';
 import type { Edge } from '../core/plan.ts';
 import { changeData, readClones, readData, readStack, writeData } from '../data.ts';
 import { fail } from '../failure.ts';
+import { locked, readJson, writeJson } from '../json-files.ts';
+import { readUpgraded } from '../upgraded.ts';
 import { appendMessage } from './messages.ts';
 import { alive, readRecord } from './processes.ts';
 import { shareBoard } from './share.ts';
-import { currentStack } from './stacks.ts';
+import { readStackFile } from './stack-file.ts';
+import { currentStack, shelfOf, stackNamed } from './stacks.ts';
 
 export interface QueuedEdit {
   id: string;
@@ -40,7 +46,7 @@ export function editDone(id: unknown): void {
 
 const CHANGES =
   '[--propose] [--add <app,...>] [--remove <app,...>] [--cable <caller>:<callee>]... [--uncable <caller>:<callee>]... [--branch <app>=<branch>]... [--note <app>="<note>"]... [--arrange] [--request "<words>"] [--phase "<name>"] [--step|--propose-step <from>:<to>[="<note>"]]... [--unstep <from>:<to>]... [--area <area>|auto]';
-const USAGE = `usage: koppler board new "<name>" ${CHANGES}\n       koppler board edit "<name>" ${CHANGES}\n       koppler board share "<name>"\n       koppler board open <file or link>\n       koppler board delete "<name>"`;
+const USAGE = `usage: koppler board new "<name>" ${CHANGES}\n       koppler board edit "<name>" ${CHANGES}\n       koppler board share "<name>"\n       koppler board open <file or link>\n       koppler board delete "<name>"\n       koppler board copy "<name>" --to|--from <stack> [--drop-missing]`;
 
 /** Queues a change for an open canvas of the stack in use, dropping ones a day old that no canvas took. */
 function enqueue(change: Omit<QueuedEdit, 'id' | 'at' | 'stack'>): void {
@@ -54,11 +60,73 @@ function enqueue(change: Omit<QueuedEdit, 'id' | 'at' | 'stack'>): void {
   writeData('board-edits', { edits: [...queued().filter(one => now - Date.parse(one.at) < DAY), entry] });
 }
 
+/** A board by its name, its exact spelling first. */
+const byName = (boards: StoredPreset[], name: string): StoredPreset | undefined =>
+  boards.find(one => one.name === name) ?? boards.find(one => one.name.toLowerCase() === name.toLowerCase());
+
 /** Your own board, by name, as kept for this stack. */
-const ownBoard = (name: string): StoredPreset | undefined => {
-  const own = (readData('state')?.['presets'] ?? []) as StoredPreset[];
-  return own.find(one => one.name === name) ?? own.find(one => one.name.toLowerCase() === name.toLowerCase());
-};
+const ownBoard = (name: string): StoredPreset | undefined =>
+  byName((readData('state')?.['presets'] ?? []) as StoredPreset[], name);
+
+/**
+ * `koppler board copy`: one of your boards or a team board, as it is, into another stack's own boards (--to), or one
+ * of that stack's into yours (--from). A card for an app the receiving stack lacks is refused, or left off when asked.
+ */
+function copyBoard(name: string, args: string[]): void {
+  const to = flagValue(args, '--to');
+  const from = flagValue(args, '--from');
+  if (!to === !from || to?.startsWith('-') || from?.startsWith('-')) fail(USAGE);
+  const other = stackNamed(to ?? from ?? '');
+  if ('error' in other) fail(other.error);
+  const ours = readStack() ?? fail('no stack loaded (koppler init)');
+  const oursName = ours.name ?? 'the stack in use';
+  if (path.resolve(other.dir) === path.resolve(currentStack() ?? '')) fail(`${other.name} is the stack in use`);
+  const read = readStackFile(path.join(other.dir, 'stack.json'));
+  if (read.error !== undefined) fail(read.error);
+  const theirs = read.stack ?? fail(`cannot read ${other.name}`);
+  // The other stack's own boards wait on its shelf while this one is in use.
+  const shelf = path.join(shelfOf(other.dir), 'state.json');
+  const shelved = readUpgraded(shelf, upgradeBoardFile);
+  if (shelved.error !== undefined) fail(`${other.name}'s boards: ${shelved.error}`);
+  const boards = {
+    ours: [...((readData('state')?.['presets'] ?? []) as StoredPreset[]), ...((ours.presets ?? []) as StoredPreset[])],
+    theirs: [
+      ...((shelved.value?.['presets'] ?? []) as StoredPreset[]),
+      ...(((theirs as { presets?: unknown }).presets ?? []) as StoredPreset[]),
+    ],
+  };
+  const [giver, taker] = to ? (['ours', 'theirs'] as const) : (['theirs', 'ours'] as const);
+  const apps = { ours: ours.apps as Record<string, { name?: string }>, theirs: theirs.apps };
+  const names = { ours: oursName, theirs: other.name };
+  const board =
+    byName(boards[giver], name) ?? fail(`no board called ${name} in ${names[giver]}; koppler use --boards lists them`);
+  if (byName(boards[taker], board.name)) fail(`${names[taker]} already has a board called ${board.name}`);
+  const missing = Object.keys(board.nodes).filter(id => !Object.hasOwn(apps[taker], id));
+  const named = (id: string) => apps[giver][id]?.name ?? id;
+  if (missing.length && !args.includes('--drop-missing'))
+    fail(
+      `${names[taker]} has no ${missing.map(id => `${named(id)} (${id})`).join(', ')}; --drop-missing leaves ${missing.length === 1 ? 'it' : 'them'} off the copy`,
+    );
+  const [kept] = withoutMissingApps({ apps: apps[taker], presets: [board] }).presets;
+  // A feature board needs no app that runs here; any other needs one.
+  if (!kept || (!Object.keys(kept.nodes).length && !kept['feature']))
+    fail(`${names[taker]} has none of the apps on ${board.name}`);
+  // An area the other stack lacks is left off: there the board takes the area its apps are in.
+  const areas = (to ? (theirs as { areas?: unknown }).areas : ours.areas) ?? {};
+  const { area, ...arealess } = kept;
+  const copy: StoredPreset = typeof area === 'string' && !Object.hasOwn(areas, area) ? arealess : kept;
+  if (to)
+    locked(shelf, () => {
+      const now = (readJson(shelf) ?? {}) as Record<string, unknown>;
+      writeJson(shelf, { ...now, presets: [...((now['presets'] ?? []) as StoredPreset[]), copy] });
+    });
+  else {
+    changeData('state', state => ({ ...state, presets: [...((state['presets'] ?? []) as StoredPreset[]), copy] }));
+    enqueue({ board: copy.name, edit: {}, preset: copy });
+  }
+  const without = missing.length ? `, without ${missing.map(named).join(', ')}` : '';
+  console.log(`COPIED ${board.name} to ${names[taker]}'s boards${without}`);
+}
 
 /** Opens the pull request that makes one of your boards a team board of the stack in use. */
 async function share(name: string): Promise<void> {
@@ -101,6 +169,10 @@ export function boardCommand(args: string[]): void | Promise<void> {
   }
   if (what === 'share' && name && !name.startsWith('-')) return share(name);
   if (what === 'open' && name && !name.startsWith('-')) return openBoard(name, args.includes('--no-open'));
+  if (what === 'copy' && name?.trim() && !name.startsWith('-')) {
+    copyBoard(name, args);
+    return;
+  }
   if ((what !== 'edit' && what !== 'new') || !name?.trim() || name.startsWith('-')) fail(USAGE);
   const create = what === 'new';
   const values = (flag: string) => args.filter((_, at) => args[at - 1] === flag);

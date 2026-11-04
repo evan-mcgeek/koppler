@@ -60,7 +60,8 @@ export type Start =
 
 const portOf = (url: string | undefined) =>
   url && URL.canParse(url) ? Number(new URL(url).port) || undefined : undefined;
-const quote = (word: string) => (/^[\w@%+=:,./-]+$/.test(word) ? word : `'${word.replace(/'/g, `'\\''`)}'`);
+/** A word as a shell reads it back unchanged. */
+export const quote = (word: string) => (/^[\w@%+=:,./-]+$/.test(word) ? word : `'${word.replace(/'/g, `'\\''`)}'`);
 
 /**
  * A .NET app's launch profile for an environment: one named after it (PROD for prod) before the stack's baseProfile,
