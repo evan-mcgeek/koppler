@@ -9,6 +9,7 @@
   import { DATABASE_KINDS } from '../src/core/databases.ts';
   import LocalAddress from './LocalAddress.svelte';
   import { SECRET_TYPES } from '../src/core/secret-types.ts';
+  import { changes } from '../src/core/stack-changes.ts';
   import { getAt, parsePath, setAt } from '../src/core/stack-path.ts';
   import AreasTab from './AreasTab.svelte';
   import EnvOverrides from './EnvOverrides.svelte';
@@ -21,7 +22,6 @@
     APP_HEAD,
     APP_TABS,
     BY_KIND,
-    changes,
     child,
     HOWS,
     KIND_FIELDS,
@@ -118,7 +118,7 @@
   const shown = $derived(tabs[Math.min(tab, tabs.length - 1)]);
   const count = $derived(changes(stack, draft));
   const valueAt = (from: unknown, path: string) => (path ? getAt(from, parts(path)) : from);
-  const changedAt = (path: string) => changes(valueAt(stack, path), valueAt(draft, path)) > 0;
+  const changedAt = (path: string) => changes(valueAt(stack, path), valueAt(draft, path), path.split('.').at(-1)) > 0;
   const changedIn = (keys: string[]) => keys.filter(key => changedAt(child(at, key)));
   /** The fields with a change, by name. */
   const named = $derived.by(() => {

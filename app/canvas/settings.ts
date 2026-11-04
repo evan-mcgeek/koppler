@@ -282,28 +282,6 @@ export function summary(value: unknown): string {
   return JSON.stringify(value);
 }
 
-/** How many fields differ between two stacks: each value that changed, was added or was taken out counts once, and so does a reorder. */
-export function changes(a: unknown, b: unknown): number {
-  const isTree = (one: unknown) => typeof one === 'object' && one !== null;
-  if (!isTree(a) || !isTree(b) || Array.isArray(a) !== Array.isArray(b))
-    return JSON.stringify(a) === JSON.stringify(b) ? 0 : 1;
-  const left = a as Record<string, unknown>;
-  const right = b as Record<string, unknown>;
-  // The same keys in another order (areas moved) is one change too.
-  const both = Object.keys(left).filter(key => Object.hasOwn(right, key));
-  const moved =
-    both.join('\n') !==
-    Object.keys(right)
-      .filter(key => Object.hasOwn(left, key))
-      .join('\n')
-      ? 1
-      : 0;
-  return [...new Set([...Object.keys(left), ...Object.keys(right)])].reduce(
-    (sum, key) => sum + changes(left[key], right[key]),
-    moved,
-  );
-}
-
 type Fields = Record<string, unknown>;
 const fieldsOf = (value: unknown): Fields =>
   typeof value === 'object' && value !== null && !Array.isArray(value) ? (value as Fields) : {};

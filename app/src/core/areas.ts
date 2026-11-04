@@ -72,8 +72,9 @@ export function areaId(name: string, taken: readonly string[]): string {
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-|-$/g, '') || 'area';
-  let id = base;
-  for (let n = 2; taken.includes(id); n++) id = `${base}-${String(n)}`;
+  const keyed = /^\d+$/.test(base) ? `area-${base}` : base;
+  let id = keyed;
+  for (let n = 2; taken.includes(id); n++) id = `${keyed}-${String(n)}`;
   return id;
 }
 
@@ -106,30 +107,34 @@ export function areaUse(stack: unknown, id: string): { apps: string[]; boards: s
   };
 }
 
-/** The stack without an area: out of its areas, out of every app's list, and off every team board set to it. */
+/** The stack without an area: out of its areas, out of every app's list, and off every team board set to it; every key stays where it was. */
 export function withoutArea<S>(stack: S, id: string): S {
-  const { areas, apps, presets, ...rest } = json(stack);
-  const { [id]: _gone, ...left } = json(areas);
-  const out: Json = { ...rest };
-  if (Object.keys(left).length) out['areas'] = left;
-  if (apps !== undefined)
-    out['apps'] = Object.fromEntries(
-      Object.entries(json(apps)).map(([key, value]) => {
-        const app = json(value);
-        if (!Array.isArray(app['areas'])) return [key, value];
-        const { areas: had, ...plain } = app;
-        const kept = (had as unknown[]).filter(area => area !== id);
-        return [key, kept.length ? { ...plain, areas: kept } : plain];
+  // A key mapped to undefined is dropped where it stands.
+  const each = (value: Json, change: (key: string, one: unknown) => unknown): Json =>
+    Object.fromEntries(
+      Object.entries(value).flatMap(([key, one]) => {
+        const next = change(key, one);
+        return next === undefined ? [] : [[key, next]];
       }),
     );
-  if (presets !== undefined)
-    out['presets'] = Array.isArray(presets)
-      ? presets.map((value: unknown) => {
-          const { area, ...plain } = json(value);
-          return area === id ? plain : value;
-        })
-      : presets;
-  return out as S;
+  return each(json(stack), (key, value) => {
+    if (key === 'areas') {
+      const left = each(json(value), area => (area === id ? undefined : json(value)[area]));
+      return Object.keys(left).length ? left : undefined;
+    }
+    if (key === 'apps')
+      return each(json(value), (_, one) => {
+        const app = json(one);
+        if (!Array.isArray(app['areas'])) return one;
+        const kept = (app['areas'] as unknown[]).filter(area => area !== id);
+        return each(app, (field, held) => (field !== 'areas' ? held : kept.length ? kept : undefined));
+      });
+    if (key === 'presets' && Array.isArray(value))
+      return value.map((one: unknown) =>
+        json(one)['area'] === id ? each(json(one), (field, held) => (field === 'area' ? undefined : held)) : one,
+      );
+    return value;
+  }) as S;
 }
 
 type Stack = { areas?: Record<string, { name: string }> | undefined; apps: Record<string, HasAreas | undefined> };

@@ -12,6 +12,7 @@
   import { chosen as areaChoice } from './areas.svelte.ts';
   import { board } from './board.svelte.ts';
   import { ago, openBoard, openFile, openLink } from './boards.ts';
+  import { tick } from 'svelte';
   import { post } from './data.ts';
   import { runs } from './run.svelte.ts';
   import { toasts } from './toast.svelte.ts';
@@ -120,13 +121,38 @@
   /** The board whose row menu is open, and where. */
   let rowMenu = $state<HTMLDivElement>();
   let menuFor = $state<{ preset: StoredPreset; mine: boolean } | null>(null);
-  const openRowMenu = (preset: StoredPreset, mine: boolean, at: { x: number; y: number }) => {
+  /** What opened the row menu, to have the keyboard back when it closes. */
+  let opener: HTMLElement | null = null;
+  const openRowMenu = async (
+    preset: StoredPreset,
+    mine: boolean,
+    at: { x: number; y: number },
+    from: HTMLElement | null,
+  ) => {
     menuFor = { preset, mine };
+    opener = from;
     if (!rowMenu) return;
     rowMenu.style.top = `${String(Math.min(at.y, innerHeight - 160))}px`;
     rowMenu.style.left = `${String(Math.min(at.x, innerWidth - 200))}px`;
     rowMenu.showPopover();
+    await tick();
     rowMenu.querySelector<HTMLButtonElement>('button')?.focus();
+  };
+  /** Up and down move through a menu's items; nothing else is done with them. */
+  const arrows = (ev: KeyboardEvent, within: HTMLElement | undefined) => {
+    ev.stopPropagation();
+    if (ev.key !== 'ArrowDown' && ev.key !== 'ArrowUp') return;
+    ev.preventDefault();
+    const all = [...(within?.querySelectorAll<HTMLButtonElement>('[role^="menuitem"]') ?? [])];
+    const at = all.indexOf(document.activeElement as HTMLButtonElement);
+    all[(at + (ev.key === 'ArrowDown' ? 1 : -1) + all.length) % all.length]?.focus();
+  };
+  let areaMenu = $state<HTMLDivElement>();
+  const startSetting = async (preset: StoredPreset, mine: boolean) => {
+    rowMenu?.hidePopover();
+    setting = { preset, mine };
+    await tick();
+    areaMenu?.querySelector<HTMLButtonElement>('[aria-checked="true"]')?.focus();
   };
   /** The board whose area is being set, in place of the lists. */
   let setting = $state<{ preset: StoredPreset; mine: boolean } | null>(null);
@@ -137,14 +163,13 @@
       board.edit(preset.name, { area });
       return;
     }
-    const at = board.team.findIndex(one => one.name === preset.name);
-    const path = `presets[${String(at)}].area`;
-    const said = await post('stack-edit', area ? { path, value: area } : { path, unset: true });
+    const said = await post('board-area', { name: preset.name, area });
+    // Read again either way: a refusal means the stack changed under the canvas.
+    await board.reload();
     if ('error' in said) {
-      toasts.show(`Could not set the area of ${preset.name}: ${said.error}`, 'warning');
+      toasts.show(`Could not set the area of ${preset.name}. ${said.error}`, 'warning');
       return;
     }
-    await board.reload();
     if (board.name === preset.name) board.handArea = area;
   };
   const choose = (preset: StoredPreset) => {
@@ -241,7 +266,12 @@
     oncontextmenu={ev => {
       if (!hasAreas) return;
       ev.preventDefault();
-      openRowMenu(preset, mine, { x: ev.clientX, y: ev.clientY });
+      void openRowMenu(
+        preset,
+        mine,
+        { x: ev.clientX, y: ev.clientY },
+        ev.currentTarget.querySelector<HTMLElement>('button'),
+      );
     }}
   >
     <button
@@ -280,7 +310,7 @@
         title="More"
         onclick={ev => {
           const at = ev.currentTarget.getBoundingClientRect();
-          openRowMenu(preset, mine, { x: at.left, y: at.bottom + 2 });
+          void openRowMenu(preset, mine, { x: at.left, y: at.bottom + 2 }, ev.currentTarget);
         }}><Icon of={Ellipsis} size={14} /></button
       >
     {/if}
@@ -372,28 +402,36 @@
         <strong>{heading}</strong>
         <span>{yours ? 'Your board, on this Mac.' : 'Team board. Changing it changes it for the team.'}</span>
       </div>
-      <div class="radios" role="radiogroup" aria-label={heading}>
-        <div class="worked">
-          <label>
-            <input
-              type="radio"
-              name="board-area"
-              checked={!hand}
-              aria-describedby="{id}-why"
-              onchange={() => void setArea(preset, yours, null)}
-            />Worked out from its apps</label
-          >
-          <small id="{id}-why">{areaWhy(facts, preset)}</small>
-        </div>
+      <div
+        bind:this={areaMenu}
+        class="radios"
+        role="menu"
+        aria-label={heading}
+        tabindex="-1"
+        onkeydown={ev => {
+          arrows(ev, areaMenu);
+        }}
+      >
+        <button
+          type="button"
+          role="menuitemradio"
+          class="worked"
+          aria-checked={!hand}
+          aria-label="Worked out from its apps"
+          aria-describedby="{id}-why"
+          onclick={() => void setArea(preset, yours, null)}
+          ><span class="dot" aria-hidden="true"></span><span class="words"
+            >Worked out from its apps<small id="{id}-why">{areaWhy(facts, preset)}</small></span
+          ></button
+        >
         {#each Object.entries(board.areas) as [area, one] (area)}
-          <label>
-            <input
-              type="radio"
-              name="board-area"
-              checked={hand === area}
-              onchange={() => void setArea(preset, yours, area)}
-            /><span>{one.name}</span>
-          </label>
+          <button
+            type="button"
+            role="menuitemradio"
+            aria-checked={hand === area}
+            onclick={() => void setArea(preset, yours, area)}
+            ><span class="dot" aria-hidden="true"></span>{one.name}</button
+          >
         {/each}
       </div>
       <button class="back" type="button" onclick={() => (setting = null)}>Back to the boards</button>
@@ -547,12 +585,11 @@
     tabindex="-1"
     aria-label={menuFor?.preset.name ?? 'Board'}
     onkeydown={ev => {
-      ev.stopPropagation();
-      if (ev.key !== 'ArrowDown' && ev.key !== 'ArrowUp') return;
-      ev.preventDefault();
-      const all = [...(rowMenu?.querySelectorAll<HTMLButtonElement>('button') ?? [])];
-      const at = all.indexOf(document.activeElement as HTMLButtonElement);
-      all[(at + (ev.key === 'ArrowDown' ? 1 : -1) + all.length) % all.length]?.focus();
+      arrows(ev, rowMenu);
+    }}
+    ontoggle={ev => {
+      const here = document.activeElement;
+      if (ev.newState === 'closed' && (here === document.body || rowMenu?.contains(here))) opener?.focus();
     }}
   >
     {#if menuFor}
@@ -565,14 +602,7 @@
           choose(preset);
         }}>Open</button
       >
-      <button
-        type="button"
-        role="menuitem"
-        onclick={() => {
-          rowMenu?.hidePopover();
-          setting = { preset, mine: yours };
-        }}>Set area…</button
-      >
+      <button type="button" role="menuitem" onclick={() => void startSetting(preset, yours)}>Set area…</button>
       {#if yours && reloadable(preset)}
         <button
           type="button"
@@ -944,32 +974,33 @@
   .radios {
     display: grid;
   }
-  .radios label {
-    display: flex;
-    align-items: center;
+  .menu .radios button {
     gap: 12px;
     padding: 8px 14px;
-    font: 13px var(--sans);
-    cursor: pointer;
+    font: 400 13px var(--sans);
   }
-  .radios label:hover {
-    background: color-mix(in oklab, var(--ink) 7%, transparent);
-  }
-  .radios .worked {
+  .menu .radios .worked {
     border-bottom: 1px solid var(--line);
   }
+  .radios .words {
+    display: grid;
+  }
   .radios small {
-    display: block;
-    margin-top: -6px;
-    padding: 0 14px 8px 40px;
     color: var(--ink-muted);
     font: 11px var(--sans);
   }
-  .radios input {
+  /* A radio's mark: a ring, filled at its centre for the one in use. */
+  .dot {
+    flex: none;
     width: 14px;
     height: 14px;
-    margin: 0;
-    accent-color: var(--ink);
+    box-sizing: border-box;
+    border: 1px solid var(--line-strong);
+    border-radius: 50%;
+  }
+  [aria-checked='true'] > .dot {
+    border-color: var(--ink);
+    background: radial-gradient(circle, var(--ink) 0 3px, transparent 3.5px);
   }
   .menu .back {
     border-top: 1px solid var(--line);

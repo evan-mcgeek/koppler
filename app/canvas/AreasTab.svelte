@@ -23,6 +23,23 @@
   let dragged = $state<string | null>(null);
   const use = $derived(asking ? areaUse(stack, asking) : null);
 
+  /** A lock on the list holds its order and what can be added. */
+  const listLocked = $derived(ctx.locked('areas'));
+  /** The lock that keeps an area from being removed, in words: on it, or on an app or team board it would change. */
+  const heldBy = (id: string): string | undefined => {
+    if (listLocked) return 'the areas';
+    if (ctx.locked(`areas.${id}`) || ctx.locked(`areas.${id}.name`)) return `the ${nameOf(id)} area`;
+    const all = (stack ?? {}) as {
+      apps?: Record<string, { name?: string; areas?: string[] }>;
+      presets?: { name?: string; area?: string }[];
+    };
+    const app = Object.entries(all.apps ?? {}).find(
+      ([key, one]) => one.areas?.includes(id) && ctx.locked(`apps.${key}.areas`),
+    );
+    if (app) return `${app[1].name ?? app[0]}'s areas`;
+    const at = (all.presets ?? []).findIndex((one, n) => one.area === id && ctx.locked(`presets[${String(n)}].area`));
+    return at < 0 ? undefined : `the area of ${all.presets?.[at]?.name ?? 'a team board'}`;
+  };
   const order = (next: string[]) => void ctx.save('areas', Object.fromEntries(next.map(id => [id, areas[id]])));
   const move = (id: string, to: number) => {
     const rest = ids.filter(one => one !== id);
@@ -56,6 +73,7 @@
   <tbody>
     {#each ids as id, at (id)}
       {@const held = areaUse(stack, id)}
+      {@const holder = heldBy(id)}
       <tr
         class:dragged={dragged === id}
         ondragover={ev => {
@@ -63,7 +81,7 @@
         }}
         ondrop={ev => {
           ev.preventDefault();
-          if (dragged && dragged !== id) move(dragged, at);
+          if (dragged && dragged !== id && !listLocked) move(dragged, at);
           dragged = null;
         }}
       >
@@ -71,9 +89,10 @@
           <button
             class="handle"
             type="button"
-            draggable="true"
+            draggable={!listLocked}
+            disabled={listLocked}
             aria-label="Move {nameOf(id)}"
-            title="Drag to reorder, or use the arrow keys"
+            title={listLocked ? 'Locked: the areas' : 'Drag to reorder, or use the arrow keys'}
             ondragstart={ev => {
               dragged = id;
               ev.dataTransfer?.setData('text/plain', id);
@@ -93,7 +112,8 @@
             class="name"
             aria-label="Name"
             value={areas[id]?.name ?? ''}
-            disabled={ctx.locked(`areas.${id}`)}
+            disabled={ctx.locked(`areas.${id}.name`)}
+            title={ctx.locked(`areas.${id}.name`) ? 'Locked' : undefined}
             onchange={ev => void ctx.save(`areas.${id}.name`, ev.currentTarget.value.trim())}
           />
           {#if ctx.problem?.(`areas.${id}.name`)}<span class="error" role="alert"
@@ -104,8 +124,12 @@
         <td class="mono">{count(held.apps.length, 'app')}</td>
         <td class="mono">{count(held.boards.length, 'board')}</td>
         <td class="end">
-          <button class="link" type="button" disabled={ctx.locked(`areas.${id}`)} onclick={() => void remove(id)}
-            >Remove</button
+          <button
+            class="link"
+            type="button"
+            disabled={!!holder}
+            title={holder ? `Locked: ${holder}` : undefined}
+            onclick={() => void remove(id)}>Remove</button
           >
         </td>
       </tr>
@@ -145,6 +169,8 @@
   <button
     class="link add"
     type="button"
+    disabled={listLocked}
+    title={listLocked ? 'Locked: the areas' : undefined}
     onclick={async () => {
       adding = true;
       await tick();

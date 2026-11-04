@@ -82,12 +82,12 @@ test('a board set by hand says so, a tie says why in its tooltip, and the row me
   await rowOf(menu, 'Order emails').hover();
   await rowOf(menu, 'Order emails').getByRole('button', { name: 'More for Order emails' }).click();
   await page.getByRole('menu', { name: 'Order emails' }).getByRole('menuitem', { name: 'Set area…' }).click();
-  const setting = menu.getByRole('radiogroup', { name: 'Order emails · area' });
+  const setting = menu.getByRole('menu', { name: 'Order emails · area' });
   await expect(menu).toContainText('Team board. Changing it changes it for the team.');
-  await expect(setting.getByRole('radio', { name: 'Payments' })).toBeChecked();
+  await expect(setting.getByRole('menuitemradio', { name: 'Payments' })).toBeChecked();
   await expect(setting).toContainText('Shipping: 1 of its 2 apps');
   await page.screenshot({ path: 'test-results/areas-set-area.png' });
-  await setting.getByRole('radio', { name: /Worked out from its apps/ }).click();
+  await setting.getByRole('menuitemradio', { name: /Worked out from its apps/ }).click();
   await expect.poll(() => read().presets.find(one => one.name === 'Order emails')?.area).toBeUndefined();
   await expect(menu.locator('p.sub')).toHaveText(['Team boards · Payments', 'Shipping']);
   await expect(rowOf(menu, 'Order emails')).not.toContainText('set by hand');
@@ -95,7 +95,7 @@ test('a board set by hand says so, a tie says why in its tooltip, and the row me
   // Right-click a team board, then your own: yours is kept on this Mac.
   await rowOf(menu, 'Checkout').click({ button: 'right' });
   await page.getByRole('menu', { name: 'Checkout' }).getByRole('menuitem', { name: 'Set area…' }).click();
-  await menu.getByRole('radiogroup', { name: 'Checkout · area' }).getByRole('radio', { name: 'Shipping' }).click();
+  await menu.getByRole('menu', { name: 'Checkout · area' }).getByRole('menuitemradio', { name: 'Shipping' }).click();
   await expect.poll(() => read().presets.find(one => one.name === 'Checkout')?.area).toBe('shipping');
   await page.keyboard.press('Escape');
   menu = await boardMenu(page);
@@ -103,8 +103,8 @@ test('a board set by hand says so, a tie says why in its tooltip, and the row me
   await page.getByRole('menu', { name: 'Refund debugging' }).getByRole('menuitem', { name: 'Set area…' }).click();
   await expect(menu).toContainText('Your board, on this Mac.');
   await menu
-    .getByRole('radiogroup', { name: 'Refund debugging · area' })
-    .getByRole('radio', { name: 'Payments' })
+    .getByRole('menu', { name: 'Refund debugging · area' })
+    .getByRole('menuitemradio', { name: 'Payments' })
     .click();
   await expect(rowOf(menu, 'Refund debugging')).toContainText('Payments · set by hand');
   await expect
@@ -214,4 +214,114 @@ test("a team board's settings set its area, or take it from its apps", async ({ 
   await panel.getByRole('button', { name: 'Save' }).click();
   await expect(panel.getByRole('status')).toHaveText('Saved');
   expect(read().presets.find(one => one.name === 'Order emails')?.area).toBeUndefined();
+});
+
+test("a team board's area goes to that board even when the stack changed on disk since the canvas read it", async ({
+  page,
+  canvas,
+}) => {
+  const read = stackFile(canvas.dir);
+  const menu = await boardMenu(page);
+  await expect(rowOf(menu, 'Order emails')).toBeVisible();
+  // A pull puts another team board first: the canvas's copy is now one place off.
+  const file = path.join(canvas.dir, 'stack', 'stack.json');
+  fs.writeFileSync(
+    file,
+    JSON.stringify({
+      ...SHOP,
+      presets: [{ name: 'Sign up', version: 1, nodes: { web: {} }, edges: [] }, ...(SHOP.presets ?? [])],
+    }),
+  );
+  await rowOf(menu, 'Browse').click({ button: 'right' });
+  await page.getByRole('menu', { name: 'Browse' }).getByRole('menuitem', { name: 'Set area…' }).click();
+  await menu.getByRole('menu', { name: 'Browse · area' }).getByRole('menuitemradio', { name: 'Payments' }).click();
+  await expect.poll(() => read().presets.find(one => one.name === 'Browse')?.area).toBe('payments');
+  expect(read().presets.find(one => one.name === 'Checkout')?.area).toBeUndefined();
+  // One gone from the file is refused with why, and nothing else changes.
+  fs.writeFileSync(file, JSON.stringify({ ...SHOP, presets: (SHOP.presets ?? []).filter((_, n) => n !== 0) }));
+  await rowOf(menu, 'Checkout').click({ button: 'right' });
+  await page.getByRole('menu', { name: 'Checkout' }).getByRole('menuitem', { name: 'Set area…' }).click();
+  await menu.getByRole('menu', { name: 'Checkout · area' }).getByRole('menuitemradio', { name: 'Shipping' }).click();
+  await expect(page.getByText(/The stack changed: it has no team board called Checkout now/)).toBeVisible();
+  expect(read().presets.map(one => one.area)).toEqual([undefined, 'payments']);
+});
+
+test("the keyboard moves through a row's menu and the areas without setting one until Enter", async ({
+  page,
+  canvas,
+}) => {
+  const read = stackFile(canvas.dir);
+  const menu = await boardMenu(page);
+  const more = rowOf(menu, 'Order emails').getByRole('button', { name: 'More for Order emails' });
+  await rowOf(menu, 'Order emails').hover();
+  await more.click();
+  const rowMenu = page.getByRole('menu', { name: 'Order emails' });
+  await expect(rowMenu.getByRole('menuitem', { name: 'Open' })).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(rowMenu).toBeHidden();
+  await expect(more).toBeFocused();
+  await page.keyboard.press('Enter');
+  await page.keyboard.press('ArrowDown');
+  await expect(rowMenu.getByRole('menuitem', { name: 'Set area…' })).toBeFocused();
+  await page.keyboard.press('Enter');
+  const areas = menu.getByRole('menu', { name: 'Order emails · area' });
+  await expect(areas.getByRole('menuitemradio', { name: 'Payments' })).toBeFocused();
+  await expect(areas.getByRole('menuitemradio', { name: 'Payments' })).toHaveAttribute('aria-checked', 'true');
+  // Arrows only move; Enter sets.
+  await page.keyboard.press('ArrowDown');
+  await expect(areas.getByRole('menuitemradio', { name: 'Shipping' })).toBeFocused();
+  await page.waitForTimeout(300);
+  expect(read().presets.find(one => one.name === 'Order emails')?.area).toBe('payments');
+  await page.keyboard.press('Enter');
+  await expect.poll(() => read().presets.find(one => one.name === 'Order emails')?.area).toBe('shipping');
+});
+
+test('a lock in the Areas tab keeps what it covers, and Remove says which lock holds it', async ({ page, canvas }) => {
+  stackFile(canvas.dir);
+  const lock = (at: string) =>
+    page.evaluate(async path => {
+      const token = location.pathname.split('/')[2] ?? '';
+      await fetch(`/stack-lock?token=${token}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ path, on: true }),
+      });
+    }, at);
+  await lock('areas.shipping.name');
+  await lock('apps.orders.areas');
+  await expect
+    .poll(
+      async () =>
+        ((await (await page.request.get(`${canvas.url}data/status.json`)).json()) as { locks?: string[] }).locks,
+    )
+    .toEqual(expect.arrayContaining(['areas.shipping.name', 'apps.orders.areas']));
+  await fromMenu(page, 'Settings', 'Stack settings');
+  const panel = page.getByRole('dialog', { name: 'Acme Shop settings' });
+  await page.getByRole('tab', { name: 'Areas' }).click();
+  const row = (id: string) => panel.getByRole('table', { name: 'Areas' }).getByRole('row').filter({ hasText: id });
+  await expect(row('shipping').getByRole('textbox', { name: 'Name' })).toBeDisabled();
+  await expect(row('payments').getByRole('textbox', { name: 'Name' })).toBeEnabled();
+  await expect(row('payments').getByRole('button', { name: 'Remove' })).toBeDisabled();
+  await expect(row('payments').getByRole('button', { name: 'Remove' })).toHaveAttribute(
+    'title',
+    "Locked: Orders API's areas",
+  );
+  // Removing it would take its locked name too.
+  await expect(row('shipping').getByRole('button', { name: 'Remove' })).toHaveAttribute(
+    'title',
+    'Locked: the Shipping area',
+  );
+  await panel.getByRole('button', { name: 'Close' }).click();
+  await lock('areas');
+  await expect
+    .poll(
+      async () =>
+        ((await (await page.request.get(`${canvas.url}data/status.json`)).json()) as { locks?: string[] }).locks,
+    )
+    .toContain('areas');
+  await fromMenu(page, 'Settings', 'Stack settings');
+  await page.getByRole('tab', { name: 'Areas' }).click();
+  await expect(panel.getByRole('button', { name: 'Add area' })).toBeDisabled();
+  await expect(row('payments').getByRole('button', { name: 'Move Payments' })).toBeDisabled();
+  await expect(row('shipping').getByRole('button', { name: 'Remove' })).toHaveAttribute('title', 'Locked: the areas');
 });

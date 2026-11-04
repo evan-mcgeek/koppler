@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cardChanges } from './stack-changes.ts';
+import { cardChanges, changes } from './stack-changes.ts';
 
 describe('cardChanges', () => {
   const base = {
@@ -24,4 +24,13 @@ describe('cardChanges', () => {
   it('has nothing for the same stack', () => {
     expect(cardChanges(base, structuredClone(base))).toEqual({});
   });
+});
+
+it('a field cleared and typed again is no change; areas in another order are one', () => {
+  expect(changes({ name: 'Acme Shop', envs: ['qa'] }, { envs: ['qa'], name: 'Acme Shop' })).toBe(0);
+  expect(
+    changes({ areas: { a: { name: 'A' }, b: { name: 'B' } } }, { areas: { b: { name: 'B' }, a: { name: 'A' } } }),
+  ).toBe(1);
+  expect(changes({ a: { name: 'A' }, b: { name: 'B' } }, { b: { name: 'B' }, a: { name: 'A' } }, 'areas')).toBe(1);
+  expect(changes({ name: 'Acme Shop' }, { name: 'Acme Store', envs: ['qa'] })).toBe(2);
 });

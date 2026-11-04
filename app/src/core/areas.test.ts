@@ -146,6 +146,8 @@ test("a new area's id is made from its name, once", () => {
   expect(areaId('Payments', ['payments', 'payments-2'])).toBe('payments-3');
   expect(areaId('Über', [])).toBe('ber');
   expect(areaId('!!', [])).toBe('area');
+  // An all-digit key sorts first in an object, so it could never be moved: it gets a word in front.
+  expect(areaId('2025', [])).toBe('area-2025');
 });
 
 const full = {
@@ -195,4 +197,23 @@ test('removing an area takes it out of every app and team board, and leaves the 
   });
   // The last area goes with its key.
   expect(withoutArea({ areas: { payments: { name: 'Payments' } }, apps: {} }, 'payments')).toEqual({ apps: {} });
+});
+
+test('removing an area keeps every key where it was', () => {
+  const stack = {
+    name: 'Acme Shop',
+    areas: { payments: { name: 'Payments' }, shipping: { name: 'Shipping' } },
+    apps: { orders: { name: 'Orders API', areas: ['payments', 'shipping'], kind: 'dotnet' } },
+    presets: [{ name: 'Checkout', area: 'payments', nodes: {} }],
+    envs: ['qa'],
+  };
+  expect(JSON.stringify(withoutArea(stack, 'payments'))).toBe(
+    JSON.stringify({
+      name: 'Acme Shop',
+      areas: { shipping: { name: 'Shipping' } },
+      apps: { orders: { name: 'Orders API', areas: ['shipping'], kind: 'dotnet' } },
+      presets: [{ name: 'Checkout', nodes: {} }],
+      envs: ['qa'],
+    }),
+  );
 });
