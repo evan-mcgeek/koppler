@@ -5,6 +5,9 @@
   import Plus from '@lucide/svelte/icons/plus';
   import Ellipsis from '@lucide/svelte/icons/ellipsis';
   import { flushSync, tick } from 'svelte';
+  import { appGroups, type AppGroup } from '../src/core/areas.ts';
+  import AreaFilter from './AreaFilter.svelte';
+  import { chosen as areaChoice } from './areas.svelte.ts';
   import X from '@lucide/svelte/icons/x';
   import Needs from './Needs.svelte';
   import Summary from './Summary.svelte';
@@ -41,6 +44,17 @@
     const off = (app: StackApp) => (onBoard.includes(app.id) ? 0 : 1);
     return board.apps.filter(matches).sort((a, b) => off(a) - off(b) || order(a, b));
   });
+  const hasAreas = $derived(Object.keys(board.areas).length > 0);
+  /** With a choice of areas: the apps under the chosen areas, the board's own outside them first. */
+  const areaGroups = $derived(
+    appGroups(
+      { areas: board.areas, apps: Object.fromEntries(board.apps.map(app => [app.id, { areas: app.areas }])) },
+      shown.map(app => app.id),
+      onBoard,
+      areaChoice.ids,
+    ),
+  );
+  const listed = $derived(areaGroups?.groups.reduce((n, group) => n + group.apps.length, 0) ?? shown.length);
   const groups = $derived([
     { title: `On the board · ${String(onBoard.length)}`, apps: shown.filter(app => onBoard.includes(app.id)) },
     { title: 'Not on the board', apps: shown.filter(app => !onBoard.includes(app.id)) },
@@ -223,109 +237,146 @@
   };
 </script>
 
+{#snippet sorter()}
+  <button class="sort" type="button" onclick={toggleSort} title={sortHint} aria-label={sortHint}>
+    Sort: {sort === 'name' ? 'A–Z' : 'Added'}
+  </button>
+{/snippet}
+
+{#snippet appRow(app: StackApp, extra?: AppGroup['apps'][number])}
+  {@const on = onBoard.includes(app.id)}
+  {@const runnable = !app.outside && app.cloned}
+  {@const up = on ? live.up(app.id) : null}
+  <div class="app" class:on role="listitem" data-id={app.id}>
+    <span class="kind">{app.kindLabel}</span>
+    <button
+      class="main"
+      type="button"
+      title="{app.name}. {hintOf(app, on)}"
+      draggable={runnable && !on}
+      onkeydown={rowStep}
+      ondragstart={ev => {
+        ev.dataTransfer?.setData('text/app', app.id);
+      }}
+      onclick={() => {
+        pick(app, on);
+      }}
+    >
+      <span class="name">{app.name}</span>
+      {#if extra?.outside}<span class="state">Outside your areas</span>{/if}
+      {#if extra?.also.length}<span class="also">also {extra.also.join(' · ')}</span>{/if}
+      {#if app.outside}<span class="state">Outside</span>{:else if !app.cloned}<span class="state">Not cloned</span
+        >{/if}
+    </button>
+    <span class="light">
+      {#if on}
+        <span
+          class="led"
+          data-state={up === true ? 'running' : up === false ? 'failed' : undefined}
+          role="img"
+          aria-label={up === true ? 'Running' : up === false ? 'Not answering' : 'Not running'}
+        ></span>
+      {/if}
+    </span>
+    <span class="row-acts">
+      {#if runnable}
+        <button
+          class="alone"
+          type="button"
+          aria-label="Run {app.name} alone"
+          title="Run alone: just this app and its tunnels, on a board of its own"
+          onclick={() => {
+            runs.alone(app.id);
+          }}><Icon of={Play} size={11} />Run alone</button
+        >
+        {#if on}
+          <button
+            type="button"
+            aria-label="Remove {app.name} from the board"
+            title="Remove from the board"
+            onclick={() => void move(app.id, true)}><Icon of={X} size={12} /></button
+          >
+        {:else}
+          <button
+            type="button"
+            aria-label="Add {app.name} to the board"
+            title="Add to the board"
+            onclick={() => void move(app.id, false)}><Icon of={Plus} size={12} /></button
+          >
+        {/if}
+      {/if}
+      <button
+        type="button"
+        aria-label="More for {app.name}"
+        aria-haspopup="menu"
+        aria-expanded={moreOpen && moreFor?.app.id === app.id}
+        title="More"
+        onclick={ev => {
+          openMore(app, on, ev.currentTarget);
+        }}><Icon of={Ellipsis} size={13} /></button
+      >
+    </span>
+  </div>
+{/snippet}
+
 <svelte:window bind:innerWidth={inner} />
 <aside id="side-apps" aria-label="Apps" class:protected={board.protected} style:width="{width}px">
   <section aria-labelledby="apps-title">
     <h2 id="apps-title">
       Apps
-      {#if board.apps.length}
+      {#if areaGroups}
+        <span class="count">{listed} of {board.apps.length}</span>
+      {:else if board.apps.length}
         <span class="count">{onBoard.length} of {board.apps.length} on the board</span>
       {/if}
-      <button class="sort" type="button" onclick={toggleSort} title={sortHint} aria-label={sortHint}>
-        Sort: {sort === 'name' ? 'A–Z' : 'Added'}
-      </button>
+      {#if hasAreas}<span class="filter"><AreaFilter /></span>{:else}{@render sorter()}{/if}
     </h2>
-    <input
-      class="search"
-      type="search"
-      bind:value={search}
-      placeholder="Find or filter: a name, .net, lambda"
-      aria-label="Find an app by name or kind"
-      autocomplete="off"
-      spellcheck="false"
-    />
-    {#each groups as group (group.title)}
-      {#if group.apps.length}
+    <div class="find">
+      <input
+        class="search"
+        type="search"
+        bind:value={search}
+        placeholder="Find or filter: a name, .net, lambda"
+        aria-label="Find an app by name or kind"
+        autocomplete="off"
+        spellcheck="false"
+      />
+      {#if hasAreas}{@render sorter()}{/if}
+    </div>
+    {#if areaGroups}
+      {#each areaGroups.groups as group (group.title)}
         <h3 class="group">{group.title}</h3>
         <div class="apps" role="list" aria-label={group.title}>
-          {#each group.apps as app (app.id)}
-            {@const on = onBoard.includes(app.id)}
-            {@const runnable = !app.outside && app.cloned}
-            {@const up = on ? live.up(app.id) : null}
-            <div class="app" class:on role="listitem" data-id={app.id}>
-              <span class="kind">{app.kindLabel}</span>
-              <button
-                class="main"
-                type="button"
-                title="{app.name}. {hintOf(app, on)}"
-                draggable={runnable && !on}
-                onkeydown={rowStep}
-                ondragstart={ev => {
-                  ev.dataTransfer?.setData('text/app', app.id);
-                }}
-                onclick={() => {
-                  pick(app, on);
-                }}
-              >
-                <span class="name">{app.name}</span>
-                {#if app.outside}<span class="state">Outside</span>{:else if !app.cloned}<span class="state"
-                    >Not cloned</span
-                  >{/if}
-              </button>
-              <span class="light">
-                {#if on}
-                  <span
-                    class="led"
-                    data-state={up === true ? 'running' : up === false ? 'failed' : undefined}
-                    role="img"
-                    aria-label={up === true ? 'Running' : up === false ? 'Not answering' : 'Not running'}
-                  ></span>
-                {/if}
-              </span>
-              <span class="row-acts">
-                {#if runnable}
-                  <button
-                    class="alone"
-                    type="button"
-                    aria-label="Run {app.name} alone"
-                    title="Run alone: just this app and its tunnels, on a board of its own"
-                    onclick={() => {
-                      runs.alone(app.id);
-                    }}><Icon of={Play} size={11} />Run alone</button
-                  >
-                  {#if on}
-                    <button
-                      type="button"
-                      aria-label="Remove {app.name} from the board"
-                      title="Remove from the board"
-                      onclick={() => void move(app.id, true)}><Icon of={X} size={12} /></button
-                    >
-                  {:else}
-                    <button
-                      type="button"
-                      aria-label="Add {app.name} to the board"
-                      title="Add to the board"
-                      onclick={() => void move(app.id, false)}><Icon of={Plus} size={12} /></button
-                    >
-                  {/if}
-                {/if}
-                <button
-                  type="button"
-                  aria-label="More for {app.name}"
-                  aria-haspopup="menu"
-                  aria-expanded={moreOpen && moreFor?.app.id === app.id}
-                  title="More"
-                  onclick={ev => {
-                    openMore(app, on, ev.currentTarget);
-                  }}><Icon of={Ellipsis} size={13} /></button
-                >
-              </span>
-            </div>
+          {#each group.apps as one (one.id)}
+            {@const app = board.apps.find(each => each.id === one.id)}
+            {#if app}{@render appRow(app, one)}{/if}
           {/each}
         </div>
+      {/each}
+      {#if areaGroups.hidden}
+        <p class="hidden-line">
+          <span>{areaGroups.hidden} {areaGroups.hidden === 1 ? 'app' : 'apps'} in other areas</span>
+          <button
+            type="button"
+            onclick={() => {
+              areaChoice.set([]);
+            }}>Show all</button
+          >
+        </p>
       {/if}
-    {/each}
-    {#if !shown.length}
+    {:else}
+      {#each groups as group (group.title)}
+        {#if group.apps.length}
+          <h3 class="group">{group.title}</h3>
+          <div class="apps" role="list" aria-label={group.title}>
+            {#each group.apps as app (app.id)}
+              {@render appRow(app)}
+            {/each}
+          </div>
+        {/if}
+      {/each}
+    {/if}
+    {#if !listed}
       <p class="empty">{board.apps.length ? 'No app matches.' : 'No apps in this stack yet.'}</p>
     {/if}
     <div class="adds">
@@ -485,6 +536,47 @@
   }
   .sort:hover {
     color: var(--ink);
+  }
+  .filter {
+    margin-left: auto;
+  }
+  .find {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0 8px 8px;
+  }
+  .find .search {
+    flex: 1;
+    width: auto;
+    margin: 0;
+  }
+  .also {
+    color: var(--ink-muted);
+    font: 400 10.5px var(--mono);
+  }
+  /* What the areas hide: one dashed line, with the way back to all of them. */
+  .hidden-line {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin: 8px 0 0;
+    padding: 8px;
+    border-top: 1px dashed var(--line-strong);
+    border-bottom: 1px dashed var(--line-strong);
+    color: var(--ink-muted);
+    font: 400 12px var(--sans);
+  }
+  .hidden-line button {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--ink);
+    font: inherit;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    cursor: pointer;
   }
   .search {
     width: calc(100% - 16px);

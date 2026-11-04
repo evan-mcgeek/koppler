@@ -97,13 +97,14 @@ export function appGroups(
  * Team boards under their area, in the stack's order, then those in no area; with a choice, only the chosen areas'
  * groups and the no-area one, and what the others hold.
  */
-export function boardGroups<B extends { name: string; nodes: Record<string, unknown>; area?: string }>(
+export function boardGroups<B extends { name: string; nodes: Record<string, unknown>; area?: unknown }>(
   stack: Stack,
   boards: readonly B[],
   chosen: readonly string[] | undefined,
 ): { groups: { title: string; area?: string; boards: B[] }[]; hidden: { count: number; areas: string[] } } {
-  const of = (board: B) => boardArea(stack, board).id;
-  const all = [
+  const of = (board: B) =>
+    boardArea(stack, { nodes: board.nodes, ...(typeof board.area === 'string' && { area: board.area }) }).id;
+  const all: { title: string; area?: string; boards: B[] }[] = [
     ...Object.keys(stack.areas ?? {}).map(area => ({
       title: nameOf(stack, area),
       area,

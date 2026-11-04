@@ -891,7 +891,7 @@
   header:global(.l5) .names :global(.picker) {
     max-width: 100px;
   }
-  /* The stack's menu stays in the page, so the board menu's stack row can open it. */
+  header:global(.l5) :global(.out-area),
   header:global(.l6) .names :global(:is(.slash, .picker)) {
     display: none;
   }
