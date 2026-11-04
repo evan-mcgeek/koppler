@@ -65,8 +65,8 @@ test('the board menu groups team boards by area, hides the others with a line, a
   await bar.getByRole('button', { name: /^Board:/ }).click();
   const menu = page.getByRole('dialog', { name: 'Boards' });
   await expect(menu.locator('p.sub')).toHaveText(['Payments', 'Shipping', 'No area']);
+  // Picked in the menu, the menu stays open and regroups at once.
   await only(page, menu, 'Payments');
-  await bar.getByRole('button', { name: /^Board:/ }).click();
   await expect(menu.locator('p.sub')).toHaveText(['Payments', 'No area']);
   await expect(menu).toContainText('1 team board in Shipping');
   await page.screenshot({ path: 'test-results/areas-menu.png' });

@@ -204,7 +204,7 @@
       <span class="here" aria-hidden="true"></span><span class="name">{preset.name.replace(SUFFIX, '')}</span
       >{#if SUFFIX.test(preset.name)}<span class="suffix">{SUFFIX.exec(preset.name)?.[0]}</span>{/if}
       {#if area?.by === 'hand' && !mine}<span class="meta">set by hand</span>{/if}
-      {#if hasAreas && (mine || elsewhere)}<span class="area">{area?.id ? board.areas[area.id]?.name : 'No area'}</span
+      {#if hasAreas && (mine || elsewhere) && area?.id}<span class="area">{board.areas[area.id]?.name}</span
         >{:else if !hasAreas}<span class="meta">{size(preset)}</span>{/if}
     </button>
     {#if mine && typeof preset['source'] === 'string' && /^(https?:|\/)/.test(preset['source'])}

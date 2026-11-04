@@ -336,7 +336,7 @@
         class="search"
         type="search"
         bind:value={search}
-        placeholder="Find or filter: a name, .net, lambda"
+        placeholder={hasAreas ? 'Find or filter' : 'Find or filter: a name, .net, lambda'}
         aria-label="Find an app by name or kind"
         autocomplete="off"
         spellcheck="false"
