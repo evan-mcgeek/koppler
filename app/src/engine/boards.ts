@@ -39,7 +39,7 @@ export function editDone(id: unknown): void {
 }
 
 const CHANGES =
-  '[--propose] [--add <app,...>] [--remove <app,...>] [--cable <caller>:<callee>]... [--uncable <caller>:<callee>]... [--branch <app>=<branch>]... [--note <app>="<note>"]... [--arrange] [--request "<words>"] [--phase "<name>"] [--step|--propose-step <from>:<to>[="<note>"]]... [--unstep <from>:<to>]...';
+  '[--propose] [--add <app,...>] [--remove <app,...>] [--cable <caller>:<callee>]... [--uncable <caller>:<callee>]... [--branch <app>=<branch>]... [--note <app>="<note>"]... [--arrange] [--request "<words>"] [--phase "<name>"] [--step|--propose-step <from>:<to>[="<note>"]]... [--unstep <from>:<to>]... [--area <area>|auto]';
 const USAGE = `usage: koppler board new "<name>" ${CHANGES}\n       koppler board edit "<name>" ${CHANGES}\n       koppler board share "<name>"\n       koppler board open <file or link>\n       koppler board delete "<name>"`;
 
 /** Queues a change for an open canvas of the stack in use, dropping ones a day old that no canvas took. */
@@ -127,8 +127,23 @@ export function boardCommand(args: string[]): void | Promise<void> {
     note: Object.fromEntries(pairs('--note', '=')),
     ...(args.includes('--arrange') && { arrange: true }),
     ...(featureEdit(args) ?? {}),
+    ...areaEdit(values('--area')),
   };
   for (const line of changeBoard(name, edit, create, args.includes('--propose'))) console.log(line);
+}
+
+/** A board's area set by hand, or `auto` to take it from its apps again. */
+function areaEdit(given: string[]): { area?: string | null } {
+  const [area, ...more] = given;
+  if (area === undefined) return {};
+  if (more.length) fail(`--area once\n${USAGE}`);
+  if (area === 'auto') return { area: null };
+  const areas = Object.keys(readStack()?.areas ?? {});
+  if (!areas.includes(area))
+    fail(
+      `${area} is not an area of the stack: ${areas.length ? areas.join(', ') : 'it has none'} (koppler stack set areas.<id>)`,
+    );
+  return { area };
 }
 
 /**

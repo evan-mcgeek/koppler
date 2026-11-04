@@ -264,6 +264,10 @@ const App = z.looseObject(
       .optional()
       .describe('What it does, in a few words, for someone who does not build it'),
     kind: required.describe('What it is built with: dotnet, node, web, flutter, lambda, other'),
+    areas: z
+      .array(z.string(), { error: 'a list of area ids' })
+      .optional()
+      .describe('The parts of the stack it belongs to, by id from "areas"; with none, it shows in every area'),
     /** Its repo: owner/repo, or host/path/to/repo. An outside system has none. */
     slug: matching(SLUG, 'owner/repo, or host/path/to/repo').optional().describe('Its repo: owner/repo'),
     /** Set for a system that is never run locally (a SaaS), to what it is. */
@@ -524,6 +528,10 @@ const Preset = z.looseObject(
       })
       .optional(),
     edges: z.array(z.unknown(), { error: 'a list of { from, to }' }).optional(),
+    area: z
+      .string()
+      .optional()
+      .describe('Its area, by id from "areas", set by hand; without it, the area most of its apps are in'),
   },
   { error: 'an object' },
 );
@@ -557,6 +565,12 @@ export const StackSchema = z.looseObject(
       })
       .optional(),
     apps: z.record(z.string(), App, { error: 'an object keyed by app id' }),
+    areas: z
+      .record(z.string(), z.looseObject({ name: required.describe('Its name') }, { error: 'an object with a name' }), {
+        error: 'an object keyed by area id',
+      })
+      .optional()
+      .describe('Parts of the stack a person can choose to see; a view only, runs and environments stay the same'),
     kinds: z.record(z.string(), Kind, { error: 'an object keyed by kind id' }).optional(),
     queues: z.record(z.string(), Queue, { error: 'an object keyed by queue id' }).optional(),
     databases: z.record(z.string(), Database, { error: 'an object keyed by database id' }).optional(),
@@ -660,6 +674,8 @@ function presetProblems(index: number, preset: Loose, stack: Loose): string[] {
     );
   for (const [id] of entries(preset['nodes']))
     if (!has(stack['apps'], id)) problems.push(`${at}.nodes.${id}: no such app`);
+  const area = preset['area'];
+  if (typeof area === 'string' && !has(stack['areas'], area)) problems.push(`${at}.area: no such area under "areas"`);
   for (const [n, edge] of list(preset['edges']).entries()) {
     const from = isObject(edge) ? edge['from'] : undefined;
     const to = isObject(edge) ? edge['to'] : undefined;
@@ -735,8 +751,16 @@ function crossProblems(stack: Loose): string[] {
     for (const [env] of entries(isObject(database) ? database['envs'] : undefined))
       if (!envs.includes(env)) problems.push(`databases.${id}.envs.${env}: must be one of envs`);
   }
+  for (const [id] of entries(stack['areas']))
+    if (!ID.test(id)) problems.push(`areas.${id}: id must be lowercase letters, digits and dashes`);
   for (const [id, app] of entries(stack['apps'])) {
     if (!ID.test(id)) problems.push(`apps.${id}: id must be lowercase letters, digits and dashes`);
+    list(isObject(app) ? app['areas'] : undefined).forEach((area, n, all) => {
+      const at = `apps.${id}.areas[${String(n)}]`;
+      if (typeof area !== 'string') return;
+      if (!has(stack['areas'], area)) problems.push(`${at}: no such area under "areas"`);
+      else if (all.indexOf(area) !== n) problems.push(`${at}: ${area} is already in the list`);
+    });
     for (const [used] of entries(isObject(app) ? app['uses'] : undefined))
       if (!has(stack['databases'], used)) problems.push(`apps.${id}.uses.${used}: no such database under "databases"`);
     for (const [bucket] of entries(isObject(app) ? app['buckets'] : undefined)) {
