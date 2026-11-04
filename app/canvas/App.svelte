@@ -16,7 +16,7 @@
   import Inbox from './Inbox.svelte';
   import { inbox } from './inbox.svelte.ts';
   import History from './History.svelte';
-  import { credentials, opens } from './bar.svelte.ts';
+  import { bar as barState, credentials, opens } from './bar.svelte.ts';
   import HistoryIcon from '@lucide/svelte/icons/history';
   import RefreshCw from '@lucide/svelte/icons/refresh-cw';
   import BarMenu from './BarMenu.svelte';
@@ -323,6 +323,7 @@
       if (!full()) break;
       el.classList.add(step);
     }
+    barState.stackOut = el.classList.contains('l6');
   };
   $effect(() => {
     if (!bar) return;
@@ -874,7 +875,8 @@
   header:global(.l5) .names :global(.picker) {
     max-width: 100px;
   }
-  header:global(.l6) .names {
+  /* The stack's menu stays in the page, so the board menu's stack row can open it. */
+  header:global(.l6) .names :global(:is(.slash, .picker)) {
     display: none;
   }
   header:global(.l7) .boards :global(.picker .name) {

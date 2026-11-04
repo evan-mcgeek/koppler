@@ -9,3 +9,5 @@ export const opens: {
 } = {};
 /** How many credentials the apps on the board need and do not have stored, for the menu that holds Credentials. */
 export const credentials = $state({ missing: 0 });
+/** What the bar has given up as it narrows, for the menus that open from it. */
+export const bar = $state({ stackOut: false });

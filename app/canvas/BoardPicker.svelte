@@ -4,6 +4,7 @@
   // The board on screen, by name: a menu of the team's boards and the user's own, to open, rename, copy, share or
   // delete one, start a new one, or open one from a file or a link.
   import type { StoredPreset } from '../src/core/presets.ts';
+  import { bar } from './bar.svelte.ts';
   import { board } from './board.svelte.ts';
   import { ago, openBoard, openFile, openLink } from './boards.ts';
   import { post } from './data.ts';
@@ -19,7 +20,7 @@
   let find = $state<HTMLInputElement>();
   let query = $state('');
   /** The bar too narrow for the stack's name: it is the menu's first row instead. */
-  let stackRow = $state(false);
+  const stackRow = $derived(bar.stackOut);
   const shows = (preset: StoredPreset) => preset.name.toLowerCase().includes(query.trim().toLowerCase());
   /** "(local)" or "(mine)" after a board's name: set apart, so a long name keeps it. */
   const SUFFIX = / \((local|mine)\)$/;
@@ -52,7 +53,6 @@
   const fresh = (ev: ToggleEvent) => {
     if (ev.newState !== 'open') return;
     query = '';
-    stackRow = !!picker?.closest('header')?.classList.contains('l6');
     named = board.name ?? '';
     link = '';
     hint = { text: OPEN_HINT, warn: false };
@@ -61,6 +61,11 @@
     if (ev.key === 'ArrowDown' && ev.target === find) {
       ev.preventDefault();
       options()[0]?.focus();
+      return;
+    }
+    if (ev.key === 'ArrowUp' && ev.target === options()[0]) {
+      ev.preventDefault();
+      find?.focus();
       return;
     }
     if ((ev.key !== 'ArrowDown' && ev.key !== 'ArrowUp') || (ev.target as Element).matches('input')) return;
@@ -221,8 +226,9 @@
             choose(preset);
           }}
         >
-          <span class="here" aria-hidden="true"></span><span class="name">{preset.name}</span><span class="meta"
-            >{size(preset)}</span
+          <span class="here" aria-hidden="true"></span><span class="name">{preset.name.replace(SUFFIX, '')}</span
+          >{#if SUFFIX.test(preset.name)}<span class="suffix">{SUFFIX.exec(preset.name)?.[0].trim()}</span>{/if}<span
+            class="meta">{size(preset)}</span
           >
         </button>
         {#if title === 'Your boards' && typeof preset['source'] === 'string' && /^(https?:|\/)/.test(preset['source'])}

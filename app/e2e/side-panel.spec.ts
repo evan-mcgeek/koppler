@@ -108,3 +108,36 @@ test('in a narrower window the widest the panel goes leaves the board 640px', as
   await page.setViewportSize({ width: 1440, height: 800 });
   await expect.poll(() => width(page)).toBe(560);
 });
+
+test('from the keyboard: More opens on its first item, and an app added keeps the focus on its row', async ({
+  page,
+}) => {
+  const row = panel(page).getByRole('listitem').filter({ hasText: 'Catalog API' });
+  await row.getByRole('button', { name: /^Catalog API/ }).focus();
+  await page.keyboard.press('Tab');
+  await page.keyboard.press('Tab');
+  await page.keyboard.press('Tab');
+  await expect(row.getByRole('button', { name: 'More for Catalog API' })).toBeFocused();
+  await page.keyboard.press('Enter');
+  const menu = page.getByRole('menu', { name: 'More' });
+  await expect(menu.getByRole('menuitem', { name: 'Run alone' })).toBeFocused();
+  await page.keyboard.press('ArrowDown');
+  await expect(menu.getByRole('menuitem', { name: 'Add to the board' })).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(panel(page).getByRole('list', { name: 'On the board · 3' })).toContainText('Catalog API');
+  await expect(panel(page).getByRole('button', { name: /^Catalog API/ })).toBeFocused();
+  await page.keyboard.press('ArrowDown');
+  await expect(panel(page).getByRole('button', { name: /^Orders API/ })).toBeFocused();
+});
+
+test('in a narrow bar the stack is the board menu first row, and Switch stack opens its menu', async ({ page }) => {
+  await page.setViewportSize({ width: 1010, height: 800 });
+  const bar = page.getByRole('banner');
+  await expect(bar.getByRole('button', { name: 'Acme Shop' })).toBeHidden();
+  await bar.getByRole('button', { name: /^Board:/ }).click();
+  const menu = page.getByRole('dialog', { name: 'Boards' });
+  await expect(menu).toContainText('Acme Shop');
+  await menu.getByRole('button', { name: 'Switch stack' }).click();
+  await expect(page.getByRole('menu', { name: 'Stacks' })).toBeVisible();
+  await page.screenshot({ path: 'test-results/side-panel-narrow.png' });
+});

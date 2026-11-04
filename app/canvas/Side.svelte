@@ -4,6 +4,7 @@
   import Play from '@lucide/svelte/icons/play';
   import Plus from '@lucide/svelte/icons/plus';
   import Ellipsis from '@lucide/svelte/icons/ellipsis';
+  import { flushSync, tick } from 'svelte';
   import X from '@lucide/svelte/icons/x';
   import Needs from './Needs.svelte';
   import Summary from './Summary.svelte';
@@ -53,6 +54,13 @@
       discovered.last = app.id;
     } else if (!app.cloned) void copyClone(app);
     else board.add(app.id);
+  };
+  /** Added or taken off, the row moves to the other list: the keyboard stays on it. */
+  const move = async (id: string, on: boolean) => {
+    if (on) board.remove(id);
+    else board.add(id);
+    await tick();
+    document.querySelector<HTMLElement>(`aside .app[data-id="${id}"] .main`)?.focus();
   };
   const hintOf = (app: StackApp, on: boolean) =>
     on
@@ -122,13 +130,19 @@
   };
   let more = $state<HTMLDivElement>();
   let moreFor = $state<{ app: StackApp; on: boolean } | null>(null);
+  let moreOpen = $state(false);
+  let edgeFocused = $state(false);
   const openMore = (app: StackApp, on: boolean, from: HTMLElement) => {
     moreFor = { app, on };
+    // Drawn for this app before it is placed and focused.
+    flushSync();
     if (!more) return;
     const at = from.getBoundingClientRect();
     more.style.top = `${String(at.bottom + 4)}px`;
     more.style.left = `${String(Math.max(8, at.right - 220))}px`;
     more.showPopover();
+    const tall = more.getBoundingClientRect().height;
+    if (at.bottom + 4 + tall > innerHeight - 8) more.style.top = `${String(Math.max(8, at.top - 4 - tall))}px`;
     more.querySelector<HTMLButtonElement>('button')?.focus();
   };
   const menuStep = (ev: KeyboardEvent) => {
@@ -210,7 +224,7 @@
 </script>
 
 <svelte:window bind:innerWidth={inner} />
-<aside aria-label="Apps" class:protected={board.protected} style:width="{width}px">
+<aside id="side-apps" aria-label="Apps" class:protected={board.protected} style:width="{width}px">
   <section aria-labelledby="apps-title">
     <h2 id="apps-title">
       Apps
@@ -238,7 +252,7 @@
             {@const on = onBoard.includes(app.id)}
             {@const runnable = !app.outside && app.cloned}
             {@const up = on ? live.up(app.id) : null}
-            <div class="app" class:on role="listitem">
+            <div class="app" class:on role="listitem" data-id={app.id}>
               <span class="kind">{app.kindLabel}</span>
               <button
                 class="main"
@@ -284,18 +298,14 @@
                       type="button"
                       aria-label="Remove {app.name} from the board"
                       title="Remove from the board"
-                      onclick={() => {
-                        board.remove(app.id);
-                      }}><Icon of={X} size={12} /></button
+                      onclick={() => void move(app.id, true)}><Icon of={X} size={12} /></button
                     >
                   {:else}
                     <button
                       type="button"
                       aria-label="Add {app.name} to the board"
                       title="Add to the board"
-                      onclick={() => {
-                        board.add(app.id);
-                      }}><Icon of={Plus} size={12} /></button
+                      onclick={() => void move(app.id, false)}><Icon of={Plus} size={12} /></button
                     >
                   {/if}
                 {/if}
@@ -303,6 +313,7 @@
                   type="button"
                   aria-label="More for {app.name}"
                   aria-haspopup="menu"
+                  aria-expanded={moreOpen && moreFor?.app.id === app.id}
                   title="More"
                   onclick={ev => {
                     openMore(app, on, ev.currentTarget);
@@ -358,6 +369,7 @@
   class:most={width >= cap}
   role="separator"
   aria-orientation="vertical"
+  aria-controls="side-apps"
   aria-label="Side panel width"
   aria-valuemin={MIN}
   aria-valuemax={cap}
@@ -371,10 +383,27 @@
     choose(WIDE);
   }}
   onkeydown={nudge}
+  onfocus={ev => {
+    edgeFocused = (ev.currentTarget as HTMLElement).matches(':focus-visible');
+  }}
+  onblur={() => {
+    edgeFocused = false;
+  }}
 >
-  {#if dragging}<span class="size">{width} px</span>{/if}
+  {#if dragging || edgeFocused}<span class="size">{width} px</span>{/if}
 </div>
-<div bind:this={more} class="more-menu" popover role="menu" tabindex="-1" aria-label="More" onkeydown={menuStep}>
+<div
+  bind:this={more}
+  class="more-menu"
+  popover
+  role="menu"
+  tabindex="-1"
+  aria-label="More"
+  onkeydown={menuStep}
+  ontoggle={ev => {
+    moreOpen = ev.newState === 'open';
+  }}
+>
   {#if moreFor}
     {@const app = moreFor.app}
     {#if !app.outside && app.cloned}
@@ -391,8 +420,7 @@
         role="menuitem"
         onclick={() => {
           more?.hidePopover();
-          if (moreFor?.on) board.remove(app.id);
-          else board.add(app.id);
+          void move(app.id, !!moreFor?.on);
         }}>{moreFor.on ? 'Remove from the board' : 'Add to the board'}</button
       >
     {/if}
@@ -608,9 +636,13 @@
     left: 3px;
     width: 1px;
   }
-  .edge:hover::after,
-  .edge:focus-visible::after {
+  .edge:hover::after {
     background: var(--ink);
+  }
+  .edge:focus-visible::after {
+    left: 2px;
+    width: 4px;
+    border: 1px solid var(--ink);
   }
   .edge.dragging::after {
     width: 2px;
@@ -645,6 +677,9 @@
     border: 1px solid var(--line-strong);
     background: var(--surface);
     box-shadow: var(--lift);
+  }
+  .more-menu button + button {
+    border-top: 1px solid var(--line);
   }
   .more-menu button {
     display: block;
