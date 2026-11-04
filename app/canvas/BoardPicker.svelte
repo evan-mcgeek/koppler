@@ -174,7 +174,7 @@
   popovertarget={id}
 >
   <span class="name">{label.replace(SUFFIX, '')}</span>
-  {#if SUFFIX.test(label)}<span class="suffix" title="Changed on this Mac">{SUFFIX.exec(label)?.[0].trim()}</span>{/if}
+  {#if SUFFIX.test(label)}<span class="suffix" title="Changed on this Mac">{SUFFIX.exec(label)?.[0]}</span>{/if}
   {#if board.feature}<span class="kind">Feature board</span>{/if}
 </button>
 <div
@@ -227,7 +227,7 @@
           }}
         >
           <span class="here" aria-hidden="true"></span><span class="name">{preset.name.replace(SUFFIX, '')}</span
-          >{#if SUFFIX.test(preset.name)}<span class="suffix">{SUFFIX.exec(preset.name)?.[0].trim()}</span>{/if}<span
+          >{#if SUFFIX.test(preset.name)}<span class="suffix">{SUFFIX.exec(preset.name)?.[0]}</span>{/if}<span
             class="meta">{size(preset)}</span
           >
         </button>
