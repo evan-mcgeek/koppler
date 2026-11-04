@@ -524,6 +524,10 @@ const Preset = z.looseObject(
       })
       .optional(),
     edges: z.array(z.unknown(), { error: 'a list of { from, to }' }).optional(),
+    layout: z.unknown().optional().describe('Where its cards sit, and the side each cable leaves from'),
+    outside: z.unknown().optional().describe('The outside systems pinned on it'),
+    feature: z.unknown().optional().describe('A feature board: its request, phases and steps'),
+    discover: z.unknown().optional().describe("Where its cards sit on Discover's map"),
   },
   { error: 'an object' },
 );
