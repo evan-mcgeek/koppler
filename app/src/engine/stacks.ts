@@ -9,6 +9,7 @@ import { Failure } from '../failure.ts';
 import { configDir, tempDir } from '../paths.ts';
 import {
   type Config,
+  expand,
   type Index,
   loadConfig,
   readIndex,
@@ -52,6 +53,9 @@ export const LOADING = path.join(tempDir(), 'loading.json');
 export const stackKey = (dir: string): string =>
   crypto.createHash('sha1').update(path.resolve(dir)).digest('hex').slice(0, 12);
 
+/** Where a stack's own files wait while another stack is in use. */
+export const shelfOf = (dir: string): string => path.join(tempDir(), 'stacks', stackKey(dir));
+
 /** Moves each per-stack file that is in `from` to `to`. */
 const moveFiles = (from: string, to: string, make = true) => {
   const there = PER_STACK.filter(file => fs.existsSync(path.join(from, file)));
@@ -75,14 +79,13 @@ export function setStack(config: Config, dir: string, save: Save = saveConfig): 
   if (from && path.resolve(from) === path.resolve(dir)) return;
   const refused = switchRefused(config, dir);
   if (refused) throw new Failure(refused);
-  const shelf = (stack: string) => path.join(tempDir(), 'stacks', stackKey(stack));
   if (from) {
-    fs.mkdirSync(shelf(from), { recursive: true });
-    moveFiles(tempDir(), shelf(from), false);
+    fs.mkdirSync(shelfOf(from), { recursive: true });
+    moveFiles(tempDir(), shelfOf(from), false);
   }
   // With no stack in use before, what lies there is put aside too, never deleted: it may be a run's action log.
   else moveFiles(tempDir(), path.join(tempDir(), 'stacks', `unassigned-${String(Date.now())}`));
-  moveFiles(shelf(dir), tempDir(), false);
+  moveFiles(shelfOf(dir), tempDir(), false);
   config.stack = dir;
   save(config);
 }
@@ -168,6 +171,24 @@ export function knownStacks(index: Pick<Index, 'repos'> | null | undefined): Kno
       },
     ];
   });
+}
+
+/** One of those stacks, by its name or its folder; why there is none when no single one matches. */
+export function stackNamed(
+  want: string,
+  index: Pick<Index, 'repos'> | null | undefined = readIndex(),
+): KnownStack | { error: string } {
+  const folder = path.resolve(expand(want));
+  const matches = knownStacks(index).filter(
+    stack => stack.dir === folder || stack.name.toLowerCase() === want.toLowerCase(),
+  );
+  const [match] = matches;
+  if (match && matches.length === 1) return match;
+  return {
+    error: matches.length
+      ? `several stacks are called ${want}; use its folder: koppler use`
+      : `no stack called ${want}; see: koppler use`,
+  };
 }
 
 /** Switches to one of those stacks; any other folder is refused. */
