@@ -679,7 +679,8 @@ test.describe('a bucket, an API Gateway and a Step Functions the apps use', () =
     await card(page, 'resource:api').click();
     await expect(panel.getByRole('heading', { name: 'Routes' })).toBeVisible();
     await expect(panel.getByText('POST /orders, GET /orders')).toBeVisible();
-
+    // The panel opening moves the map: the next card is clicked where it settles.
+    await settled(page);
     await card(page, 'resource:refunds').click();
     await expect(panel.getByRole('heading', { name: 'Started by' })).toBeVisible();
     await expect(panel.locator('.step')).toHaveText(['1 Check the refund', '2 Pay it backCalls Payments API']);
