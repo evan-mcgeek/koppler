@@ -1,8 +1,9 @@
 <script lang="ts">
   import Icon from './Icon.svelte';
   import X from '@lucide/svelte/icons/x';
-  // What is worth knowing about the board before it runs: tunnels the plan moved, and apps on the board that are
-  // still called in the deployed environment. Each note is dismissed for this board.
+  // What is worth knowing about the board before it runs: tunnels the plan moved, apps on the board that are
+  // still called in the deployed environment, and apps it keeps that the stack has no more. Each note is dismissed
+  // for this board.
   import { describePlan } from '../src/core/ports.ts';
   import { board } from './board.svelte.ts';
 
@@ -11,6 +12,8 @@
     text: string;
     /** The cable that would put it right. */
     cable?: { from: string; to: string };
+    /** An app kept hidden on the board that the stack has no more. */
+    gone?: string;
   }
   const name = board.nameOf;
   const ports = $derived(
@@ -33,13 +36,25 @@
   const tooNew = $derived<Note[]>(
     board.formatError ? [{ key: `format:${board.formatError}`, text: `${board.formatError}.` }] : [],
   );
-  const notes = $derived([...tooNew, ...ports, ...unwired].filter(note => !board.dismissed.includes(note.key)));
+  const gone = $derived(
+    board.hidden
+      .filter(id => !board.app(id))
+      .map((id): Note => ({
+        key: `gone:${id}`,
+        text: `${id} is kept on this board, but this stack has no such app.`,
+        gone: id,
+      })),
+  );
+  const notes = $derived(
+    [...tooNew, ...gone, ...ports, ...unwired].filter(note => !board.dismissed.includes(note.key)),
+  );
 </script>
 
 {#if notes.length && !board.live}
   <div class="notes" role="group" aria-label="About this board">
     {#each notes as note (note.key)}
       {@const cable = note.cable}
+      {@const app = note.gone}
       <div class="note" role="note">
         <span>{note.text}</span>
         <button
@@ -57,6 +72,14 @@
             onclick={() => {
               board.connect(cable.from, cable.to);
             }}>Connect</button
+          >
+        {:else if app}
+          <button
+            class="do"
+            type="button"
+            onclick={() => {
+              board.dropHidden([app]);
+            }}>Take it off the board</button
           >
         {/if}
       </div>

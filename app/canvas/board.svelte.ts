@@ -20,6 +20,7 @@ import {
   migrate,
   VERSION as PRESET_VERSION,
   type BoardEdit,
+  type OpenedNode,
   type StackFacts,
   type StoredPreset,
   withHidden,
@@ -243,6 +244,41 @@ const discoverOf = (given: unknown): DiscoverState => {
 /** Anything Discover has to keep: cards opened or moved, or the layout Arrange gave. */
 const discoverKept = (discover: DiscoverState) =>
   discover.open.length > 0 || Object.keys(discover.at).length > 0 || discover.layout !== undefined;
+
+type KeptLayout = {
+  nodes?: Record<string, Partial<Point> | undefined>;
+  infra?: Record<string, Point | undefined>;
+  sides?: Record<string, unknown[] | undefined>;
+};
+const layoutOf = (preset: StoredPreset) => (preset['layout'] ?? {}) as KeptLayout;
+/** Where a board kept a card, when it kept a usable place. */
+function placeIn(layout: KeptLayout, id: string): Point | null {
+  const { x, y } = layout.nodes?.[id] ?? {};
+  return typeof x === 'number' && typeof y === 'number' && Number.isFinite(x) && Number.isFinite(y) ? { x, y } : null;
+}
+/** A cable on the sides a board kept for it, or on the sides that face each other. */
+function keptCable(from: string, to: string, at: Record<string, Point>, sides?: KeptLayout['sides']): CableEdge {
+  const isSide = (side: unknown): side is Side => typeof side === 'string' && side in SIDES;
+  const whole = (key: string, value: unknown) => (Number.isInteger(value) ? { [key]: value as number } : {});
+  const finite = (key: string, value: unknown) =>
+    typeof value === 'number' && Number.isFinite(value) ? { [key]: value } : {};
+  const [fromSide, toSide, , , fromSlot, toSlot, points, fromShift, toShift] = sides?.[`${from}>${to}`] ?? [];
+  if (!isSide(fromSide) || !isSide(toSide))
+    return cable(
+      from,
+      to,
+      sidesFor(at, { from, to }, 'down', () => ({ w: 260, h: 160 })),
+    );
+  return cable(from, to, {
+    fromSide,
+    toSide,
+    ...whole('fromSlot', fromSlot),
+    ...whole('toSlot', toSlot),
+    ...finite('fromShift', fromShift),
+    ...finite('toShift', toShift),
+    ...(Array.isArray(points) && { points: points as Point[] }),
+  });
+}
 
 class Board {
   /** The stack's name and the environment the board runs against; empty until the board is opened. */
@@ -1312,7 +1348,7 @@ class Board {
   /** The board on screen as a board to keep, where its cards sit, and the apps of it this stack cannot show yet. */
   #asPreset(name: string): StoredPreset {
     return withHidden(
-      [...this.own, ...this.team].find(one => one.name === this.name),
+      this.#stored(),
       { ...this.#onScreen(name), layout: this.#layout() },
       id => !!this.app(id)?.cloned,
     );
@@ -1560,17 +1596,8 @@ class Board {
     const checked = check(given, this.#facts());
     if (checked.error !== undefined) return { error: checked.error };
     const { preset, notes } = checked;
-    const layout = (given['layout'] ?? {}) as {
-      nodes?: Record<string, Partial<Point> | undefined>;
-      infra?: Record<string, Point | undefined>;
-      sides?: Record<string, unknown[] | undefined>;
-    };
-    const place = (id: string) => {
-      const { x, y } = layout.nodes?.[id] ?? {};
-      return typeof x === 'number' && typeof y === 'number' && Number.isFinite(x) && Number.isFinite(y)
-        ? { x, y }
-        : null;
-    };
+    const layout = layoutOf(given);
+    const place = (id: string) => placeIn(layout, id);
     const ids = Object.keys(preset.nodes);
     const placed = ids.every(place);
     this.scratch = false;
@@ -1596,46 +1623,29 @@ class Board {
       : [];
     this.infra = this.infra.map(unselected);
     this.nodes = ids.flatMap(id => {
-      const app = this.app(id);
       const node = preset.nodes[id];
-      if (!app || !node) return [];
-      const chosen = {
-        ...node,
-        hideTunnels: node.tunnels === false,
-        showQueues: node.queues === true,
-        ...(node.followsClone && { branch: '', asked: node.branch }),
-      };
-      return [this.#card(app, (placed && place(id)) || { x: 0, y: 0 }, chosen)];
+      return node ? this.#opened(id, node, (placed && place(id)) || { x: 0, y: 0 }) : [];
     });
     const at = Object.fromEntries(this.nodes.map(({ id, position }) => [id, position]));
-    const isSide = (side: unknown): side is Side => typeof side === 'string' && side in SIDES;
-    const whole = (key: string, value: unknown) => (Number.isInteger(value) ? { [key]: value as number } : {});
-    const finite = (key: string, value: unknown) =>
-      typeof value === 'number' && Number.isFinite(value) ? { [key]: value } : {};
-    this.edges = preset.edges.map(({ from, to }) => {
-      const [fromSide, toSide, , , fromSlot, toSlot, points, fromShift, toShift] =
-        layout.sides?.[`${from}>${to}`] ?? [];
-      if (!placed || !isSide(fromSide) || !isSide(toSide))
-        return cable(
-          from,
-          to,
-          sidesFor(at, { from, to }, 'down', () => ({ w: 260, h: 160 })),
-        );
-      return cable(from, to, {
-        fromSide,
-        toSide,
-        ...whole('fromSlot', fromSlot),
-        ...whole('toSlot', toSlot),
-        ...finite('fromShift', fromShift),
-        ...finite('toShift', toShift),
-        ...(Array.isArray(points) && { points: points as Point[] }),
-      });
-    });
+    this.edges = preset.edges.map(({ from, to }) => keptCable(from, to, at, placed ? layout.sides : undefined));
     // The board before's tunnel and queue cards are not this one's: each goes where this board kept it, or beside its app.
     this.infra = [];
     this.syncInfra(placed ? (layout.infra ?? {}) : {});
     this.opened = placed ? 'fit' : 'arrange';
     return { notes };
+  }
+
+  /** An app's card as a board opens it: how it runs, its branch and note, and what it shows. */
+  #opened(id: string, node: OpenedNode, at: Point): CardNode[] {
+    const app = this.app(id);
+    if (!app) return [];
+    const chosen = {
+      ...node,
+      hideTunnels: node.tunnels === false,
+      showQueues: node.queues === true,
+      ...(node.followsClone && { branch: '', asked: node.branch }),
+    };
+    return [this.#card(app, at, chosen)];
   }
 
   /** Takes every card off the board. Undo brings them back. */
@@ -1789,26 +1799,53 @@ class Board {
     // After the view: a new card goes on a spot that is on screen.
     this.syncInfra((saved?.infra ?? {}) as Record<string, Point | undefined>);
   }
-  /** Puts back the apps of the board on screen it was kept with, hidden, that the stack can show now. */
+  /** Puts back the apps of the board on screen it was kept with, hidden, that the stack can show now, as it opens them. */
   #unhide(): void {
-    const stored = [...this.own, ...this.team].find(one => one.name === this.name);
+    const stored = this.#stored();
     // An emptied board is left empty.
     if (!stored || !this.nodes.length) return;
-    const back = Object.keys(stored.nodes).filter(
-      id => this.app(id)?.cloned && !this.nodes.some(node => node.id === id),
-    );
-    const places = ((stored['layout'] ?? {}) as { nodes?: Record<string, Partial<Point> | undefined> }).nodes ?? {};
-    for (const id of back) {
-      const app = this.app(id);
-      const { x, y } = places[id] ?? {};
-      if (app && typeof x === 'number' && typeof y === 'number')
-        this.nodes = [...this.nodes, this.#card(app, { x, y })];
-      else this.add(id);
-    }
+    const opened = check(stored, this.#facts()).preset;
     const on = (id: string) => this.nodes.some(node => node.id === id);
-    for (const { from, to } of stored.edges as { from: string; to: string }[])
-      if ((back.includes(from) || back.includes(to)) && on(from) && on(to) && this.#facts().canCall(from, to))
-        this.connect(from, to);
+    const back = Object.keys(opened?.nodes ?? {}).filter(id => !on(id));
+    if (!opened || !back.length) return;
+    const layout = layoutOf(stored);
+    for (const id of back) {
+      const node = opened.nodes[id];
+      const place = placeIn(layout, id);
+      if (!node) continue;
+      if (place) this.nodes = [...this.nodes, ...this.#opened(id, node, place)];
+      else {
+        this.add(id);
+        this.nodes = this.nodes.map(card =>
+          card.id === id ? (this.#opened(id, node, card.position)[0] ?? card) : card,
+        );
+      }
+    }
+    const at = Object.fromEntries(this.nodes.map(({ id, position }) => [id, position]));
+    const placed = back.every(id => placeIn(layout, id));
+    const returning = opened.edges.filter(({ from, to }) => back.includes(from) || back.includes(to));
+    this.edges = [
+      ...this.edges,
+      ...returning.map(({ from, to }) => keptCable(from, to, at, placed ? layout.sides : undefined)),
+    ];
+  }
+  /** The apps of the board on screen it keeps hidden: this stack has no clone of them, or no such app. */
+  get hidden(): string[] {
+    const on = new Set(this.nodes.map(({ id }) => id));
+    return Object.keys(this.#stored()?.nodes ?? {}).filter(id => !on.has(id) && !this.app(id)?.cloned);
+  }
+  /** Takes apps kept hidden off the board on screen; a team board becomes the user's own, as a change from the terminal makes it. */
+  dropHidden(ids: string[]): void {
+    const stored = this.#stored();
+    if (!stored || !ids.length) return;
+    const changed = editPreset(stored, { remove: ids });
+    this.own = this.own.includes(stored)
+      ? this.own.map(one => (one === stored ? changed : one))
+      : [...this.own, changed];
+  }
+  /** The board on screen as it is kept, the user's own before the team's. */
+  #stored(): StoredPreset | undefined {
+    return [...this.own, ...this.team].find(one => one.name === this.name);
   }
 
   /** Keeps the board on screen among the user's boards (a changed team board becomes their copy), before it is saved. */
@@ -2083,11 +2120,8 @@ class Board {
     }
     const before = this.content();
     const on = (id: string) => this.cards.some(node => node.id === id);
-    // An app kept hidden on the board is taken off where the board is kept.
-    const hidden = (change.remove ?? []).filter(
-      id => !on(id) && this.own.some(one => one.name === name && one.nodes[id]),
-    );
-    if (hidden.length) this.own = this.own.map(one => (one.name === name ? editPreset(one, { remove: hidden }) : one));
+    const hidden = (change.remove ?? []).filter(id => this.hidden.includes(id));
+    this.dropHidden(hidden);
     for (const id of change.remove ?? []) this.remove(id);
     for (const id of change.add ?? []) this.add(id);
     for (const [id, branch] of Object.entries(change.branch ?? {})) this.set(id, { branch });
