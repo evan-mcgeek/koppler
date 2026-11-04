@@ -311,16 +311,8 @@ test('a lock in the Areas tab keeps what it covers, and Remove says which lock h
     'title',
     'Locked: the Shipping area',
   );
-  await panel.getByRole('button', { name: 'Close' }).click();
+  // A lock set elsewhere while the panel is open holds at once, without opening it again.
   await lock('areas');
-  await expect
-    .poll(
-      async () =>
-        ((await (await page.request.get(`${canvas.url}data/status.json`)).json()) as { locks?: string[] }).locks,
-    )
-    .toContain('areas');
-  await fromMenu(page, 'Settings', 'Stack settings');
-  await page.getByRole('tab', { name: 'Areas' }).click();
   await expect(panel.getByRole('button', { name: 'Add area' })).toBeDisabled();
   await expect(row('payments').getByRole('button', { name: 'Move Payments' })).toBeDisabled();
   await expect(row('shipping').getByRole('button', { name: 'Remove' })).toHaveAttribute('title', 'Locked: the areas');

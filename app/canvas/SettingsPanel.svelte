@@ -49,6 +49,11 @@
   let draft = $state.raw<unknown>(null);
   let schema = $state.raw<Schema | null>(null);
   let locks = $state<string[]>([]);
+  // A lock set elsewhere (the terminal, another tab) shows while the panel is open, not only when it opens.
+  $effect(() => {
+    const known = live.status?.locks;
+    if (known) locks = known;
+  });
   let problems = $state(new Map<string, string>());
   let tab = $state(0);
   let saving = $state(false);
