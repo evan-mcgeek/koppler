@@ -194,6 +194,8 @@ export interface BoardEdit {
   arrange?: boolean;
   /** Its request, phases and steps: a board with them is a feature board. */
   feature?: FeatureEdit;
+  /** Its area, by id, set by hand; null puts it back to the area its apps are in. */
+  area?: string | null;
 }
 
 const isPoint = (value: unknown): value is { x: number; y: number } =>
@@ -202,7 +204,9 @@ const same = (a: Edge) => (b: Edge) => a.from === b.from && a.to === b.to;
 
 /** The board with the edit made. What it does not touch stays as it was, card places too; new cards go in a column to the right. */
 export function editPreset(given: StoredPreset, edit: BoardEdit): StoredPreset {
-  const preset = edit.feature ? { ...given, feature: editFeature(featureOf(given['feature']), edit.feature) } : given;
+  const featured = edit.feature ? { ...given, feature: editFeature(featureOf(given['feature']), edit.feature) } : given;
+  const { area: _, ...arealess } = featured;
+  const preset = edit.area === undefined ? featured : edit.area === null ? arealess : { ...arealess, area: edit.area };
   const gone = new Set(edit.remove ?? []);
   const kept = <T>(all: Record<string, T>) => Object.fromEntries(Object.entries(all).filter(([id]) => !gone.has(id)));
   const nodes = kept(preset.nodes);
@@ -263,6 +267,8 @@ export function describeEdit(
     edit.feature?.step?.length &&
       `${proposed ? 'add' : 'added'} the step${edit.feature.step.length > 1 ? 's' : ''} ${cables(edit.feature.step)}`,
     edit.feature?.unstep?.length && `${proposed ? 'take off' : 'took off'} the step ${cables(edit.feature.unstep)}`,
+    edit.area === null && `${proposed ? 'take' : 'took'} its area from its apps`,
+    edit.area && `set its area to ${edit.area}`,
   ]
     .filter(Boolean)
     .join('; ');

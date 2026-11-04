@@ -11,6 +11,7 @@ import { actionsCommand, stepCommand } from './cli/records.ts';
 import { fail, Failure } from './failure.ts';
 import { canvas, logs, restart, status, stop } from './cli/running.ts';
 import { readData, readStack } from './data.ts';
+import { boardArea } from './core/areas.ts';
 import { completion, SHELLS, type Shell } from './core/completion.ts';
 import { guide } from './core/guide.ts';
 import { switchCommand } from './engine/branch.ts';
@@ -112,18 +113,36 @@ function refresh(args: string[]): void {
 /** Stacks on this Mac, or switch to one; --boards lists the boards of the stack in use (the team's presets and your own). */
 function use(args: string[]): void {
   if (args.includes('--boards')) {
-    const own = (readData('state')?.['presets'] ?? []) as { name: string }[];
+    const stack = loaded();
+    const wanted = args.includes('--area') ? args[args.indexOf('--area') + 1] : undefined;
+    if (args.includes('--area') && (!wanted || !Object.hasOwn(stack.areas ?? {}, wanted)))
+      fail(`--area needs one of the stack's areas: ${Object.keys(stack.areas ?? {}).join(', ') || 'it has none'}`);
+    const own = (readData('state')?.['presets'] ?? []) as {
+      name: string;
+      nodes?: Record<string, unknown>;
+      area?: string;
+    }[];
     const boards = [
-      ...(loaded().presets ?? []).map(preset => ({ name: preset.name, from: 'team' })),
-      ...own.map(preset => ({ name: preset.name, from: 'yours' })),
-    ];
+      ...(stack.presets ?? []).map(preset => ({ ...preset, from: 'team' })),
+      ...own.map(preset => ({ ...preset, from: 'yours' })),
+    ]
+      .map(board => {
+        const area = boardArea(stack, { nodes: board.nodes ?? {}, ...(board.area && { area: board.area }) });
+        return { name: board.name, from: board.from, ...(area.id && { area: area.id, areaBy: area.by }) };
+      })
+      .filter(board => !wanted || board.area === wanted);
     if (args.includes('--json')) console.log(JSON.stringify(boards, null, 2));
-    else if (!boards.length) console.log('No boards yet: build one on the canvas.');
+    else if (!boards.length) console.log(wanted ? `No board in ${wanted}.` : 'No boards yet: build one on the canvas.');
     else
-      for (const board of boards)
-        console.log(`${board.name}  (${board.from === 'team' ? 'team preset' : 'your board'})`);
+      for (const board of boards) {
+        const area = board.area
+          ? `, ${stack.areas?.[board.area]?.name ?? board.area}${board.areaBy === 'hand' ? ' (set by hand)' : ''}`
+          : '';
+        console.log(`${board.name}  (${board.from === 'team' ? 'team preset' : 'your board'}${area})`);
+      }
     return;
   }
+  if (args.includes('--area')) fail('--area lists the boards of one area: koppler use --boards --area <area>');
   const wanted = positional(args);
   if (!wanted.length) {
     stacksCommand(args);
@@ -427,8 +446,8 @@ const COMMANDS: Command[] = [
   {
     name: 'use',
     who: 'you',
-    args: '[<stack>] [--boards] [--json]',
-    about: 'list the stacks on this Mac (* is in use), switch to one, or list its boards',
+    args: '[<stack>] [--boards [--area <area>]] [--json]',
+    about: 'list the stacks on this Mac (* is in use), switch to one, or list its boards, with their area',
     run: use,
     example: 'koppler use "Shop"',
   },
@@ -750,7 +769,7 @@ const COMMANDS: Command[] = [
   {
     name: 'board',
     who: 'agent',
-    args: 'new|edit "<name>" [--add <app,...>] [--remove <app,...>] [--cable <caller>:<callee>]... [--uncable <caller>:<callee>]... [--branch <app>=<branch>]... [--note <app>="<note>"]... [--arrange] [--propose] [--request "<words>"] [--phase "<name>"] [--step|--propose-step <from>:<to>[="<note>"]]... [--unstep <from>:<to>]...',
+    args: 'new|edit "<name>" [--add <app,...>] [--remove <app,...>] [--cable <caller>:<callee>]... [--uncable <caller>:<callee>]... [--branch <app>=<branch>]... [--note <app>="<note>"]... [--arrange] [--propose] [--request "<words>"] [--phase "<name>"] [--step|--propose-step <from>:<to>[="<note>"]]... [--unstep <from>:<to>]... [--area <area>|auto]',
     forms: [
       [
         'new "<name>" [--add <app,...>] [--cable <caller>:<callee>]...',
@@ -763,6 +782,7 @@ const COMMANDS: Command[] = [
       ['edit "<name>" [--cable <caller>:<callee>]... [--uncable <caller>:<callee>]...', 'add or take off cables'],
       ['edit "<name>" [--branch <app>=<branch>]... [--note <app>="<note>"]...', "set an app's branch or note"],
       ['new|edit "<name>" ... --arrange', 'lay the board out afresh, as Arrange on the canvas does'],
+      ['edit "<name>" --area <area>|auto', 'set the area its menu groups it under, or take it from its apps again'],
       [
         'new|edit "<name>" [--request "<words>"] [--phase "<name>"] [--step <from>:<to>[="<note>"]]...',
         "make it a feature board: the request it came from, and the stack's links it uses as numbered steps, each in the phase named before it",
