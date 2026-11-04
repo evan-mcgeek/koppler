@@ -78,6 +78,10 @@
     const touching = map.links.filter(({ from, to }) => picked.includes(from) || picked.includes(to));
     return new Set([...picked, ...touching.flatMap(({ from, to }) => [from, to])]);
   });
+  /** Walking through the steps: the two cards of the step on screen; the rest dim. */
+  const walking = $derived(
+    discovered.current ? new Set([discovered.current.step.from, discovered.current.step.to]) : null,
+  );
   // What the flow measured and where a card is while it is dragged: kept across redraws so fitting sees every card.
   let flowState = $state.raw<Record<Card, Node>>({});
   /** Where a card is: where it is being dragged, else where it was put. */
@@ -91,7 +95,13 @@
       position: placeOf(card) ?? { x: 0, y: 0 },
       data: discovered.data(card, onBoard, hidden),
       selected: discovered.picked.includes(card),
-      class: [!placeOf(card) && 'unplaced', near && !near.has(card) && 'dimmed'].filter(Boolean).join(' '),
+      class: [
+        !placeOf(card) && 'unplaced',
+        near && !near.has(card) && 'dimmed',
+        walking && !walking.has(card) && 'dimmed',
+      ]
+        .filter(Boolean)
+        .join(' '),
     })),
   );
   const box = (card: Card): Box | undefined => {
@@ -594,9 +604,9 @@
       {#if discovered.current}
         {@const { step, number } = discovered.current}
         <div class="pickbar stepbar" role="status" aria-label="Step {number}">
-          <span class="said">
-            <strong>{number}</strong>
-            {name(step.from)} → {name(step.to)}{#if step.note}<span class="note">{step.note}</span>{/if}
+          <span class="said" title="{number} {name(step.from)} → {name(step.to)}{step.note ? `: ${step.note}` : ''}">
+            <span class="what"><strong>{number}</strong> {name(step.from)} → {name(step.to)}</span>
+            <span class="note">{step.note ?? ''}</span>
           </span>
           <button
             class="icon"
@@ -1010,17 +1020,24 @@
     white-space: nowrap;
     transform: translateX(-50%);
   }
-  /* A step's note can be long: it wraps, the bar keeps to the map's width. */
+  /* One size for every step, so its arrows stay under the pointer: two lines, each cut short, the whole in its title. */
   .stepbar {
     gap: 4px;
-    max-width: min(640px, calc(100% - 32px));
-    white-space: normal;
+    width: min(560px, calc(100% - 32px));
   }
   .stepbar .said {
     display: grid;
     flex: 1;
     gap: 2px;
+    min-width: 0;
     margin-right: 10px;
+  }
+  .stepbar .what,
+  .stepbar .note {
+    min-height: 1.3em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   .stepbar strong {
     font: 600 12px var(--mono);
