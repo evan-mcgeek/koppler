@@ -191,7 +191,7 @@ test("a step's number on the map picks its row in the panel", async ({ page, can
     '--step',
     'queue:events:payments',
     '--step',
-    'web:payments',
+    'web:payments=Pays the order with the saved card, and asks for a new one when it is declined',
   );
   const panel = page.getByRole('complementary', { name: 'New feature' });
   const row = (number: string) => panel.locator('.step').filter({ has: page.getByText(number, { exact: true }) });
@@ -230,6 +230,21 @@ test("a step's number on the map picks its row in the panel", async ({ page, can
     })
     .toBe(true);
   await page.screenshot({ path: 'test-results/feature-step-walk.png' });
+  // The cards the step does not touch dim, as the other links do.
+  await expect(card(page, 'payments')).not.toHaveClass(/dimmed/);
+  await expect(card(page, 'orders')).toHaveClass(/dimmed/);
+  // The bar keeps its size from step to step, so the arrows stay under the pointer.
+  const arrows = async () => JSON.stringify(await bar.getByRole('button', { name: 'Previous step' }).boundingBox());
+  const at = await arrows();
+  await page.keyboard.press('ArrowLeft');
+  await expect(bar).toHaveAccessibleName('Step 2.1');
+  expect(await arrows()).toBe(at);
+  await page.keyboard.press('ArrowLeft');
+  await expect(bar).toHaveAccessibleName('Step 1.2');
+  expect(await arrows()).toBe(at);
+  await page.keyboard.press('ArrowRight');
+  await page.keyboard.press('ArrowRight');
+  await expect(bar).toHaveAccessibleName('Step 2.2');
   await bar.getByRole('button', { name: 'Previous step' }).click();
   await expect(bar).toHaveAccessibleName('Step 2.1');
   await page.keyboard.press('Escape');
