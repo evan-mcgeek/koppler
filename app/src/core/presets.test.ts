@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { check, migrate, VERSION, type StackFacts } from './presets.ts';
+import { check, migrate, VERSION, withHidden, type StackFacts, type StoredPreset } from './presets.ts';
 
 const stack: StackFacts = {
   known: id => ['app', 'api', 'db-api', 'far'].includes(id),
@@ -79,13 +79,13 @@ test('only what this stack can run opens, and every change is noted', () => {
   });
   expect(result.notes).toEqual([
     'it had no version, read as the oldest format',
-    'not in this stack: gone',
-    'not cloned: far',
+    'gone is not in this stack, kept on the board and hidden until the stack has it',
+    'far is not cloned here, kept on the board and hidden until it is cloned',
     'app has no "windows" platform, using ios',
     'api cannot run in "docker", using cli',
     'api has no branch feat/x in your clone (fetch it first)',
     'db-api does not call api, cable left out',
-    '1 cable left out with their apps',
+    '1 cable hidden with them',
   ]);
 });
 
@@ -128,4 +128,38 @@ test('a preset written by hand is read safely', () => {
   expect(check({ name: 'Odd', version: 1, nodes: { app: {}, api: {} }, edges }, stack).preset?.edges).toEqual([
     { from: 'app', to: 'api' },
   ]);
+});
+
+test('apps the stack cannot show stay on the board as kept, with their cables and places; ones taken off go', () => {
+  const stored: StoredPreset = {
+    name: 'Checkout',
+    nodes: { web: { run: 'cli' }, orders: { run: 'cli' }, shipping: { run: 'cli', branch: 'develop' } },
+    edges: [
+      { from: 'web', to: 'orders' },
+      { from: 'orders', to: 'shipping' },
+      { from: 'web', to: 'shipping' },
+    ],
+    layout: {
+      nodes: { web: { x: 0, y: 0 }, shipping: { x: 840, y: 0 } },
+      sides: { 'orders>shipping': ['right', 'left'], 'web>shipping': ['bottom', 'top'] },
+    },
+  };
+  const now: StoredPreset = {
+    name: 'Checkout',
+    nodes: { web: { run: 'cli' } },
+    edges: [],
+    layout: { nodes: { web: { x: 10, y: 0 } }, sides: {} },
+  };
+  // Orders API was taken off the screen and goes with its cables; Shipping API the stack cannot show.
+  expect(withHidden(stored, now, id => id !== 'shipping')).toEqual({
+    name: 'Checkout',
+    nodes: { web: { run: 'cli' }, shipping: { run: 'cli', branch: 'develop' } },
+    edges: [{ from: 'web', to: 'shipping' }],
+    layout: {
+      nodes: { web: { x: 10, y: 0 }, shipping: { x: 840, y: 0 } },
+      sides: { 'web>shipping': ['bottom', 'top'] },
+    },
+  });
+  expect(withHidden(stored, now, () => true)).toBe(now);
+  expect(withHidden(undefined, now, () => false)).toBe(now);
 });

@@ -3,7 +3,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { at, card, expect, saved, STACK, test } from './canvas.ts';
+import type { Page } from '@playwright/test';
+import { at, card, expect, saved, saveSettles, STACK, test } from './canvas.ts';
 
 const layout = { nodes: { web: { x: 0, y: 0 }, orders: { x: 420, y: 0 } } };
 test.use({
@@ -213,6 +214,178 @@ test('a board opened from a file in the terminal shows on the canvas, and Reload
   await page.getByRole('button', { name: 'Reload Payments flow' }).click();
   await expect(card(page, 'payments')).toBeVisible();
   await expect(page.getByRole('status').filter({ hasText: 'Reloaded Payments flow' })).toBeVisible();
+});
+
+/** The stack as a sync leaves it with a new app, Shipping API, cloned here and called by Orders API. */
+const withShipping = ({ dir, temp }: { dir: string; temp: string }) => {
+  type Apps = Record<string, Record<string, unknown>>;
+  const file = (name: string) => path.join(temp, `${name}.json`);
+  const read = (name: string) => JSON.parse(fs.readFileSync(file(name), 'utf8')) as { apps: Apps };
+  const registry = read('registry');
+  const orders = registry.apps['orders'] as { consumes: Record<string, unknown> };
+  orders.consumes['shipping'] = { how: 'env', env: 'Shipping__Url' };
+  registry.apps['shipping'] = {
+    name: 'Shipping API',
+    kind: 'dotnet',
+    slug: 'acme/shipping-api',
+    url: 'http://localhost:5004',
+  };
+  fs.writeFileSync(file('registry'), JSON.stringify(registry));
+  const local = read('local');
+  local.apps['shipping'] = { ...local.apps['orders'], path: path.join(dir, 'clones', 'shipping') };
+  fs.writeFileSync(file('local'), JSON.stringify(local));
+};
+const shippingFlow = (dir: string) => {
+  const file = path.join(dir, 'shipping.json');
+  fs.writeFileSync(
+    file,
+    JSON.stringify({
+      name: 'Shipping flow',
+      version: 1,
+      nodes: { web: { run: 'cli' }, orders: { run: 'cli' }, shipping: { run: 'cli' } },
+      edges: [
+        { from: 'web', to: 'orders' },
+        { from: 'orders', to: 'shipping' },
+      ],
+    }),
+  );
+  return file;
+};
+/** The board as the page kept it, once the page has kept it. */
+const keptFlow = async (temp: string) => {
+  await expect.poll(() => (state(temp) as { preset?: string }).preset).toBe('Shipping flow');
+  const flow = state(temp).presets.find(one => one.name === 'Shipping flow') as
+    { nodes: Record<string, unknown>; edges: { from: string; to: string }[] } | undefined;
+  return { apps: Object.keys(flow?.nodes ?? {}).sort(), cables: flow?.edges.map(({ from, to }) => `${from}>${to}`) };
+};
+
+test('a board opened from the terminal after the stack changed shows every app of it', async ({ page, canvas }) => {
+  await expect(card(page, 'web')).toBeVisible();
+  withShipping(canvas);
+  koppler(canvas, 'board', 'open', shippingFlow(canvas.dir), '--no-open');
+  await expect(page.getByRole('status').filter({ hasText: 'Opened Shipping flow from the terminal.' })).toBeVisible();
+  await expect(card(page, 'shipping')).toBeVisible();
+  await expect(page.locator('.svelte-flow__node-app')).toHaveCount(3);
+  await expect(page.locator('.svelte-flow__edge')).toHaveCount(2);
+  expect(await keptFlow(canvas.temp)).toEqual({
+    apps: ['orders', 'shipping', 'web'],
+    cables: ['web>orders', 'orders>shipping'],
+  });
+});
+
+test('a board keeps an app the stack does not have, says so, and shows it once the stack has it', async ({
+  page,
+  canvas,
+}) => {
+  await expect(card(page, 'web')).toBeVisible();
+  koppler(canvas, 'board', 'open', shippingFlow(canvas.dir), '--no-open');
+  const said = page.getByRole('status').filter({ hasText: 'Opened Shipping flow from the terminal' });
+  await expect(said).toContainText(
+    'shipping is not in this stack, kept on the board and hidden until the stack has it',
+  );
+  await expect(page.locator('.svelte-flow__node-app')).toHaveCount(2);
+  await page.screenshot({ path: 'test-results/board-kept-hidden.png' });
+  // Hidden, not lost: the board as kept still has it and its cable.
+  expect(await keptFlow(canvas.temp)).toEqual({
+    apps: ['orders', 'shipping', 'web'],
+    cables: ['web>orders', 'orders>shipping'],
+  });
+
+  withShipping(canvas);
+  koppler(canvas, 'refresh', '--no-sync');
+  await expect(card(page, 'shipping')).toBeVisible();
+  await expect(page.locator('.svelte-flow__edge[data-id="orders>shipping"]')).toHaveCount(1);
+});
+
+test('an app kept hidden on the board on screen comes off it when the terminal removes it', async ({
+  page,
+  canvas,
+}) => {
+  await expect(card(page, 'web')).toBeVisible();
+  koppler(canvas, 'board', 'open', shippingFlow(canvas.dir), '--no-open');
+  expect((await keptFlow(canvas.temp)).apps).toEqual(['orders', 'shipping', 'web']);
+  koppler(canvas, 'board', 'edit', 'Shipping flow', '--remove', 'shipping');
+  await expect(page.getByRole('status')).toContainText('The agent changed Shipping flow: removed shipping.');
+  await expect.poll(() => waiting(canvas.temp)).toBe(0);
+  await saveSettles(page);
+  expect(await keptFlow(canvas.temp)).toEqual({ apps: ['orders', 'web'], cables: ['web>orders'] });
+});
+
+test('an app the stack has no more comes off the board from the note about it', async ({ page, canvas }) => {
+  await expect(card(page, 'web')).toBeVisible();
+  koppler(canvas, 'board', 'open', shippingFlow(canvas.dir), '--no-open');
+  expect((await keptFlow(canvas.temp)).apps).toEqual(['orders', 'shipping', 'web']);
+  const note = page
+    .getByRole('note')
+    .filter({ hasText: 'shipping is kept on this board, but this stack has no such app.' });
+  await expect(note).toBeVisible();
+  await note.getByRole('button', { name: 'Take it off the board' }).click();
+  await expect(note).toHaveCount(0);
+  await saveSettles(page);
+  expect(await keptFlow(canvas.temp)).toEqual({ apps: ['orders', 'web'], cables: ['web>orders'] });
+});
+
+test.describe('a team board with an app not cloned here', () => {
+  test.use({
+    uncloned: ['payments'],
+    stack: {
+      ...STACK,
+      presets: [
+        {
+          name: 'Checkout',
+          version: 1,
+          nodes: {
+            web: { run: 'cli' },
+            orders: { run: 'cli' },
+            payments: { run: 'ide', branch: 'feature/checkout', note: 'Refunds on' },
+          },
+          edges: [
+            { from: 'web', to: 'orders' },
+            { from: 'orders', to: 'payments' },
+          ],
+        },
+      ],
+    },
+  });
+  const openCheckout = async (page: Page) => {
+    await page.getByRole('button', { name: /^Board: / }).click();
+    await page
+      .getByRole('dialog', { name: 'Boards' })
+      .getByRole('button', { name: /^Checkout/ })
+      .click();
+    await expect(page.locator('.svelte-flow__node-app')).toHaveCount(2);
+  };
+  const own = (temp: string) => state(temp).presets.map(one => one.name);
+
+  test('shows the app as the board keeps it once it is cloned, and stays the team board', async ({ page, canvas }) => {
+    await expect(card(page, 'web')).toBeVisible();
+    await openCheckout(page);
+    const local = path.join(canvas.temp, 'local.json');
+    const clones = JSON.parse(fs.readFileSync(local, 'utf8')) as { apps: Record<string, object> };
+    clones.apps['payments'] = { ...clones.apps['orders'], path: path.join(canvas.dir, 'clones', 'payments') };
+    fs.writeFileSync(local, JSON.stringify(clones));
+    koppler(canvas, 'refresh', '--no-sync');
+    await expect(card(page, 'payments')).toBeVisible();
+    await expect(card(page, 'payments').getByLabel('Branch')).toHaveValue('feature/checkout');
+    await expect(page.locator('.svelte-flow__edge[data-id="orders>payments"]')).toHaveCount(1);
+    await saveSettles(page);
+    const payments = (state(canvas.temp).nodes as Record<string, { run?: string; branch?: string; note?: string }>)[
+      'payments'
+    ];
+    expect(payments).toMatchObject({ run: 'ide', branch: 'feature/checkout', note: 'Refunds on' });
+    expect(own(canvas.temp)).toEqual(['Shop']);
+  });
+
+  test('takes the app off when the terminal removes it, in a board of your own', async ({ page, canvas }) => {
+    await expect(card(page, 'web')).toBeVisible();
+    await openCheckout(page);
+    koppler(canvas, 'board', 'edit', 'Checkout', '--remove', 'payments');
+    await expect(page.getByRole('status')).toContainText('The agent changed Checkout: removed Payments API.');
+    await expect.poll(() => waiting(canvas.temp)).toBe(0);
+    await saveSettles(page);
+    const checkout = state(canvas.temp).presets.find(one => one.name === 'Checkout');
+    expect(Object.keys(checkout?.nodes ?? {}).sort()).toEqual(['orders', 'web']);
+  });
 });
 
 test('a board deleted from the terminal goes to Recently deleted on an open canvas, which says so', async ({

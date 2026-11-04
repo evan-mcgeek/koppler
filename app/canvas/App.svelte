@@ -210,11 +210,14 @@
   // A board changed from the terminal is changed here too, said, and kept, so this page never saves its older copy
   // over it. In Live it waits for Edit.
   const made: Record<string, true> = {};
+  // A board opened from the terminal waits for the stack to be read again, and the edits after it wait for that board.
+  let opening = false;
   $effect(() => {
     const edits = live.status?.boardEdits ?? [];
     if (!board.stack || board.live) return;
     untrack(() => {
       for (const one of edits.filter(one => !made[one.id])) {
+        if (opening) return;
         made[one.id] = true;
         // A queue or database a feature step names is said by its name too.
         const name = (id: string) => (id.includes(':') ? discovered.data(id, false, 0).name : board.nameOf(id));
@@ -222,16 +225,29 @@
           board.deleteBoard(one.board);
           toasts.show(`The agent deleted ${one.board}. Recently deleted brings it back.`);
         } else if (one.preset) {
-          const out = board.importBoards(
-            one.preset,
-            typeof one.preset['source'] === 'string' ? one.preset['source'] : one.board,
-          );
-          toasts.show(
-            out.error === undefined
-              ? `Opened ${one.board} from the terminal.`
-              : `Cannot open ${one.board}. ${out.error}`,
-            out.error === undefined ? 'message' : 'warning',
-          );
+          const preset = one.preset;
+          opening = true;
+          // The stack may have changed since this page read it: the board opens with the apps it has now.
+          void board
+            .reload()
+            .catch(() => undefined)
+            .then(() => {
+              const out = board.importBoards(
+                preset,
+                typeof preset['source'] === 'string' ? preset['source'] : one.board,
+              );
+              toasts.show(
+                out.error !== undefined
+                  ? `Cannot open ${one.board}. ${out.error}`
+                  : out.notes.length
+                    ? `Opened ${one.board} from the terminal, changed to fit: ${out.notes.join('; ')}.`
+                    : `Opened ${one.board} from the terminal.`,
+                out.error === undefined ? 'message' : 'warning',
+              );
+              opening = false;
+              void post('board-edit-done', { id: one.id });
+            });
+          return;
         } else if (board.edit(one.board, one.edit, one.create)) {
           toasts.show(
             one.create
