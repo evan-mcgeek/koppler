@@ -527,8 +527,10 @@ test('A request that was no run (filling in settings, an answer) is finished wit
   const after = JSON.parse(fs.readFileSync(listener, 'utf8'));
   assert.equal(after.busy, undefined);
   assert.equal(after.session, 'abcd1234');
-  // Nothing taken and no run waiting: said so.
-  assert.match(koppler('history', 'done').out, /no run is waiting to be applied/);
+  // Nothing taken and no run waiting, as after listening again first: said so, and no failure.
+  const again = koppler('history', 'done');
+  assert.equal(again.code, 0, again.out);
+  assert.match(again.out, /Nothing is open/);
   fs.rmSync(dir, { recursive: true });
 });
 
