@@ -268,7 +268,7 @@
                   ></span>
                 {/if}
               </span>
-              <span class="acts">
+              <span class="row-acts">
                 {#if runnable}
                   <button
                     class="alone"
@@ -553,7 +553,7 @@
     height: 10px;
   }
   /* Over the end of the name's first line, on the panel's colour, left of the light. */
-  .acts {
+  .row-acts {
     position: absolute;
     top: 3px;
     right: 34px;
@@ -565,11 +565,11 @@
     background: color-mix(in oklab, var(--ink) 6%, var(--panel));
     visibility: hidden;
   }
-  .app:hover .acts,
-  .app:focus-within .acts {
+  .app:hover .row-acts,
+  .app:focus-within .row-acts {
     visibility: visible;
   }
-  .acts button {
+  .row-acts button {
     display: inline-flex;
     align-items: center;
     gap: 5px;
@@ -583,10 +583,10 @@
     font: 600 12px var(--sans);
     cursor: pointer;
   }
-  .acts button:hover {
+  .row-acts button:hover {
     background: color-mix(in oklab, var(--ink) 10%, transparent);
   }
-  .acts button:focus-visible {
+  .row-acts button:focus-visible {
     outline: 2px solid var(--ink);
     outline-offset: -2px;
   }

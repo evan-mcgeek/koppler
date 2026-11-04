@@ -37,7 +37,7 @@ test('the board picker sits in the bar in every view, and the side panel starts 
   // B opens it too, and Find a board narrows it.
   await page.keyboard.press('Escape');
   await page.keyboard.press('b');
-  await expect(menu).toBeVisible();
+  await expect(menu.getByRole('searchbox', { name: 'Find a board' })).toBeFocused();
   await page.keyboard.type('zzz');
   await expect(menu).toContainText('No board is called that.');
 });

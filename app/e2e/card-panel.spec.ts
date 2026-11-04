@@ -27,7 +27,7 @@ test("zoomed out, the picked card's choices open beside the board, change it, an
   // Another card takes its place; two picked at once have no panel.
   // The board slid left for the panel, so Web Shop is out of view: the Apps list brings it back and picks it.
   await page
-    .getByRole('complementary', { name: 'Board and apps' })
+    .getByRole('complementary', { name: 'Apps' })
     .getByRole('button', { name: 'Web Shop', exact: true })
     .click();
   await expect(page.getByRole('complementary', { name: 'Web Shop' })).toBeVisible();
