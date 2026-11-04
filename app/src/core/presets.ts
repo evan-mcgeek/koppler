@@ -11,6 +11,10 @@ type Loose = Record<string, unknown>;
 const isObject = (value: unknown): value is Loose =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
+/** A board's apps as the team gets them: a card's note stays with whoever wrote it. */
+export const withoutNotes = (nodes: Record<string, Loose>): Record<string, Loose> =>
+  Object.fromEntries(Object.entries(nodes).map(([id, { note: _, ...node }]) => [id, node]));
+
 /** A preset as it is stored: read from a file, a link or the stack, so only its outline is certain. */
 export interface StoredPreset extends Loose {
   name: string;

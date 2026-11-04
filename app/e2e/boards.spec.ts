@@ -258,6 +258,10 @@ test('a board of your own is shared with the team: it joins the stack as a team 
   await page.getByRole('button', { name: 'Add Web Shop to the board', exact: true }).first().click();
   await page.getByRole('button', { name: 'Add Orders API to the board', exact: true }).first().click();
   await expect(picker(page)).toHaveText('Web Shop');
+  // A card's note is the user's own: it stays on this Mac.
+  await card(page, 'web').getByRole('button', { name: 'Add a note for the agent' }).click();
+  await card(page, 'web').getByLabel('Note for the agent').fill('my private finding');
+  await page.getByRole('searchbox').focus();
   await saveSettles(page);
   await picker(page).click();
   await boards(page).getByRole('button', { name: 'Share Web Shop with the team' }).click();
@@ -269,15 +273,24 @@ test('a board of your own is shared with the team: it joins the stack as a team 
     "Commit the stack's repo",
   );
   const kept = JSON.parse(fs.readFileSync(file, 'utf8')) as {
-    presets: { name: string; nodes: object; layout?: object }[];
+    presets: { name: string; nodes: Record<string, { note?: string }>; layout?: object }[];
   };
   const shared = kept.presets.find(one => one.name === 'Web Shop');
   expect(Object.keys(shared?.nodes ?? {}).sort()).toEqual(['orders', 'web']);
+  expect(shared?.nodes['web']?.note).toBeUndefined();
   expect(shared?.layout).toBeTruthy();
-  // The menu lists it with the team's boards.
+  // The menu lists it with the team's boards, and the team board opens without the note.
   await picker(page).click();
   await expect(boards(page).getByText('Team board').first()).toBeVisible();
   await expect(opens(page).filter({ hasText: 'Web Shop' })).toHaveCount(2);
+  await boards(page)
+    .getByRole('button', { name: /^Checkout/ })
+    .click();
+  await expect(picker(page)).toHaveText('Checkout');
+  await picker(page).click();
+  await opens(page).filter({ hasText: 'Web Shop' }).first().click();
+  await expect(picker(page)).toHaveText('Web Shop');
+  await expect(card(page, 'web').getByRole('button', { name: 'Add a note for the agent' })).toBeVisible();
 });
 
 test('with something running, opening another board first stops and reverts it', async ({ page }) => {

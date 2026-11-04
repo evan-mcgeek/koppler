@@ -19,6 +19,7 @@ import {
   editPreset,
   migrate,
   VERSION as PRESET_VERSION,
+  withoutNotes,
   type BoardEdit,
   type StackFacts,
   type StoredPreset,
@@ -1495,7 +1496,7 @@ class Board {
   asShared(preset: StoredPreset): string {
     const { name, nodes, edges } = preset;
     const version = migrate(preset).preset?.version ?? PRESET_VERSION;
-    return JSON.stringify({ name, version, koppler: BOARD_FORMAT.version, nodes, edges }, null, 2);
+    return JSON.stringify({ name, version, koppler: BOARD_FORMAT.version, nodes: withoutNotes(nodes), edges }, null, 2);
   }
 
   /** The notes about this board the user dismissed. */
