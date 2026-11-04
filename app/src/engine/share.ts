@@ -66,7 +66,7 @@ export function teamBoard(preset: StoredPreset): { board: StoredPreset; error?: 
     board: {
       name,
       ...(version !== undefined && { version }),
-      nodes,
+      nodes: Object.fromEntries(Object.entries(nodes).map(([id, { note: _, ...node }]) => [id, node])),
       edges,
       ...(layout ? { layout } : {}),
       ...(outside ? { outside } : {}),
