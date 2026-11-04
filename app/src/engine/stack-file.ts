@@ -4,7 +4,7 @@ import { readUpgraded } from '../upgraded.ts';
 import path from 'node:path';
 import { readJson, writeJson } from '../json-files.ts';
 import { kindsFor } from '../core/kinds.ts';
-import { unknownFields, validateStack } from '../core/stack.ts';
+import { unknownField, unknownFields, validateStack } from '../core/stack.ts';
 import { withoutMissingApps } from '../core/missing-apps.ts';
 import { getAt, parsePath, setAt } from '../core/stack-path.ts';
 import { brokenLock, LOCKED } from './locks.ts';
@@ -104,7 +104,7 @@ function newProblems(before: unknown, next: unknown): string[] {
     ...validateStack(next).filter(problem => !broken.has(problem)),
     ...unknownFields(next)
       .filter(where => !unknown.has(where))
-      .map(where => `${where}: not a field Koppler knows (koppler stack schema lists them)`),
+      .map(where => `${unknownField(where)} (koppler stack schema lists them)`),
   ];
 }
 

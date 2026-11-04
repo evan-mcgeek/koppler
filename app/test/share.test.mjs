@@ -8,7 +8,7 @@ import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 const entry = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'dist', 'koppler.mjs');
-const board = { name: 'Shop', version: 1, nodes: { web: { run: 'cli', note: 'mine' } }, edges: [], layout: { nodes: { web: { x: 0, y: 0 } } } };
+const board = { name: 'Shop', version: 1, nodes: { web: { run: 'cli', note: 'mine' } }, edges: [], layout: { nodes: { web: { x: 0, y: 0 } } }, outside: ['web'] };
 const stackOf = presets => ({ name: 'Acme', envs: ['qa'], apps: { web: { name: 'Web', kind: 'node', slug: 'acme/web' } }, presets });
 
 /** A folder holding the stack, its own board in the run state, and a stand-in for gh that plays GitHub. */
@@ -79,6 +79,10 @@ test('a stack that is not on GitHub keeps the board in its file here, to commit'
   assert.deepEqual(kept.presets.map(one => one.name), ['Team', 'Shop']);
   // A card's note is this Mac's own, so it stays here.
   assert.deepEqual(kept.presets[1].nodes, { web: { run: 'cli' } });
+  // A shared board holds only what the stack's format knows.
+  const checked = koppler('stack', 'check', path.join(stack, 'stack.json'));
+  assert.equal(checked.status, 0, checked.stderr);
+  assert.equal(checked.stdout.trim(), `${path.join(stack, 'stack.json')}: OK`);
   assert.match(koppler('board', 'share', 'Nope').stderr, /Nope is not one of your boards/);
   fs.rmSync(dir, { recursive: true, force: true });
 });
@@ -92,5 +96,7 @@ test('a feature board is shared with its request, phases, steps and where its ca
   assert.equal(shared.status, 0, shared.stderr);
   const kept = JSON.parse(fs.readFileSync(path.join(stack, 'stack.json'), 'utf8')).presets.find(one => one.name === 'Checkout');
   assert.deepEqual([kept.feature, kept.discover], [feature, discover]);
+  const checked = koppler('stack', 'check', path.join(stack, 'stack.json'));
+  assert.equal(checked.status, 0, checked.stderr);
   fs.rmSync(dir, { recursive: true, force: true });
 });
