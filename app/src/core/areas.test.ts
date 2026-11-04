@@ -1,5 +1,15 @@
 import { expect, test } from 'vitest';
-import { appGroups, boardArea, boardGroups, hiddenBy, inAreas } from './areas.ts';
+import {
+  appGroups,
+  areaId,
+  areaUse,
+  areaWhy,
+  boardArea,
+  boardGroups,
+  hiddenBy,
+  inAreas,
+  withoutArea,
+} from './areas.ts';
 
 const areas = { payments: { name: 'Payments' }, shipping: { name: 'Shipping' }, accounts: { name: 'Accounts' } };
 const apps = {
@@ -23,8 +33,8 @@ test("a board's area is the one most of its apps are in, counting only apps that
 
 test('a tie goes to the smaller area, then to the first in the stack', () => {
   // Payments has 3 apps, Shipping 3, Accounts 1.
-  expect(boardArea(stack, board(['pay', 'signup']))).toEqual({ id: 'accounts', by: 'apps' });
-  expect(boardArea(stack, board(['pay', 'ship']))).toEqual({ id: 'payments', by: 'apps' });
+  expect(boardArea(stack, board(['pay', 'signup']))).toEqual({ id: 'accounts', by: 'apps', tie: true });
+  expect(boardArea(stack, board(['pay', 'ship']))).toEqual({ id: 'payments', by: 'apps', tie: true });
 });
 
 test('a board set by hand keeps its area; one of only shared apps has none', () => {
@@ -119,4 +129,70 @@ test("a choice hides the apps outside it but the board's own, and says the areas
   expect(hiddenBy(shop, ['payments'], [])).toEqual({ apps: ['ship', 'signup'], areas: ['Shipping', 'Accounts'] });
   expect(hiddenBy(shop, ['payments', 'shipping', 'accounts'], [])).toEqual({ apps: [], areas: [] });
   expect(hiddenBy(shop, undefined, [])).toEqual({ apps: [], areas: [] });
+});
+
+test('why a board is in its area, from its apps alone', () => {
+  expect(areaWhy(stack, board(['web', 'pay', 'basket', 'ship']))).toBe('Payments: 2 of its 4 apps');
+  expect(areaWhy(stack, board(['pay', 'signup']))).toBe('1 app in Payments, 1 in Accounts. Accounts is smaller');
+  expect(areaWhy(stack, board(['pay', 'ship']))).toBe('1 app in Payments, 1 in Shipping. Payments comes first');
+  expect(areaWhy(stack, board(['web']))).toBe('None of its apps is in an area');
+  // Set by hand, it still says what its apps would give.
+  expect(areaWhy(stack, board(['pay'], 'accounts'))).toBe('Payments: 1 of its 1 app');
+});
+
+test("a new area's id is made from its name, once", () => {
+  expect(areaId('Order emails', [])).toBe('order-emails');
+  expect(areaId('  Payments & Refunds ', [])).toBe('payments-refunds');
+  expect(areaId('Payments', ['payments', 'payments-2'])).toBe('payments-3');
+  expect(areaId('Über', [])).toBe('ber');
+  expect(areaId('!!', [])).toBe('area');
+});
+
+const full = {
+  areas: { payments: { name: 'Payments' }, shipping: { name: 'Shipping' } },
+  apps: {
+    web: { name: 'Web Shop' },
+    orders: { name: 'Orders API', areas: ['payments', 'shipping'] },
+    pay: { name: 'Payments API', areas: ['payments'] },
+    ship: { name: 'Shipping API', areas: ['shipping'] },
+  },
+  presets: [
+    { name: 'Checkout', nodes: { web: {}, pay: {} } },
+    { name: 'Order emails', nodes: { web: {}, ship: {} }, area: 'payments' },
+    { name: 'Track a parcel', nodes: { ship: {} } },
+  ],
+};
+
+test('what an area holds: its apps, and the team boards in it, worked out or set by hand', () => {
+  expect(areaUse(full, 'payments')).toEqual({
+    apps: ['Orders API', 'Payments API'],
+    boards: ['Checkout', 'Order emails'],
+    byHand: ['Order emails'],
+  });
+  expect(areaUse(full, 'shipping')).toEqual({
+    apps: ['Orders API', 'Shipping API'],
+    boards: ['Track a parcel'],
+    byHand: [],
+  });
+});
+
+test('removing an area takes it out of every app and team board, and leaves the rest as it was', () => {
+  const out = withoutArea({ ...full, envs: ['qa'] }, 'payments');
+  expect(out).toEqual({
+    envs: ['qa'],
+    areas: { shipping: { name: 'Shipping' } },
+    apps: {
+      web: { name: 'Web Shop' },
+      orders: { name: 'Orders API', areas: ['shipping'] },
+      pay: { name: 'Payments API' },
+      ship: { name: 'Shipping API', areas: ['shipping'] },
+    },
+    presets: [
+      { name: 'Checkout', nodes: { web: {}, pay: {} } },
+      { name: 'Order emails', nodes: { web: {}, ship: {} } },
+      { name: 'Track a parcel', nodes: { ship: {} } },
+    ],
+  });
+  // The last area goes with its key.
+  expect(withoutArea({ areas: { payments: { name: 'Payments' } }, apps: {} }, 'payments')).toEqual({ apps: {} });
 });

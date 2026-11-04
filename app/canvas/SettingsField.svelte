@@ -6,6 +6,7 @@
   // Each keeps its value through the panel, which checks it; a lock keeps it as it is.
   import { untrack } from 'svelte';
   import { parsePath, setAt } from '../src/core/stack-path.ts';
+  import AreaPick from './AreaPick.svelte';
   import Checks from './Checks.svelte';
   import Chips from './Chips.svelte';
   import KindIcon from './KindIcon.svelte';
@@ -94,6 +95,7 @@
       envs?: string[];
       queues?: Record<string, { name?: string }>;
       apps?: Record<string, { name?: string; outside?: unknown }>;
+      areas?: Record<string, { name?: string }>;
     } | null,
   );
   const signIns = $derived(Object.keys((ctx.stack() as { signIns?: object } | null)?.signIns ?? {}).length);
@@ -337,6 +339,7 @@
         value={text(value)}
         options={choice.options}
         other={!!choice.other}
+        unset={choice.unset}
         {required}
         disabled={locked}
         placeholder={bare ? (EXAMPLES[path.split('.').at(-1) ?? ''] ?? name) : hint}
@@ -378,6 +381,14 @@
           const next = on ? [...strings, app] : strings.filter(one => one !== app);
           void save(next.length ? next : undefined);
         }}
+      />
+    {:else if control === 'areas'}
+      <AreaPick
+        value={strings}
+        areas={stack?.areas ?? {}}
+        label={name}
+        disabled={locked}
+        onchange={(next: string[]) => void save(next.length ? next : undefined)}
       />
     {:else if control === 'queues'}
       <Checks

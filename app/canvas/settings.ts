@@ -53,6 +53,8 @@ export interface Choice {
   options: Option[];
   /** Whether a value that is not listed can be typed. */
   other?: boolean;
+  /** What having none means, where "Not set" does not say it. */
+  unset?: string;
 }
 
 export type Kind = 'text' | 'number' | 'switch' | 'choice' | 'group' | 'table' | 'list' | 'json';
@@ -175,7 +177,7 @@ export interface Tab {
   /** What the tab holds, in a few words. */
   about?: string;
   /** A view of its own: what each environment uses, or the stack's apps. */
-  view?: 'envs' | 'apps';
+  view?: 'envs' | 'apps' | 'areas';
 }
 /** An app's settings: what it is first; then how it runs here, where it is deployed, and the rest. */
 export const APP_HEAD = ['name', 'description', 'kind', 'slug'];
@@ -238,6 +240,12 @@ export const STACK_TABS: Tab[] = [
   },
   { name: 'Apps', about: 'Every app in the stack', keys: ['apps'], view: 'apps' },
   {
+    name: 'Areas',
+    about: "Parts of the stack people can choose to see. A view only: runs, environments and secrets don't change.",
+    keys: ['areas'],
+    view: 'areas',
+  },
+  {
     name: 'Databases',
     about: 'Named from the code. Renaming here does not change the code.',
     keys: ['databases'],
@@ -274,16 +282,25 @@ export function summary(value: unknown): string {
   return JSON.stringify(value);
 }
 
-/** How many fields differ between two stacks: each value that changed, was added or was taken out counts once. */
+/** How many fields differ between two stacks: each value that changed, was added or was taken out counts once, and so does a reorder. */
 export function changes(a: unknown, b: unknown): number {
   const isTree = (one: unknown) => typeof one === 'object' && one !== null;
   if (!isTree(a) || !isTree(b) || Array.isArray(a) !== Array.isArray(b))
     return JSON.stringify(a) === JSON.stringify(b) ? 0 : 1;
   const left = a as Record<string, unknown>;
   const right = b as Record<string, unknown>;
+  // The same keys in another order (areas moved) is one change too.
+  const both = Object.keys(left).filter(key => Object.hasOwn(right, key));
+  const moved =
+    both.join('\n') !==
+    Object.keys(right)
+      .filter(key => Object.hasOwn(left, key))
+      .join('\n')
+      ? 1
+      : 0;
   return [...new Set([...Object.keys(left), ...Object.keys(right)])].reduce(
     (sum, key) => sum + changes(left[key], right[key]),
-    0,
+    moved,
   );
 }
 
@@ -505,12 +522,13 @@ export function addressNote(value: unknown): { warn?: string; note?: string } {
 }
 
 /** A dedicated control for the field at a path, where its schema alone would give a plain box. */
-export type Control = 'kind' | 'pick' | 'address' | 'chips' | 'ordered' | 'envs' | 'queues' | 'apps';
+export type Control = 'kind' | 'pick' | 'address' | 'chips' | 'ordered' | 'envs' | 'queues' | 'apps' | 'areas';
 export function controlOf(path: string, schema: Schema, value: unknown, choice: Choice | null): Control | undefined {
   if (path === 'envs') return 'ordered';
   if (path === 'protected') return 'envs';
   if (/(?:^|\.)(publishes|reads)$/.test(path)) return 'queues';
   if (/^apps\.[a-z0-9-]+\.after$/.test(path)) return 'apps';
+  if (/^apps\.[a-z0-9-]+\.areas$/.test(path)) return 'areas';
   if (choice) return /(?:^|\.)kind$/.test(path) && !path.startsWith('databases.') ? 'kind' : 'pick';
   if (/(?:^|\.)(url|deployedUrl|deployed)$/.test(path)) return 'address';
   const strings = (one: Schema) => types(one).includes('array') && types(one.items ?? {}).includes('string');

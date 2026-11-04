@@ -7,6 +7,28 @@ type HasAreas = { areas?: readonly string[] | undefined };
 export const inAreas = (app: HasAreas, chosen: readonly string[] | undefined): boolean =>
   !chosen?.length || !app.areas?.length || app.areas.some(area => chosen.includes(area));
 
+/** The areas a board's apps are in, most apps first; a tie goes to the area with fewer apps in the stack, then to the first in the stack. */
+function ranked(stack: { areas?: Areas | undefined; apps: Record<string, HasAreas | undefined> }, ids: string[]) {
+  const order = Object.keys(stack.areas ?? {});
+  const count = (of: string[]) => {
+    const counts = new Map<string, number>();
+    for (const id of of)
+      for (const area of (Object.hasOwn(stack.apps, id) ? stack.apps[id]?.areas : undefined) ?? [])
+        if (order.includes(area)) counts.set(area, (counts.get(area) ?? 0) + 1);
+    return counts;
+  };
+  const onBoard = count(ids);
+  const size = count(Object.keys(stack.apps));
+  const areas = [...onBoard.keys()].sort(
+    (a, b) =>
+      (onBoard.get(b) ?? 0) - (onBoard.get(a) ?? 0) ||
+      (size.get(a) ?? 0) - (size.get(b) ?? 0) ||
+      order.indexOf(a) - order.indexOf(b),
+  );
+  const top = onBoard.get(areas[0] ?? '') ?? 0;
+  return { areas, onBoard, size, tied: areas.filter(area => onBoard.get(area) === top) };
+}
+
 /**
  * A board's area: the one set by hand, else the one most of its apps are in, counting only apps that have one. A tie
  * goes to the area with fewer apps in the stack, then to the first in the stack.
@@ -14,25 +36,100 @@ export const inAreas = (app: HasAreas, chosen: readonly string[] | undefined): b
 export function boardArea(
   stack: { areas?: Areas | undefined; apps: Record<string, HasAreas | undefined> },
   board: { nodes: Record<string, unknown>; area?: string },
-): { id?: string; by: 'hand' | 'apps' } {
+): { id?: string; by: 'hand' | 'apps'; tie?: true } {
+  if (board.area && Object.hasOwn(stack.areas ?? {}, board.area)) return { id: board.area, by: 'hand' };
+  const { areas, tied } = ranked(stack, Object.keys(board.nodes));
+  const [id] = areas;
+  return id ? { id, by: 'apps', ...(tied.length > 1 && { tie: true as const }) } : { by: 'apps' };
+}
+
+/** Why its apps put a board in an area, in a few words: "Payments: 2 of its 3 apps", or how a tie was settled. */
+export function areaWhy(
+  stack: { areas?: Record<string, { name: string }> | undefined; apps: Record<string, HasAreas | undefined> },
+  board: { nodes: Record<string, unknown> },
+): string {
+  const ids = Object.keys(board.nodes);
+  const { onBoard, size, tied } = ranked(stack, ids);
+  const name = (id: string) => stack.areas?.[id]?.name ?? id;
+  const [first] = tied;
+  if (!first) return 'None of its apps is in an area';
+  const n = onBoard.get(first) ?? 0;
+  if (tied.length === 1)
+    return `${name(first)}: ${String(n)} of its ${String(ids.length)} ${ids.length === 1 ? 'app' : 'apps'}`;
   const order = Object.keys(stack.areas ?? {});
-  if (board.area && order.includes(board.area)) return { id: board.area, by: 'hand' };
-  const count = (ids: string[]) => {
-    const counts = new Map<string, number>();
-    for (const id of ids)
-      for (const area of (Object.hasOwn(stack.apps, id) ? stack.apps[id]?.areas : undefined) ?? [])
-        if (order.includes(area)) counts.set(area, (counts.get(area) ?? 0) + 1);
-    return counts;
-  };
-  const onBoard = count(Object.keys(board.nodes));
-  const size = count(Object.keys(stack.apps));
-  const [id] = [...onBoard.keys()].sort(
-    (a, b) =>
-      (onBoard.get(b) ?? 0) - (onBoard.get(a) ?? 0) ||
-      (size.get(a) ?? 0) - (size.get(b) ?? 0) ||
-      order.indexOf(a) - order.indexOf(b),
+  const listed = [...tied].sort((a, b) => order.indexOf(a) - order.indexOf(b));
+  const counts = listed
+    .map((id, at) => `${String(n)}${at ? '' : n === 1 ? ' app' : ' apps'} in ${name(id)}`)
+    .join(', ');
+  const smaller = tied.some(id => size.get(id) !== size.get(first));
+  return `${counts}. ${name(first)} ${smaller ? 'is smaller' : 'comes first'}`;
+}
+
+/** An id for a new area, from its name: lowercase letters, digits and dashes, not one taken. */
+export function areaId(name: string, taken: readonly string[]): string {
+  const base =
+    name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '') || 'area';
+  let id = base;
+  for (let n = 2; taken.includes(id); n++) id = `${base}-${String(n)}`;
+  return id;
+}
+
+type Json = Record<string, unknown>;
+const json = (value: unknown): Json =>
+  typeof value === 'object' && value !== null && !Array.isArray(value) ? (value as Json) : {};
+const presetsOf = (stack: unknown) => {
+  const presets = json(stack)['presets'];
+  return Array.isArray(presets) ? (presets as unknown[]).map(json) : [];
+};
+
+/** What an area holds: its apps by name, and the team boards in it, worked out or set by hand. */
+export function areaUse(stack: unknown, id: string): { apps: string[]; boards: string[]; byHand: string[] } {
+  const facts = json(stack) as { areas?: Areas; apps: Record<string, HasAreas & { name?: string }> };
+  const apps = Object.entries(json(facts.apps) as Record<string, HasAreas & { name?: string }>)
+    .filter(([, app]) => app.areas?.includes(id))
+    .map(([key, app]) => app.name ?? key);
+  const named = (preset: Json) => (typeof preset['name'] === 'string' ? preset['name'] : '');
+  const inIt = presetsOf(stack).filter(
+    preset =>
+      boardArea(facts, {
+        nodes: json(preset['nodes']),
+        ...(typeof preset['area'] === 'string' && { area: preset['area'] }),
+      }).id === id,
   );
-  return id ? { id, by: 'apps' } : { by: 'apps' };
+  return {
+    apps,
+    boards: inIt.map(named),
+    byHand: inIt.filter(preset => preset['area'] === id).map(named),
+  };
+}
+
+/** The stack without an area: out of its areas, out of every app's list, and off every team board set to it. */
+export function withoutArea<S>(stack: S, id: string): S {
+  const { areas, apps, presets, ...rest } = json(stack);
+  const { [id]: _gone, ...left } = json(areas);
+  const out: Json = { ...rest };
+  if (Object.keys(left).length) out['areas'] = left;
+  if (apps !== undefined)
+    out['apps'] = Object.fromEntries(
+      Object.entries(json(apps)).map(([key, value]) => {
+        const app = json(value);
+        if (!Array.isArray(app['areas'])) return [key, value];
+        const { areas: had, ...plain } = app;
+        const kept = (had as unknown[]).filter(area => area !== id);
+        return [key, kept.length ? { ...plain, areas: kept } : plain];
+      }),
+    );
+  if (presets !== undefined)
+    out['presets'] = Array.isArray(presets)
+      ? presets.map((value: unknown) => {
+          const { area, ...plain } = json(value);
+          return area === id ? plain : value;
+        })
+      : presets;
+  return out as S;
 }
 
 type Stack = { areas?: Record<string, { name: string }> | undefined; apps: Record<string, HasAreas | undefined> };

@@ -73,7 +73,7 @@ test('the board menu groups team boards by area, hides the others with a line, a
   await menu.getByRole('searchbox', { name: 'Find a board' }).fill('bro');
   await expect(menu.getByText('Hidden by your areas')).toBeVisible();
   await expect(menu).toContainText('Opening it shows it; your areas stay as they are');
-  await menu.getByRole('button', { name: /Browse/ }).click();
+  await menu.getByRole('button', { name: /^Browse/ }).click();
   // Opening it leaves the choice alone; the bar says it is outside it.
   await expect(bar.getByRole('button', { name: /^Board: Browse/ })).toContainText('Shipping');
   await expect(panel(page).getByRole('button', { name: 'Areas: Payments' })).toBeVisible();
