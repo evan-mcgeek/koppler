@@ -30,9 +30,12 @@
       ev.preventDefault();
       chosen.set([row.dataset['area']]);
     } else if (ev.key === 'ArrowDown' || ev.key === 'ArrowUp') {
+      // The checklist keeps its arrows: the board menu around it has its own.
       ev.preventDefault();
+      ev.stopPropagation();
       const boxes = [...(list?.querySelectorAll<HTMLInputElement>('input') ?? [])];
-      const at = boxes.indexOf(ev.target as HTMLInputElement);
+      const from = (ev.target as Element).closest('.row')?.querySelector('input') ?? null;
+      const at = boxes.indexOf(from as HTMLInputElement);
       boxes[(at + (ev.key === 'ArrowDown' ? 1 : -1) + boxes.length) % boxes.length]?.focus();
     }
   };
@@ -79,7 +82,7 @@
       <label>
         <input
           type="checkbox"
-          checked={chosen.narrows && chosen.ids.includes(area)}
+          checked={on(area)}
           onchange={() => {
             toggle(area);
           }}

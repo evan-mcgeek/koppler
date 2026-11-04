@@ -64,17 +64,30 @@ test('the board menu groups team boards by area, hides the others with a line, a
   const bar = page.getByRole('banner');
   await bar.getByRole('button', { name: /^Board:/ }).click();
   const menu = page.getByRole('dialog', { name: 'Boards' });
-  await expect(menu.locator('p.sub')).toHaveText(['Payments', 'Shipping', 'No area']);
+  await expect(menu.locator('p.sub')).toHaveText(['Team boards · Payments', 'Shipping', 'No area']);
   // Picked in the menu, the menu stays open and regroups at once.
   await only(page, menu, 'Payments');
-  await expect(menu.locator('p.sub')).toHaveText(['Payments', 'No area']);
+  await expect(menu.locator('p.sub')).toHaveText(['Team boards · Payments', 'No area']);
   await expect(menu).toContainText('1 team board in Shipping');
   await page.screenshot({ path: 'test-results/areas-menu.png' });
   await menu.getByRole('searchbox', { name: 'Find a board' }).fill('bro');
-  await expect(menu.getByText('In other areas')).toBeVisible();
+  await expect(menu.getByText('Hidden by your areas')).toBeVisible();
+  await expect(menu).toContainText('Opening it shows it; your areas stay as they are');
   await menu.getByRole('button', { name: /Browse/ }).click();
   // Opening it leaves the choice alone; the bar says it is outside it.
   await expect(bar.getByRole('button', { name: /^Board: Browse/ })).toContainText('Shipping');
   await expect(panel(page).getByRole('button', { name: 'Areas: Payments' })).toBeVisible();
   await page.screenshot({ path: 'test-results/areas-outside.png' });
+});
+
+test('with every area on, unticking one hides only that one', async ({ page }) => {
+  await panel(page).getByRole('button', { name: 'Areas: All' }).click();
+  const list = page.getByRole('dialog', { name: 'Areas to see' });
+  await expect(list.getByRole('checkbox', { name: 'Payments' })).toBeChecked();
+  await list.getByRole('checkbox', { name: 'Shipping' }).uncheck();
+  await page.keyboard.press('Escape');
+  await expect(panel(page).getByRole('button', { name: 'Areas: Payments' })).toBeVisible();
+  // Searching within the areas says so.
+  await panel(page).getByRole('searchbox').fill('pay');
+  await expect(panel(page)).toContainText('Searched within Payments and apps with no area.');
 });

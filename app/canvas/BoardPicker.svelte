@@ -1,5 +1,6 @@
 <script lang="ts">
   import Icon from './Icon.svelte';
+  import EyeOff from '@lucide/svelte/icons/eye-off';
   import X from '@lucide/svelte/icons/x';
   // The board on screen, by name: a menu of the team's boards and the user's own, to open, rename, copy, share or
   // delete one, start a new one, or open one from a file or a link.
@@ -49,7 +50,11 @@
     const id = here && areaOf(here).id;
     return id && !areaChoice.ids.includes(id) ? (board.areas[id]?.name ?? id) : undefined;
   });
-  const joined = (names: string[]) => new Intl.ListFormat('en', { type: 'conjunction' }).format(names);
+  /** "Shipping, Notifications and Accounts". */
+  const joined = (names: string[]) =>
+    names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names.at(-1) ?? ''}` : (names[0] ?? '');
+  /** What the areas hide besides the board on screen, pinned above them. */
+  const hiddenCount = $derived(teams.hidden.count - (pinned ? 1 : 0));
   /** "(local)" or "(mine)" after a board's name: set apart, so a long name keeps it. */
   const SUFFIX = / \((local|mine)\)$/;
   let open = $state(false);
@@ -186,7 +191,8 @@
   };
 </script>
 
-{#snippet boardRow(preset: StoredPreset, mine: boolean, elsewhere = false)}
+<!-- eslint-disable @typescript-eslint/no-confusing-void-expression -- {@render} of a snippet returns nothing -->
+{#snippet boardRow(preset: StoredPreset, mine: boolean, elsewhere = false, under = '')}
   {@const area = hasAreas ? areaOf(preset) : undefined}
   <div class="row" class:elsewhere>
     <button
@@ -201,10 +207,15 @@
         choose(preset);
       }}
     >
-      <span class="here" aria-hidden="true"></span><span class="name">{preset.name.replace(SUFFIX, '')}</span
-      >{#if SUFFIX.test(preset.name)}<span class="suffix">{SUFFIX.exec(preset.name)?.[0]}</span>{/if}
+      <span class="here" aria-hidden="true"></span><span class="what"
+        ><span class="line"
+          ><span class="name">{preset.name.replace(SUFFIX, '')}</span>{#if SUFFIX.test(preset.name)}<span class="suffix"
+              >{SUFFIX.exec(preset.name)?.[0]}</span
+            >{/if}</span
+        >{#if under}<span class="under">{under}</span>{/if}</span
+      >
       {#if area?.by === 'hand' && !mine}<span class="meta">set by hand</span>{/if}
-      {#if hasAreas && (mine || elsewhere) && area?.id}<span class="area">{board.areas[area.id]?.name}</span
+      {#if hasAreas && (mine || elsewhere || under) && area?.id}<span class="area">{board.areas[area.id]?.name}</span
         >{:else if !hasAreas}<span class="meta">{size(preset)}</span>{/if}
     </button>
     {#if mine && typeof preset['source'] === 'string' && /^(https?:|\/)/.test(preset['source'])}
@@ -309,25 +320,25 @@
   {/if}
   {#if pinned}
     <p>Current board</p>
-    {@render boardRow(pinned, false)}
+    {@render boardRow(pinned, false, false, 'Outside your areas')}
   {/if}
-  {#if teams.groups.length}<p>Team boards</p>{/if}
-  {#each teams.groups as group (group.title)}
-    {#if hasAreas}<p class="sub">{group.title}</p>{/if}
+  {#if !hasAreas && teams.groups.length}<p>Team boards</p>{/if}
+  {#each teams.groups as group, n (group.title)}
+    {#if hasAreas}<p class="sub">{n === 0 ? `Team boards · ${group.title}` : group.title}</p>{/if}
     {#each group.boards.filter(one => one !== pinned) as preset (preset.name)}
       {@render boardRow(preset, false)}
     {/each}
   {/each}
   {#if query.trim() && hiddenMatches.length}
-    <p>In other areas</p>
+    <p>Hidden by your areas</p>
     {#each hiddenMatches as preset (preset.name)}
-      {@render boardRow(preset, false, true)}
+      {@render boardRow(preset, false, true, 'Opening it shows it; your areas stay as they are')}
     {/each}
-  {:else if !query.trim() && teams.hidden.count}
+  {:else if !query.trim() && hiddenCount}
     <p class="hidden-line">
-      <span
-        >{teams.hidden.count}
-        {teams.hidden.count === 1 ? 'team board' : 'team boards'}{teams.hidden.areas.length <= 3
+      <Icon of={EyeOff} size={13} /><span class="said"
+        >{hiddenCount}
+        {pinned ? 'more ' : ''}{hiddenCount === 1 ? 'team board' : 'team boards'}{teams.hidden.areas.length <= 3
           ? ` in ${joined(teams.hidden.areas)}`
           : ''}</span
       >
@@ -582,6 +593,23 @@
     border-bottom: 1px dashed var(--line-strong);
     font-weight: 400;
     font-size: 12px;
+  }
+  .what {
+    display: grid;
+    flex: 1;
+    min-width: 0;
+  }
+  .line {
+    display: flex;
+    gap: 6px;
+    min-width: 0;
+  }
+  .under {
+    color: var(--ink-muted);
+    font: 400 11px var(--sans);
+  }
+  .menu p.hidden-line .said {
+    flex: 1;
   }
   .area {
     flex: none;

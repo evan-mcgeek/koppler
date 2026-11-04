@@ -4,6 +4,7 @@
   import Play from '@lucide/svelte/icons/play';
   import Plus from '@lucide/svelte/icons/plus';
   import Ellipsis from '@lucide/svelte/icons/ellipsis';
+  import EyeOff from '@lucide/svelte/icons/eye-off';
   import { flushSync, tick } from 'svelte';
   import { appGroups, type AppGroup } from '../src/core/areas.ts';
   import AreaFilter from './AreaFilter.svelte';
@@ -38,18 +39,22 @@
     return !asked || app.name.toLowerCase().includes(asked) || kind(app.kindLabel).startsWith(kind(asked));
   };
   /** The apps on the board first, then the rest; each part by name, or in the order it was added. */
+  const place = (app: StackApp) => (onBoard.includes(app.id) ? onBoard.indexOf(app.id) : board.apps.indexOf(app));
+  const order = (a: StackApp, b: StackApp) => (sort === 'name' ? a.name.localeCompare(b.name) : place(a) - place(b));
+  /** The matches in the order picked, the board's own not put first: an area group lists them in that order. */
+  const sorted = $derived(board.apps.filter(matches).sort(order));
   const shown = $derived.by(() => {
-    const place = (app: StackApp) => (onBoard.includes(app.id) ? onBoard.indexOf(app.id) : board.apps.indexOf(app));
-    const order = (a: StackApp, b: StackApp) => (sort === 'name' ? a.name.localeCompare(b.name) : place(a) - place(b));
     const off = (app: StackApp) => (onBoard.includes(app.id) ? 0 : 1);
-    return board.apps.filter(matches).sort((a, b) => off(a) - off(b) || order(a, b));
+    return [...sorted].sort((a, b) => off(a) - off(b) || order(a, b));
   });
   const hasAreas = $derived(Object.keys(board.areas).length > 0);
+  const joined = (names: string[]) =>
+    names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names.at(-1) ?? ''}` : (names[0] ?? '');
   /** With a choice of areas: the apps under the chosen areas, the board's own outside them first. */
   const areaGroups = $derived(
     appGroups(
       { areas: board.areas, apps: Object.fromEntries(board.apps.map(app => [app.id, { areas: app.areas }])) },
-      shown.map(app => app.id),
+      sorted.map(app => app.id),
       onBoard,
       areaChoice.ids,
     ),
@@ -237,6 +242,7 @@
   };
 </script>
 
+<!-- eslint-disable @typescript-eslint/no-confusing-void-expression -- {@render} of a snippet returns nothing -->
 {#snippet sorter()}
   <button class="sort" type="button" onclick={toggleSort} title={sortHint} aria-label={sortHint}>
     Sort: {sort === 'name' ? 'A–Z' : 'Added'}
@@ -354,8 +360,15 @@
         </div>
       {/each}
       {#if areaGroups.hidden}
+        {#if search.trim()}
+          <p class="searched">
+            Searched within {joined(areaChoice.ids.map(id => board.areas[id]?.name ?? id))} and apps with no area.
+          </p>
+        {/if}
         <p class="hidden-line">
-          <span>{areaGroups.hidden} {areaGroups.hidden === 1 ? 'app' : 'apps'} in other areas</span>
+          <Icon of={EyeOff} size={13} /><span class="said"
+            >{areaGroups.hidden} {areaGroups.hidden === 1 ? 'app' : 'apps'} in other areas</span
+          >
           <button
             type="button"
             onclick={() => {
@@ -565,6 +578,15 @@
     padding: 8px;
     border-top: 1px dashed var(--line-strong);
     border-bottom: 1px dashed var(--line-strong);
+    color: var(--ink-muted);
+    font: 400 12px var(--sans);
+  }
+  .hidden-line .said {
+    flex: 1;
+  }
+  .searched {
+    margin: 8px 0 0;
+    padding: 0 8px;
     color: var(--ink-muted);
     font: 400 12px var(--sans);
   }
