@@ -33,3 +33,24 @@ export function cardChanges(base: Record<string, unknown>, now: Record<string, u
   }
   return out;
 }
+
+/**
+ * How many fields differ between two stacks: each value that changed, was added or was taken out counts once. Areas
+ * put in another order count once too, as their order is the board menu's; `at` names the key the two are under.
+ */
+export function changes(a: unknown, b: unknown, at = ''): number {
+  const isTree = (one: unknown) => typeof one === 'object' && one !== null;
+  if (!isTree(a) || !isTree(b) || Array.isArray(a) !== Array.isArray(b))
+    return JSON.stringify(a) === JSON.stringify(b) ? 0 : 1;
+  const left = a as Record<string, unknown>;
+  const right = b as Record<string, unknown>;
+  const both = (one: object, other: object) =>
+    Object.keys(one)
+      .filter(key => Object.hasOwn(other, key))
+      .join('\n');
+  const moved = at === 'areas' && !Array.isArray(a) && both(left, right) !== both(right, left) ? 1 : 0;
+  return [...new Set([...Object.keys(left), ...Object.keys(right)])].reduce(
+    (sum, key) => sum + changes(left[key], right[key], key),
+    moved,
+  );
+}

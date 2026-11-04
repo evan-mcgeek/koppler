@@ -9,7 +9,9 @@
   import { DATABASE_KINDS } from '../src/core/databases.ts';
   import LocalAddress from './LocalAddress.svelte';
   import { SECRET_TYPES } from '../src/core/secret-types.ts';
+  import { changes } from '../src/core/stack-changes.ts';
   import { getAt, parsePath, setAt } from '../src/core/stack-path.ts';
+  import AreasTab from './AreasTab.svelte';
   import EnvOverrides from './EnvOverrides.svelte';
   import SettingsField from './SettingsField.svelte';
   import { board } from './board.svelte.ts';
@@ -20,7 +22,6 @@
     APP_HEAD,
     APP_TABS,
     BY_KIND,
-    changes,
     child,
     HOWS,
     KIND_FIELDS,
@@ -48,6 +49,11 @@
   let draft = $state.raw<unknown>(null);
   let schema = $state.raw<Schema | null>(null);
   let locks = $state<string[]>([]);
+  // A lock set elsewhere (the terminal, another tab) shows while the panel is open, not only when it opens.
+  $effect(() => {
+    const known = live.status?.locks;
+    if (known) locks = known;
+  });
   let problems = $state(new Map<string, string>());
   let tab = $state(0);
   let saving = $state(false);
@@ -85,7 +91,17 @@
   const app = $derived(/^apps\.[a-z0-9-]+$/.test(at) ? at.slice(5) : null);
   const outside = $derived(!!app && !!value?.['outside']);
   // What it is first, then tabs; a part with no tabs of its own (a queue) shows all its fields in one.
-  const head = $derived(app ? APP_HEAD : at ? [] : STACK_HEAD);
+  // An app's areas sit under its name, once the stack has areas to pick from.
+  const stackAreas = $derived(Object.keys((draft as { areas?: object } | null)?.areas ?? {}).length > 0);
+  const head = $derived(
+    app
+      ? stackAreas || value?.['areas'] !== undefined
+        ? ['name', 'areas', ...APP_HEAD.slice(1)]
+        : APP_HEAD
+      : at
+        ? []
+        : STACK_HEAD,
+  );
   const tabs = $derived.by((): Tab[] => {
     const identity: Tab = {
       name: 'Identity',
@@ -94,7 +110,9 @@
     };
     const own = app ? [identity, ...(outside ? OUTSIDE_TABS : APP_TABS)] : at ? [] : [identity, ...STACK_TABS];
     const named = new Set([...head, ...own.flatMap(one => one.keys)]);
-    const rest = [...Object.keys(shape.properties ?? {}), ...Object.keys(value ?? {})].filter(key => !named.has(key));
+    const rest = [...Object.keys(shape.properties ?? {}), ...Object.keys(value ?? {})].filter(
+      key => !named.has(key) && !(app && key === 'areas'),
+    );
     const other = [...new Set(rest)];
     // One row of a list (a need): only the fields of its type, and any others it already has.
     const row = at ? rowOf(at, value, draft) : undefined;
@@ -105,7 +123,7 @@
   const shown = $derived(tabs[Math.min(tab, tabs.length - 1)]);
   const count = $derived(changes(stack, draft));
   const valueAt = (from: unknown, path: string) => (path ? getAt(from, parts(path)) : from);
-  const changedAt = (path: string) => changes(valueAt(stack, path), valueAt(draft, path)) > 0;
+  const changedAt = (path: string) => changes(valueAt(stack, path), valueAt(draft, path), path.split('.').at(-1)) > 0;
   const changedIn = (keys: string[]) => keys.filter(key => changedAt(child(at, key)));
   /** The fields with a change, by name. */
   const named = $derived.by(() => {
@@ -123,6 +141,8 @@
   export async function open(what: { title: string; path: string }): Promise<void> {
     title = what.title;
     at = what.path;
+    // Nothing to edit until this part is read: an edit made meanwhile would be lost when it comes.
+    draft = null;
     changed = false;
     asked = false;
     saved = false;
@@ -170,6 +190,14 @@
       return {
         options: Object.entries(DATABASE_KINDS).map(([id, words]) => ({ value: id, label: words })),
         other: true,
+      };
+    // A team board's area, set by hand; none takes it from its apps.
+    if (/^presets\[\d+\]\.area$/.test(path))
+      return {
+        options: Object.entries((all as { areas?: Record<string, { name?: string }> }).areas ?? {}).map(
+          ([id, area]) => ({ value: id, label: area.name ?? id }),
+        ),
+        unset: 'Worked out from its apps',
       };
     if (key === 'sso') return typed(choices.awsProfiles);
     if (key === 'signIn') return typed(Object.keys(all.signIns ?? {}), false);
@@ -326,6 +354,8 @@
         {#if /^databases\.[a-z0-9-]+$/.test(at)}<LocalAddress database={at.slice('databases.'.length)} />{/if}
         {#if shown?.view === 'envs' && app && value}
           <EnvOverrides path={at} app={value} schema={shape} envs={board.envs} {ctx} />
+        {:else if shown?.view === 'areas'}
+          <AreasTab stack={draft} {ctx} />
         {:else if shown?.view === 'apps'}
           <ul class="apps">
             {#each Object.entries((value?.['apps'] ?? {}) as Record<string, { name?: string; kind?: string }>) as [id, one] (id)}

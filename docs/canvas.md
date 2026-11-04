@@ -18,16 +18,23 @@ A board file can also be opened, dropped on the page or linked from GitHub.
 ### Areas
 
 A big stack can name its parts as areas, such as Payments or Shipping, and each app the areas it is in (`koppler stack set apps.<id>.areas '["payments"]'`).
+The stack's settings have an **Areas** tab to add, rename and remove areas, with how many apps and team boards each has; an area's id is made from its first name and stays when it is renamed, and dragging an area sets the order the board menu groups in.
+Removing an area that apps or team boards use asks first and names them; on Save it is taken out of every app and team board at once.
+An app's areas are under its name in its settings: each one can be taken out, and **Add** opens the stack's areas to tick; with none, the app shows in every area.
 **Areas**, above the Apps list and under **Find a board** in the board menu, picks the areas you want to see; your choice is kept on this Mac, per stack, and both places show the same one.
 With some areas picked, the Apps list groups its apps under them, then the apps in no area, which always show; the apps on the board always show too, under **On this board** when they are outside your areas.
 An app in two areas lists once, with "also" and the other one under its name, and a dashed line says how many apps your areas hide, with **Show all**.
 The board menu groups the team boards under their area, the one most of their apps are in unless it was set by hand, with **No area** last; your own boards stay one list, each with its area.
-**Find a board** looks through every board: one your areas hide shows under **In other areas**, and opening it leaves your choice as it is, with its area beside its name in the bar.
+**Find a board** looks through every board: one your areas hide shows under **Hidden by your areas**, and opening it leaves your choice as it is, with its area beside its name in the bar.
 A card in Discover says its areas on its second line; in Plan and Live it does so after its kind, only while your areas hide some.
 Discover leaves the apps outside your areas off the map, with their links, but never the board's own.
 A card that links to one keeps a dashed **+N hidden**, which names them and their areas and opens the Areas checklist; the solid **+N** still brings in what is one step out.
 A dashed line under the map says which areas it shows and how many apps it hides, with **Areas** and **Show all**, and a picked card's panel still lists its hidden links, muted, each with its area.
 **Find a card** (`/`) marks an app your areas hide as **Hidden by your areas**, with its areas; picking it adds those areas to your choice and brings it onto the map.
+A board whose area was set by hand says **set by hand**; one whose apps tie says **tie**, and its tooltip says which area it went to and why.
+Right-click a board in the menu, or point at it and click **…**, for **Set area…**: pick an area, or **Worked out from its apps** to take it from its apps again.
+In a stack with areas, that menu also holds your own boards' **Share with the team…** and **Delete…**.
+Your own boards keep their area on this Mac; a team board's area is in the stack, so changing it changes it for the team, and its settings under **Team boards** set it too.
 Areas are a view only: what runs, the environments and the secrets stay the same.
 
 ## Cards

@@ -180,6 +180,25 @@ export function editStack(
 }
 
 /**
+ * Sets a team board's area by hand, or takes it from its apps again (`null`). The board is found by its name in the
+ * file as it is now, so a stack changed since it was read cannot put the area on another board.
+ */
+export function setBoardArea(
+  name: string,
+  area: string | null,
+  { config = loadConfig() }: { config?: Config } = {},
+): { path: string; value: unknown; error?: undefined } | { error: string } {
+  const used = stackInUse(config);
+  if (used.error !== undefined) return used;
+  const { presets } = used.stack as { presets?: unknown };
+  const at = (Array.isArray(presets) ? (presets as ({ name?: unknown } | null)[]) : []).findIndex(
+    one => one?.name === name,
+  );
+  if (at < 0) return { error: `The stack changed: it has no team board called ${name} now. Read it again.` };
+  return editStack(`presets[${String(at)}].area`, area ? [area] : undefined, { config });
+}
+
+/**
  * Adds a system the apps call that never runs here (a SaaS API, a managed service), with the apps that call it, so it
  * shows on their boards as an outside card.
  */

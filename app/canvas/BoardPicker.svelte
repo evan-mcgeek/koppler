@@ -1,16 +1,18 @@
 <script lang="ts">
   import Icon from './Icon.svelte';
   import EyeOff from '@lucide/svelte/icons/eye-off';
+  import Ellipsis from '@lucide/svelte/icons/ellipsis';
   import X from '@lucide/svelte/icons/x';
   // The board on screen, by name: a menu of the team's boards and the user's own, to open, rename, copy, share or
   // delete one, start a new one, or open one from a file or a link.
   import type { StoredPreset } from '../src/core/presets.ts';
   import { bar } from './bar.svelte.ts';
-  import { boardArea, boardGroups } from '../src/core/areas.ts';
+  import { areaWhy, boardArea, boardGroups } from '../src/core/areas.ts';
   import AreaFilter from './AreaFilter.svelte';
   import { chosen as areaChoice } from './areas.svelte.ts';
   import { board } from './board.svelte.ts';
   import { ago, openBoard, openFile, openLink } from './boards.ts';
+  import { tick } from 'svelte';
   import { post } from './data.ts';
   import { runs } from './run.svelte.ts';
   import { toasts } from './toast.svelte.ts';
@@ -85,6 +87,7 @@
   // Before it shows, not after: what is typed next must not be wiped by a late reset.
   const fresh = (ev: ToggleEvent) => {
     if (ev.newState !== 'open') return;
+    setting = null;
     query = '';
     named = board.name ?? '';
     link = '';
@@ -106,6 +109,68 @@
     const all = options();
     const at = all.indexOf(document.activeElement as HTMLButtonElement);
     all[(at + (ev.key === 'ArrowDown' ? 1 : -1) + all.length) % all.length]?.focus();
+  };
+  /** Why a board is in its area, for its tooltip: by hand, or how its apps settled a tie. */
+  const whyOf = (preset: StoredPreset) => {
+    const area = areaOf(preset);
+    if (area.by === 'hand') return `Set by hand. From its apps: ${areaWhy(facts, preset)}`;
+    return area.tie ? areaWhy(facts, preset) : undefined;
+  };
+  const reloadable = (preset: StoredPreset) =>
+    typeof preset['source'] === 'string' && /^(https?:|\/)/.test(preset['source']);
+  /** The board whose row menu is open, and where. */
+  let rowMenu = $state<HTMLDivElement>();
+  let menuFor = $state<{ preset: StoredPreset; mine: boolean } | null>(null);
+  /** What opened the row menu, to have the keyboard back when it closes. */
+  let opener: HTMLElement | null = null;
+  const openRowMenu = async (
+    preset: StoredPreset,
+    mine: boolean,
+    at: { x: number; y: number },
+    from: HTMLElement | null,
+  ) => {
+    menuFor = { preset, mine };
+    opener = from;
+    if (!rowMenu) return;
+    rowMenu.style.top = `${String(Math.min(at.y, innerHeight - 160))}px`;
+    rowMenu.style.left = `${String(Math.min(at.x, innerWidth - 200))}px`;
+    rowMenu.showPopover();
+    await tick();
+    rowMenu.querySelector<HTMLButtonElement>('button')?.focus();
+  };
+  /** Up and down move through a menu's items; nothing else is done with them. */
+  const arrows = (ev: KeyboardEvent, within: HTMLElement | undefined) => {
+    ev.stopPropagation();
+    if (ev.key !== 'ArrowDown' && ev.key !== 'ArrowUp') return;
+    ev.preventDefault();
+    const all = [...(within?.querySelectorAll<HTMLButtonElement>('[role^="menuitem"]') ?? [])];
+    const at = all.indexOf(document.activeElement as HTMLButtonElement);
+    all[(at + (ev.key === 'ArrowDown' ? 1 : -1) + all.length) % all.length]?.focus();
+  };
+  let areaMenu = $state<HTMLDivElement>();
+  const startSetting = async (preset: StoredPreset, mine: boolean) => {
+    rowMenu?.hidePopover();
+    setting = { preset, mine };
+    await tick();
+    areaMenu?.querySelector<HTMLButtonElement>('[aria-checked="true"]')?.focus();
+  };
+  /** The board whose area is being set, in place of the lists. */
+  let setting = $state<{ preset: StoredPreset; mine: boolean } | null>(null);
+  // Yours is kept on this Mac as `koppler board edit --area` keeps it; a team board's is a fact of the stack.
+  const setArea = async (preset: StoredPreset, mine: boolean, area: string | null) => {
+    setting = null;
+    if (mine) {
+      board.edit(preset.name, { area });
+      return;
+    }
+    const said = await post('board-area', { name: preset.name, area });
+    // Read again either way: a refusal means the stack changed under the canvas.
+    await board.reload();
+    if ('error' in said) {
+      toasts.show(`Could not set the area of ${preset.name}. ${said.error}`, 'warning');
+      return;
+    }
+    if (board.name === preset.name) board.handArea = area;
   };
   const choose = (preset: StoredPreset) => {
     close();
@@ -194,7 +259,21 @@
 <!-- eslint-disable @typescript-eslint/no-confusing-void-expression -- {@render} of a snippet returns nothing -->
 {#snippet boardRow(preset: StoredPreset, mine: boolean, elsewhere = false, under = '')}
   {@const area = hasAreas ? areaOf(preset) : undefined}
-  <div class="row" class:elsewhere>
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <div
+    class="row"
+    class:elsewhere
+    oncontextmenu={ev => {
+      if (!hasAreas) return;
+      ev.preventDefault();
+      void openRowMenu(
+        preset,
+        mine,
+        { x: ev.clientX, y: ev.clientY },
+        ev.currentTarget.querySelector<HTMLElement>('button'),
+      );
+    }}
+  >
     <button
       type="button"
       aria-current={preset.name === board.name}
@@ -202,7 +281,9 @@
         ? `Opened from ${preset['source']}`
         : elsewhere
           ? 'Hidden by your areas. Opening it leaves them as they are.'
-          : undefined}
+          : hasAreas
+            ? whyOf(preset)
+            : undefined}
       onclick={() => {
         choose(preset);
       }}
@@ -214,12 +295,28 @@
             >{/if}</span
         >{#if under}<span class="under">{under}</span>{/if}</span
       >
-      {#if area?.by === 'hand' && !mine}<span class="meta">set by hand</span>{/if}
-      {#if hasAreas && (mine || elsewhere || under) && area?.id}<span class="area">{board.areas[area.id]?.name}</span
+      {#if hasAreas && (mine || elsewhere || under) && area?.id}<span class="area"
+          >{board.areas[area.id]?.name}{area.by === 'hand' ? ' · set by hand' : area.tie ? ' · tie' : ''}</span
+        >{:else if area?.by === 'hand'}<span class="meta">set by hand</span>{:else if area?.tie}<span class="meta"
+          >tie</span
         >{:else if !hasAreas}<span class="meta">{size(preset)}</span>{/if}
     </button>
-    {#if mine && typeof preset['source'] === 'string' && /^(https?:|\/)/.test(preset['source'])}
-      {@const from = preset['source']}
+    {#if hasAreas}
+      <button
+        class="act more-for"
+        type="button"
+        aria-label="More for {preset.name}"
+        aria-haspopup="menu"
+        title="More"
+        onclick={ev => {
+          const at = ev.currentTarget.getBoundingClientRect();
+          void openRowMenu(preset, mine, { x: at.left, y: at.bottom + 2 }, ev.currentTarget);
+        }}><Icon of={Ellipsis} size={14} /></button
+      >
+    {/if}
+    <!-- With areas, a board's actions are in its row menu, so its name keeps the room. -->
+    {#if mine && !hasAreas && reloadable(preset)}
+      {@const from = String(preset['source'])}
       <button
         class="act"
         type="button"
@@ -228,7 +325,7 @@
         onclick={() => void reload(from, preset.name)}>Reload</button
       >
     {/if}
-    {#if mine}
+    {#if mine && !hasAreas}
       <button
         class="act"
         type="button"
@@ -296,145 +393,247 @@
       >
     </div>
   {/if}
-  <input
-    bind:this={find}
-    bind:value={query}
-    class="find"
-    type="search"
-    aria-label="Find a board"
-    placeholder="Find a board"
-    autocomplete="off"
-    spellcheck="false"
-  />
-  {#if hasAreas}
-    <div class="area-row">
-      <AreaFilter />
-      {#if areaChoice.narrows}<button
-          class="show-all"
+  {#if setting}
+    {@const { preset, mine: yours } = setting}
+    {@const hand = typeof preset['area'] === 'string' && preset['area'] in board.areas ? preset['area'] : null}
+    {@const heading = `${preset.name} · area`}
+    <div class="set-area">
+      <div class="set-head">
+        <strong>{heading}</strong>
+        <span>{yours ? 'Your board, on this Mac.' : 'Team board. Changing it changes it for the team.'}</span>
+      </div>
+      <div
+        bind:this={areaMenu}
+        class="radios"
+        role="menu"
+        aria-label={heading}
+        tabindex="-1"
+        onkeydown={ev => {
+          arrows(ev, areaMenu);
+        }}
+      >
+        <button
+          type="button"
+          role="menuitemradio"
+          class="worked"
+          aria-checked={!hand}
+          aria-label="Worked out from its apps"
+          aria-describedby="{id}-why"
+          onclick={() => void setArea(preset, yours, null)}
+          ><span class="dot" aria-hidden="true"></span><span class="words"
+            >Worked out from its apps<small id="{id}-why">{areaWhy(facts, preset)}</small></span
+          ></button
+        >
+        {#each Object.entries(board.areas) as [area, one] (area)}
+          <button
+            type="button"
+            role="menuitemradio"
+            aria-checked={hand === area}
+            onclick={() => void setArea(preset, yours, area)}
+            ><span class="dot" aria-hidden="true"></span>{one.name}</button
+          >
+        {/each}
+      </div>
+      <button class="back" type="button" onclick={() => (setting = null)}>Back to the boards</button>
+    </div>
+  {:else}
+    <input
+      bind:this={find}
+      bind:value={query}
+      class="find"
+      type="search"
+      aria-label="Find a board"
+      placeholder="Find a board"
+      autocomplete="off"
+      spellcheck="false"
+    />
+    {#if hasAreas}
+      <div class="area-row">
+        <AreaFilter />
+        {#if areaChoice.narrows}<button
+            class="show-all"
+            type="button"
+            onclick={() => {
+              areaChoice.set([]);
+            }}>Show all</button
+          >{/if}
+      </div>
+    {/if}
+    {#if pinned}
+      <p>Current board</p>
+      {@render boardRow(pinned, false, false, 'Outside your areas')}
+    {/if}
+    {#if !hasAreas && teams.groups.length}<p>Team boards</p>{/if}
+    {#each teams.groups as group, n (group.title)}
+      {#if hasAreas}<p class="sub">{n === 0 ? `Team boards · ${group.title}` : group.title}</p>{/if}
+      {#each group.boards.filter(one => one !== pinned) as preset (preset.name)}
+        {@render boardRow(preset, false)}
+      {/each}
+    {/each}
+    {#if query.trim() && hiddenMatches.length}
+      <p>Hidden by your areas</p>
+      {#each hiddenMatches as preset (preset.name)}
+        {@render boardRow(preset, false, true, 'Opening it shows it; your areas stay as they are')}
+      {/each}
+    {:else if !query.trim() && hiddenCount}
+      <p class="hidden-line">
+        <Icon of={EyeOff} size={13} /><span class="said"
+          >{hiddenCount}
+          {pinned ? 'more ' : ''}{hiddenCount === 1 ? 'team board' : 'team boards'}{teams.hidden.areas.length <= 3
+            ? ` in ${joined(teams.hidden.areas)}`
+            : ''}</span
+        >
+        <button
           type="button"
           onclick={() => {
             areaChoice.set([]);
           }}>Show all</button
-        >{/if}
-    </div>
-  {/if}
-  {#if pinned}
-    <p>Current board</p>
-    {@render boardRow(pinned, false, false, 'Outside your areas')}
-  {/if}
-  {#if !hasAreas && teams.groups.length}<p>Team boards</p>{/if}
-  {#each teams.groups as group, n (group.title)}
-    {#if hasAreas}<p class="sub">{n === 0 ? `Team boards · ${group.title}` : group.title}</p>{/if}
-    {#each group.boards.filter(one => one !== pinned) as preset (preset.name)}
-      {@render boardRow(preset, false)}
-    {/each}
-  {/each}
-  {#if query.trim() && hiddenMatches.length}
-    <p>Hidden by your areas</p>
-    {#each hiddenMatches as preset (preset.name)}
-      {@render boardRow(preset, false, true, 'Opening it shows it; your areas stay as they are')}
-    {/each}
-  {:else if !query.trim() && hiddenCount}
-    <p class="hidden-line">
-      <Icon of={EyeOff} size={13} /><span class="said"
-        >{hiddenCount}
-        {pinned ? 'more ' : ''}{hiddenCount === 1 ? 'team board' : 'team boards'}{teams.hidden.areas.length <= 3
-          ? ` in ${joined(teams.hidden.areas)}`
-          : ''}</span
-      >
-      <button
-        type="button"
-        onclick={() => {
-          areaChoice.set([]);
-        }}>Show all</button
-      >
-    </p>
-  {/if}
-  {#if board.own.some(shows)}<p>Your boards</p>{/if}
-  {#each board.own.filter(shows) as preset (preset.name)}
-    {@render boardRow(preset, true)}
-  {/each}
-  {#if !board.team.length && !board.own.length}
-    <p class="none">No boards yet. A board is kept as soon as it has an app.</p>
-  {:else if query.trim() && !board.team.some(shows) && !board.own.some(shows)}
-    <p class="none">No board is called that.</p>
-  {/if}
-  <div class="strip">
-    <div class="acts">
-      <button
-        type="button"
-        onclick={() => {
-          close();
-          board.newBoard();
-        }}>New board</button
-      >
-      <button
-        type="button"
-        title="A board for one feature: its request, and the steps it takes through the stack, read in Discover"
-        onclick={() => {
-          close();
-          board.newFeature();
-        }}>New feature board</button
-      >
-      <button
-        type="button"
-        disabled={!board.nodes.length}
-        onclick={() => {
-          close();
-          board.duplicate();
-        }}>Duplicate</button
-      >
-    </div>
-    {#if mine}
-      <form onsubmit={rename}>
-        <input type="text" aria-label="Name of this board" maxlength="80" bind:value={named} />
-        <button type="submit" disabled={named.trim() === board.name}>Rename</button>
-      </form>
+        >
+      </p>
     {/if}
-    <form onsubmit={fromLink}>
-      <input
-        type="text"
-        aria-label="Open a board from a link"
-        placeholder="Paste a GitHub link to a board file"
-        bind:value={link}
-      />
-      {#if link.trim()}
-        <button type="submit" disabled={busy}>Open</button>
-      {:else}
-        <button type="button" onclick={() => file?.click()}>Open a file…</button>
+    {#if board.own.some(shows)}<p>Your boards</p>{/if}
+    {#each board.own.filter(shows) as preset (preset.name)}
+      {@render boardRow(preset, true)}
+    {/each}
+    {#if !board.team.length && !board.own.length}
+      <p class="none">No boards yet. A board is kept as soon as it has an app.</p>
+    {:else if query.trim() && !board.team.some(shows) && !board.own.some(shows)}
+      <p class="none">No board is called that.</p>
+    {/if}
+    <div class="strip">
+      <div class="acts">
+        <button
+          type="button"
+          onclick={() => {
+            close();
+            board.newBoard();
+          }}>New board</button
+        >
+        <button
+          type="button"
+          title="A board for one feature: its request, and the steps it takes through the stack, read in Discover"
+          onclick={() => {
+            close();
+            board.newFeature();
+          }}>New feature board</button
+        >
+        <button
+          type="button"
+          disabled={!board.nodes.length}
+          onclick={() => {
+            close();
+            board.duplicate();
+          }}>Duplicate</button
+        >
+      </div>
+      {#if mine}
+        <form onsubmit={rename}>
+          <input type="text" aria-label="Name of this board" maxlength="80" bind:value={named} />
+          <button type="submit" disabled={named.trim() === board.name}>Rename</button>
+        </form>
       {/if}
-    </form>
-    <input
-      bind:this={file}
-      type="file"
-      accept=".json,application/json"
-      hidden
-      onchange={() => {
-        close();
-        void openFile(file?.files?.[0]);
-        if (file) file.value = '';
-      }}
-    />
-    <p class="hint" class:warn={hint.warn} role="status">{hint.text}</p>
-  </div>
-  {#if board.trash.length}
-    <details>
-      <summary>Recently deleted ({board.trash.length})</summary>
-      {#each board.trash as gone (gone.name + gone.deleted)}
-        <div class="row gone">
-          <span class="name" title={gone.name}>{gone.name}</span><span class="meta">{ago(gone.deleted)}</span>
-          <button
-            class="act"
-            type="button"
-            aria-label="Restore {gone.name}"
-            onclick={() => {
-              board.restore(gone);
-            }}>Restore</button
-          >
-        </div>
-      {/each}
-    </details>
+      <form onsubmit={fromLink}>
+        <input
+          type="text"
+          aria-label="Open a board from a link"
+          placeholder="Paste a GitHub link to a board file"
+          bind:value={link}
+        />
+        {#if link.trim()}
+          <button type="submit" disabled={busy}>Open</button>
+        {:else}
+          <button type="button" onclick={() => file?.click()}>Open a file…</button>
+        {/if}
+      </form>
+      <input
+        bind:this={file}
+        type="file"
+        accept=".json,application/json"
+        hidden
+        onchange={() => {
+          close();
+          void openFile(file?.files?.[0]);
+          if (file) file.value = '';
+        }}
+      />
+      <p class="hint" class:warn={hint.warn} role="status">{hint.text}</p>
+    </div>
+    {#if board.trash.length}
+      <details>
+        <summary>Recently deleted ({board.trash.length})</summary>
+        {#each board.trash as gone (gone.name + gone.deleted)}
+          <div class="row gone">
+            <span class="name" title={gone.name}>{gone.name}</span><span class="meta">{ago(gone.deleted)}</span>
+            <button
+              class="act"
+              type="button"
+              aria-label="Restore {gone.name}"
+              onclick={() => {
+                board.restore(gone);
+              }}>Restore</button
+            >
+          </div>
+        {/each}
+      </details>
+    {/if}
   {/if}
+  <div
+    bind:this={rowMenu}
+    class="row-menu"
+    popover
+    role="menu"
+    tabindex="-1"
+    aria-label={menuFor?.preset.name ?? 'Board'}
+    onkeydown={ev => {
+      arrows(ev, rowMenu);
+    }}
+    ontoggle={ev => {
+      const here = document.activeElement;
+      if (ev.newState === 'closed' && (here === document.body || rowMenu?.contains(here))) opener?.focus();
+    }}
+  >
+    {#if menuFor}
+      {@const { preset, mine: yours } = menuFor}
+      <button
+        type="button"
+        role="menuitem"
+        onclick={() => {
+          rowMenu?.hidePopover();
+          choose(preset);
+        }}>Open</button
+      >
+      <button type="button" role="menuitem" onclick={() => void startSetting(preset, yours)}>Set area…</button>
+      {#if yours && reloadable(preset)}
+        <button
+          type="button"
+          role="menuitem"
+          onclick={() => {
+            rowMenu?.hidePopover();
+            close();
+            void reload(String(preset['source']), preset.name);
+          }}>Reload</button
+        >
+      {/if}
+      {#if yours}
+        <button
+          type="button"
+          role="menuitem"
+          onclick={() => {
+            rowMenu?.hidePopover();
+            void share(preset);
+          }}>Share with the team…</button
+        >
+        <button
+          type="button"
+          role="menuitem"
+          onclick={() => {
+            rowMenu?.hidePopover();
+            askDelete(preset);
+          }}>Delete…</button
+        >
+      {/if}
+    {/if}
+  </div>
 </div>
 
 <style>
@@ -728,6 +927,86 @@
   .gone {
     padding: 2px 4px;
     font-size: 13px;
+  }
+  /* A board's own actions are there when you are at its row. */
+  .menu .row .more-for {
+    opacity: 0;
+  }
+  .menu .row:hover .more-for,
+  .menu .row:focus-within .more-for {
+    opacity: 1;
+  }
+  .row-menu {
+    position: fixed;
+    inset: auto;
+    width: 200px;
+    margin: 0;
+    padding: 0;
+    border: 1px solid var(--line-strong);
+    background: var(--surface);
+    box-shadow: var(--lift);
+  }
+  .menu .row-menu button {
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--line);
+    font-weight: 400;
+  }
+  .menu .row-menu button:last-child {
+    border-bottom: 0;
+  }
+  .set-area {
+    display: grid;
+    border: 1px solid var(--line-strong);
+  }
+  .set-head {
+    display: grid;
+    gap: 2px;
+    padding: 12px 14px 10px;
+    border-bottom: 1px solid var(--line);
+  }
+  .set-head strong {
+    font: 600 14px var(--sans);
+  }
+  .set-head span {
+    color: var(--ink-muted);
+    font: 12px var(--sans);
+  }
+  .radios {
+    display: grid;
+  }
+  .menu .radios button {
+    gap: 12px;
+    padding: 8px 14px;
+    font: 400 13px var(--sans);
+  }
+  .menu .radios .worked {
+    border-bottom: 1px solid var(--line);
+  }
+  .radios .words {
+    display: grid;
+  }
+  .radios small {
+    color: var(--ink-muted);
+    font: 11px var(--sans);
+  }
+  /* A radio's mark: a ring, filled at its centre for the one in use. */
+  .dot {
+    flex: none;
+    width: 14px;
+    height: 14px;
+    box-sizing: border-box;
+    border: 1px solid var(--line-strong);
+    border-radius: 50%;
+  }
+  [aria-checked='true'] > .dot {
+    border-color: var(--ink);
+    background: radial-gradient(circle, var(--ink) 0 3px, transparent 3.5px);
+  }
+  .menu .back {
+    border-top: 1px solid var(--line);
+    color: var(--ink-muted);
+    font-weight: 400;
+    font-size: 12px;
   }
   .gone .name {
     flex: 1;

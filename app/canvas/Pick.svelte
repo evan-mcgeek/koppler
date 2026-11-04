@@ -11,6 +11,7 @@
     disabled = false,
     label,
     placeholder = '',
+    unset = 'Not set',
     onpick,
   }: {
     id?: string;
@@ -21,6 +22,7 @@
     disabled?: boolean;
     label?: string;
     placeholder?: string;
+    unset?: string | undefined;
     onpick: (value: string | undefined) => void;
   } = $props();
   const LONG = 30;
@@ -79,7 +81,7 @@
       onpick(next || undefined);
     }}
   >
-    {#if !required || !value}<option value="">{required ? 'Choose…' : 'Not set'}</option>{/if}
+    {#if !required || !value}<option value="">{required ? 'Choose…' : unset}</option>{/if}
     {#each shown as one (one.value)}<option value={one.value}>{one.label}</option>{/each}
     {#if other}<option value={OTHER}>Other…</option>{/if}
   </select>

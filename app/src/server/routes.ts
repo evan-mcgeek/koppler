@@ -19,6 +19,7 @@ import {
   addApps,
   addOutside,
   editStack,
+  setBoardArea,
   removeApp,
   refreshRegistry,
   replaceStack,
@@ -233,6 +234,17 @@ export const ROUTES: Record<string, Route> = {
     const result = editStack(at, body['unset'] === true ? undefined : [body['value']]);
     if (result.error !== undefined) return { status: 400, body: result };
     // One field: the registry is copied again on the spot, without a full sync.
+    refreshRegistry();
+    forgetStacks();
+    return { status: 200, body: result };
+  },
+  // A team board's area from the board menu, found by its name in the stack as it is now.
+  '/board-area': body => {
+    const name = typeof body['name'] === 'string' ? body['name'] : '';
+    const area = typeof body['area'] === 'string' ? body['area'] : null;
+    if (!name) return { status: 400, body: { error: 'Which team board?' } };
+    const result = setBoardArea(name, area);
+    if (result.error !== undefined) return { status: 400, body: result };
     refreshRegistry();
     forgetStacks();
     return { status: 200, body: result };
