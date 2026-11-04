@@ -1,8 +1,10 @@
 <script lang="ts">
-  // Find a card by name among everything the stack knows; one not on the map yet is brought onto it.
+  // Find a card by name among everything the stack knows; one not on the map yet is brought onto it, and one the chosen
+  // areas hide brings its areas into the choice first.
   import type { Card } from '../src/core/discover.ts';
   import { board } from './board.svelte.ts';
   import { discovered } from './discover.svelte.ts';
+  import { areaNames, chosen } from './areas.svelte.ts';
 
   const { open, onpick, onclose }: { open: boolean; onpick: (card: Card) => void; onclose: () => void } = $props();
   let dialog = $state<HTMLDialogElement>();
@@ -31,7 +33,12 @@
     const words = query.trim().toLowerCase();
     if (!words) return [];
     return all
-      .map(card => ({ card, ...discovered.data(card, false, 0), on: shown.has(card) }))
+      .map(card => ({
+        card,
+        ...discovered.data(card, false, 0),
+        on: shown.has(card),
+        hidden: discovered.hiding.apps.includes(card),
+      }))
       .filter(one => one.name.toLowerCase().includes(words))
       .sort(
         (a, b) =>
@@ -49,6 +56,7 @@
   const pick = (card: Card | undefined) => {
     if (!card) return;
     shut();
+    if (discovered.hiding.apps.includes(card)) chosen.set([...chosen.ids, ...(board.facts?.apps[card]?.areas ?? [])]);
     onpick(card);
   };
 </script>
@@ -100,7 +108,13 @@
           >
             <span class="name">{one.name}</span>
             {#if one.tag}<span class="tag">{one.tag}</span>{/if}
-            <span class="where">{one.on ? 'On the map' : 'Show'}</span>
+            <span
+              class="where"
+              title={one.hidden ? `Picking it shows ${areaNames(one.card).join(' and ')} too` : undefined}
+              >{#if one.on}On the map{:else if one.hidden}Hidden by your areas · <span class="areas"
+                  >{areaNames(one.card).join(' · ')}</span
+                >{:else}Show{/if}</span
+            >
           </button>
         </li>
       {/each}
@@ -169,6 +183,11 @@
     border: 1px solid var(--line-strong);
     color: var(--ink-muted);
     font: 400 10px var(--mono);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  .areas {
+    font: 400 11px var(--mono);
   }
   .where {
     color: var(--ink-muted);

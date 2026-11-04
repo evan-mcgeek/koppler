@@ -22,7 +22,6 @@
   import { along, layOut, routePath } from '../src/core/layout.ts';
   import { engine } from './elk.ts';
   import { linksOf, sourceOf, type Card, type Link } from '../src/core/discover.ts';
-  import { hiddenBy } from '../src/core/areas.ts';
   import AreaFilter from './AreaFilter.svelte';
   import { areaNames, chosen } from './areas.svelte.ts';
   import { isLight, appearance } from './appearance.svelte.ts';
@@ -275,13 +274,7 @@
   const list = (names: string[]) =>
     names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${String(names.at(-1))}` : (names[0] ?? '');
   const lastStack = $derived(discovered.last ? board.facts?.apps[discovered.last] : undefined);
-  /** What the chosen areas leave off the map, but the board's own. */
-  const hiding = $derived(
-    hiddenBy({ areas: board.areas, apps: board.facts?.apps ?? {} }, chosen.narrows ? chosen.ids : undefined, [
-      ...board.nodes.map(node => node.id),
-      ...board.pinned,
-    ]),
-  );
+  const hiding = $derived(discovered.hiding);
   const chosenNames = $derived(chosen.ids.map(id => board.areas[id]?.name ?? id));
   /** Brings a card to the middle of the map and picks it. */
   const show = (card: Card) => {
@@ -293,11 +286,8 @@
   /** A card found that was not on the map: shown once the layout has placed it. */
   let bringing = $state<Card | null>(null);
   const found = (card: Card) => {
-    if (map.cards.some(one => one.card === card)) show(card);
-    else {
-      bringing = card;
-      discovered.open(card);
-    }
+    bringing = card;
+    if (!map.cards.some(one => one.card === card)) discovered.open(card);
   };
   $effect(() => {
     if (bringing && placeOf(bringing)) {

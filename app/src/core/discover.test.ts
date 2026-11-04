@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { changedNote, deadEnds, linksOf, mapOf, sourceOf, type Facts } from './discover.ts';
+import { changedNote, deadEnds, linksOf, mapOf, placesOf, sourceOf, type Facts } from './discover.ts';
 
 const app = (name: string, extra: object = {}) => ({ name, kind: 'node', slug: `acme/${name}`, ...extra });
 const facts = {
@@ -191,5 +191,17 @@ describe('sourceOf', () => {
     expect(link && sourceOf(copy, link)).toBeUndefined();
     expect(at('web', 'orders')).toBeUndefined();
     expect(at('orders', 'queue:events')).toBeUndefined();
+  });
+});
+
+describe('placesOf', () => {
+  it('places a card left nowhere by the layout, and keeps where cards not on the map were left', () => {
+    const kept = { web: { x: 0, y: 0 }, mail: { x: 300, y: 200 } };
+    expect(placesOf(kept, ['web', 'orders'], { web: { x: 9, y: 9 }, orders: { x: 300, y: 0 } })).toEqual({
+      web: { x: 0, y: 0 },
+      orders: { x: 300, y: 0 },
+      mail: { x: 300, y: 200 },
+    });
+    expect(placesOf(kept, ['web'], {})).toBe(kept);
   });
 });

@@ -27,6 +27,7 @@ A card in Discover says its areas on its second line; in Plan and Live it does s
 Discover leaves the apps outside your areas off the map, with their links, but never the board's own.
 A card that links to one keeps a dashed **+N hidden**, which names them and their areas and opens the Areas checklist; the solid **+N** still brings in what is one step out.
 A dashed line under the map says which areas it shows and how many apps it hides, with **Areas** and **Show all**, and a picked card's panel still lists its hidden links, muted, each with its area.
+**Find a card** (`/`) marks an app your areas hide as **Hidden by your areas**, with its areas; picking it adds those areas to your choice and brings it onto the map.
 Areas are a view only: what runs, the environments and the secrets stay the same.
 
 ## Cards

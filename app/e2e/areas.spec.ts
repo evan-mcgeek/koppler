@@ -173,15 +173,20 @@ const onMap = async (page: Page, id: string) => {
   return { x: Number(x), y: Number(y) };
 };
 
-test('an app Show all brings back never lands on a card moved by hand', async ({ page }) => {
-  await discover(page);
-  const spot = await onMap(page, 'catalog');
+/** Picks only one area in the board menu, as a person in Discover would. */
+const onlyInMenu = async (page: Page, name: string) => {
   await page
     .getByRole('banner')
     .getByRole('button', { name: /^Board:/ })
     .click();
-  await only(page, page.getByRole('dialog', { name: 'Boards' }), 'Payments');
+  await only(page, page.getByRole('dialog', { name: 'Boards' }), name);
   await page.keyboard.press('Escape');
+};
+
+test('an app Show all brings back never lands on a card moved by hand', async ({ page }) => {
+  await discover(page);
+  const spot = await onMap(page, 'catalog');
+  await onlyInMenu(page, 'Payments');
   await expect(card(page, 'catalog')).toHaveCount(0);
   await expect(page.locator('.map[data-moving]')).toHaveCount(0);
   // Orders API, moved by hand to where the layout of every app puts Catalog API.
@@ -204,6 +209,59 @@ test('an app Show all brings back never lands on a card moved by hand', async ({
   await expect(page.locator('.map[data-moving]')).toHaveCount(0);
   expect(await overlapping(page)).toEqual([]);
   await page.screenshot({ path: 'test-results/areas-back-beside.png' });
+});
+
+test('Find a card says an app is hidden by your areas, and picking it shows its area too', async ({ page }) => {
+  await only(page, panel(page), 'Payments');
+  await discover(page);
+  await page.keyboard.press('/');
+  const finder = page.getByRole('dialog', { name: 'Find a card' });
+  await finder.getByRole('searchbox').fill('catalog');
+  const option = finder.getByRole('option', { name: /Catalog API/ });
+  await expect(option).toContainText('Hidden by your areas · Shipping');
+  await option.click();
+  await expect(card(page, 'catalog')).toBeVisible();
+  await expect(card(page, 'catalog').locator('.lean')).toHaveClass(/picked/);
+  await expect(page.getByRole('button', { name: 'Areas: All' })).toHaveCount(0);
+  await expect(page.getByRole('region', { name: 'Hidden by your areas' })).toHaveCount(0);
+});
+
+test('a picked card the areas hide is picked no more', async ({ page }) => {
+  await discover(page);
+  await card(page, 'catalog').click();
+  await expect(page.getByRole('complementary', { name: 'Catalog API' })).toBeVisible();
+  // Narrowed in Plan's Apps list, away from the map.
+  await page.keyboard.press('e');
+  await only(page, panel(page), 'Payments');
+  await page.keyboard.press('d');
+  await expect(card(page, 'orders')).toBeVisible();
+  await expect(card(page, 'catalog')).toHaveCount(0);
+  await expect(page.getByRole('complementary', { name: 'Catalog API' })).toHaveCount(0);
+  await expect(page.getByRole('status').filter({ hasText: '1 picked' })).toHaveCount(0);
+  await expect(page.locator('.svelte-flow__node.dimmed')).toHaveCount(0);
+});
+
+test.describe('a feature board whose steps reach outside the areas', () => {
+  test.use({
+    board: {
+      env: 'qa',
+      mode: 'auto',
+      nodes: { web: { x: 0, y: 0, run: 'cli' } },
+      edges: [],
+      feature: {
+        request: 'Browse the catalog',
+        cards: [],
+        phases: [{ name: 'Browse', steps: [{ from: 'web', to: 'catalog', kind: 'call' }] }],
+      },
+    },
+  });
+
+  test("counts no step's app as hidden", async ({ page }) => {
+    await only(page, panel(page), 'Payments');
+    await discover(page);
+    await expect(card(page, 'catalog')).toBeVisible();
+    await expect(page.getByRole('region', { name: 'Hidden by your areas' })).toHaveCount(0);
+  });
 });
 
 test.describe('a board with an app in two areas', () => {

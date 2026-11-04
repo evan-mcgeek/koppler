@@ -2,7 +2,8 @@
 // board; it keeps only which cards were opened and where its cards sit, per board.
 import type { Point } from '../src/core/arrange.ts';
 import { DIRECTIONS, type Direction, type Laid } from '../src/core/layout.ts';
-import { deadEnds, linksOf, mapOf, type Card, type Link } from '../src/core/discover.ts';
+import { hiddenBy } from '../src/core/areas.ts';
+import { deadEnds, linksOf, mapOf, placesOf, type Card, type Link } from '../src/core/discover.ts';
 import {
   editFeature,
   featureCards,
@@ -65,13 +66,23 @@ class Discovered {
   /** The map: the board's apps, what they touch, and what was brought in from each opened card. */
   /** The board's own cards: its apps, and the outside systems put on it by hand. */
   #own = $derived([...board.nodes.map(node => node.id), ...board.pinned]);
+  /** What the map always shows, whatever the areas: the board's own cards, and a feature's. */
+  #always = $derived(board.feature ? [...featureCards(board.feature), ...this.#own] : this.#own);
+  /** The apps the chosen areas leave off the map, and the areas they are in. */
+  hiding = $derived(
+    hiddenBy(
+      { areas: board.areas, apps: board.facts?.apps ?? {} },
+      chosen.narrows ? chosen.ids : undefined,
+      this.#always,
+    ),
+  );
   map = $derived.by(() => {
     const facts = board.facts;
     if (!facts) return { cards: [], links: [] as Link[] };
     const feature = board.feature;
     const areas = chosen.narrows ? chosen.ids : undefined;
     if (!feature) return mapOf(facts, this.#own, board.discover.open, true, areas);
-    const shown = mapOf(facts, [...featureCards(feature), ...this.#own], board.discover.open, false, areas);
+    const shown = mapOf(facts, this.#always, board.discover.open, false, areas);
     // A step the stack has no link for yet is drawn as found, until it is accepted and recorded.
     const missing = numbered(feature)
       .map(({ step }) => step)
@@ -210,19 +221,14 @@ class Discovered {
   }
 
   /** Where each card sits: where it was left, else where the layout puts it. */
-  positions = $derived.by((): Record<Card, Point> => {
-    const kept = board.discover.at;
-    const ids = this.map.cards.map(one => one.card);
-    if (ids.every(id => kept[id])) return kept;
-    // While a new layout is worked out, the cards stay where the last one put them.
-    const laid = (this.layout ?? this.laid)?.at ?? {};
-    return Object.fromEntries(
-      ids.flatMap(id => {
-        const at = kept[id] ?? laid[id];
-        return at ? [[id, at] as const] : [];
-      }),
-    );
-  });
+  // While a new layout is worked out, the cards stay where the last one put them.
+  positions = $derived(
+    placesOf(
+      board.discover.at,
+      this.map.cards.map(one => one.card),
+      (this.layout ?? this.laid)?.at ?? {},
+    ),
+  );
   /** A link's route from the layout, while both its cards are where the layout put them (`place`: where each is now). */
   routeOf(link: Link, place: (card: Card) => Point | undefined): Point[] | undefined {
     const layout = this.layout;

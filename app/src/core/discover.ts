@@ -1,6 +1,7 @@
 // Discover: how the stack fits together, read from its facts. The board's apps, everything one step away from them, and
 // one step further from each card whose hidden links were brought in.
 import { inAreas } from './areas.ts';
+import type { Point } from './arrange.ts';
 import type { Call, Stack } from './stack.ts';
 
 /**
@@ -181,4 +182,16 @@ export function mapOf(
     };
   });
   return { cards, links };
+}
+
+/** Where each card sits: where it was left, else where the layout puts it; places kept for cards not shown stay kept. */
+export function placesOf(
+  kept: Record<Card, Point>,
+  cards: readonly Card[],
+  laid: Record<Card, Point>,
+): Record<Card, Point> {
+  if (cards.every(id => kept[id])) return kept;
+  const at = { ...kept };
+  for (const id of cards) if (!at[id] && laid[id]) at[id] = laid[id];
+  return at;
 }
