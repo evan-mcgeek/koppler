@@ -73,8 +73,16 @@ test('an app card opens its settings: edits wait for Save, a broken one is refus
     return answer.json() as Promise<{ error?: string }>;
   });
   expect(refused.error).toMatch(/apps\.orders\.url is locked/);
+  // A status put together before the unlock, arriving after it, does not lock the field again.
+  await expect.poll(async () => (await statusNow(page)).locks).toContain('apps.orders.url');
+  const before = await statusNow(page);
+  await page.route('**/data/status.json', route => route.fulfill({ json: { ...before, asked: Date.now() } }));
   await panel.getByRole('button', { name: 'Unlock URL', exact: true }).click();
   await expect(url).toBeEnabled();
+  await page.waitForTimeout(2000);
+  await expect(url).toBeEnabled();
+  await page.unrouteAll();
+  await expect(panel.getByRole('button', { name: 'Lock URL', exact: true })).toBeVisible();
 });
 
 test('an environment uses its own value only where it is given one', async ({ page, canvas }) => {
@@ -478,3 +486,6 @@ test('a view picked while the board reads the saved stack again stays picked', a
   await kept;
   await expect(page.getByRole('radio', { name: 'Discover' })).toBeChecked();
 });
+
+const statusNow = (page: Page) =>
+  page.evaluate(async () => (await (await fetch('data/status.json')).json()) as { locks?: string[] });

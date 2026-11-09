@@ -181,6 +181,7 @@ It holds each flow's request, steps and app names, with an app's description whe
 Run in the stack repo's CI (`koppler export site/index.html --stack .`), it stays as current as the stack, behind your company's own sign-in.
 
 **Plan** shows every field of a card; **Live** shows what runs, with short cards.
+Live is there only while something runs; once the last app stops, the board goes back to Plan.
 
 <img alt="The Live view: short cards with their state, every app running" src="images/live.png">
 

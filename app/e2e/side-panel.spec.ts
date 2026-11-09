@@ -1,7 +1,7 @@
 // The side panel as Claude Design drew it: the board picker in the bar, app names that fit, actions on hover, and a
 // width you can change.
 import type { Page } from '@playwright/test';
-import { expect, test } from './canvas.ts';
+import { expect, runningApps, test } from './canvas.ts';
 
 test.use({
   uncloned: ['payments'],
@@ -21,6 +21,8 @@ const width = async (page: Page) => Math.round((await panel(page).boundingBox())
 
 test('the board picker sits in the bar in every view, and the side panel starts with Apps', async ({ page }) => {
   const bar = page.getByRole('banner');
+  await runningApps(page, ['web']);
+  await expect(page.getByRole('radio', { name: 'Live' })).toBeEnabled();
   for (const view of ['Plan', 'Live', 'Discover']) {
     await page.getByRole('radio', { name: view }).check({ force: true });
     await expect(bar.getByRole('button', { name: /^Board:/ })).toBeVisible();

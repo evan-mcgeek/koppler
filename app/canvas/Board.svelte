@@ -133,7 +133,7 @@
     else if (key === 'escape' && board.present) void presentBoard();
     else if (key === 'd') board.goDiscover();
     else if (key === 'e') board.goEdit();
-    else if (key === 'l') board.goLive();
+    else if (key === 'l' && live.running) board.goLive();
   };
   // The board opens where it was left; one that was never placed is fitted to the window. An empty one is not: the
   // fit would wait for the first card added and then move the view under the next ones.

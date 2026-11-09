@@ -49,10 +49,12 @@
   let draft = $state.raw<unknown>(null);
   let schema = $state.raw<Schema | null>(null);
   let locks = $state<string[]>([]);
-  // A lock set elsewhere (the terminal, another tab) shows while the panel is open, not only when it opens.
+  // A lock set elsewhere (the terminal, another tab) shows while the panel is open, not only when it opens. A status
+  // put together before this panel's own lock or unlock would undo it, so it waits for a newer one.
+  let since = '';
   $effect(() => {
-    const known = live.status?.locks;
-    if (known) locks = known;
+    const status = live.status;
+    if (status?.locks && (status.at ?? '') >= since) locks = status.locks;
   });
   let problems = $state(new Map<string, string>());
   let tab = $state(0);
@@ -235,7 +237,9 @@
     locked: path => lockedBy(locks, path),
     lock: (path, on) => {
       void post('stack-lock', { path, on }).then(said => {
-        if (!('error' in said)) locks = on ? [...locks, path] : locks.filter(one => one !== path);
+        if ('error' in said) return;
+        since = new Date().toISOString();
+        locks = on ? [...locks, path] : locks.filter(one => one !== path);
       });
     },
     keys: path => {

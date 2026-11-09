@@ -103,6 +103,8 @@ export interface Run {
   pinned?: boolean;
 }
 interface Status {
+  /** When the server put it together. */
+  at?: string;
   /** The trace collector: off, starting, or on with where its view is. */
   traces?: { state: 'off' | 'starting' | 'on'; view?: string };
   apps?: Record<string, AppStatus | undefined>;
@@ -183,6 +185,12 @@ class Live {
   /** The first ask is answered, or failed, and the cards are drawn with it. */
   asked = $state(false);
   #timer: ReturnType<typeof setInterval> | undefined;
+
+  /** Whether Koppler runs anything, or is starting it: what the Live view has to show. */
+  get running(): boolean {
+    const last = this.status?.runs?.at(-1)?.state;
+    return !!this.status?.running?.some(one => one !== 'canvas') || last === 'applying' || last === 'waiting';
+  }
 
   #last = '';
   /** Asks for the status now and every second and a half, while the page is in view. */

@@ -36,6 +36,7 @@
   import Overview from './Overview.svelte';
   import { dragging, FIT, present, toolState, type Tool } from './tools.svelte.ts';
   import { undo } from './undo.svelte.ts';
+  import { live } from './live.svelte.ts';
 
   const flow = useSvelteFlow();
   const map = $derived(discovered.map);
@@ -373,7 +374,7 @@
       ev.preventDefault();
       finding = true;
     } else if (key === 'e') board.goEdit();
-    else if (key === 'l') board.goLive();
+    else if (key === 'l' && live.running) board.goLive();
     else if (key === 'f') void fit();
     else if (key === 'p') void presentMap();
     else if (board.feature && (key === 'arrowright' || key === 'arrowleft')) {
