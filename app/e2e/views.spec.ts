@@ -89,6 +89,13 @@ test('Live is off while nothing runs, and the board leaves it once the run stops
   await expect(page.getByRole('radio', { name: 'Plan' })).toBeChecked();
   await expect(live).toBeDisabled();
   await expect(card(page, 'web').locator('.body')).toBeVisible();
+
+  // An app you run yourself, from your terminal or IDE, counts too.
+  await page.route('**/data/status.json', async route => {
+    const status = (await (await route.fetch()).json()) as Record<string, unknown>;
+    await route.fulfill({ json: { ...status, apps: { web: { listening: true } } } });
+  });
+  await expect(live).toBeEnabled();
 });
 
 test('Present shows the board alone, and Escape brings the page back', async ({ page }) => {
