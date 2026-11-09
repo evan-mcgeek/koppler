@@ -12,6 +12,7 @@ import {
   stackPath,
   type FeatureEdit,
   type Numbered,
+  type StepRef,
 } from '../src/core/feature.ts';
 import { areaNames, chosen } from './areas.svelte.ts';
 import { board } from './board.svelte.ts';
@@ -90,22 +91,26 @@ class Discovered {
       .map((step): Link => ({ from: step.from, to: step.to, kind: step.kind, sure: 'found' }));
     return { cards: shown.cards, links: [...shown.links, ...missing] };
   });
-  /** The feature's steps, numbered, by link: `from>to`. */
-  steps = $derived(
-    new Map(board.feature ? numbered(board.feature).map(one => [`${one.step.from}>${one.step.to}`, one]) : []),
-  );
+  /** The feature's steps, numbered, in order. */
+  steps = $derived(board.feature ? numbered(board.feature) : []);
+  /** A link's steps: one link can be a step in several phases. */
+  stepsOf(link: { from: Card; to: Card }): Numbered[] {
+    return this.steps.filter(one => one.step.from === link.from && one.step.to === link.to);
+  }
+  /** The link's step to show: the picked one, else the one in the picked phase, else its first. */
   stepOf(link: { from: Card; to: Card }): Numbered | undefined {
-    return this.steps.get(`${link.from}>${link.to}`);
+    const all = this.stepsOf(link);
+    return all.find(one => one.number === this.current?.number) ?? all.find(one => one.phase === this.phase) ?? all[0];
   }
   /** The phase picked in the feature's panel: the others dim. */
   phase = $state<number | null>(null);
   /** The step picked by its number on the map: its row in the panel is marked. */
   step = $state<string | null>(null);
   /** The picked step, while the feature still has it. */
-  current = $derived(this.step === null ? undefined : [...this.steps.values()].find(one => one.number === this.step));
+  current = $derived(this.step === null ? undefined : this.steps.find(one => one.number === this.step));
   /** Picks the step `by` places on from the picked one, or the first or last when none is; it stops at either end. */
   walk(by: 1 | -1) {
-    const all = [...this.steps.values()].map(one => one.number);
+    const all = this.steps.map(one => one.number);
     if (!all.length) return;
     const at = this.current ? all.indexOf(this.current.number) : by > 0 ? -1 : all.length;
     this.step = all[Math.min(all.length - 1, Math.max(0, at + by))] ?? null;
@@ -325,7 +330,7 @@ class Discovered {
     this.editFeature({ step: [{ from: link.from, to: link.to, kind: link.kind }] });
   }
   /** Accepted: a link the stack does not record yet is recorded first, then the step is the feature's own. */
-  async accept(steps: { from: Card; to: Card }[]): Promise<void> {
+  async accept(steps: StepRef[]): Promise<void> {
     const facts = board.facts;
     if (!facts) return;
     const known = linksOf(facts);
@@ -346,7 +351,7 @@ class Discovered {
     this.editFeature({ accept: steps });
     if (recorded) await board.reload();
   }
-  drop(steps: { from: Card; to: Card }[]): void {
+  drop(steps: StepRef[]): void {
     this.editFeature({ drop: steps });
   }
   /** Proposed steps, every one. */

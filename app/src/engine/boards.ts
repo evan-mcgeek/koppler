@@ -45,7 +45,7 @@ export function editDone(id: unknown): void {
 }
 
 const CHANGES =
-  '[--propose] [--add <app,...>] [--remove <app,...>] [--cable <caller>:<callee>]... [--uncable <caller>:<callee>]... [--branch <app>=<branch>]... [--note <app>="<note>"]... [--arrange] [--request "<words>"] [--phase "<name>"] [--step|--propose-step <from>:<to>[="<note>"]]... [--unstep <from>:<to>]... [--area <area>|auto]';
+  '[--propose] [--add <app,...>] [--remove <app,...>] [--cable <caller>:<callee>]... [--uncable <caller>:<callee>]... [--branch <app>=<branch>]... [--note <app>="<note>"]... [--arrange] [--request "<words>"] [--phase "<name>"] [--step|--propose-step <from>:<to>[="<note>"]]... [--unstep ["<phase>":]<from>:<to>]... [--drop-phase "<name>"]... [--rename-phase "<old>"="<new>"] [--area <area>|auto]';
 const USAGE = `usage: koppler board new "<name>" ${CHANGES}\n       koppler board edit "<name>" ${CHANGES}\n       koppler board share "<name>"\n       koppler board open <file or link>\n       koppler board delete "<name>"\n       koppler board copy "<name>" --to|--from <stack> [--drop-missing]`;
 
 /** Queues a change for an open canvas of the stack in use, dropping ones a day old that no canvas took. */
@@ -223,25 +223,29 @@ function areaEdit(given: string[]): { area: string | null } {
  * A card is an app's id, `queue:<id>` or `database:<id>`.
  */
 function featureEdit(args: string[]): { feature: FeatureEdit } | null {
-  const flags = ['--request', '--phase', '--step', '--propose-step', '--unstep'];
+  const flags = ['--request', '--phase', '--step', '--propose-step', '--unstep', '--drop-phase', '--rename-phase'];
   if (!args.some(arg => flags.includes(arg))) return null;
   const stack = readStack() ?? fail('no stack loaded (koppler init)');
   const edit: FeatureEdit = {};
   let phase: string | undefined;
-  const pair = (flag: string, value: string | undefined) => {
+  /** `<from>:<to>[=<note>]`, or with a phase first when `phased`: `<phase>:<from>:<to>`. */
+  const pair = (flag: string, value: string | undefined, phased = false) => {
     const [ends = '', ...said] = (value ?? '').split('=');
-    const [from = '', to = '', ...more] = ends.split(':').reduce<string[]>((cards, part) => {
+    const cards = ends.split(':').reduce<string[]>((all, part) => {
       // `queue:events` and `database:orders` are one card each.
-      const last = cards.at(-1);
-      if (last === 'queue' || last === 'database') cards[cards.length - 1] = `${last}:${part}`;
-      else cards.push(part);
-      return cards;
+      const last = all.at(-1);
+      if (last === 'queue' || last === 'database') all[all.length - 1] = `${last}:${part}`;
+      else all.push(part);
+      return all;
     }, []);
-    if (!from || !to || more.length) fail(`${flag} ${value ?? ''}: expected <from>:<to>\n${USAGE}`);
+    const [from = '', to = ''] = cards.slice(-2);
+    const phase = cards.slice(0, -2).join(':').trim();
+    if (!from || !to || (phase && !phased) || (cards.length > 2 && !phase))
+      fail(`${flag} ${value ?? ''}: expected ${phased ? '["<phase>":]' : ''}<from>:<to>\n${USAGE}`);
     for (const card of [from, to])
       if (!inStack(stack, card)) fail(`${card} is not in the stack: an app's id, queue:<id> or database:<id>`);
     const note = said.join('=').trim();
-    return { from, to, ...(note && { note }) };
+    return { from, to, ...(note && { note }), ...(phase && { phase }) };
   };
   args.forEach((arg, at) => {
     const value = args[at + 1];
@@ -261,8 +265,14 @@ function featureEdit(args: string[]): { feature: FeatureEdit } | null {
         },
       ];
     } else if (arg === '--unstep') {
-      const { from, to } = pair(arg, value);
-      edit.unstep = [...(edit.unstep ?? []), { from, to }];
+      const { from, to, phase: named } = pair(arg, value, true);
+      edit.unstep = [...(edit.unstep ?? []), { from, to, ...(named && { phase: named }) }];
+    } else if (arg === '--drop-phase' && value?.trim()) edit.dropPhase = [...(edit.dropPhase ?? []), value.trim()];
+    else if (arg === '--rename-phase') {
+      const [from = '', ...to] = (value ?? '').split('=');
+      if (!from.trim() || !to.join('=').trim())
+        fail(`--rename-phase ${value ?? ''}: expected "<old>"="<new>"\n${USAGE}`);
+      edit.rename = { from: from.trim(), to: to.join('=').trim() };
     }
   });
   return { feature: edit };
@@ -347,16 +357,32 @@ export function changeBoard(name: string, edit: BoardEdit, create: boolean, prop
     here(from, 'call');
     here(to, 'be called');
   }
+  const phases = [...(featureOf(board['feature'])?.phases ?? []).map(one => one.name), ...(edit.feature?.phase ?? [])];
+  for (const phase of [
+    ...(edit.feature?.dropPhase ?? []),
+    ...(edit.feature?.rename ? [edit.feature.rename.from] : []),
+    ...(edit.feature?.unstep ?? []).flatMap(one => (one.phase ? [one.phase] : [])),
+  ])
+    if (!phases.includes(phase))
+      fail(`${board.name} has no phase called ${phase}${phases.length ? `: its phases are ${phases.join(', ')}` : ''}`);
 
   const before = featureOf(board['feature']);
   const changed = { ...editPreset(board, edit), name: board.name };
-  if (!create && JSON.stringify(changed) === JSON.stringify(board)) return [`Nothing to change on ${board.name}.`];
   const named = (id: string) =>
     id.startsWith('queue:')
       ? (stack.queues?.[id.slice(6)]?.name ?? id)
       : id.startsWith('database:')
         ? (stack.databases?.[id.slice(9)]?.name ?? id)
         : (app(id)?.name ?? id);
+  // Compared as read back, so the order a step's fields were written in is no change.
+  const asRead = { ...editPreset(board, edit.feature ? { feature: {} } : {}), name: board.name };
+  if (!create && JSON.stringify(changed) === JSON.stringify(asRead)) {
+    // A step already there is why, when one was given.
+    const kept = describeEdit(edit, named, false, before)
+      .split('; ')
+      .filter(one => one.startsWith('kept '));
+    return [`Nothing to change on ${board.name}${kept.length ? `: ${kept.join('; ')}` : ''}.`];
+  }
   if (propose) {
     const asked = appendMessage({
       kind: 'question',

@@ -110,6 +110,17 @@
               renaming = one.name;
             }}>Rename</button
           >
+          <button
+            class="text quiet"
+            type="button"
+            aria-label="Remove {one.name}"
+            title={one.steps.length
+              ? 'Take this phase and its steps off the feature'
+              : 'Take this phase off the feature'}
+            onclick={() => {
+              discovered.editFeature({ dropPhase: [one.name] });
+            }}>Remove</button
+          >
         {/if}
       </header>
       {#each steps.filter(step => step.phase === at) as { step, number } (number)}
@@ -128,12 +139,16 @@
             {#if step.proposed}
               <span class="ask"
                 ><strong>Proposed</strong>
-                <button class="text" type="button" onclick={() => void discovered.accept([step])}>Accept</button>
+                <button
+                  class="text"
+                  type="button"
+                  onclick={() => void discovered.accept([{ ...step, phase: one.name }])}>Accept</button
+                >
                 <button
                   class="text"
                   type="button"
                   onclick={() => {
-                    discovered.drop([step]);
+                    discovered.drop([{ ...step, phase: one.name }]);
                   }}>Drop</button
                 ></span
               >
@@ -146,7 +161,7 @@
               aria-label="Take step {number} off"
               title="Take this step off the feature"
               onclick={() => {
-                discovered.editFeature({ unstep: [step] });
+                discovered.editFeature({ unstep: [{ ...step, phase: one.name }] });
               }}><X size={14} /></button
             >
           {/if}

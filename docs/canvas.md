@@ -168,9 +168,10 @@ Pick several cards (Shift-click) and **Plan a run with these** puts the cloned o
 <img alt="Discover on QA: the board's apps with what they touch one step away, Orders API picked and its links listed in the panel" src="images/discover.png">
 
 A **feature board** (New feature board in the boards menu) is for one feature: the request it came from, and which of the stack's links it uses, as numbered steps in phases.
+One link can be a step in several phases, each with its own number and note.
 Describe the feature and **Hand it to the agent**: its proposals show dashed, each with Accept and Drop, until you accept them; accepting a link the stack does not have yet records it there.
 Or start from an app, and add a picked card's links with **Add as a step**.
-The panel on the right holds the request and the steps: pick a phase to dim the others, rename it, or take a step off.
+The panel on the right holds the request and the steps: pick a phase to dim the others, rename or remove it, or take a step off.
 **Walk through the steps**, or click a step's number on the map, to follow the feature one step at a time: → and ← move on and back, each step brought into view with its note, and Esc stops.
 
 <img alt="A feature board, Checkout: its steps numbered in two phases on the map and in the panel, and one step the agent proposed, dashed, with Accept and Drop" src="images/feature-board.png">

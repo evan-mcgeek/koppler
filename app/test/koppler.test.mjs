@@ -552,17 +552,28 @@ test('A feature board from the terminal: its request, phases and steps; the agen
   assert.match(replaced.out, /CHANGED Pay: replaced the step Web to Orders$/m);
   assert.deepEqual(pay().feature.phases[0].steps, [{ from: 'web', to: 'orders', kind: 'call', note: 'Sends the order' }, { from: 'orders', to: 'queue:events', kind: 'publish' }]);
 
-  // A step already on the board is kept as it is, and said so.
-  const kept = koppler('board', 'edit', 'Pay', '--phase', 'Refund', '--step', 'web:orders=Refunds it');
-  assert.equal(kept.code, 0, kept.out);
-  assert.match(kept.out, /CHANGED Pay: added the phase Refund; kept Web to Orders in Order: a link is a step once per board$/m);
-  assert.equal(pay().feature.phases[0].steps[0].note, 'Sends the order');
+  // A link can be a step in several phases, each with its own note; one already a step in its phase is kept, and said so.
+  const again = koppler('board', 'edit', 'Pay', '--phase', 'Refund', '--step', 'web:orders=Refunds it');
+  assert.equal(again.code, 0, again.out);
+  assert.match(again.out, /CHANGED Pay: added the phase Refund; added the step Web to Orders$/m);
+  const kept = koppler('board', 'edit', 'Pay', '--phase', 'Refund', '--step', 'web:orders=Refunds it twice');
+  assert.match(kept.out, /^Nothing to change on Pay: kept Web to Orders in Refund: it is a step there already\.$/m);
+  assert.deepEqual(pay().feature.phases.map(phase => phase.steps.map(step => step.note)), [['Sends the order', undefined], ['Refunds it']]);
+  // Taken off one phase only, then the phase itself; a phase the board lacks is refused.
+  const unstepped = koppler('board', 'edit', 'Pay', '--unstep', 'Refund:web:orders');
+  assert.match(unstepped.out, /CHANGED Pay: took off the step Web to Orders in Refund$/m);
+  assert.deepEqual(pay().feature.phases.map(phase => phase.steps.length), [2, 0]);
+  assert.match(koppler('board', 'edit', 'Pay', '--rename-phase', 'Refund=Refunds').out, /renamed the phase Refund to Refunds$/m);
+  assert.match(koppler('board', 'edit', 'Pay', '--drop-phase', 'Refunds').out, /took off the phase Refunds$/m);
+  assert.deepEqual(pay().feature.phases.map(phase => phase.name), ['Order']);
+  const missing = koppler('board', 'edit', 'Pay', '--drop-phase', 'Ghost');
+  assert.notEqual(missing.code, 0);
+  assert.match(missing.out, /Pay has no phase called Ghost: its phases are Order/);
 
   const proposed = koppler('board', 'edit', 'Pay', '--phase', 'Settle', '--propose-step', 'queue:events:web=Reads it', '--unstep', 'web:orders');
   assert.equal(proposed.code, 0, proposed.out);
   assert.deepEqual(pay().feature.phases.map(phase => phase.steps), [
     [{ from: 'orders', to: 'queue:events', kind: 'publish' }],
-    [],
     [{ from: 'queue:events', to: 'web', kind: 'read', note: 'Reads it', proposed: true }],
   ]);
   assert.match(koppler('board', 'edit', 'Pay', '--step', 'web:ghost').out, /ghost is not in the stack/);
