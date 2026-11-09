@@ -2,7 +2,7 @@
 // open canvas to make it on its own copy too, so the canvas shows it and never saves its older copy over it.
 import path from 'node:path';
 import { flagValue } from '../cli/output.ts';
-import { inStack, kindBetween, type FeatureEdit } from '../core/feature.ts';
+import { featureOf, inStack, kindBetween, type FeatureEdit } from '../core/feature.ts';
 import { upgradeBoardFile } from '../core/migrations/files.ts';
 import { withoutMissingApps } from '../core/missing-apps.ts';
 import { describeEdit, editPreset, migrate, VERSION, type BoardEdit, type StoredPreset } from '../core/presets.ts';
@@ -348,6 +348,7 @@ export function changeBoard(name: string, edit: BoardEdit, create: boolean, prop
     here(to, 'be called');
   }
 
+  const before = featureOf(board['feature']);
   const changed = { ...editPreset(board, edit), name: board.name };
   if (!create && JSON.stringify(changed) === JSON.stringify(board)) return [`Nothing to change on ${board.name}.`];
   const named = (id: string) =>
@@ -361,7 +362,7 @@ export function changeBoard(name: string, edit: BoardEdit, create: boolean, prop
       kind: 'question',
       title: create ? `Make the board ${board.name}?` : `Change ${board.name}?`,
       summary: 'The agent proposes this. Nothing changes until you say yes.',
-      sections: [{ title: 'It would', items: describeEdit(edit, named, true).split('; ').filter(Boolean) }],
+      sections: [{ title: 'It would', items: describeEdit(edit, named, true, before).split('; ').filter(Boolean) }],
       choices: [
         { id: 'accept', label: create ? 'Make it' : 'Make the change' },
         { id: 'reject', label: 'Leave it as it is' },
@@ -374,7 +375,7 @@ export function changeBoard(name: string, edit: BoardEdit, create: boolean, prop
       ],
     });
     return [
-      `PROPOSED ${board.name}: ${describeEdit(edit, named)}`,
+      `PROPOSED ${board.name}: ${describeEdit(edit, named, false, before)}`,
       'The user answers in the canvas inbox; the answer comes back as a koppler-reply prompt.',
     ];
   }
@@ -386,7 +387,7 @@ export function changeBoard(name: string, edit: BoardEdit, create: boolean, prop
   });
   enqueue({ board: board.name, edit, ...(create && { create: true as const }) });
   const canvas = readRecord('canvas');
-  const said = describeEdit(edit, named);
+  const said = describeEdit(edit, named, false, before);
   return [
     `${create ? 'MADE' : 'CHANGED'} ${board.name}${said ? `: ${said}` : ''}`,
     canvas && alive(canvas)

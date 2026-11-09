@@ -1,6 +1,6 @@
 // Presets (saved boards): bringing one saved in an older format up to date, and checking it against the stack before
 // it opens.
-import { editFeature, featureOf, type FeatureEdit } from './feature.ts';
+import { editFeature, featureOf, type Feature, type FeatureEdit } from './feature.ts';
 import { BOARD_FORMAT, migrateBoard } from './migrations/board/index.ts';
 import type { Edge } from './plan.ts';
 
@@ -295,6 +295,8 @@ export function describeEdit(
   name: (id: string) => string = id => id,
   /** Said of a change not made yet: "add", not "added". */
   proposed = false,
+  /** The feature before the edit: a step already on it is kept, not added. */
+  before: Feature | null = null,
 ): string {
   const list = (ids: string[] = []) => ids.map(name).join(', ');
   const cables = (edges: Edge[] = []) => edges.map(edge => `${name(edge.from)} to ${name(edge.to)}`).join(', ');
@@ -302,7 +304,10 @@ export function describeEdit(
   const unsteps = edit.feature?.unstep ?? [];
   const among = (list: Edge[]) => (one: Edge) => list.some(other => other.from === one.from && other.to === one.to);
   const replaced = steps.filter(among(unsteps));
-  const added = steps.filter(one => !among(unsteps)(one));
+  const fresh = steps.filter(one => !among(unsteps)(one));
+  const phaseOf = (one: Edge) => before?.phases.find(phase => phase.steps.some(step => among([step])(one)))?.name;
+  const added = fresh.filter((one, at) => !phaseOf(one) && fresh.findIndex(among([one])) === at);
+  const kept = fresh.filter(one => phaseOf(one));
   const off = unsteps.filter(one => !among(steps)(one));
   return [
     edit.add?.length && `${proposed ? 'add' : 'added'} ${list(edit.add)}`,
@@ -322,6 +327,9 @@ export function describeEdit(
     replaced.length &&
       `${proposed ? 'replace' : 'replaced'} the step${replaced.length > 1 ? 's' : ''} ${cables(replaced)}`,
     off.length && `${proposed ? 'take off' : 'took off'} the step ${cables(off)}`,
+    ...kept.map(
+      one => `${proposed ? 'keep' : 'kept'} ${cables([one])} in ${phaseOf(one) ?? ''}: a link is a step once per board`,
+    ),
     edit.area === null && `${proposed ? 'take' : 'took'} its area from its apps`,
     edit.area && `set its area to ${edit.area}`,
   ]
