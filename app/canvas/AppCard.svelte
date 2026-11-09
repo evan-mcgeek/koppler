@@ -295,7 +295,7 @@
         : `Will change ${String(changedLines)} ${changedLines === 1 ? 'line' : 'lines'}`}
     </p>{/if}
   {#if where}<p class="where nodrag" data-on={up ?? 'other'}>{where}</p>
-  {:else if stateSaid}<p class="where nodrag" data-state={now?.state}>{stateSaid}</p>{/if}
+  {:else if stateSaid && !failed}<p class="where nodrag" data-state={now?.state}>{stateSaid}</p>{/if}
   {#if steps.length}
     <button class="progress nodrag" type="button" data-tone={tone} aria-expanded={open} onclick={() => (open = !open)}>
       <span class="marks">
@@ -630,8 +630,7 @@
   .why {
     contain: inline-size;
     display: -webkit-box;
-    margin: -4px 0 0;
-    padding: 0 14px 10px 16px;
+    margin: -4px 14px 10px 16px;
     overflow: hidden;
     font-size: 12.5px;
     line-height: 1.4;
