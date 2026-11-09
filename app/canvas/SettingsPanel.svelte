@@ -49,10 +49,14 @@
   let draft = $state.raw<unknown>(null);
   let schema = $state.raw<Schema | null>(null);
   let locks = $state<string[]>([]);
-  // A lock set elsewhere (the terminal, another tab) shows while the panel is open, not only when it opens.
+  // A lock set elsewhere (the terminal, another tab) shows while the panel is open, not only when it opens. Only a
+  // change on the server counts: a status put together before this panel's own lock or unlock would undo it.
+  let server = '';
   $effect(() => {
     const known = live.status?.locks;
-    if (known) locks = known;
+    if (!known || JSON.stringify(known) === server) return;
+    server = JSON.stringify(known);
+    locks = known;
   });
   let problems = $state(new Map<string, string>());
   let tab = $state(0);
