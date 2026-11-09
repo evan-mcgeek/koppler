@@ -2,7 +2,7 @@
 import type { Page } from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
-import { card, expect, nextEdit, test, fromList } from './canvas.ts';
+import { card, expect, nextEdit, test, fromList, STACK } from './canvas.ts';
 
 const rows = (page: Page) => page.getByRole('complementary').getByRole('listitem');
 test.use({
@@ -271,4 +271,27 @@ test('an outside system is added to the stack with the apps that call it', async
         sendsTo: ['web'],
       },
     ]);
+});
+
+test.describe('with an outside system in the stack', () => {
+  test.use({
+    stack: {
+      ...STACK,
+      apps: { ...STACK.apps, crm: { name: 'CRM', kind: 'other', outside: 'SaaS CRM', consumes: { orders: {} } } },
+    },
+  });
+  test('a new outside system can send to another one', async ({ page }) => {
+    const asked: unknown[] = [];
+    await page.route('**/apps-outside?*', async route => {
+      asked.push(route.request().postDataJSON());
+      await route.fulfill({ json: { added: 'web-form' } });
+    });
+    await page.getByRole('button', { name: 'Add outside system…' }).click();
+    const add = page.getByRole('dialog', { name: 'Add an outside system' });
+    await add.getByLabel('Name').fill('Web form');
+    await add.getByRole('checkbox', { name: 'CRM gets its calls' }).check();
+    await page.screenshot({ path: 'test-results/next-add-outside-chain.png' });
+    await add.getByRole('button', { name: 'Add' }).click();
+    await expect.poll(() => asked).toEqual([{ name: 'Web form', url: '', why: '', calledBy: [], sendsTo: ['crm'] }]);
+  });
 });

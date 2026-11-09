@@ -298,7 +298,7 @@ test('An outside system joins the stack with the apps that call it; what cannot 
   const before = fs.readFileSync(file, 'utf8');
   assert.match(addOutside({ name: ' ' }, opts).error, /Give the outside system a name/);
   assert.match(addOutside({ name: 'Stripe', calledBy: [] }, opts).error, /Say which apps call Stripe, or which it sends to/);
-  assert.match(addOutside({ name: 'Stripe', calledBy: ['zzz', 'sf'] }, opts).error, /Not apps of the stack that run here: zzz, sf/);
+  assert.match(addOutside({ name: 'Stripe', calledBy: ['zzz', 'sf', 'zzz'] }, opts).error, /Not in the stack: zzz\.$/);
   assert.match(addOutside({ name: 'Stripe', url: 'ftp://x', calledBy: ['a'] }, opts).error, /not a web address/);
   assert.match(addOutside({ name: 'salesforce', calledBy: ['a'] }, opts).error, /already has salesforce/);
   assert.equal(fs.readFileSync(file, 'utf8'), before);
@@ -310,6 +310,12 @@ test('An outside system joins the stack with the apps that call it; what cannot 
   // A webhook: the outside system calls the app.
   assert.deepEqual(addOutside({ name: 'Adyen', sendsTo: ['b'] }, opts), { added: 'adyen' });
   assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')).apps.adyen.consumes, { b: {} });
+  // A chain of outside systems: a web form creates a record in the CRM, which calls the app.
+  assert.deepEqual(addOutside({ name: 'Web form', sendsTo: ['sf'] }, opts), { added: 'web-form' });
+  assert.deepEqual(addOutside({ name: 'Mailer', calledBy: ['sf'] }, opts), { added: 'mailer' });
+  const chain = JSON.parse(fs.readFileSync(file, 'utf8')).apps;
+  assert.deepEqual(chain['web-form'].consumes, { sf: {} });
+  assert.deepEqual(chain.sf.consumes, { mailer: {} });
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
