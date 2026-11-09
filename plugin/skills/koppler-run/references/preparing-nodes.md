@@ -48,7 +48,6 @@ Collect every local node's `prereqs`, remove duplicates, check before asking:
 | `tunnel`   | `lsof -iTCP:<port> -sTCP:LISTEN`                     | user starts `alias` in their own terminal                                                      |
 | `hosts`    | `grep <host> /etc/hosts`                             | user adds the line (needs sudo)                                                                |
 | `devCerts` | `dotnet dev-certs https --check --trust`             | `dotnet dev-certs https --clean && dotnet dev-certs https --trust`                             |
-| `file`     | the path exists                                      | follow the entry's `note` or its `secrets` fetch steps                                         |
 | `nuget`    | the repo restored before (`obj/project.assets.json`) | README GitHub packages setup with a `read:packages` token                                      |
 
 Two tunnels on the same `port` conflict; the stack's `notes` say which one can move and how.
