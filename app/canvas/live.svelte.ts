@@ -103,6 +103,8 @@ export interface Run {
   pinned?: boolean;
 }
 interface Status {
+  /** When the server put it together. */
+  at?: string;
   /** The trace collector: off, starting, or on with where its view is. */
   traces?: { state: 'off' | 'starting' | 'on'; view?: string };
   apps?: Record<string, AppStatus | undefined>;

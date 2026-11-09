@@ -76,7 +76,7 @@ test('an app card opens its settings: edits wait for Save, a broken one is refus
   // A status put together before the unlock, arriving after it, does not lock the field again.
   await expect.poll(async () => (await statusNow(page)).locks).toContain('apps.orders.url');
   const before = await statusNow(page);
-  await page.route('**/data/status.json', route => route.fulfill({ json: { ...before, at: Date.now() } }));
+  await page.route('**/data/status.json', route => route.fulfill({ json: { ...before, asked: Date.now() } }));
   await panel.getByRole('button', { name: 'Unlock URL', exact: true }).click();
   await expect(url).toBeEnabled();
   await page.waitForTimeout(2000);
