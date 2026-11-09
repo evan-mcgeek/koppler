@@ -298,6 +298,12 @@ export function describeEdit(
 ): string {
   const list = (ids: string[] = []) => ids.map(name).join(', ');
   const cables = (edges: Edge[] = []) => edges.map(edge => `${name(edge.from)} to ${name(edge.to)}`).join(', ');
+  const steps = edit.feature?.step ?? [];
+  const unsteps = edit.feature?.unstep ?? [];
+  const among = (list: Edge[]) => (one: Edge) => list.some(other => other.from === one.from && other.to === one.to);
+  const replaced = steps.filter(among(unsteps));
+  const added = steps.filter(one => !among(unsteps)(one));
+  const off = unsteps.filter(one => !among(steps)(one));
   return [
     edit.add?.length && `${proposed ? 'add' : 'added'} ${list(edit.add)}`,
     edit.remove?.length && `${proposed ? 'remove' : 'removed'} ${list(edit.remove)}`,
@@ -312,9 +318,10 @@ export function describeEdit(
     edit.arrange && (proposed ? 'lay it out afresh' : 'arranged'),
     edit.feature?.request !== undefined && 'set the request',
     ...(edit.feature?.phase ?? []).map(phase => `${proposed ? 'add' : 'added'} the phase ${phase}`),
-    edit.feature?.step?.length &&
-      `${proposed ? 'add' : 'added'} the step${edit.feature.step.length > 1 ? 's' : ''} ${cables(edit.feature.step)}`,
-    edit.feature?.unstep?.length && `${proposed ? 'take off' : 'took off'} the step ${cables(edit.feature.unstep)}`,
+    added.length && `${proposed ? 'add' : 'added'} the step${added.length > 1 ? 's' : ''} ${cables(added)}`,
+    replaced.length &&
+      `${proposed ? 'replace' : 'replaced'} the step${replaced.length > 1 ? 's' : ''} ${cables(replaced)}`,
+    off.length && `${proposed ? 'take off' : 'took off'} the step ${cables(off)}`,
     edit.area === null && `${proposed ? 'take' : 'took'} its area from its apps`,
     edit.area && `set its area to ${edit.area}`,
   ]

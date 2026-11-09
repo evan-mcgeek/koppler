@@ -546,6 +546,12 @@ test('A feature board from the terminal: its request, phases and steps; the agen
     phases: [{ name: 'Order', steps: [{ from: 'web', to: 'orders', kind: 'call', note: 'Sends it' }, { from: 'orders', to: 'queue:events', kind: 'publish' }] }],
   });
 
+  // Taken off and added in one call, a step is replaced where it was.
+  const replaced = koppler('board', 'edit', 'Pay', '--unstep', 'web:orders', '--step', 'web:orders=Sends the order');
+  assert.equal(replaced.code, 0, replaced.out);
+  assert.match(replaced.out, /CHANGED Pay: replaced the step Web to Orders$/m);
+  assert.deepEqual(pay().feature.phases[0].steps, [{ from: 'web', to: 'orders', kind: 'call', note: 'Sends the order' }, { from: 'orders', to: 'queue:events', kind: 'publish' }]);
+
   const proposed = koppler('board', 'edit', 'Pay', '--phase', 'Settle', '--propose-step', 'queue:events:web=Reads it', '--unstep', 'web:orders');
   assert.equal(proposed.code, 0, proposed.out);
   assert.deepEqual(pay().feature.phases.map(phase => phase.steps), [

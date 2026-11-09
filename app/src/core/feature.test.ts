@@ -39,6 +39,26 @@ describe('editFeature', () => {
     expect(featureCards(dropped)).not.toContain('payments');
   });
 
+  it('replaces a step taken off and added in one edit, where it was', () => {
+    const feature = editFeature(null, {
+      phase: ['Pay', 'Ship'],
+      step: [
+        { from: 'web', to: 'orders', kind: 'call', note: 'old', phase: 'Pay' },
+        { from: 'orders', to: 'queue:events', kind: 'publish', phase: 'Pay' },
+      ],
+    });
+    const replaced = editFeature(feature, {
+      unstep: [{ from: 'web', to: 'orders' }],
+      step: [{ from: 'web', to: 'orders', kind: 'call', note: 'new' }],
+    });
+    expect(replaced.phases[0]?.steps).toEqual([
+      { from: 'web', to: 'orders', kind: 'call', note: 'new' },
+      { from: 'orders', to: 'queue:events', kind: 'publish' },
+    ]);
+    expect(replaced.phases[1]?.steps).toEqual([]);
+    expect(editFeature(feature, { unstep: [{ from: 'web', to: 'orders' }] }).phases[0]?.steps).toHaveLength(1);
+  });
+
   it('renames a phase and starts from a card before any step names it', () => {
     const feature = editFeature(editFeature(null, { phase: ['One'], card: ['web'] }), {
       rename: { from: 'One', to: 'Pay in the app' },

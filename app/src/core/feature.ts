@@ -110,6 +110,14 @@ export function editFeature(given: Feature | null, edit: FeatureEdit): Feature {
       ...feature,
       phases: feature.phases.map(one => (one.name === edit.rename?.from ? { ...one, name: renamed } : one)),
     };
+  const steps = (change: (steps: Step[]) => Step[]) => {
+    feature = { ...feature, phases: feature.phases.map(one => ({ ...one, steps: change(one.steps) })) };
+  };
+  // A step taken off and added in the same edit is replaced where it was.
+  for (const gone of [...(edit.unstep ?? []), ...(edit.drop ?? [])]) {
+    const { phase: _, ...added } = edit.step?.find(same(gone)) ?? {};
+    steps(all => all.flatMap(step => (!same(gone)(step) ? [step] : 'kind' in added ? [added] : [])));
+  }
   for (const { phase: into, ...step } of edit.step ?? []) {
     if (feature.phases.some(one => one.steps.some(same(step)))) continue;
     const name = into?.trim() || feature.phases.at(-1)?.name || 'Steps';
@@ -119,11 +127,6 @@ export function editFeature(given: Feature | null, edit: FeatureEdit): Feature {
       phases: feature.phases.map(one => (one.name === name ? { ...one, steps: [...one.steps, step] } : one)),
     };
   }
-  const steps = (change: (steps: Step[]) => Step[]) => {
-    feature = { ...feature, phases: feature.phases.map(one => ({ ...one, steps: change(one.steps) })) };
-  };
-  for (const gone of [...(edit.unstep ?? []), ...(edit.drop ?? [])])
-    steps(all => all.filter(step => !same(gone)(step)));
   for (const kept of edit.accept ?? [])
     steps(all => all.map(({ proposed, ...step }) => (same(kept)(step) || !proposed ? step : { ...step, proposed })));
   return feature;
