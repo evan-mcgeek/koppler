@@ -113,6 +113,13 @@
   $effect(() => {
     inbox.follow();
   });
+  // Live shows what runs: once nothing does, the board is back in Plan.
+  $effect(() => {
+    if (board.live && !live.running)
+      untrack(() => {
+        board.goEdit();
+      });
+  });
   /** A stack on its way in, from here, another tab or the terminal: the board waits until the page reloads with it. */
   const loading = $derived(
     stacks.switching ?? (live.status?.loading && live.status.loading !== board.dir ? live.status.loading : null),
@@ -476,10 +483,11 @@
           }}
         />Plan</label
       >
-      <label
+      <label aria-disabled={!live.running} title={live.running ? undefined : 'Nothing is running'}
         ><input
           type="radio"
           name="view"
+          disabled={!live.running}
           checked={board.live && !board.discovering}
           onchange={() => {
             board.goLive();

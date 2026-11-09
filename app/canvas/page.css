@@ -140,10 +140,15 @@ details[open] > summary:not(:has(.chev))::before {
   outline: 2px solid var(--ink);
   outline-offset: 2px;
 }
+.seg label[aria-disabled='true'] {
+  opacity: 0.45;
+}
 .seg label[aria-disabled='true'],
 .seg label[aria-disabled='true'] input {
-  opacity: 0.45;
   cursor: not-allowed;
+}
+.seg label[aria-disabled='true']:hover {
+  color: var(--ink-muted);
 }
 
 /* An on/off switch: a checkbox over its label, drawn as a square track beside it, filled when on. */

@@ -1,6 +1,6 @@
 // The new canvas's two views: Edit sets the board up, Live shows it as it runs, in the same places.
 import type { Page } from '@playwright/test';
-import { at, card, expect, test } from './canvas.ts';
+import { at, card, expect, runningApps, test } from './canvas.ts';
 
 const corner = async (page: Page, id: string) => {
   const box = await card(page, id).boundingBox();
@@ -20,6 +20,7 @@ test.use({
 test('Live shows the same board in the same places as cards to read, and nothing on it can be changed', async ({
   page,
 }) => {
+  await runningApps(page, ['web']);
   await expect(card(page, 'web').locator('.body')).toBeVisible();
   const before = [await corner(page, 'web'), await corner(page, 'orders')];
   const middles = await Promise.all(
@@ -68,6 +69,26 @@ test('Live shows the same board in the same places as cards to read, and nothing
   await expect(page.getByRole('button', { name: 'Undo' })).toBeDisabled();
   await page.keyboard.press('l');
   await expect(page.getByRole('radio', { name: 'Live' })).toBeChecked();
+});
+
+test('Live is off while nothing runs, and the board leaves it once the run stops', async ({ page }) => {
+  const live = page.getByRole('radio', { name: 'Live' });
+  await expect(card(page, 'web').locator('.body')).toBeVisible();
+  await expect(live).toBeDisabled();
+  await expect(page.locator('label', { has: live })).toHaveAttribute('title', 'Nothing is running');
+  await page.keyboard.press('l');
+  await expect(page.getByRole('radio', { name: 'Plan' })).toBeChecked();
+  await page.screenshot({ path: 'test-results/next-live-off.png' });
+
+  await runningApps(page, ['web']);
+  await expect(live).toBeEnabled();
+  await page.keyboard.press('l');
+  await expect(live).toBeChecked();
+
+  await page.unrouteAll();
+  await expect(page.getByRole('radio', { name: 'Plan' })).toBeChecked();
+  await expect(live).toBeDisabled();
+  await expect(card(page, 'web').locator('.body')).toBeVisible();
 });
 
 test('Present shows the board alone, and Escape brings the page back', async ({ page }) => {

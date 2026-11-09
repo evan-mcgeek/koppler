@@ -259,3 +259,9 @@ export const actions = async (page: Page, id: string) => {
   await page.locator(`.svelte-flow__node[data-id="${id}"] header`).hover();
   return page.locator(`.tools[data-card="${id}"]`);
 };
+/** The server's status, as if Koppler ran these apps: what the Live view needs to open. */
+export const runningApps = (page: Page, ids: string[]) =>
+  page.route('**/data/status.json', async route => {
+    const status = (await (await route.fetch()).json()) as Record<string, unknown>;
+    await route.fulfill({ json: { ...status, running: ids } });
+  });

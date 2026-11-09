@@ -1,6 +1,6 @@
 // The new canvas's frame and messages: refused cables, the protected environment, the empty board, the sheets.
 import type { Page } from '@playwright/test';
-import { at, card, expect, STACK, test, fromMenu } from './canvas.ts';
+import { at, card, expect, STACK, test, fromMenu, runningApps } from './canvas.ts';
 
 const cable = (page: Page, id: string) => page.locator(`.svelte-flow__edge[data-id="${id}"]`);
 const middle = async (page: Page, id: string) => {
@@ -135,7 +135,9 @@ test('the shortcuts sheet opens with ? and from the mark, and the appearance is 
 
 test('the keyboard: Space presses the focused button, and shortcuts stay off under an open menu', async ({ page }) => {
   // Space is the hand tool on the board only: on a button it presses it.
+  await runningApps(page, ['web']);
   const live = page.getByRole('radio', { name: 'Live' });
+  await expect(live).toBeEnabled();
   const percent = page.getByTitle('Reset to 100%');
   await page.getByRole('button', { name: 'Zoom out' }).focus();
   const before = await percent.textContent();
