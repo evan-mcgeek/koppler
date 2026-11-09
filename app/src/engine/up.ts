@@ -638,7 +638,12 @@ async function startApps(up: Up): Promise<void> {
         if (!(error instanceof Failure)) throw error;
         console.error(error.message);
         down.set(id, error.message);
-        step(id, 'Start', 'failed', error.message.split('\n')[0] ?? '');
+        step(
+          id,
+          'Start',
+          'failed',
+          (error.message.split('\n')[0] ?? '').replace(/; last lines of .+:$/, '; its log says why.'),
+        );
         continue;
       }
       const mobile = up.stack.apps[id]?.mobile;

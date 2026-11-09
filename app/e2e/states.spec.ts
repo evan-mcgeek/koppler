@@ -36,3 +36,27 @@ test('each card says its state in words, with a dot of its colour', async ({ pag
   await expect(card(page, 'catalog')).toContainText('Secret missing: Db__Password. Set it under Credentials.');
   await page.screenshot({ path: 'test-results/next-states.png' });
 });
+
+test('a card that failed to start says so once, in its Failed block, three lines at most', async ({ page }) => {
+  const why = `payments exited before answering on port 5003; its log says why. ${'Unhandled exception at start. '.repeat(6)}`;
+  const status = {
+    live: { env: 'qa', nodes: { payments: {} } },
+    apps: {
+      payments: {
+        state: { state: 'failed-to-start', detail: why },
+        steps: [{ label: 'Start', state: 'failed', detail: why }],
+      },
+    },
+  };
+  await page.route('**/data/status.json', route => route.fulfill({ json: status }));
+  await page.reload();
+  const payments = card(page, 'payments');
+  await expect(payments.locator('.why')).toBeVisible();
+  await expect(payments.getByText(/exited before answering/)).toHaveCount(1);
+  await expect(payments.getByRole('img', { name: 'Failed to start' })).toBeVisible();
+  // Clamped to three whole lines: nothing of a fourth shows under the fix button.
+  const [height, line] = await payments
+    .locator('.why')
+    .evaluate(el => [el.clientHeight, parseFloat(getComputedStyle(el).lineHeight)]);
+  expect(height).toBeLessThanOrEqual(line * 3 + 1);
+});

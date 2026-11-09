@@ -36,7 +36,8 @@ test('koppler up writes each app\'s steps for its card as it goes; the step a fa
     { label: 'First 1 s', state: 'done', detail: 'No errors in its first 1 s.' },
   ]);
   assert.equal(progress.apps.web[0].state, 'failed');
-  assert.match(progress.apps.web[0].detail, /web exited right away/);
+  // The reason, not the log's path: the card's Show log has the rest.
+  assert.equal(progress.apps.web[0].detail, 'web exited right away; its log says why.');
   assert.deepEqual(progress.apps.app, [{ label: 'Start', state: 'user', detail: 'Start it in your IDE.' }]);
 });
 
