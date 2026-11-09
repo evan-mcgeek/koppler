@@ -59,6 +59,43 @@ describe('editFeature', () => {
     expect(editFeature(feature, { unstep: [{ from: 'web', to: 'orders' }] }).phases[0]?.steps).toHaveLength(1);
   });
 
+  it('lets one link be a step in several phases, each with its own note; takes it off one phase or every one', () => {
+    const feature = editFeature(null, {
+      phase: ['Order', 'Nightly batch'],
+      step: [
+        { from: 'orders', to: 'database:orders-db', kind: 'uses', note: 'Saves it', phase: 'Order' },
+        { from: 'orders', to: 'database:orders-db', kind: 'uses', note: 'Reads the day', phase: 'Nightly batch' },
+        { from: 'orders', to: 'database:orders-db', kind: 'uses', note: 'Again', phase: 'Nightly batch' },
+      ],
+    });
+    expect(numbered(feature).map(({ number, step }) => `${number} ${step.note ?? ''}`)).toEqual([
+      '1.1 Saves it',
+      '2.1 Reads the day',
+    ]);
+    const db = { from: 'orders', to: 'database:orders-db' } as const;
+    const once = editFeature(feature, { unstep: [{ ...db, phase: 'Nightly batch' }] });
+    expect(once.phases.map(phase => phase.steps.length)).toEqual([1, 0]);
+    expect(editFeature(feature, { unstep: [db] }).phases.map(phase => phase.steps.length)).toEqual([0, 0]);
+    // Replaced in its own phase only.
+    const replaced = editFeature(feature, {
+      unstep: [{ ...db, phase: 'Nightly batch' }],
+      step: [{ ...db, kind: 'uses', note: 'Reads yesterday', phase: 'Nightly batch' }],
+    });
+    expect(replaced.phases.map(phase => phase.steps.map(step => step.note))).toEqual([
+      ['Saves it'],
+      ['Reads yesterday'],
+    ]);
+  });
+
+  it('takes a phase off with its steps', () => {
+    const feature = editFeature(null, {
+      phase: ['Order', 'Refund'],
+      step: [{ from: 'web', to: 'orders', kind: 'call', phase: 'Order' }],
+    });
+    expect(editFeature(feature, { dropPhase: ['Refund'] }).phases.map(phase => phase.name)).toEqual(['Order']);
+    expect(editFeature(feature, { dropPhase: ['Order'] }).phases).toEqual([{ name: 'Refund', steps: [] }]);
+  });
+
   it('renames a phase and starts from a card before any step names it', () => {
     const feature = editFeature(editFeature(null, { phase: ['One'], card: ['web'] }), {
       rename: { from: 'One', to: 'Pay in the app' },

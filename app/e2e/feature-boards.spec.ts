@@ -301,3 +301,36 @@ test('a feature board shared with the team keeps its steps and where its cards s
     .toBe('Customers pay for an order.');
   expect(read().presets?.find(one => one.name === 'New feature')?.discover?.at['orders']).toEqual(placed);
 });
+
+test('one link is a step in two phases: both are walked, one is taken off, and a phase is removed', async ({
+  page,
+  canvas,
+}) => {
+  await newFeature(page);
+  await page.getByLabel('Describe the feature').fill('Customers pay, and get a refund.');
+  await page.getByRole('button', { name: 'Hand it to the agent' }).click();
+  await expect.poll(() => kept(canvas.temp)?.feature?.request).toBe('Customers pay, and get a refund.');
+  koppler(canvas, 'board', 'edit', 'New feature', '--phase', 'Order', '--step', 'web:orders=Places it');
+  koppler(canvas, 'board', 'edit', 'New feature', '--phase', 'Refund', '--step', 'web:orders=Refunds it');
+  const panel = page.getByRole('complementary', { name: 'New feature' });
+  const row = (number: string) => panel.locator('.step').filter({ has: page.getByText(number, { exact: true }) });
+  await expect(row('1.1')).toContainText('Places it');
+  await expect(row('2.1')).toContainText('Refunds it');
+  // One link on the map, numbered by the step in view.
+  await expect(page.locator('.links .number text')).toHaveText(['1.1']);
+  await panel.getByRole('button', { name: 'Walk through the steps' }).click();
+  const bar = page.getByRole('status', { name: /^Step / });
+  await expect(bar).toHaveAccessibleName('Step 1.1');
+  await page.keyboard.press('ArrowRight');
+  await expect(bar).toHaveAccessibleName('Step 2.1');
+  await expect(page.locator('.links .number text')).toHaveText(['2.1']);
+  await page.keyboard.press('Escape');
+
+  await row('2.1').hover();
+  await panel.getByRole('button', { name: 'Take step 2.1 off' }).click();
+  await expect(row('1.1')).toContainText('Places it');
+  await expect(panel.locator('.step')).toHaveCount(1);
+  await panel.getByRole('button', { name: 'Remove Refund' }).click();
+  await expect(panel.getByRole('button', { name: 'Refund', exact: true })).toHaveCount(0);
+  await expect.poll(() => kept(canvas.temp)?.feature?.phases.length).toBe(1);
+});

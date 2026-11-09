@@ -773,10 +773,12 @@
                 </span>
                 {#if board.feature}
                   {@const step = discovered.stepOf(link)}
+                  {@const numbers = discovered.stepsOf(link).map(one => one.number)}
                   <span class="detail">
-                    {#if step}<span>Step {step.number}{step.step.proposed ? ', proposed' : ''}</span>{:else}<span
-                        >Not in this feature</span
-                      >
+                    {#if step}<span
+                        >Step{numbers.length > 1 ? 's' : ''}
+                        {numbers.join(', ')}{step.step.proposed ? ', proposed' : ''}</span
+                      >{:else}<span>Not in this feature</span>
                       <button
                         class="text"
                         type="button"

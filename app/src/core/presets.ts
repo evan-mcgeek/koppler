@@ -305,10 +305,20 @@ export function describeEdit(
   const among = (list: Edge[]) => (one: Edge) => list.some(other => other.from === one.from && other.to === one.to);
   const replaced = steps.filter(among(unsteps));
   const fresh = steps.filter(one => !among(unsteps)(one));
-  const phaseOf = (one: Edge) => before?.phases.find(phase => phase.steps.some(step => among([step])(one)))?.name;
-  const added = fresh.filter((one, at) => !phaseOf(one) && fresh.findIndex(among([one])) === at);
-  const kept = fresh.filter(one => phaseOf(one));
+  /** The phase a step goes in: its own, else the last one. */
+  const into = (one: { phase?: string }) =>
+    one.phase?.trim() ||
+    [...(before?.phases ?? []).map(phase => phase.name), ...(edit.feature?.phase ?? [])].at(-1) ||
+    'Steps';
+  const there = (one: Edge & { phase?: string }) =>
+    !!before?.phases.some(phase => phase.name === into(one) && phase.steps.some(step => among([step])(one)));
+  const added = fresh.filter(
+    (one, at) => !there(one) && fresh.findIndex(other => among([other])(one) && into(other) === into(one)) === at,
+  );
+  const kept = fresh.filter(there);
   const off = unsteps.filter(one => !among(steps)(one));
+  const dropped = edit.feature?.dropPhase ?? [];
+  const rename = edit.feature?.rename;
   return [
     edit.add?.length && `${proposed ? 'add' : 'added'} ${list(edit.add)}`,
     edit.remove?.length && `${proposed ? 'remove' : 'removed'} ${list(edit.remove)}`,
@@ -322,14 +332,18 @@ export function describeEdit(
     ),
     edit.arrange && (proposed ? 'lay it out afresh' : 'arranged'),
     edit.feature?.request !== undefined && 'set the request',
-    ...(edit.feature?.phase ?? []).map(phase => `${proposed ? 'add' : 'added'} the phase ${phase}`),
+    ...(edit.feature?.phase ?? [])
+      .filter(phase => !before?.phases.some(one => one.name === phase.trim()))
+      .map(phase => `${proposed ? 'add' : 'added'} the phase ${phase}`),
     added.length && `${proposed ? 'add' : 'added'} the step${added.length > 1 ? 's' : ''} ${cables(added)}`,
     replaced.length &&
       `${proposed ? 'replace' : 'replaced'} the step${replaced.length > 1 ? 's' : ''} ${cables(replaced)}`,
-    off.length && `${proposed ? 'take off' : 'took off'} the step ${cables(off)}`,
-    ...kept.map(
-      one => `${proposed ? 'keep' : 'kept'} ${cables([one])} in ${phaseOf(one) ?? ''}: a link is a step once per board`,
+    ...off.map(
+      one => `${proposed ? 'take off' : 'took off'} the step ${cables([one])}${one.phase ? ` in ${one.phase}` : ''}`,
     ),
+    ...kept.map(one => `${proposed ? 'keep' : 'kept'} ${cables([one])} in ${into(one)}: it is a step there already`),
+    ...dropped.map(phase => `${proposed ? 'take off' : 'took off'} the phase ${phase}`),
+    rename && `${proposed ? 'rename' : 'renamed'} the phase ${rename.from} to ${rename.to}`,
     edit.area === null && `${proposed ? 'take' : 'took'} its area from its apps`,
     edit.area && `set its area to ${edit.area}`,
   ]
