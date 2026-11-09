@@ -335,7 +335,7 @@
       >
     </div>
   {/if}
-  {#if calls.length}
+  {#if calls.length && !board.live}
     <div class="calls nodrag nopan">
       <span class="calls-label">Calls {board.env.toUpperCase()}</span>
       {#each calls as other (other.id)}

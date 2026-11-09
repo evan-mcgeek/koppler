@@ -1,7 +1,7 @@
 // The queue cards Plan shows (the ones Koppler can run here) and the apps a card still calls in the deployed environment.
 // The rest of the stack's queues, and outside systems, are in Discover.
 import type { Page } from '@playwright/test';
-import { card, expect, saved, STACK, test } from './canvas.ts';
+import { card, expect, runningApps, saved, STACK, test } from './canvas.ts';
 
 const queue = (page: Page) => page.locator('.svelte-flow__node-queue');
 const at = (x: number, y: number) => ({ x, y, run: 'cli', branch: 'main', showQueues: true });
@@ -143,6 +143,16 @@ test('a card lists the apps it still calls in the deployed environment, and a cl
   await calls.getByRole('button', { name: 'Payments API' }).click();
   await expect(page.locator('.svelte-flow__edge[data-id="orders>payments"]')).toHaveCount(1);
   await expect(calls).toHaveCount(0);
+});
+
+test('Live leaves the deployed calls off the cards: they belong to planning the board', async ({ page }) => {
+  await runningApps(page, ['orders']);
+  const calls = card(page, 'orders').locator('.calls');
+  await expect(calls).toContainText('Calls QA');
+  await page.getByRole('radio', { name: 'Live' }).check();
+  await expect(calls).toHaveCount(0);
+  await page.getByRole('radio', { name: 'Plan' }).check();
+  await expect(calls).toContainText('Calls QA');
 });
 
 test('a queue card is joined to its own app on whichever side of the app it is moved to, round any card between', async ({
