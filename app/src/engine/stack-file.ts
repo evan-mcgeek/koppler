@@ -222,8 +222,8 @@ export function addOutside(
     [...new Set(Array.isArray(list) ? (list as unknown[]) : [])].filter((id): id is string => typeof id === 'string');
   const callers = ids(given.calledBy);
   const called = ids(given.sendsTo);
-  const unknown = [...callers, ...called].filter(id => !apps[id] || apps[id].outside);
-  if (unknown.length) return { error: `Not apps of the stack that run here: ${[...new Set(unknown)].join(', ')}.` };
+  const unknown = [...callers, ...called].filter(id => !apps[id]);
+  if (unknown.length) return { error: `Not in the stack: ${[...new Set(unknown)].join(', ')}.` };
   if (!callers.length && !called.length)
     return { error: `Say which apps call ${name}, or which it sends to: its card shows next to them.` };
   const base =

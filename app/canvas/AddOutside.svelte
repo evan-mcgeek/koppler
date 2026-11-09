@@ -14,7 +14,8 @@
   let called = $state<Record<string, boolean>>({});
   let error = $state('');
   let adding = $state(false);
-  const apps = $derived(board.apps.filter(app => !app.outside));
+  // Your apps first, then the outside systems: one can call another (a web form sends to the CRM).
+  const apps = $derived([...board.apps.filter(app => !app.outside), ...board.apps.filter(app => app.outside)]);
   const ids = (on: Record<string, boolean>) => apps.filter(app => on[app.id]).map(app => app.id);
 
   export function open(): void {
@@ -67,7 +68,7 @@
       <input bind:value={why} maxlength="200" placeholder="Payment provider" />
     </label>
     <fieldset>
-      <legend>Your apps</legend>
+      <legend>Your apps and outside systems</legend>
       <div class="callers">
         <span class="head" aria-hidden="true"><span></span><span>Calls it</span><span>Gets its calls</span></span>
         {#each apps as app (app.id)}
