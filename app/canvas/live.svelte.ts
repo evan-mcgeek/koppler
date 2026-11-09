@@ -186,10 +186,15 @@ class Live {
   asked = $state(false);
   #timer: ReturnType<typeof setInterval> | undefined;
 
-  /** Whether Koppler runs anything, or is starting it: what the Live view has to show. */
+  /** Whether anything runs here, started by Koppler or by you, or a run is starting: what the Live view has to show. */
   get running(): boolean {
     const last = this.status?.runs?.at(-1)?.state;
-    return !!this.status?.running?.some(one => one !== 'canvas') || last === 'applying' || last === 'waiting';
+    return (
+      !!this.status?.running?.some(one => one !== 'canvas') ||
+      Object.values(this.status?.apps ?? {}).some(app => app?.listening || app?.running?.length) ||
+      last === 'applying' ||
+      last === 'waiting'
+    );
   }
 
   #last = '';
