@@ -177,7 +177,7 @@ export interface Tab {
   /** What the tab holds, in a few words. */
   about?: string;
   /** A view of its own: what each environment uses, or the stack's apps. */
-  view?: 'envs' | 'apps' | 'areas';
+  view?: 'envs' | 'apps' | 'areas' | 'schedule';
 }
 /** An app's settings: what it is first; then how it runs here, where it is deployed, and the rest. */
 export const APP_HEAD = ['name', 'description', 'kind', 'slug'];
@@ -225,6 +225,24 @@ export const APP_TABS: Tab[] = [
   { name: 'Secrets', about: 'The secrets it needs, and how to get each', keys: ['secrets'] },
   { name: 'Environments', about: ENVS_ABOUT, keys: ['envs'], view: 'envs' },
 ];
+/** A scheduled job runs deployed only: its schedule, what it calls and needs, and per environment; nothing about running here. */
+export const JOB_TABS: Tab[] = [
+  {
+    name: 'Schedule',
+    about: 'A scheduled job runs deployed only. Koppler never starts it on this Mac.',
+    keys: ['schedule'],
+    view: 'schedule',
+  },
+  {
+    name: 'Calls',
+    about: 'What it calls, the queues it sends to and reads, and the databases it uses',
+    keys: ['consumes', 'publishes', 'reads', 'uses'],
+  },
+  { name: 'Secrets', about: 'The secrets it needs, and how to get each', keys: ['secrets'] },
+  { name: 'Environments', about: ENVS_ABOUT, keys: ['envs'], view: 'envs' },
+];
+/** What a service has and a job does not: hidden while it is a job, back when it is a service again. */
+export const SERVICE_ONLY = [...(APP_TABS[0]?.keys ?? []), 'deployedUrl', 'cors', 'prereqs'];
 /** An outside system never runs here: only where it is, what it calls, and per environment. */
 export const OUTSIDE_TABS: Tab[] = [
   { name: 'Deployed', about: 'Where it is and what it is', keys: ['outside', 'deployedUrl'] },

@@ -605,6 +605,7 @@
   .jobs {
     contain: inline-size;
     display: flex;
+    width: 100%;
     align-items: start;
     gap: 6px;
     margin: 0;
@@ -620,6 +621,10 @@
   .jobs :global(svg) {
     flex: none;
     margin-top: 2px;
+  }
+  .jobs span {
+    flex: 1;
+    min-width: 0;
   }
   .jobs:hover span {
     text-decoration: underline;
