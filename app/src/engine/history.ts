@@ -3,6 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import * as kp from '../core/plan.ts';
+import { notRunHere } from '../core/stack.ts';
 import { APP_ID, RUN_ID } from '../ids.ts';
 import { readStack } from '../data.ts';
 import { tempDir } from '../paths.ts';
@@ -93,9 +94,9 @@ export function runRecord(prompt: Prompt | null | undefined): RunRecord | null {
   if (!isId(id, RUN_ID)) return null;
   const stop = prompt?.tag === 'koppler-stop';
   const board = kp.board(stop ? {} : data);
-  // An app with nothing to run here (`outside` in the stack: a SaaS, a library, a config repo) is never part of a run.
+  // An app with nothing to run here (an outside system, a scheduled job) is never part of a run.
   const stack = readStack();
-  const kept = Object.entries(board.nodes).filter(([app]) => ID.test(app) && !stack?.apps[app]?.outside);
+  const kept = Object.entries(board.nodes).filter(([app]) => ID.test(app) && !notRunHere(stack?.apps[app]));
   const nodes = Object.fromEntries(
     kept.map(([app, node]): [string, kp.BoardNode] => [
       app,

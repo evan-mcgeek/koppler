@@ -3,6 +3,7 @@
 import type { Point } from '../src/core/arrange.ts';
 import { DIRECTIONS, type Direction, type Laid } from '../src/core/layout.ts';
 import { hiddenBy } from '../src/core/areas.ts';
+import { scheduleWords } from '../src/core/schedule.ts';
 import { deadEnds, linksOf, mapOf, placesOf, type Card, type Link } from '../src/core/discover.ts';
 import {
   editFeature,
@@ -46,6 +47,8 @@ export interface LeanData extends Record<string, unknown> {
   edited: { tag: 'New' | 'Changed'; says: string } | null;
   /** Its clone's branch and changed files, when the repo's main branch does not have them. */
   changed: string;
+  /** A scheduled job: its schedule on the environment read, in words and as written, and the app whose repo it ships from. */
+  job?: { words: string; expression: string; env: string; from: string };
 }
 
 export const CARD = { w: 200, h: 64 };
@@ -187,6 +190,26 @@ class Discovered {
     }
     const stack = facts?.apps[card];
     const app = board.app(card);
+    if (stack?.schedule) {
+      const expression = stack.schedule[board.env] ?? '';
+      const from = Object.entries(facts?.apps ?? {}).find(
+        ([other, one]) => other !== card && !one.schedule && one.slug && one.slug.toLowerCase() === slug.toLowerCase(),
+      )?.[1].name;
+      return {
+        ...base,
+        repo: '',
+        name: stack.name,
+        areas: areaNames(card).join(' · '),
+        tag: app?.kindLabel ?? stack.kind,
+        meta: '',
+        job: {
+          words: expression ? scheduleWords(expression) : `no schedule on ${board.env.toUpperCase()}`,
+          expression,
+          env: board.env,
+          from: from ?? '',
+        },
+      };
+    }
     if (stack?.outside)
       return {
         ...base,
@@ -206,6 +229,22 @@ class Discovered {
     };
   }
 
+  /** When a phase starts on a schedule, not from a call: its first step leaves a scheduled job. Its schedule in words. */
+  startsOn(phase: { steps: { from: Card }[] }): string {
+    const expression = board.facts?.apps[phase.steps[0]?.from ?? '']?.schedule?.[board.env];
+    return expression ? scheduleWords(expression) : '';
+  }
+  /** Each scheduled job on the map with the app on it whose repo it ships from: drawn side by side, joined by a line. */
+  sameRepo = $derived.by((): [Card, Card][] => {
+    const apps = board.facts?.apps ?? {};
+    const shown = this.map.cards.map(one => one.card);
+    return shown.flatMap((job): [Card, Card][] => {
+      const slug = apps[job]?.schedule && apps[job].slug?.toLowerCase();
+      const from =
+        slug && shown.find(id => id !== job && !apps[id]?.schedule && apps[id]?.slug?.toLowerCase() === slug);
+      return from ? [[from, job]] : [];
+    });
+  });
   /** The layout Arrange last chose. */
   get direction(): Direction {
     return DIRECTIONS[(board.discover.layout ?? 0) % DIRECTIONS.length] ?? 'RIGHT';
@@ -213,7 +252,10 @@ class Discovered {
   /** What the map's layout is worked out from: its cards as measured, its links, the layout chosen. */
   layoutInput = $derived.by(() => {
     const cards = this.map.cards.map(({ card }) => ({ id: card, w: CARD.w, h: this.heights[card] ?? CARD.h }));
-    const links = this.map.links.map(link => ({ id: linkKey(link), from: link.from, to: link.to }));
+    const links = [
+      ...this.map.links.map(link => ({ id: linkKey(link), from: link.from, to: link.to })),
+      ...this.sameRepo.map(([from, to]) => ({ id: `${from}~${to}`, from, to })),
+    ];
     // Laid out once every card has its height, so the cards are placed once.
     const measured = this.map.cards.every(({ card }) => this.heights[card]);
     return { cards, links, measured, key: JSON.stringify([cards, links, this.direction]) };

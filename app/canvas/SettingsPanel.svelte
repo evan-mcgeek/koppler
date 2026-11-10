@@ -12,6 +12,7 @@
   import { changes } from '../src/core/stack-changes.ts';
   import { getAt, parsePath, setAt } from '../src/core/stack-path.ts';
   import AreasTab from './AreasTab.svelte';
+  import JobSchedule from './JobSchedule.svelte';
   import EnvOverrides from './EnvOverrides.svelte';
   import SettingsField from './SettingsField.svelte';
   import { board } from './board.svelte.ts';
@@ -29,6 +30,8 @@
     lockedBy,
     OTHER_ABOUT,
     OUTSIDE_TABS,
+    JOB_TABS,
+    SERVICE_ONLY,
     problemsByPath,
     rowOf,
     STACK_HEAD,
@@ -92,6 +95,8 @@
   const value = $derived((at ? getAt(draft, parts(at)) : draft) as Record<string, unknown> | undefined);
   const app = $derived(/^apps\.[a-z0-9-]+$/.test(at) ? at.slice(5) : null);
   const outside = $derived(!!app && !!value?.['outside']);
+  /** A scheduled job: Runs as, On a schedule. */
+  const job = $derived(!!app && !outside && value?.['schedule'] !== undefined);
   // What it is first, then tabs; a part with no tabs of its own (a queue) shows all its fields in one.
   // An app's areas sit under its name, once the stack has areas to pick from.
   const stackAreas = $derived(Object.keys((draft as { areas?: object } | null)?.areas ?? {}).length > 0);
@@ -110,10 +115,14 @@
       about: app ? 'What it is called, and where its code is' : 'What the stack is called',
       keys: head,
     };
-    const own = app ? [identity, ...(outside ? OUTSIDE_TABS : APP_TABS)] : at ? [] : [identity, ...STACK_TABS];
+    const own = app
+      ? [identity, ...(outside ? OUTSIDE_TABS : job ? JOB_TABS : APP_TABS)]
+      : at
+        ? []
+        : [identity, ...STACK_TABS];
     const named = new Set([...head, ...own.flatMap(one => one.keys)]);
     const rest = [...Object.keys(shape.properties ?? {}), ...Object.keys(value ?? {})].filter(
-      key => !named.has(key) && !(app && key === 'areas'),
+      key => !named.has(key) && !(app && key === 'areas') && !(job && SERVICE_ONLY.includes(key)),
     );
     const other = [...new Set(rest)];
     // One row of a list (a need): only the fields of its type, and any others it already has.
@@ -356,7 +365,37 @@
           </div>
         {/if}
         {#if /^databases\.[a-z0-9-]+$/.test(at)}<LocalAddress database={at.slice('databases.'.length)} />{/if}
-        {#if shown?.view === 'envs' && app && value}
+        {#if app && !outside && shown === tabs[0]}
+          <div class="runs-as" role="radiogroup" aria-label="Runs as">
+            <span class="label">Runs as</span>
+            <span class="seg">
+              {#each [['service', 'A service'], ['schedule', 'On a schedule']] as [kind, said] (kind)}
+                <label>
+                  <input
+                    type="radio"
+                    name="runs-as"
+                    checked={(kind === 'schedule') === job}
+                    onchange={() =>
+                      void ctx.save(
+                        child(at, 'schedule'),
+                        kind === 'schedule' ? Object.fromEntries(board.envs.map(env => [env, ''])) : undefined,
+                      )}
+                  />{said}
+                </label>
+              {/each}
+            </span>
+            {#if job}<span class="note">A scheduled job runs deployed only. Koppler never starts it on this Mac.</span
+              >{/if}
+          </div>
+        {/if}
+        {#if shown?.view === 'schedule' && app && value}
+          <JobSchedule
+            path={child(at, 'schedule')}
+            schedule={(value['schedule'] ?? {}) as Record<string, string>}
+            envs={board.envs}
+            {ctx}
+          />
+        {:else if shown?.view === 'envs' && app && value}
           <EnvOverrides path={at} app={value} schema={shape} envs={board.envs} {ctx} />
         {:else if shown?.view === 'areas'}
           <AreasTab stack={draft} {ctx} />
@@ -451,6 +490,33 @@
 </dialog>
 
 <style>
+  .runs-as {
+    padding: 14px 20px 0;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    align-items: center;
+    gap: 6px 12px;
+    margin-bottom: 14px;
+  }
+  .runs-as .label {
+    color: var(--ink-muted);
+    font: 12px var(--sans);
+  }
+  .runs-as .seg {
+    justify-self: start;
+    height: 30px;
+  }
+  .runs-as .seg label {
+    display: grid;
+    place-items: center;
+    padding: 0 12px;
+    font-size: 12.5px;
+  }
+  .runs-as .note {
+    grid-column: 2;
+    color: var(--ink-muted);
+    font: 12px var(--sans);
+  }
   dialog {
     position: fixed;
     inset: 0 0 0 auto;

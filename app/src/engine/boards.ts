@@ -3,6 +3,7 @@
 import path from 'node:path';
 import { flagValue } from '../cli/output.ts';
 import { featureOf, inStack, kindBetween, type FeatureEdit } from '../core/feature.ts';
+import { notRunHere } from '../core/stack.ts';
 import { upgradeBoardFile } from '../core/migrations/files.ts';
 import { withoutMissingApps } from '../core/missing-apps.ts';
 import { describeEdit, editPreset, migrate, VERSION, type BoardEdit, type StoredPreset } from '../core/presets.ts';
@@ -343,7 +344,10 @@ export function changeBoard(name: string, edit: BoardEdit, create: boolean, prop
   const clones = readClones();
   for (const id of edit.add ?? []) {
     if (!app(id)) fail(`${id} is not an app in the stack`);
-    if (app(id)?.outside) fail(`${app(id)?.name ?? id} does not run on this Mac`);
+    if (notRunHere(app(id)))
+      fail(
+        `${app(id)?.name ?? id} does not run on this Mac${app(id)?.schedule ? ': a scheduled job runs deployed only' : ''}`,
+      );
     if (!clones[id]) fail(`${app(id)?.name ?? id} is not cloned on this Mac (koppler sync prints how)`);
   }
   const on = new Set([...Object.keys(board.nodes).filter(id => !edit.remove?.includes(id)), ...(edit.add ?? [])]);

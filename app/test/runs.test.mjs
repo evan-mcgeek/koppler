@@ -44,7 +44,7 @@ test('States: waiting until picked up, then applying, done or failed; replaced b
 
 test('The commands, end to end in a throwaway folder: plan, applied, a changed board, stop.', async () => {
   dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-runs-'));
-  fs.writeFileSync(path.join(dir, 'registry.json'), JSON.stringify({ envs: ['qa'], apps: { api: { name: 'Orders API' }, web: { name: 'Web' }, docs: { name: 'Docs', outside: 'a library, nothing to run' } } }));
+  fs.writeFileSync(path.join(dir, 'registry.json'), JSON.stringify({ envs: ['qa'], apps: { api: { name: 'Orders API' }, web: { name: 'Web' }, docs: { name: 'Docs', outside: 'a library, nothing to run' }, nightly: { name: 'Nightly settlement', schedule: { qa: 'cron(0 0 * * ? *)' } } } }));
   env = { ...process.env, KOPPLER_TEMP: dir, KOPPLER_STATE: path.join(dir, 'state') };
   koppler = (...args) => { const r = spawnSync('node', [path.join(here, '..', 'dist', 'koppler.mjs'), ...args], { encoding: 'utf8', env }); return (r.stdout + r.stderr).trim(); };
   add = o => fs.appendFileSync(path.join(dir, 'history.jsonl'), JSON.stringify(o) + '\n');
@@ -53,9 +53,11 @@ test('The commands, end to end in a throwaway folder: plan, applied, a changed b
 
 test('An app with nothing to run never makes it into a run, and koppler up refuses it by name.', async () => {
   process.env.KOPPLER_TEMP = dir;
-  assert.deepEqual(Object.keys(runRecord(send('run0003', [{ id: 'api', run: 'cli' }, { id: 'docs', run: 'cli' }])).nodes), ['api']);
+  assert.deepEqual(Object.keys(runRecord(send('run0003', [{ id: 'api', run: 'cli' }, { id: 'docs', run: 'cli' }, { id: 'nightly', run: 'cli' }])).nodes), ['api']);
   delete process.env.KOPPLER_TEMP;
   assert.match(koppler('up', 'docs'), /Docs does not run on this Mac: a library, nothing to run/);
+  // A scheduled job runs deployed only: never started here.
+  assert.match(koppler('up', 'nightly'), /Nightly settlement does not run on this Mac: a scheduled job runs deployed only/);
   add(runRecord(send('run0004', [{ id: 'api', run: 'cli' }, { id: 'web', run: 'cli' }, { id: 'app', run: 'ide' }])));
   assert.match(koppler('plan'), /START: Orders API, Web, app\n {2}This is what the user confirmed on the canvas\./);
 });
