@@ -58,21 +58,20 @@ test('the Apps list shows the chosen areas, then apps in none; an app in two lis
   await expect(panel(page)).toContainText('1 of 4 on the board');
 });
 
-test('the board menu groups team boards by area, hides the others with a line, and finds a hidden one', async ({
-  page,
-}) => {
+test('the board menu lists boards by area, hides the others with a line, and finds a hidden one', async ({ page }) => {
   const bar = page.getByRole('banner');
   await bar.getByRole('button', { name: /^Board:/ }).click();
   const menu = page.getByRole('dialog', { name: 'Boards' });
-  await expect(menu.locator('p.sub')).toHaveText(['Team boards · Payments', 'Shipping', 'No area']);
+  await expect(menu.locator('p.sub span:first-child')).toHaveText(['Payments', 'Shipping', 'No area']);
   // Picked in the menu, the menu stays open and regroups at once.
   await only(page, menu, 'Payments');
-  await expect(menu.locator('p.sub')).toHaveText(['Team boards · Payments', 'No area']);
+  await expect(menu.locator('p.sub span:first-child')).toHaveText(['Payments', 'No area']);
   await expect(menu).toContainText('1 team board in Shipping');
   await page.screenshot({ path: 'test-results/areas-menu.png' });
   await menu.getByRole('searchbox', { name: 'Find a board' }).fill('bro');
   await expect(menu.getByText('Hidden by your areas')).toBeVisible();
-  await expect(menu).toContainText('Opening it shows it; your areas stay as they are');
+  // Each with its area under its name, and its Team tag.
+  await expect(menu.locator('.row.elsewhere').filter({ hasText: 'Browse' })).toContainText(/Browse\s*Shipping\s*Team/);
   await menu.getByRole('button', { name: /^Browse/ }).click();
   // Opening it leaves the choice alone; the bar says it is outside it.
   await expect(bar.getByRole('button', { name: /^Board: Browse/ })).toContainText('Shipping');

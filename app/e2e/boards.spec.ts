@@ -1,6 +1,6 @@
 // The new canvas's boards: the one on screen is kept by name, and the team's and the user's own open from the picker.
 import type { Page } from '@playwright/test';
-import { card, expect, saveSettles, STACK, test, fromList, openSection } from './canvas.ts';
+import { card, expect, saveSettles, STACK, test, fromList, fromBoardMenu, openSection } from './canvas.ts';
 
 const picker = (page: Page) => page.getByRole('button', { name: /^Board: / });
 const boards = (page: Page) => page.getByRole('dialog', { name: 'Boards' });
@@ -16,7 +16,7 @@ const kept = async (page: Page, url: string) =>
 test('a team board opens arranged, and changing it makes a copy of your own', async ({ page, canvas }) => {
   await expect(picker(page)).toHaveText('New board');
   await picker(page).click();
-  await expect(opens(page)).toHaveText([/Checkout\s*3 apps/, /Browse\s*2 apps/]);
+  await expect(opens(page)).toHaveText([/^Browse\s*Team\s*$/, /^Checkout\s*Team\s*$/]);
   await page.screenshot({ path: 'test-results/next-boards.png' });
   await boards(page)
     .getByRole('button', { name: /^Checkout/ })
@@ -71,7 +71,8 @@ test('your own board comes back as you left it, and a new board starts empty', a
   expect(Object.keys((await kept(page, canvas.url))?.presets?.[0]?.nodes ?? {})).toHaveLength(3);
 
   await picker(page).click();
-  await expect(opens(page)).toHaveText([/Checkout/, /Browse\s*2 apps/, /Browse \(local\)\s*3 apps/]);
+  // A team board's copy sits right after it.
+  await expect(opens(page)).toHaveText([/^Browse\s*Team\s*$/, /^Browse\s*\(local\)\s*$/, /^Checkout\s*Team\s*$/]);
   await boards(page)
     .getByRole('button', { name: /^Browse \(local\)/ })
     .click();
@@ -185,7 +186,7 @@ test('a board of your own is renamed, copied, shared, deleted and restored', asy
   await boards(page).getByRole('button', { name: 'Duplicate' }).click();
   await expect(picker(page)).toHaveText('Orders work copy');
   await picker(page).click();
-  await boards(page).getByRole('button', { name: 'Delete Orders work copy' }).click();
+  await fromBoardMenu(page, 'Orders work copy', 'Delete…');
   const ask = page.getByRole('dialog').filter({ hasText: 'Delete board' });
   await expect(ask).toContainText('2 apps and 0 cables');
   await expect(ask).toContainText('It is the board on screen, so the screen empties.');
@@ -264,7 +265,7 @@ test('a board of your own is shared with the team: it joins the stack as a team 
   await page.getByRole('searchbox').focus();
   await saveSettles(page);
   await picker(page).click();
-  await boards(page).getByRole('button', { name: 'Share Web Shop with the team' }).click();
+  await fromBoardMenu(page, 'Web Shop', 'Share with the team…');
   // The stack is not in a repo on GitHub: the review says the board is kept in its file here, to commit.
   const review = page.getByRole('dialog', { name: 'Share Web Shop with the team' });
   // The review waits on the server asking git where the stack lives, which a busy machine can take seconds to answer.
@@ -282,8 +283,7 @@ test('a board of your own is shared with the team: it joins the stack as a team 
   expect(shared?.layout).toBeTruthy();
   // The menu lists it with the team's boards, and the team board opens without the note.
   await picker(page).click();
-  await expect(boards(page).getByText('Team board').first()).toBeVisible();
-  await expect(opens(page).filter({ hasText: 'Web Shop' })).toHaveCount(2);
+  await expect(opens(page).filter({ hasText: 'Web Shop' })).toHaveText([/^Web Shop\s*Team\s*$/, /^Web Shop\s*$/]);
   await boards(page)
     .getByRole('button', { name: /^Checkout/ })
     .click();

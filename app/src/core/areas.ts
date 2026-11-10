@@ -206,29 +206,46 @@ export function hiddenBy(
   return { apps, areas: areas.map(area => nameOf(stack, area)) };
 }
 
+/** A board's name to sort by: a copy's "(local)" set aside, so it sits right after the team board it copies. */
+const sortName = (name: string) => name.replace(/ \(local\)$/, '').toLowerCase();
+
 /**
- * Team boards under their area, in the stack's order, then those in no area; with a choice, only the chosen areas'
- * groups and the no-area one, and what the others hold.
+ * Boards under their area, in the stack's order, then those in no area; inside each, by name ignoring case, a team
+ * board before its copy. With a choice, only the chosen areas' groups and the no-area one, and what the others hold.
  */
-export function boardGroups<B extends { name: string; nodes: Record<string, unknown>; area?: unknown }>(
+export function boardGroups<B extends { name: string; nodes: Record<string, unknown>; area?: unknown; mine?: boolean }>(
   stack: Stack,
   boards: readonly B[],
   chosen: readonly string[] | undefined,
-): { groups: { title: string; area?: string; boards: B[] }[]; hidden: { count: number; areas: string[] } } {
+): {
+  groups: { title: string; area?: string; boards: B[] }[];
+  hidden: { count: number; team: number; yours: number; areas: string[] };
+} {
   const of = (board: B) =>
     boardArea(stack, { nodes: board.nodes, ...(typeof board.area === 'string' && { area: board.area }) }).id;
+  const sorted = [...boards].sort(
+    (a, b) =>
+      sortName(a.name).localeCompare(sortName(b.name)) ||
+      Number(!!a.mine) - Number(!!b.mine) ||
+      a.name.localeCompare(b.name),
+  );
   const all: { title: string; area?: string; boards: B[] }[] = [
     ...Object.keys(stack.areas ?? {}).map(area => ({
       title: nameOf(stack, area),
       area,
-      boards: boards.filter(board => of(board) === area),
+      boards: sorted.filter(board => of(board) === area),
     })),
-    { title: 'No area', boards: boards.filter(board => !of(board)) },
+    { title: 'No area', boards: sorted.filter(board => !of(board)) },
   ].filter(group => group.boards.length);
   const shown = (group: { area?: string }) => !narrows(stack, chosen) || !group.area || chosen.includes(group.area);
-  const hid = all.filter(group => !shown(group));
+  const hid = all.filter(group => !shown(group)).flatMap(group => group.boards);
   return {
     groups: all.filter(shown),
-    hidden: { count: hid.reduce((n, group) => n + group.boards.length, 0), areas: hid.map(group => group.title) },
+    hidden: {
+      count: hid.length,
+      team: hid.filter(board => !board.mine).length,
+      yours: hid.filter(board => board.mine).length,
+      areas: all.filter(group => !shown(group)).map(group => group.title),
+    },
   };
 }

@@ -5,7 +5,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import type { Page } from '@playwright/test';
-import { at, card, expect, nextEdit, sent, STACK, test } from './canvas.ts';
+import { at, card, expect, nextEdit, sent, STACK, test, fromBoardMenu } from './canvas.ts';
 
 const stack = {
   ...STACK,
@@ -288,10 +288,7 @@ test('a feature board shared with the team keeps its steps and where its cards s
   await expect.poll(() => kept(canvas.temp)?.discover?.at?.['orders']).toBeTruthy();
   const placed = kept(canvas.temp)?.discover?.at?.['orders'];
   await page.getByRole('button', { name: /^Board: / }).click();
-  await page
-    .getByRole('dialog', { name: 'Boards' })
-    .getByRole('button', { name: 'Share New feature with the team' })
-    .click();
+  await fromBoardMenu(page, 'New feature', 'Share with the team…');
   await page
     .getByRole('dialog', { name: 'Share New feature with the team' })
     .getByRole('button', { name: 'Add to team boards' })

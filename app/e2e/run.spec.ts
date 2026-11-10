@@ -87,8 +87,8 @@ test('with nothing running Stop is off, and what the last run left is reverted f
   const lastRun = async () => {
     const status = (await (await page.request.get(`${canvas.url}data/status.json`)).json()) as {
       runs?: { kind: string }[];
-    };
-    return status.runs?.at(-1)?.kind;
+    } | null;
+    return status?.runs?.at(-1)?.kind;
   };
   await expect.poll(lastRun).toBe('stop');
 });

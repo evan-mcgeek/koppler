@@ -24,7 +24,9 @@ An app's areas are under its name in its settings: each one can be taken out, an
 **Areas**, above the Apps list and under **Find a board** in the board menu, picks the areas you want to see; your choice is kept on this Mac, per stack, and both places show the same one.
 With some areas picked, the Apps list groups its apps under them, then the apps in no area, which always show; the apps on the board always show too, under **On this board** when they are outside your areas.
 An app in two areas lists once, with "also" and the other one under its name, and a dashed line says how many apps your areas hide, with **Show all**.
-The board menu groups the team boards under their area, the one most of their apps are in unless it was set by hand, with **No area** last; your own boards stay one list, each with its area.
+The board menu is one list: the team's boards and your own together under each area, the one most of their apps are in unless it was set by hand, with **No area** last and each heading's count beside it.
+Inside an area boards go by name, a team board just before its **(local)** copy; a team board carries a small **Team** tag, your own none, and a feature board says so under its name.
+When your areas hide boards, a dashed line counts them by kind ("4 boards in Payments and Accounts: 3 team, 1 yours"); with no areas the menu is one list by name.
 **Find a board** looks through every board: one your areas hide shows under **Hidden by your areas**, and opening it leaves your choice as it is, with its area beside its name in the bar.
 In Plan and Live a card says its areas after its kind, only while your areas hide some.
 Discover leaves the apps outside your areas off the map, with their links, but never the board's own.

@@ -270,3 +270,11 @@ export const runningApps = (page: Page, ids: string[]) =>
     const status = (await (await route.fetch()).json()) as Record<string, unknown>;
     await route.fulfill({ json: { ...status, running: ids } });
   });
+
+/** Picks an item from a board's … menu in the open board menu, as a person does. */
+export const fromBoardMenu = async (page: Page, name: string, item: string) => {
+  const menu = page.getByRole('dialog', { name: 'Boards' });
+  await menu.locator('.row').filter({ hasText: name }).first().hover();
+  await menu.getByRole('button', { name: `More for ${name}`, exact: true }).click();
+  await page.getByRole('menu', { name }).getByRole('menuitem', { name: item }).click();
+};
