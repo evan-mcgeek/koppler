@@ -53,6 +53,10 @@ Each app is a card with:
 
 Apps you have not cloned yet show greyed out, with the command to clone them.
 
+Under its name, a card's sections fold to one line each, saying what they hold: Setup (branch, who starts it, tunnels, queues, libraries, cables), Databases, Note for the agent, and Calls, the deployed apps it still calls (in Plan only).
+A click on a line opens or folds it, ⌥-click does every section, and **Fold all** / **Open all** are among its actions; a new card starts with Setup open, and each card keeps how it was left on this Mac.
+The failure and **Ask the agent to fix** never fold.
+
 Pointing at a card shows its actions above it: run it alone, stop or restart it while it runs, its log, its settings, and taking it off the board.
 
 <img alt="A running card: its actions above it, its branch, all its steps done, and the deployed app it still calls" src="images/card.png" width="320">

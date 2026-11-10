@@ -1,6 +1,6 @@
 // The new canvas's boards: the one on screen is kept by name, and the team's and the user's own open from the picker.
 import type { Page } from '@playwright/test';
-import { card, expect, saveSettles, STACK, test, fromList } from './canvas.ts';
+import { card, expect, saveSettles, STACK, test, fromList, openSection } from './canvas.ts';
 
 const picker = (page: Page) => page.getByRole('button', { name: /^Board: / });
 const boards = (page: Page) => page.getByRole('dialog', { name: 'Boards' });
@@ -259,7 +259,7 @@ test('a board of your own is shared with the team: it joins the stack as a team 
   await (await fromList(page, 'Orders API')).getByRole('button', { name: 'Add Orders API to the board' }).click();
   await expect(picker(page)).toHaveText('Web Shop');
   // A card's note is the user's own: it stays on this Mac.
-  await card(page, 'web').getByRole('button', { name: 'Add a note for the agent' }).click();
+  await openSection(page, 'web', 'Note for the agent');
   await card(page, 'web').getByLabel('Note for the agent').fill('my private finding');
   await page.getByRole('searchbox').focus();
   await saveSettles(page);

@@ -2,9 +2,12 @@
   // A card's choices: on the card itself, or in the side panel while the board is zoomed out.
   import BranchPicker from './BranchPicker.svelte';
   import CardNote from './CardNote.svelte';
+  import Fold from './Fold.svelte';
+  import { folds as kept } from './folds.svelte.ts';
   import { board, STARTED_BY } from './board.svelte.ts';
 
-  const { id }: { id: string } = $props();
+  /** `folds`: on the card, each section folds to a line; in the side panel, all are open. */
+  const { id, folds = false }: { id: string; folds?: boolean } = $props();
   const CHANGES = [
     ['set-aside', 'Set aside', 'Kept aside while it runs the other branch, back on Stop'],
     ['take-along', 'Take along', 'Carried to the other branch, and back on Stop'],
@@ -30,6 +33,33 @@
     board.set(id, { libraries: on ? [...local, name] : local.filter(one => one !== name) });
   };
   const mobile = $derived(!!app?.platforms.length && data?.run === 'cli');
+  const plural = (n: number, one: string, many = `${one}s`) => `${String(n)} ${n === 1 ? one : many}`;
+  /** Each folded section in one line. */
+  const setupSaid = $derived(
+    [
+      !mock && (data?.branch || current),
+      starts && STARTED_BY[data?.run ?? ''],
+      mobile && app?.platforms.find(([value]) => value === data?.platform)?.[1],
+      tunnels.length > 0 && `tunnels ${data?.hideTunnels ? 'off' : 'on'}`,
+      queues.length > 0 && `queues ${noQueues ? 'off' : 'on'}`,
+      local.length > 0 && plural(local.length, 'local library', 'local libraries'),
+    ]
+      .filter(Boolean)
+      .join(' · '),
+  );
+  const databasesSaid = $derived.by(() => {
+    const locals = databases.filter(database => board.databases[database]).length;
+    const shown = databases.filter(database => !board.databases[database] && board.tunnelShown(id, database)).length;
+    return [
+      plural(databases.length, 'database'),
+      shown > 0 && `${plural(shown, 'tunnel')} shown`,
+      locals > 0 && `${String(locals)} local`,
+    ]
+      .filter(Boolean)
+      .join(' · ');
+  });
+  /** The note's first sentence. */
+  const noteSaid = $derived((data?.note ?? '').trim().split(/(?<=[.!?])\s/)[0] ?? '');
   /** Worked out when the menu is opened. */
   let cables = $state<ReturnType<typeof board.cablesOf>>({ can: [], wired: [] });
   const wire = (ev: Event) => {
@@ -56,9 +86,31 @@
   };
 </script>
 
+<!-- eslint-disable @typescript-eslint/no-confusing-void-expression -- {@render} of a snippet returns nothing -->
 {#if data}
   <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-  <div class="body" onmousedowncapture={hold} onclick={release}>
+  <div class="body" class:folds onmousedowncapture={hold} onclick={release}>
+    {#if folds}
+      <Fold card={id} section="setup" name="Setup" summary={setupSaid}>{@render setup()}{@render more()}</Fold>
+      {#if databases.length}
+        <Fold card={id} section="databases" name="Databases" summary={databasesSaid}>{@render stores()}</Fold>
+      {/if}
+      {#if !mock}
+        <Fold card={id} section="note" name="Note for the agent" summary={noteSaid || 'Add one'} words
+          >{@render note()}</Fold
+        >
+      {/if}
+    {:else}
+      {@render setup()}
+      {#if databases.length}{@render stores()}{/if}
+      {@render more()}
+      {#if !mock}{@render note()}{/if}
+    {/if}
+  </div>
+{/if}
+
+{#snippet setup()}
+  {#if data}
     {#if !mock}<label class="field">
         Branch
         <BranchPicker
@@ -196,51 +248,59 @@
         {/if}
       </div>
     {/if}
-    {#if databases.length}
-      <div class="field databases">
-        {databases.length > 1 ? 'Databases' : 'Database'}
-        {#each databases as database (database)}
-          {@const isLocal = !!board.databases[database]}
-          {@const change = isLocal ? board.useOf(id, database)?.change : undefined}
-          <span class="database">
-            <span class="db-name">{board.databaseName(database)}{isLocal ? ' · Local' : ''}</span>
-            {#if change}
-              <button
-                class="link"
-                type="button"
-                aria-expanded={showing === database}
-                onclick={() => (showing = showing === database ? null : database)}
-                >{showing === database ? 'Hide change' : 'Show change'}</button
-              >
-            {:else if !isLocal}
-              <label
-                class="toggle"
-                title="Off draws its cable straight to the database; the tunnel keeps working, only the drawing changes."
-              >
-                <input
-                  type="checkbox"
-                  role="switch"
-                  aria-label="Show the tunnel to {board.databaseName(database)}"
-                  checked={board.tunnelShown(id, database)}
-                  onchange={ev => {
-                    board.showTunnel(id, database, ev.currentTarget.checked);
-                  }}
-                /><span class="track" aria-hidden="true"></span>Show tunnel
-              </label>
-            {/if}
-          </span>
-          {#if change && showing === database}
-            <div class="change">
-              <b>Koppler changes one line for the run</b>
-              <span class="file">{change.file}</span>
-              <code class="out">− {change.find}</code>
-              <code class="in">+ {change.replace}</code>
-              <span>Undone on Stop.</span>
-            </div>
+  {/if}
+{/snippet}
+
+{#snippet stores()}
+  {#if data}
+    <div class="field databases">
+      {#if !folds}{databases.length > 1 ? 'Databases' : 'Database'}{/if}
+      {#each databases as database (database)}
+        {@const isLocal = !!board.databases[database]}
+        {@const change = isLocal ? board.useOf(id, database)?.change : undefined}
+        <span class="database">
+          <span class="db-name">{board.databaseName(database)}{isLocal ? ' · Local' : ''}</span>
+          {#if change}
+            <button
+              class="link"
+              type="button"
+              aria-expanded={showing === database}
+              onclick={() => (showing = showing === database ? null : database)}
+              >{showing === database ? 'Hide change' : 'Show change'}</button
+            >
+          {:else if !isLocal}
+            <label
+              class="toggle"
+              title="Off draws its cable straight to the database; the tunnel keeps working, only the drawing changes."
+            >
+              <input
+                type="checkbox"
+                role="switch"
+                aria-label="Show the tunnel to {board.databaseName(database)}"
+                checked={board.tunnelShown(id, database)}
+                onchange={ev => {
+                  board.showTunnel(id, database, ev.currentTarget.checked);
+                }}
+              /><span class="track" aria-hidden="true"></span>Show tunnel
+            </label>
           {/if}
-        {/each}
-      </div>
-    {/if}
+        </span>
+        {#if change && showing === database}
+          <div class="change">
+            <b>Koppler changes one line for the run</b>
+            <span class="file">{change.file}</span>
+            <code class="out">− {change.find}</code>
+            <code class="in">+ {change.replace}</code>
+            <span>Undone on Stop.</span>
+          </div>
+        {/if}
+      {/each}
+    </div>
+  {/if}
+{/snippet}
+
+{#snippet more()}
+  {#if data}
     {#if app?.libraries.length && !mock}
       <div class="field">
         Libraries
@@ -289,16 +349,23 @@
           </select>
         </span>
       </label>
-      <CardNote
-        value={data.note}
-        placeholder="e.g. run with the new pricing flag on"
-        onchange={(note: string) => {
-          board.set(id, { note });
-        }}
-      />
     {/if}
-  </div>
-{/if}
+  {/if}
+{/snippet}
+
+{#snippet note()}
+  {#if data}
+    <CardNote
+      named={!folds}
+      start={folds && kept.opened === `${id}:note`}
+      value={data.note}
+      placeholder="e.g. run with the new pricing flag on"
+      onchange={(note: string) => {
+        board.set(id, { note });
+      }}
+    />
+  {/if}
+{/snippet}
 
 <style>
   .body {
@@ -306,6 +373,10 @@
     gap: 8px;
     padding: 10px 14px 14px 16px;
     cursor: default;
+  }
+  .body.folds {
+    gap: 0;
+    padding: 0;
   }
   .row {
     display: grid;
