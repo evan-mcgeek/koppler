@@ -7,7 +7,7 @@ const { orders } = STACK.apps;
 const job = (name: string, schedule: Record<string, string>, extra: Record<string, unknown> = {}) => ({
   name,
   kind: 'dotnet',
-  slug: orders.slug,
+  slug: orders?.slug,
   schedule,
   uses: { 'orders-db': {} },
   ...extra,
