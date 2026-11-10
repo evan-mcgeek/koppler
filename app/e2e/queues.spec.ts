@@ -134,8 +134,10 @@ test.describe('a card nobody switched', () => {
 test('a card lists the apps it still calls in the deployed environment, and a click runs one locally too', async ({
   page,
 }) => {
+  const line = card(page, 'orders').locator('.fold .line').filter({ hasText: 'Calls' });
+  await expect(line).toContainText('QA');
+  await line.click();
   const calls = card(page, 'orders').locator('.calls');
-  await expect(calls).toContainText('Calls QA');
   await expect(calls.getByRole('button')).toHaveText(['Payments API', 'Catalog API']);
   await calls.getByRole('button', { name: 'Catalog API' }).click();
   await expect(card(page, 'catalog')).toBeVisible();
@@ -147,12 +149,13 @@ test('a card lists the apps it still calls in the deployed environment, and a cl
 
 test('Live leaves the deployed calls off the cards: they belong to planning the board', async ({ page }) => {
   await runningApps(page, ['orders']);
-  const calls = card(page, 'orders').locator('.calls');
-  await expect(calls).toContainText('Calls QA');
+  const calls = card(page, 'orders').locator('.fold').filter({ hasText: 'Calls' });
+  await expect(calls).toContainText('QA');
   await page.getByRole('radio', { name: 'Live' }).check();
   await expect(calls).toHaveCount(0);
+  await expect(card(page, 'orders').locator('.calls')).toHaveCount(0);
   await page.getByRole('radio', { name: 'Plan' }).check();
-  await expect(calls).toContainText('Calls QA');
+  await expect(calls).toContainText('QA');
 });
 
 test('a queue card is joined to its own app on whichever side of the app it is moved to, round any card between', async ({

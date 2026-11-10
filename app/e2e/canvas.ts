@@ -196,6 +196,11 @@ export const test = base.extend<{
     expect(errors, 'no script errors on the page').toEqual([]);
   },
 });
+/** Opens a section of an app's card, as a click on its line does, unless it is open already. */
+export const openSection = async (page: Page, id: string, name: string): Promise<void> => {
+  const line = card(page, id).locator('.fold .line').filter({ hasText: name });
+  if ((await line.getAttribute('aria-expanded')) !== 'true') await line.click();
+};
 const clocked = new WeakSet<Page>();
 /**
  * A person's pace between two edits: the board takes edits less than 0.7 seconds apart as one step to undo. The page's

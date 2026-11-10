@@ -10,6 +10,10 @@
   import GripVertical from '@lucide/svelte/icons/grip-vertical';
   import Command from './Command.svelte';
   import CardFields from './CardFields.svelte';
+  import Fold from './Fold.svelte';
+  import ChevronsDownUp from '@lucide/svelte/icons/chevrons-down-up';
+  import ChevronsUpDown from '@lucide/svelte/icons/chevrons-up-down';
+  import { folds, SECTIONS } from './folds.svelte.ts';
   import { Handle, NodeToolbar, Position, useViewport, type NodeProps } from '@xyflow/svelte';
   import type { Side } from '../src/core/arrange.ts';
   import { board, FAR_ZOOM, type CardNode } from './board.svelte.ts';
@@ -91,6 +95,25 @@
 </script>
 
 <!-- What can be done with the card, in a bar above it while it is pointed at or picked: the title keeps its room. -->
+<!-- eslint-disable @typescript-eslint/no-confusing-void-expression -- {@render} of a snippet returns nothing -->
+{#snippet chips()}
+  {#each calls as other (other.id)}
+    {@const onBoard = board.cards.some(node => node.id === other.id)}
+    {@const can = onBoard || other.cloned}
+    <button
+      class="chip"
+      type="button"
+      disabled={!can}
+      title="{other.name} stays on deployed {board.env.toUpperCase()}.{can
+        ? ` Click to ${onBoard ? 'wire it to your local copy' : 'run it locally too and wire it'}.`
+        : ' It is not cloned on this Mac.'}"
+      onclick={() => {
+        board.callLocally(id, other.id);
+      }}>{short(other.name)}</button
+    >
+  {/each}
+{/snippet}
+
 <NodeToolbar isVisible={bar && !dragging} position={Position.Top} align="start" offset={8}>
   <span
     class="tools nodrag"
@@ -208,6 +231,19 @@
         Auto-restart
       </button>
     {/if}
+    {#if !brief}
+      {@const anyOpen = SECTIONS.some(section => folds.isOpen(id, section))}
+      <button
+        type="button"
+        aria-label={anyOpen ? 'Fold all sections' : 'Open all sections'}
+        title="{anyOpen ? 'Fold' : 'Open'} every section of this card (⌥-click a section line)"
+        onclick={() => {
+          folds.setAll(id, !anyOpen);
+        }}
+      >
+        <Icon of={anyOpen ? ChevronsDownUp : ChevronsUpDown} size={14} />{anyOpen ? 'Fold all' : 'Open all'}
+      </button>
+    {/if}
     <button
       type="button"
       aria-label="Settings for {data.name}"
@@ -287,7 +323,18 @@
         >{/if}
     </p>
   {:else}
-    <CardFields {id} />
+    <CardFields {id} folds />
+    {#if calls.length}
+      <Fold
+        card={id}
+        section="calls"
+        name="Calls"
+        summary="{String(calls.length)} deployed {calls.length === 1 ? 'app' : 'apps'}"
+      >
+        {#snippet tag()}<span class="env" data-env={board.env}>{board.env.toUpperCase()}</span>{/snippet}
+        <div class="calls open nodrag nopan">{@render chips()}</div>
+      </Fold>
+    {/if}
   {/if}
   {#if changedLines}<p class="changed" data-on={!!up}>
       {up
@@ -335,24 +382,10 @@
       >
     </div>
   {/if}
-  {#if calls.length && !board.live}
+  {#if calls.length && brief && !board.live}
     <div class="calls nodrag nopan">
       <span class="calls-label">Calls {board.env.toUpperCase()}</span>
-      {#each calls as other (other.id)}
-        {@const onBoard = board.cards.some(node => node.id === other.id)}
-        {@const can = onBoard || other.cloned}
-        <button
-          class="chip"
-          type="button"
-          disabled={!can}
-          title="{other.name} stays on deployed {board.env.toUpperCase()}.{can
-            ? ` Click to ${onBoard ? 'wire it to your local copy' : 'run it locally too and wire it'}.`
-            : ' It is not cloned on this Mac.'}"
-          onclick={() => {
-            board.callLocally(id, other.id);
-          }}>{short(other.name)}</button
-        >
-      {/each}
+      {@render chips()}
     </div>
   {/if}
   <!-- The one anchor Svelte Flow needs to draw this card's cables; the ports below are ours. -->
@@ -740,6 +773,20 @@
     display: none;
   }
   /* What it still calls in the deployed environment: in the deployed colour, edged in dashes. */
+  .calls.open {
+    padding: 2px 0 0;
+    border-top: 0;
+  }
+  .env {
+    flex: none;
+    padding: 1px 4px;
+    border: 1px solid var(--line-strong);
+    color: var(--ink);
+    font: 10px var(--mono);
+  }
+  .env[data-env='prod'] {
+    border-color: var(--prod);
+  }
   .calls-label {
     margin-right: 2px;
     color: var(--deployed);
