@@ -238,8 +238,17 @@
     const hidden = board.facts
       ? linksOf(board.facts).filter(link => outside.has(link.from === card ? link.to : link.from))
       : [];
+    // On a feature board, every link the stack has for it, so any can be added as a step.
+    const rest =
+      board.feature && board.facts
+        ? linksOf(board.facts).filter(
+            link =>
+              (link.from === card || link.to === card) &&
+              !map.links.some(one => one.from === link.from && one.to === link.to && one.kind === link.kind),
+          )
+        : [];
     const of = (test: (link: Link) => boolean, other: (link: Link) => Card) =>
-      [...map.links, ...hidden]
+      [...map.links, ...hidden, ...rest]
         .filter(test)
         .map(link => ({ link, other: other(link), outside: outside.has(other(link)) }));
     const into = (kind: Link['kind']) => (link: Link) => link.kind === kind && link.to === card;

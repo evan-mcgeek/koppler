@@ -3,7 +3,6 @@
   // one step away it is drawn back. A +N chip on it brings in the links it leaves out; a dashed +N hidden counts those
   // the chosen areas leave out, and opens the Areas checklist.
   import GitBranch from '@lucide/svelte/icons/git-branch';
-  import Laptop from '@lucide/svelte/icons/laptop';
   import Clock from '@lucide/svelte/icons/clock';
   import type { NodeProps } from '@xyflow/svelte';
   import { AREAS, discovered, type LeanData } from './discover.svelte.ts';
@@ -47,13 +46,9 @@ Schedule on {data.job.env.toUpperCase()}. Every environment in Settings"
     <span class="meta">
       {#if data.changed}<GitBranch size={12} aria-hidden="true" /><span class="here changed" title={data.changed}
           >{data.changed}</span
-        >{:else if data.cloned}<Laptop size={12} aria-hidden="true" /><span class="here">Cloned here</span>{:else}<span
-          class="what"
-          title={data.meta}>{data.meta}</span
-        >{/if}
+        >{:else if !data.cloned}<span class="what" title={data.meta}>{data.meta}</span>{/if}
     </span>
   {/if}
-  {#if data.areas}<span class="areas" title={data.areas}>{data.areas}</span>{/if}
   {#if data.deadEnd}
     <span class="dead">Dead end · no readers</span>
     <!-- Where its links would go on: they stop here. -->
@@ -349,13 +344,5 @@ Schedule on {data.job.env.toUpperCase()}. Every environment in Settings"
   }
   .lean.roomy {
     padding-bottom: 14px;
-  }
-  /* Its areas, on a line of their own under where it is. */
-  .areas {
-    overflow: hidden;
-    color: var(--ink-muted);
-    font: 400 11px var(--mono);
-    white-space: nowrap;
-    text-overflow: ellipsis;
   }
 </style>
