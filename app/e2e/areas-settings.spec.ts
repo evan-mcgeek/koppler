@@ -63,15 +63,16 @@ const boardMenu = async (page: Page) => {
 };
 const rowOf = (menu: ReturnType<Page['locator']>, name: string) => menu.locator('.row').filter({ hasText: name });
 
-test('a board set by hand says so, a tie says why in its tooltip, and the row menu sets or clears its area', async ({
+test('a board shows only its area; a tie says why in its tooltip, and the row menu sets or clears its area', async ({
   page,
   canvas,
 }) => {
   const read = stackFile(canvas.dir);
   let menu = await boardMenu(page);
-  await expect(rowOf(menu, 'Order emails')).toContainText('set by hand');
+  // How an area came about is not said in the menu: a board under its area's heading shows nothing more.
+  await expect(rowOf(menu, 'Order emails')).not.toContainText('set by hand');
   const mine = rowOf(menu, 'Refund debugging');
-  await expect(mine).toContainText('Shipping · tie');
+  await expect(mine.locator('.area')).toHaveText('Shipping');
   await expect(mine.getByRole('button').first()).toHaveAttribute(
     'title',
     '1 app in Payments, 1 in Shipping. Shipping is smaller',
@@ -90,7 +91,6 @@ test('a board set by hand says so, a tie says why in its tooltip, and the row me
   await setting.getByRole('menuitemradio', { name: /Worked out from its apps/ }).click();
   await expect.poll(() => read().presets.find(one => one.name === 'Order emails')?.area).toBeUndefined();
   await expect(menu.locator('p.sub')).toHaveText(['Team boards · Payments', 'Shipping']);
-  await expect(rowOf(menu, 'Order emails')).not.toContainText('set by hand');
 
   // Right-click a team board, then your own: yours is kept on this Mac.
   await rowOf(menu, 'Checkout').click({ button: 'right' });
@@ -106,7 +106,7 @@ test('a board set by hand says so, a tie says why in its tooltip, and the row me
     .getByRole('menu', { name: 'Refund debugging · area' })
     .getByRole('menuitemradio', { name: 'Payments' })
     .click();
-  await expect(rowOf(menu, 'Refund debugging')).toContainText('Payments · set by hand');
+  await expect(rowOf(menu, 'Refund debugging').locator('.area')).toHaveText('Payments');
   await expect
     .poll(async () => (await kept(page, canvas.url)).presets?.find(one => one.name === 'Refund debugging')?.area)
     .toBe('payments');

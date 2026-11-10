@@ -119,8 +119,8 @@ test('steps are added from a card, taken off, and kept in phases the panel names
   const panel = page.getByRole('complementary', { name: 'New feature' });
   await expect(panel).toContainText('No steps yet');
 
-  // Its links come in with +N, and one becomes a step.
-  await page.getByRole('button', { name: /Show 2 more links of Web Shop/ }).click();
+  // A feature board has no +N: a card's panel lists every link it has, and one becomes a step.
+  await expect(card(page, 'web').getByRole('button', { name: /more links? of Web Shop/ })).toHaveCount(0);
   await card(page, 'web').click();
   const calls = page
     .getByRole('complementary', { name: 'Web Shop' })

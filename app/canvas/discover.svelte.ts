@@ -33,8 +33,6 @@ export interface LeanData extends Record<string, unknown> {
   hidden: number;
   /** The apps it links to that the chosen areas leave out, each with its areas. */
   outside: string[];
-  /** The areas it is in, joined. */
-  areas: string;
   /** An app that can run here. */
   app: boolean;
   /** On a feature board, proposed by the agent and not accepted yet. */
@@ -152,9 +150,9 @@ class Discovered {
       : null;
     const base = {
       onBoard,
-      hidden,
+      // A feature board shows its flow: a card's other links are listed in its panel, to add as steps.
+      hidden: board.feature ? 0 : hidden,
       outside: outside.map(this.#withAreas),
-      areas: '',
       cloned: false,
       app: false,
       proposed,
@@ -199,7 +197,6 @@ class Discovered {
         ...base,
         repo: '',
         name: stack.name,
-        areas: areaNames(card).join(' · '),
         tag: app?.kindLabel ?? stack.kind,
         meta: '',
         job: {
@@ -220,7 +217,6 @@ class Discovered {
     return {
       ...base,
       name: stack?.name ?? card,
-      areas: areaNames(card).join(' · '),
       tag: app?.kindLabel ?? stack?.kind ?? '',
       meta: app?.cloned ? '' : 'On GitHub',
       cloned: !!app?.cloned,

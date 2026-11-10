@@ -295,10 +295,7 @@
             >{/if}</span
         >{#if under}<span class="under">{under}</span>{/if}</span
       >
-      {#if hasAreas && (mine || elsewhere || under) && area?.id}<span class="area"
-          >{board.areas[area.id]?.name}{area.by === 'hand' ? ' · set by hand' : area.tie ? ' · tie' : ''}</span
-        >{:else if area?.by === 'hand'}<span class="meta">set by hand</span>{:else if area?.tie}<span class="meta"
-          >tie</span
+      {#if hasAreas && (mine || elsewhere || under) && area?.id}<span class="area">{board.areas[area.id]?.name}</span
         >{:else if !hasAreas}<span class="meta">{size(preset)}</span>{/if}
     </button>
     {#if hasAreas}

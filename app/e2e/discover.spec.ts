@@ -714,7 +714,7 @@ test.describe('an app with changes in its clone', () => {
   test('says so on its card, and its panel names who calls it', async ({ page }) => {
     await discover(page);
     await expect(card(page, 'orders')).toContainText('3 changed');
-    await expect(card(page, 'web')).toContainText('Cloned here');
+    await expect(card(page, 'web')).not.toContainText('Cloned here');
     await card(page, 'orders').click();
     const panel = page.getByRole('complementary', { name: 'Orders API' });
     await expect(panel).toContainText('3 changed. Web Shop calls it.');
