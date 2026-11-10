@@ -1,6 +1,6 @@
 // The new canvas's board shortcuts: undo and redo, Clear, Fit, and the keyboard on cards.
 import type { Page } from '@playwright/test';
-import { actions, at, card, expect, nextEdit, test } from './canvas.ts';
+import { actions, at, card, expect, nextEdit, test, openSection } from './canvas.ts';
 
 const cards = (page: Page) => page.locator('.svelte-flow__node-app');
 const cables = (page: Page) => page.locator('.svelte-flow__edge');
@@ -86,7 +86,7 @@ test('F fits the board, Delete removes the picked cards, and a focused card move
   await expect(card(page, 'orders')).toHaveCount(0);
   await expect(cables(page)).toHaveCount(0);
   // Typing in a card's note does not remove the card.
-  await card(page, 'web').getByRole('button', { name: 'Add a note for the agent' }).click();
+  await openSection(page, 'web', 'Note for the agent');
   await card(page, 'web').getByLabel('Note for the agent').fill('ab');
   await page.keyboard.press('Backspace');
   await page.keyboard.press('Delete');

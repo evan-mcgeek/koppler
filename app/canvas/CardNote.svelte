@@ -8,6 +8,8 @@
     onchange,
     card = false,
     reading = false,
+    named = true,
+    start = false,
     editing = false,
     onediting = () => undefined,
   }: {
@@ -18,11 +20,16 @@
     card?: boolean;
     /** In Live: the note is read, not edited. */
     reading?: boolean;
+    /** Its own label shows; off where a heading above names it already. */
+    named?: boolean;
+    /** Opened to write in at once: the section it is in was just opened, with no note yet. */
+    start?: boolean;
     /** The box is open, and how the card hears it open or close. */
     editing?: boolean;
     onediting?: (open: boolean) => void;
   } = $props();
-  let noting = $state(false);
+  // svelte-ignore state_referenced_locally
+  let noting = $state(start);
   let draft = $state('');
   let before = '';
   const grow = (box: HTMLTextAreaElement) => {
@@ -47,12 +54,16 @@
 {#if !card}
   {#if value || noting}
     <label class="field nodrag">
-      Note for the agent
+      {#if named}Note for the agent{/if}
       <textarea
         rows="2"
+        aria-label={named ? undefined : 'Note for the agent'}
         {placeholder}
         {value}
         {@attach grow}
+        {@attach (box: HTMLTextAreaElement) => {
+          if (start && !value) box.focus();
+        }}
         oninput={ev => {
           grow(ev.currentTarget);
           onchange(ev.currentTarget.value);

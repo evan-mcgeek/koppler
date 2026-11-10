@@ -1,5 +1,5 @@
 // The new canvas's app card: what the user chooses on it.
-import { actions, at, card, expect, nextEdit, STACK, test } from './canvas.ts';
+import { actions, at, card, expect, nextEdit, STACK, test, openSection } from './canvas.ts';
 
 const mobile = {
   name: 'Mobile App',
@@ -73,7 +73,7 @@ test('the cables menu adds a cable to an app this one calls, and removes one', a
 });
 
 test('a note for the agent is written on the card, and the card is removed from its corner', async ({ page }) => {
-  await card(page, 'catalog').getByRole('button', { name: 'Add a note for the agent' }).click();
+  await openSection(page, 'catalog', 'Note for the agent');
   const note = card(page, 'catalog').getByLabel('Note for the agent');
   await note.fill('run with the new pricing flag on');
   await page.getByRole('searchbox').focus();
@@ -199,14 +199,14 @@ test.describe('cards stacked in a column', () => {
     const tall = async () => Math.round((await card(page, 'web').boundingBox())?.height ?? 0);
     await expect(card(page, 'payments')).toBeVisible();
     const [under, aside, before] = [await top('payments'), await top('orders'), await tall()];
-    await card(page, 'web').getByRole('button', { name: 'Add a note for the agent' }).click();
+    await openSection(page, 'web', 'Note for the agent');
     await expect.poll(tall).toBeGreaterThan(before);
     const grown = (await tall()) - before;
     await expect.poll(() => top('payments')).toBe(under + grown);
     // A card that is not under it stays.
     expect(await top('orders')).toBe(aside);
-    await card(page, 'web').getByLabel('Note for the agent').focus();
     await card(page, 'web').getByLabel('Note for the agent').blur();
+    await card(page, 'web').locator('.fold .line').filter({ hasText: 'Note for the agent' }).click();
     await expect.poll(tall).toBe(before);
     await expect.poll(() => top('payments')).toBe(under);
   });

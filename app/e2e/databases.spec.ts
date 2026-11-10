@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 // Databases on the board: a card for each, hung from its tunnel, switched between the deployed one and the user's own.
 import type { Locator, Page } from '@playwright/test';
-import { at, card, expect, saved, sent, STACK, test, fromMenu } from './canvas.ts';
+import { at, card, expect, saved, sent, STACK, test, fromMenu, openSection } from './canvas.ts';
 
 const database = (page: Page, name: string) => page.locator('.svelte-flow__node-database').filter({ hasText: name });
 const tunnel = (page: Page) => page.locator('.svelte-flow__node-tunnel');
@@ -58,6 +58,7 @@ test('two apps on one tunnel: one tunnel card with a row per database, and a car
 test('hiding the tunnel for one app draws its cable straight to the database, labelled with the tunnel', async ({
   page,
 }) => {
+  await openSection(page, 'payments', 'Databases');
   const kept = saved(page).then(r => r.request().postDataJSON() as Record<string, unknown>);
   await card(page, 'payments').getByRole('switch', { name: 'Show the tunnel to Payments' }).uncheck();
   await expect(tunnel(page).getByRole('listitem').filter({ hasText: 'Payments' })).toContainText('Cable hidden');
@@ -89,6 +90,7 @@ test('switching a database to Local asks once where it runs, then the tunnel sta
     'Local, skips the tunnel',
   );
   await expect(page.locator('.links .flow.db.local')).toHaveCount(1);
+  await openSection(page, 'payments', 'Databases');
   await expect(card(page, 'payments')).toContainText('Payments · Local');
   await card(page, 'payments').getByRole('button', { name: 'Show change' }).click();
   await expect(card(page, 'payments')).toContainText('+ DB_HOST={local}');
