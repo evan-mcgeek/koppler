@@ -95,7 +95,7 @@ test('the request goes to the agent, and its proposals wait on the map until acc
   await expect(banner).toContainText('The agent proposed 4 cards and 4 links.');
   await expect(page.locator('.lean.proposed')).toHaveCount(4);
   await expect(page.locator('.links .number text')).toHaveText(['1.1', '1.2', '2.1', '2.2']);
-  await expect(page.locator('.links .phase .name')).toHaveText(['Pay', 'Settle']);
+  await expect(page.locator('.titles .phase .name')).toHaveText(['Pay', 'Settle']);
   await page.screenshot({ path: 'test-results/feature-proposed.png' });
 
   await card(page, 'orders').getByRole('button', { name: 'Accept Orders API' }).click();
@@ -333,4 +333,68 @@ test('one link is a step in two phases: both are walked, one is taken off, and a
   await panel.getByRole('button', { name: 'Remove Refund' }).click();
   await expect(panel.getByRole('button', { name: 'Refund', exact: true })).toHaveCount(0);
   await expect.poll(() => kept(canvas.temp)?.feature?.phases.length).toBe(1);
+});
+
+test('every phase title shows whole on the map; one picked there or in the panel dims the other phases', async ({
+  page,
+  canvas,
+}) => {
+  await newFeature(page);
+  await page.getByLabel('Describe the feature').fill('Customers pay, settle and get refunds.');
+  await page.getByRole('button', { name: 'Hand it to the agent' }).click();
+  await expect.poll(() => kept(canvas.temp)?.feature?.request).toBe('Customers pay, settle and get refunds.');
+  // Phases that cross the same cards, as a real flow does: each starts from a different card of one column.
+  koppler(
+    canvas,
+    'board',
+    'edit',
+    'New feature',
+    '--phase',
+    'Pay',
+    '--step',
+    'web:orders',
+    '--step',
+    'orders:payments',
+    '--phase',
+    'Settle',
+    '--step',
+    'orders:queue:events',
+    '--step',
+    'queue:events:payments',
+    '--phase',
+    'Refund',
+    '--step',
+    'payments:queue:events',
+    '--step',
+    'web:payments',
+  );
+  const titles = page.locator('g.phase');
+  await expect(titles).toHaveCount(3);
+  await page.waitForTimeout(500);
+  // Nothing covers a title: not a card, not another title.
+  for (const name of ['Pay', 'Settle', 'Refund']) {
+    const title = titles.filter({ hasText: name });
+    const box = await title.boundingBox();
+    if (!box) throw new Error(`no title ${name}`);
+    const on = await page.evaluate(
+      ([x, y]) => document.elementFromPoint(x ?? 0, y ?? 0)?.closest('g.phase')?.textContent ?? '',
+      [box.x + 30, box.y + box.height / 2],
+    );
+    expect(on, `${name} is covered`).toContain(name);
+  }
+  await page.screenshot({ path: 'test-results/feature-phase-titles.png' });
+
+  // A title picks its phase, as the panel does: the cards of the other phases dim, and a second click lets go.
+  await titles.filter({ hasText: 'Settle' }).click();
+  const panel = page.getByRole('complementary', { name: 'New feature' });
+  await expect(panel.getByRole('button', { name: /Settle/ }).first()).toHaveAttribute('aria-pressed', 'true');
+  await expect(card(page, 'web')).toHaveClass(/dimmed/);
+  for (const id of ['orders', 'payments']) await expect(card(page, id)).not.toHaveClass(/dimmed/);
+  await page.screenshot({ path: 'test-results/feature-phase-picked.png' });
+  await titles.filter({ hasText: 'Settle' }).click();
+  await expect(page.locator('.svelte-flow__node.dimmed')).toHaveCount(0);
+  // From the panel too.
+  await panel.getByRole('button', { name: /Pay/ }).first().click();
+  await expect(card(page, 'web')).not.toHaveClass(/dimmed/);
+  await expect(page.locator('.svelte-flow__node.dimmed').first()).toBeVisible();
 });

@@ -82,6 +82,11 @@
     const touching = map.links.filter(({ from, to }) => picked.includes(from) || picked.includes(to));
     return new Set([...picked, ...touching.flatMap(({ from, to }) => [from, to])]);
   });
+  /** A phase picked: the cards of its steps; the rest dim. */
+  const inPhase = $derived.by(() => {
+    const phase = discovered.phase === null ? undefined : board.feature?.phases[discovered.phase];
+    return phase ? new Set(phase.steps.flatMap(step => [step.from, step.to])) : null;
+  });
   /** Walking through the steps: the two cards of the step on screen; the rest dim. */
   const walking = $derived(
     discovered.current ? new Set([discovered.current.step.from, discovered.current.step.to]) : null,
@@ -103,6 +108,7 @@
         !placeOf(card) && 'unplaced',
         near && !near.has(card) && 'dimmed',
         walking && !walking.has(card) && 'dimmed',
+        !walking && inPhase && !inPhase.has(card) && 'dimmed',
       ]
         .filter(Boolean)
         .join(' '),
@@ -194,16 +200,25 @@
       ];
     });
   });
-  /** Each phase's name, over the card its first step leaves, above every card of the phase so its links pass below. */
-  const phases = $derived(
-    (board.feature?.phases ?? []).flatMap((phase, at) => {
+  /**
+   * Each phase's name, just over the card its first step leaves: on a dense map the phases cross the same cards, so
+   * each sits by its own start. Phases that start from one card stand side by side.
+   */
+  /** Each phase name's width as drawn, once measured. */
+  let nameWidths = $state<Record<number, number>>({});
+  const phases = $derived.by(() => {
+    const taken: Record<Card, number> = {};
+    return (board.feature?.phases ?? []).flatMap((phase, at) => {
       const first = phase.steps[0];
       const where = first && box(first.from);
-      const tops = phase.steps.flatMap(step => [box(step.from), box(step.to)]).flatMap(one => (one ? [one.y] : []));
+      if (!first || !where) return [];
       const when = discovered.startsOn(phase);
-      return where ? [{ at, name: phase.name, when, x: where.x, y: Math.min(...tops) - 34 }] : [];
-    }),
-  );
+      const width = (nameWidths[at] ?? phase.name.length * 8.5 + (when ? when.length * 7.2 + 30 : 0)) + 34;
+      const x = where.x + (taken[first.from] ?? 0);
+      taken[first.from] = x - where.x + width + 8;
+      return [{ at, name: phase.name, when, width, x, y: where.y - 30 }];
+    });
+  });
   const proposals = $derived(discovered.proposals);
   const proposedCards = $derived(map.cards.filter(({ card }) => discovered.data(card, false, 0).proposed).length);
   const name = (card: Card) => discovered.data(card, false, 0).name;
@@ -556,23 +571,42 @@
                 text-anchor="middle">{one.label}</text
               >
             {/each}
+          </svg>
+        </ViewportPortal>
+        <!-- Each phase's name over the cards, so no card covers it; a click shows only that phase. -->
+        <ViewportPortal target="front" style="position: absolute; z-index: 1002">
+          <svg class="titles">
             {#each phases as phase (phase.at)}
               <g
                 class="phase"
                 class:faded={discovered.phase !== null && discovered.phase !== phase.at}
                 transform="translate({phase.x} {phase.y})"
+                role="button"
+                tabindex="0"
+                aria-pressed={discovered.phase === phase.at}
+                aria-label="Phase {phase.at + 1}: {phase.name}. Show only this phase"
+                onclick={() => {
+                  discovered.phase = discovered.phase === phase.at ? null : phase.at;
+                }}
+                onkeydown={ev => {
+                  if (ev.key !== 'Enter' && ev.key !== ' ') return;
+                  ev.preventDefault();
+                  discovered.phase = discovered.phase === phase.at ? null : phase.at;
+                }}
               >
+                <title>Show only this phase</title>
                 <!-- On the desk's colour, so a link passing under the label does not run through its words. -->
-                <rect
-                  class="plate"
-                  x="-4"
-                  y="-3"
-                  width={phase.name.length * 8.5 + 38 + (phase.when ? phase.when.length * 7.2 + 30 : 0)}
-                  height="24"
-                />
+                <rect class="plate" x="-4" y="-3" width={phase.width} height="24" />
                 <rect width="18" height="18" />
                 <text class="at" x="9" y="13" text-anchor="middle">{phase.at + 1}</text>
-                <text class="name" x="26" y="14"
+                <text
+                  class="name"
+                  x="26"
+                  y="14"
+                  {@attach (text: SVGTextElement) => {
+                    const width = Math.ceil(text.getComputedTextLength());
+                    if (width && nameWidths[phase.at] !== width) nameWidths = { ...nameWidths, [phase.at]: width };
+                  }}
                   >{phase.name}{#if phase.when}<tspan class="when" dx="10">◷ {phase.when}</tspan>{/if}</text
                 >
               </g>
@@ -962,7 +996,8 @@
     visibility: hidden;
   }
   .links,
-  .ends {
+  .ends,
+  .titles {
     position: absolute;
     overflow: visible;
     width: 1px;
@@ -1008,6 +1043,19 @@
   .mark.faded,
   .phase.faded {
     opacity: 0.25;
+  }
+  .phase {
+    cursor: pointer;
+    pointer-events: auto;
+    outline: none;
+  }
+  .phase:hover .plate,
+  .phase:focus-visible .plate {
+    stroke: var(--ink);
+  }
+  .phase[aria-pressed='true'] .plate {
+    stroke: var(--ink);
+    stroke-width: 2;
   }
   /* A step's number on its link, in mono, on the desk so the line breaks around it. */
   .number rect {

@@ -178,6 +178,7 @@ One link can be a step in several phases, each with its own number and note.
 Describe the feature and **Hand it to the agent**: its proposals show dashed, each with Accept and Drop, until you accept them; accepting a link the stack does not have yet records it there.
 Or start from an app, and add a picked card's links with **Add as a step**.
 The panel on the right holds the request and the steps: pick a phase to dim the others, rename or remove it, or take a step off.
+Each phase's title sits on the map over the card it starts from, above the cards; a click on it picks the phase too, dimming the other phases' cards and links.
 **Walk through the steps**, or click a step's number on the map, to follow the feature one step at a time: → and ← move on and back, each step brought into view with its note, and Esc stops.
 
 <img alt="A feature board, Checkout: its steps numbered in two phases on the map and in the panel, and one step the agent proposed, dashed, with Accept and Drop" src="images/feature-board.png">
