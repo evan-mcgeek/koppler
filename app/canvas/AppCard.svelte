@@ -8,6 +8,8 @@
   import Settings from '@lucide/svelte/icons/settings';
   import Square from '@lucide/svelte/icons/square';
   import GripVertical from '@lucide/svelte/icons/grip-vertical';
+  import Clock from '@lucide/svelte/icons/clock';
+  import { discovered } from './discover.svelte.ts';
   import Command from './Command.svelte';
   import CardFields from './CardFields.svelte';
   import { Handle, NodeToolbar, Position, useViewport, type NodeProps } from '@xyflow/svelte';
@@ -289,6 +291,24 @@
   {:else}
     <CardFields {id} />
   {/if}
+  {#each board.jobsSharing(id) as shared (shared.card)}
+    {@const said = shared.jobs.map(job => `${job.name} ${job.when}`).join(', ')}
+    <button
+      class="jobs nodrag"
+      type="button"
+      title="{said}. Scheduled jobs run deployed only; they read and write the same {shared.store}. Click to see them in Discover."
+      onclick={() => {
+        board.goDiscover();
+        discovered.open(shared.card);
+        discovered.picked = shared.jobs.map(job => job.id);
+      }}
+      ><Icon of={Clock} size={13} /><span
+        >{shared.jobs.length}
+        {shared.jobs.length === 1 ? 'job uses' : 'jobs use'}
+        {shared.store}{shared.jobs.length <= 2 ? `: ${said}` : ''}</span
+      ></button
+    >
+  {/each}
   {#if changedLines}<p class="changed" data-on={!!up}>
       {up
         ? `${String(changedLines)} ${changedLines === 1 ? 'line' : 'lines'} changed · undone on Stop`
@@ -547,6 +567,30 @@
     [data-state='secret-missing']
   ) {
     background: var(--bad);
+  }
+  /* A scheduled job shares data with this app: muted words, a link to Discover. */
+  .jobs {
+    contain: inline-size;
+    display: flex;
+    align-items: start;
+    gap: 6px;
+    margin: 0;
+    padding: 6px 14px 8px 16px;
+    border: 0;
+    border-top: 1px solid var(--line);
+    background: none;
+    color: var(--ink-muted);
+    font: 12px var(--sans);
+    text-align: left;
+    cursor: pointer;
+  }
+  .jobs :global(svg) {
+    flex: none;
+    margin-top: 2px;
+  }
+  .jobs:hover span {
+    text-decoration: underline;
+    text-underline-offset: 3px;
   }
   .changed {
     margin: 0;

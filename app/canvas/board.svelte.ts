@@ -4,6 +4,7 @@ import type { Edge, Node } from '@xyflow/svelte';
 import { resolveExpressions } from '../src/core/expressions.ts';
 import { editFeature, featureOf, type Feature } from '../src/core/feature.ts';
 import { databasesOf, withDatabases } from '../src/core/databases.ts';
+import { scheduleWords } from '../src/core/schedule.ts';
 import { changedNote } from '../src/core/discover.ts';
 import { BOARD_FORMAT } from '../src/core/migrations/board/index.ts';
 import { BOARD_FILE_FORMAT, migrateBoardFile } from '../src/core/migrations/board-file/index.ts';
@@ -177,6 +178,8 @@ export interface StackApp {
   path: string;
   /** Why it does not run on this machine. */
   outside?: string;
+  /** A scheduled job: its schedule per environment. It is always the deployed one, so it never goes on a board. */
+  schedule?: Record<string, string>;
   /** The apps the stack says it calls, and the calls found in its code. */
   calls: string[];
   /** Only the calls the stack itself records. */
@@ -550,6 +553,36 @@ class Board {
   queuesOf(id: string): string[] {
     if (this.#mock(id)) return [];
     return queuesOf(this.#registry, id).filter(queue => this.#registry?.queues?.[queue]);
+  }
+  /**
+   * What a scheduled job shares with an app on the board: each database or queue the app uses that stays deployed and a
+   * job uses too, with those jobs and their schedules here. A local one is out of the jobs' reach, so it is left out.
+   */
+  jobsSharing(id: string): { store: string; card: string; jobs: { id: string; name: string; when: string }[] }[] {
+    const stack = this.#resolved;
+    if (!stack) return [];
+    const jobs = Object.entries(stack.apps).filter(([, app]) => app.schedule);
+    if (!jobs.length) return [];
+    const using = (uses: (job: string) => boolean) =>
+      jobs
+        .filter(([job]) => job !== id && uses(job))
+        .map(([job, app]) => ({ id: job, name: app.name, when: scheduleWords(app.schedule?.[this.env] ?? '') }));
+    return [
+      ...this.databasesOf(id)
+        .filter(database => !this.databases[database])
+        .map(database => ({
+          store: this.databaseName(database),
+          card: `database:${database}`,
+          jobs: using(job => databasesOf(stack, job).includes(database)),
+        })),
+      ...this.queuesOf(id)
+        .filter(queue => this.queues[queue] !== 'local')
+        .map(queue => ({
+          store: stack.queues?.[queue]?.name ?? queue,
+          card: `queue:${queue}`,
+          jobs: using(job => queuesOf(stack, job).includes(queue)),
+        })),
+    ].filter(one => one.jobs.length);
   }
   /** An app's databases that the stack describes. */
   databasesOf(id: string): string[] {
@@ -1657,7 +1690,7 @@ class Board {
   /** An app's card as a board opens it: how it runs, its branch and note, and what it shows. */
   #opened(id: string, node: OpenedNode, at: Point): CardNode[] {
     const app = this.app(id);
-    if (!app) return [];
+    if (!app || app.schedule) return [];
     const chosen = {
       ...node,
       hideTunnels: node.tunnels === false,
@@ -1777,10 +1810,11 @@ class Board {
       changed: changedNote(clones[id] ?? {}),
       libraries: (clones[id]?.libraries ?? []).map(({ name, path }) => ({ name, path })),
       ...(app.outside && { outside: typeof app.outside === 'string' ? app.outside : 'an outside system' }),
+      ...(app.schedule && { schedule: app.schedule }),
     }));
     this.nodes = this.apps.flatMap(app => {
       const at = saved?.nodes?.[app.id];
-      return at ? [this.#card(app, { x: at.x, y: at.y }, at)] : [];
+      return at && !app.schedule ? [this.#card(app, { x: at.x, y: at.y }, at)] : [];
     });
     this.fullHeights = Object.fromEntries(
       Object.entries(saved?.nodes ?? {}).flatMap(([id, at]) =>
@@ -1992,7 +2026,7 @@ class Board {
   /** Puts an app on the board: where it is dropped, its header under the pointer, or else in the first empty spot of what is on screen, scanning rows from the top left. */
   add(id: string, dropped?: Point): void {
     const app = this.app(id);
-    if (!app || app.outside || !app.cloned || this.nodes.some(node => node.id === id)) return;
+    if (!app || app.outside || app.schedule || !app.cloned || this.nodes.some(node => node.id === id)) return;
     if (dropped) {
       const at = this.toFlow(dropped);
       this.#addOnly(this.#card(app, this.stored({ x: at.x - PLACE.w / 2, y: at.y - 22 })));

@@ -14,7 +14,7 @@ import { cableTest, type Tested } from '../server/cable-test.ts';
 import { APP, BIN } from '../paths.ts';
 import { confirm, envOf, positional } from './output.ts';
 import { fail } from '../failure.ts';
-import { appOn, storeOf } from '../core/stack.ts';
+import { appOn, notRunHere, storeOf } from '../core/stack.ts';
 
 const loaded = (): Registry => readStack() ?? fail('no stack loaded (koppler init)');
 const portOf = (stack: Registry, id: string) => Number(new URL(stack.apps[id]?.url ?? 'http://x').port);
@@ -31,8 +31,8 @@ export function ports(args: string[]): void {
   const name = (id: string) => stack.apps[id]?.name ?? id;
   for (const id of ids) if (!stack.apps[id]) fail(`${id} is not an app in the stack`);
   for (const id of ids) {
-    const outside = stack.apps[id]?.outside;
-    if (outside) fail(`${name(id)} does not run on this Mac: ${String(outside)}`);
+    const why = notRunHere(stack.apps[id]);
+    if (why) fail(`${name(id)} does not run on this Mac: ${why}`);
   }
   // An app with no tunnels for this environment never gets the first environment's: that would reach the wrong database.
   const noTunnel = missingTunnels(stack, env).filter(id => ids.includes(id));

@@ -4,6 +4,7 @@
   // the chosen areas leave out, and opens the Areas checklist.
   import GitBranch from '@lucide/svelte/icons/git-branch';
   import Laptop from '@lucide/svelte/icons/laptop';
+  import Clock from '@lucide/svelte/icons/clock';
   import type { NodeProps } from '@xyflow/svelte';
   import { AREAS, discovered, type LeanData } from './discover.svelte.ts';
 
@@ -20,6 +21,7 @@
   class:ring={!data.onBoard}
   class:proposed={data.proposed}
   class:picked={selected}
+  class:job={!!data.job}
   class:roomy={data.outside.length > 0 && discovered.direction !== 'DOWN'}
   title={data.name}
   bind:offsetHeight={height}
@@ -30,14 +32,27 @@
     {#if data.edited}<span class="edited" title={data.edited.says}>{data.edited.tag}</span>{/if}
     <span class="tag">{data.tag}</span>
   </span>
-  <span class="meta">
-    {#if data.changed}<GitBranch size={12} aria-hidden="true" /><span class="here changed" title={data.changed}
-        >{data.changed}</span
-      >{:else if data.cloned}<Laptop size={12} aria-hidden="true" /><span class="here">Cloned here</span>{:else}<span
-        class="what"
-        title={data.meta}>{data.meta}</span
-      >{/if}
-  </span>
+  {#if data.job}
+    <span class="job">
+      <span
+        class="when"
+        title="{data.job.expression || 'No schedule'}
+Schedule on {data.job.env.toUpperCase()}. Every environment in Settings"
+        ><Clock size={13} aria-hidden="true" />{data.job.words}</span
+      >
+      {#if data.job.from}<span class="from">from {data.job.from}</span>{/if}
+    </span>
+    <span class="deployed"><span>Deployed only</span><span class="env">{data.job.env.toUpperCase()}</span></span>
+  {:else}
+    <span class="meta">
+      {#if data.changed}<GitBranch size={12} aria-hidden="true" /><span class="here changed" title={data.changed}
+          >{data.changed}</span
+        >{:else if data.cloned}<Laptop size={12} aria-hidden="true" /><span class="here">Cloned here</span>{:else}<span
+          class="what"
+          title={data.meta}>{data.meta}</span
+        >{/if}
+    </span>
+  {/if}
   {#if data.areas}<span class="areas" title={data.areas}>{data.areas}</span>{/if}
   {#if data.deadEnd}
     <span class="dead">Dead end · no readers</span>
@@ -99,6 +114,41 @@
 </div>
 
 <style>
+  /* A job: its schedule and whose repo it ships from between hairlines, and a foot saying it is always deployed. */
+  .job {
+    display: grid;
+    gap: 3px;
+    margin: 2px -11px 0;
+    padding: 7px 11px 6px;
+    border-top: 1px solid var(--line);
+  }
+  .when {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--ink);
+    font: 12px var(--mono);
+  }
+  .when :global(svg) {
+    flex: none;
+    color: var(--ink-muted);
+  }
+  .from {
+    color: var(--ink-muted);
+    font: 12px var(--sans);
+  }
+  .deployed {
+    display: flex;
+    justify-content: space-between;
+    margin: 0 -11px -9px;
+    padding: 7px 11px;
+    border-top: 1px solid var(--line);
+    color: var(--ink-muted);
+    font: 12px var(--sans);
+  }
+  .deployed .env {
+    font: 11px var(--mono);
+  }
   .lean {
     position: relative;
     display: flex;

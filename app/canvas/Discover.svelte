@@ -113,6 +113,20 @@
     return at && { x: at.x, y: at.y, w: CARD.w, h: discovered.heights[card] ?? CARD.h };
   };
   const onBoard = $derived(new Set(map.cards.filter(one => one.onBoard).map(one => one.card)));
+  /** A scheduled job and the app whose repo it ships from, both on the map: a dashed line, not a cable, joins them. */
+  const sameRepo = $derived(
+    discovered.sameRepo.flatMap(([from, job]) => {
+      const [a, b] = [box(from), box(job)];
+      if (!a || !b) return [];
+      const { sides, level } = facing(a, b);
+      const routed = around(a, b, { sides, level, others: [] });
+      const middle = routed.detour ?? {
+        x: (routed.start.x + routed.end.x) / 2,
+        y: (routed.start.y + routed.end.y) / 2,
+      };
+      return [{ key: `${from}~${job}`, d: routed.d, middle }];
+    }),
+  );
   /** Each link from the side of one card that faces the other: a dot where it leaves, a ring and chevron where it lands. */
   const drawn = $derived.by(() => {
     return map.links.flatMap(link => {
@@ -186,7 +200,8 @@
       const first = phase.steps[0];
       const where = first && box(first.from);
       const tops = phase.steps.flatMap(step => [box(step.from), box(step.to)]).flatMap(one => (one ? [one.y] : []));
-      return where ? [{ at, name: phase.name, x: where.x, y: Math.min(...tops) - 34 }] : [];
+      const when = discovered.startsOn(phase);
+      return where ? [{ at, name: phase.name, when, x: where.x, y: Math.min(...tops) - 34 }] : [];
     }),
   );
   const proposals = $derived(discovered.proposals);
@@ -480,6 +495,12 @@
         />
         <ViewportPortal target="back">
           <svg class="links" aria-hidden="true">
+            {#each sameRepo as one (one.key)}
+              <g class="repo-line" data-repo={one.key}>
+                <path d={one.d} />
+                <text x={one.middle.x} y={one.middle.y - 6} text-anchor="middle">same repo</text>
+              </g>
+            {/each}
             {#each drawn as one (one.key)}
               <g
                 class="link"
@@ -542,10 +563,18 @@
                 transform="translate({phase.x} {phase.y})"
               >
                 <!-- On the desk's colour, so a link passing under the label does not run through its words. -->
-                <rect class="plate" x="-4" y="-3" width={phase.name.length * 8.5 + 38} height="24" />
+                <rect
+                  class="plate"
+                  x="-4"
+                  y="-3"
+                  width={phase.name.length * 8.5 + 38 + (phase.when ? phase.when.length * 7.2 + 30 : 0)}
+                  height="24"
+                />
                 <rect width="18" height="18" />
                 <text class="at" x="9" y="13" text-anchor="middle">{phase.at + 1}</text>
-                <text class="name" x="26" y="14">{phase.name}</text>
+                <text class="name" x="26" y="14"
+                  >{phase.name}{#if phase.when}<tspan class="when" dx="10">◷ {phase.when}</tspan>{/if}</text
+                >
               </g>
             {/each}
           </svg>
@@ -848,6 +877,21 @@
 </div>
 
 <style>
+  /* Not a cable: no call goes along it, so it is dashed, muted and ends in nothing. */
+  .repo-line path {
+    fill: none;
+    stroke: var(--line-strong);
+    stroke-width: 1;
+    stroke-dasharray: 3 4;
+  }
+  .phase .when {
+    fill: var(--ink-muted);
+    font: 12px var(--mono);
+  }
+  .repo-line text {
+    fill: var(--ink-muted);
+    font: 11px var(--mono);
+  }
   .discover {
     display: flex;
     flex: 1;

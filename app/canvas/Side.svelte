@@ -10,6 +10,10 @@
   import AreaFilter from './AreaFilter.svelte';
   import { chosen as areaChoice } from './areas.svelte.ts';
   import X from '@lucide/svelte/icons/x';
+  import Clock from '@lucide/svelte/icons/clock';
+  import ChevronDown from '@lucide/svelte/icons/chevron-down';
+  import ChevronRight from '@lucide/svelte/icons/chevron-right';
+  import { scheduleWords } from '../src/core/schedule.ts';
   import Needs from './Needs.svelte';
   import Summary from './Summary.svelte';
   import Settings from './Settings.svelte';
@@ -42,7 +46,22 @@
   const place = (app: StackApp) => (onBoard.includes(app.id) ? onBoard.indexOf(app.id) : board.apps.indexOf(app));
   const order = (a: StackApp, b: StackApp) => (sort === 'name' ? a.name.localeCompare(b.name) : place(a) - place(b));
   /** The matches in the order picked, the board's own not put first: an area group lists them in that order. */
-  const sorted = $derived(board.apps.filter(matches).sort(order));
+  const sorted = $derived(board.apps.filter(app => !app.schedule && matches(app) && !onlyJobs).sort(order));
+  /** "job" lists only the scheduled jobs. */
+  const onlyJobs = $derived(/^jobs?$/i.test(search.trim()));
+  /** The scheduled jobs, at the foot in a group of their own: they never run here, so they are not counted. */
+  const jobs = $derived(
+    board.apps.filter(app => app.schedule && (onlyJobs || matches(app))).sort((a, b) => a.name.localeCompare(b.name)),
+  );
+  const services = $derived(board.apps.filter(app => !app.schedule).length);
+  let jobsOpen = $state(false);
+  /** A search that finds a job opens the group. */
+  const jobsShown = $derived(jobsOpen || (!!search.trim() && jobs.length > 0));
+  const seeInDiscover = (app: StackApp) => {
+    board.goDiscover();
+    discovered.picked = [app.id];
+    discovered.last = app.id;
+  };
   const shown = $derived.by(() => {
     const off = (app: StackApp) => (onBoard.includes(app.id) ? 0 : 1);
     return [...sorted].sort((a, b) => off(a) - off(b) || order(a, b));
@@ -331,9 +350,9 @@
     <h2 id="apps-title">
       Apps
       {#if areaGroups}
-        <span class="count">{listed} of {board.apps.length}</span>
-      {:else if board.apps.length}
-        <span class="count">{onBoard.length} of {board.apps.length} on the board</span>
+        <span class="count">{listed} of {services}</span>
+      {:else if services}
+        <span class="count">{onBoard.length} of {services} on the board</span>
       {/if}
       {#if hasAreas}<span class="filter"><AreaFilter /></span>{:else}{@render sorter()}{/if}
     </h2>
@@ -389,8 +408,40 @@
         {/if}
       {/each}
     {/if}
-    {#if !listed}
+    {#if !listed && !(onlyJobs && jobs.length)}
       <p class="empty">{board.apps.length ? 'No app matches.' : 'No apps in this stack yet.'}</p>
+    {/if}
+    {#if jobs.length}
+      <button class="group jobs-head" type="button" aria-expanded={jobsShown} onclick={() => (jobsOpen = !jobsShown)}
+        ><Icon of={jobsShown ? ChevronDown : ChevronRight} size={13} />Scheduled jobs · {jobs.length}</button
+      >
+      {#if jobsShown}
+        <p class="jobs-note">Deployed only</p>
+        <div class="apps" role="list" aria-label="Scheduled jobs">
+          {#each jobs as app (app.id)}
+            <div class="app job" role="listitem" data-id={app.id}>
+              <span class="kind">{app.kindLabel}</span>
+              <span class="main" title="{app.name}: a scheduled job, always the deployed one. It never runs here.">
+                <span class="name">{app.name}</span>
+                <span class="when"
+                  ><Icon of={Clock} size={12} />{scheduleWords(app.schedule?.[board.env] ?? '') ||
+                    `no schedule on ${board.env.toUpperCase()}`}</span
+                >
+              </span>
+              <span class="light"></span>
+              <span class="row-acts">
+                <button type="button" onclick={() => seeInDiscover(app)}>Show in Discover</button>
+                <button
+                  type="button"
+                  onclick={() => {
+                    void dialogs.settings?.open({ title: app.name, path: `apps.${app.id}` });
+                  }}>Settings</button
+                >
+              </span>
+            </div>
+          {/each}
+        </div>
+      {/if}
     {/if}
     <div class="adds">
       <button class="add-repos" type="button" onclick={() => void dialogs.repos?.open()}>Add repos…</button>
@@ -680,6 +731,35 @@
     -webkit-line-clamp: 2;
     line-clamp: 2;
     overflow-wrap: anywhere;
+  }
+  /* A scheduled job: muted, its schedule in mono, no light, and nothing that would put it on the board. */
+  .jobs-head {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    width: 100%;
+    padding: 0;
+    border: 0;
+    background: none;
+    text-align: left;
+    cursor: pointer;
+  }
+  .jobs-note {
+    margin: 2px 0 4px;
+    color: var(--ink-muted);
+    font: 11px var(--sans);
+  }
+  .app.job {
+    color: var(--ink-muted);
+  }
+  .app.job .main {
+    cursor: default;
+  }
+  .when {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font: 11px var(--mono);
   }
   .state {
     color: var(--ink-muted);

@@ -5,6 +5,7 @@ import { loadsCode } from '../safe-env.ts';
 import { expressionProblems, resolveExpressions } from './expressions.ts';
 import { BUILT_IN_KINDS } from './kinds.ts';
 import { QUEUE_TYPES } from './plan.ts';
+import { readSchedule } from './schedule.ts';
 import { VERSION as PRESET_VERSION } from './presets.ts';
 import { BOARD_FORMAT } from './migrations/board/index.ts';
 import { migrateStack } from './migrations/stack/index.ts';
@@ -275,6 +276,12 @@ const App = z.looseObject(
       .union([z.string(), z.boolean()])
       .optional()
       .describe('Set for a system that never runs here, to what it is'),
+    schedule: z
+      .record(z.string(), z.string(), { error: 'an object keyed by environment' })
+      .optional()
+      .describe(
+        'Set for a scheduled job, to its schedule per environment: rate(...) or cron(...). Always deployed; Koppler never runs it here',
+      ),
     pending: z
       .union([z.string(), z.boolean()])
       .optional()
@@ -599,6 +606,15 @@ export const StackSchema = z.looseObject(
 
 export type Stack = z.infer<typeof StackSchema>;
 export type App = z.infer<typeof App>;
+/** Why an app never runs on this Mac: an outside system, or a scheduled job; null when it does. */
+export const notRunHere = (app: { outside?: unknown; schedule?: unknown } | undefined): string | null =>
+  app?.schedule
+    ? 'a scheduled job runs deployed only'
+    : app?.outside
+      ? typeof app.outside === 'string'
+        ? app.outside
+        : 'an outside system'
+      : null;
 export type Prereq = z.infer<typeof Prereq>;
 export type Database = z.infer<typeof Database>;
 export type Secret = z.infer<typeof Secret>;
@@ -637,6 +653,11 @@ function appProblems(id: string, app: Loose, stack: Loose, envs: string[]): stri
     }
   for (const [env] of entries(app['envs']))
     if (!envs.includes(env)) problems.push(`${at}.envs.${env}: not one of envs (${envs.join(', ')})`);
+  for (const [env, expression] of entries(app['schedule'])) {
+    if (!envs.includes(env)) problems.push(`${at}.schedule.${env}: not one of envs (${envs.join(', ')})`);
+    const read = typeof expression === 'string' ? readSchedule(expression) : { error: 'a rate(...) or cron(...)' };
+    if ('error' in read) problems.push(`${at}.schedule.${env}: ${read.error}`);
+  }
 
   const overlays = entries(app['envs']).map(
     ([env, overlay]) => [`envs.${env}.secrets`, isObject(overlay) ? overlay['secrets'] : undefined] as const,

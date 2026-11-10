@@ -164,6 +164,13 @@ export function mapOf(
     shown.add(card);
     for (const other of near(card)) shown.add(other);
   }
+  // A scheduled job sits beside the app whose repo it ships from.
+  for (const card of [...shown]) {
+    const slug = !facts.apps[card]?.schedule && facts.apps[card]?.slug?.toLowerCase();
+    if (slug)
+      for (const [id, app] of Object.entries(facts.apps))
+        if (app.schedule && app.slug?.toLowerCase() === slug && !away(id)) shown.add(id);
+  }
   const links = all.filter(link => shown.has(link.from) && shown.has(link.to));
   // A queue, database or resource a board app uses is the board's own too: it is drawn with them, not drawn back.
   const own = (card: Card) =>

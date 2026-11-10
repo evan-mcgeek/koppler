@@ -12,7 +12,7 @@ import { of as kindOf } from '../core/kinds.ts';
 import type { BoardNode, Edge } from '../core/plan.ts';
 import { aliasReady, planSteps, planTunnels, type TunnelNeed } from '../core/ports.ts';
 import { signInOf, type SignIn } from '../core/sign-in.ts';
-import type { App, Prereq } from '../core/stack.ts';
+import { notRunHere, type App, type Prereq } from '../core/stack.ts';
 import { readClones, readData, readStack, type Clone, type Registry } from '../data.ts';
 import { CODE, tempDir } from '../paths.ts';
 import { readActions, writeLogged, type Action } from './actions.ts';
@@ -133,8 +133,8 @@ function appsNamed(stack: Registry, args: string[]): string {
   if (!ids.length) fail(USAGE);
   for (const id of ids) if (!stack.apps[id]) fail(`${id} is not an app in the stack`);
   for (const id of ids) {
-    const outside = stack.apps[id]?.outside;
-    if (outside) fail(`${nameOf(stack, id)} does not run on this Mac: ${String(outside)}`);
+    const why = notRunHere(stack.apps[id]);
+    if (why) fail(`${nameOf(stack, id)} does not run on this Mac: ${why}`);
   }
   const env = envOf(stack, args);
   const now = live();

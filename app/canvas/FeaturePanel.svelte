@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Clock from '@lucide/svelte/icons/clock';
   // A feature board's panel: its request, and its steps in phases. Picking a phase dims the others on the map.
   import X from '@lucide/svelte/icons/x';
   import { linksOf } from '../src/core/discover.ts';
@@ -99,7 +100,12 @@
             title="Show only this phase on the map"
             onclick={() => {
               discovered.phase = discovered.phase === at ? null : at;
-            }}><span class="number" aria-hidden="true">{at + 1}</span>{one.name}</button
+            }}
+            ><span class="number" aria-hidden="true">{at + 1}</span>{one.name}{#if discovered.startsOn(one)}<span
+                class="when"
+                title="This phase starts on a schedule: its first step is a scheduled job"
+                ><Clock size={12} aria-hidden="true" />{discovered.startsOn(one)}</span
+              >{/if}</button
           >
           <button
             class="text quiet"
@@ -200,6 +206,14 @@
 </aside>
 
 <style>
+  .when {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-left: 8px;
+    color: var(--ink-muted);
+    font: 12px var(--mono);
+  }
   .panel {
     display: flex;
     flex: none;
