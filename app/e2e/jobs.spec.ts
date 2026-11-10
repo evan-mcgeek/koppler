@@ -39,18 +39,20 @@ test('a job has a card in Discover only, beside the API whose repo it ships from
   await expect(card(page, 'nightly')).toHaveCount(0);
   await page.getByRole('radio', { name: 'Discover' }).check();
   const nightly = lean(page, 'Nightly settlement');
-  await expect(nightly.locator('.when')).toHaveText('daily 00:00 UTC');
-  await expect(nightly.locator('.from')).toHaveText('from Orders API');
-  await expect(nightly.locator('.deployed')).toHaveText(/Deployed only\s*QA/);
-  await expect(nightly.locator('.when')).toHaveAttribute('title', /cron\(0 0 \* \* \? \*\)\nSchedule on QA/);
-  await expect(lean(page, 'Fraud check').locator('.when')).toHaveText('every hour');
+  // On the whole stack a card shows its name and kind; its schedule is in its panel.
+  await expect(nightly.locator('.when')).toHaveCount(0);
+  await nightly.click();
+  const when = page.getByRole('complementary', { name: 'Nightly settlement' }).locator('.when');
+  await expect(when).toHaveText('daily 00:00 UTC · from Orders API · deployed only');
+  await expect(when).toHaveAttribute('title', /cron\(0 0 \* \* \? \*\)\nSchedule on QA/);
   // Joined to Orders API by a line that is not a cable.
   await expect(page.locator('.repo-line[data-repo="orders~nightly"]')).toHaveCount(1);
   await expect(page.locator('.repo-line').first()).toContainText('same repo');
   await page.screenshot({ path: 'test-results/jobs-discover.png' });
   // The schedule follows the environment Discover reads.
   await page.getByRole('radio', { name: 'PROD' }).click();
-  await expect(lean(page, 'Fraud check').locator('.when')).toHaveText('every 20 min');
+  await lean(page, 'Fraud check').click();
+  await expect(page.getByRole('complementary', { name: 'Fraud check' }).locator('.when')).toHaveText(/^every 20 min/);
 });
 
 test("a local app's card says which jobs share its deployed database, and opens them in Discover", async ({ page }) => {

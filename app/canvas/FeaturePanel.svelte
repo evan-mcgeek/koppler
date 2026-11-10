@@ -8,7 +8,7 @@
   import { discovered } from './discover.svelte.ts';
 
   const { feature }: { feature: Feature } = $props();
-  const name = (card: string) => discovered.data(card, false, 0).name;
+  const name = (card: string) => discovered.data(card, false).name;
   const steps = $derived(numbered(feature));
   const recorded = $derived.by(() => {
     const known = linksOf(board.facts ?? { apps: {} });

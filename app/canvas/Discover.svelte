@@ -1,11 +1,12 @@
 <script lang="ts">
-  // The Discover view: how the stack fits together around the board, read from its facts. Picking traces; the panel
+  // The Discover view: how the stack fits together, the board's apps marked, read from its facts. Picking traces; the panel
   // lists a card's links; Plan a run with these takes the picked apps to Plan. Nothing here runs or changes the board.
   import Sparkle from '@lucide/svelte/icons/sparkle';
   import X from '@lucide/svelte/icons/x';
   import EyeOff from '@lucide/svelte/icons/eye-off';
   import GitBranch from '@lucide/svelte/icons/git-branch';
   import Laptop from '@lucide/svelte/icons/laptop';
+  import Clock from '@lucide/svelte/icons/clock';
   import { untrack } from 'svelte';
   import ChevronLeft from '@lucide/svelte/icons/chevron-left';
   import ChevronRight from '@lucide/svelte/icons/chevron-right';
@@ -62,13 +63,15 @@
       void move().finally(() => moving--);
     });
   };
-  // The map refits when it gains cards or the panel takes or gives back its room; a map not shown never answers.
-  const shown = $derived(board.feature ? map.cards.length > 0 : board.nodes.length > 0);
+  // The map refits when it gains cards, once each is placed, or the panel takes or gives back its room; a map not
+  // shown never answers.
+  const shown = $derived(map.cards.length > 0);
+  const placed = $derived(map.cards.every(({ card }) => discovered.positions[card]));
   // Read when the refit is due, after the wait, not as it was asked.
   const stillShown = () => shown;
-  const shape = $derived(`${String(map.cards.length)}:${String(!!discovered.last)}`);
+  const shape = $derived(`${String(map.cards.length)}:${String(!!discovered.last)}:${String(placed)}`);
   $effect(() => {
-    if (shape && shown)
+    if (shape && shown && placed)
       untrack(() => {
         motion(
           go => setTimeout(go, 80),
@@ -97,12 +100,12 @@
   const placeOf = (card: Card) => (flowState[card]?.dragging && flowState[card].position) || discovered.positions[card];
   const nodes = $derived(
     // A card without its place yet is drawn hidden, so it is measured before the layout places it.
-    map.cards.map(({ card, onBoard, hidden, outside }): Node<LeanData> => ({
+    map.cards.map(({ card, onBoard, outside }): Node<LeanData> => ({
       id: card,
       type: 'lean',
       ...(flowState[card]?.measured && { measured: flowState[card].measured }),
       position: placeOf(card) ?? { x: 0, y: 0 },
-      data: discovered.data(card, onBoard, hidden, outside),
+      data: discovered.data(card, onBoard, outside),
       selected: discovered.picked.includes(card),
       class: [
         !placeOf(card) && 'unplaced',
@@ -220,15 +223,15 @@
     });
   });
   const proposals = $derived(discovered.proposals);
-  const proposedCards = $derived(map.cards.filter(({ card }) => discovered.data(card, false, 0).proposed).length);
-  const name = (card: Card) => discovered.data(card, false, 0).name;
+  const proposedCards = $derived(map.cards.filter(({ card }) => discovered.data(card, false).proposed).length);
+  const name = (card: Card) => discovered.data(card, false).name;
   /** Where a call is in the caller's clone, as a link the editor opens. */
   const editorLink = (link: Link) => {
     const at = board.facts && sourceOf(board.facts, link);
     const clone = board.app(link.from)?.path;
     return at && clone ? `vscode://file${encodeURI(`${clone}/${at.file}`)}${at.line ? `:${String(at.line)}` : ''}` : '';
   };
-  const tag = (card: Card) => discovered.data(card, false, 0).tag;
+  const tag = (card: Card) => discovered.data(card, false).tag;
   /** The picked card's links, by what they do, as the panel lists them. */
   const groups = $derived.by(() => {
     const card = discovered.last;
@@ -298,7 +301,9 @@
     return resource?.type === 'sfn' ? (resource.steps ?? []) : undefined;
   });
   const lastApp = $derived(discovered.last ? board.app(discovered.last) : undefined);
-  const lastEdited = $derived(discovered.last ? discovered.data(discovered.last, false, 0).edited : null);
+  /** What the picked card's own face says; on the whole stack the card shows only its name and kind. */
+  const lastData = $derived(discovered.last ? discovered.data(discovered.last, false) : null);
+  const lastEdited = $derived(lastData?.edited ?? null);
   /** Who calls the picked card, by name, on the map or not. */
   const callers = $derived(
     discovered.last
@@ -426,7 +431,7 @@
     }
   };
   const pickedNames = $derived(discovered.picked.map(name));
-  const runnable = $derived(discovered.picked.filter(card => discovered.data(card, false, 0).app));
+  const runnable = $derived(discovered.picked.filter(card => discovered.data(card, false).app));
   const notCloned = $derived(
     discovered.picked.filter(
       card => !card.includes(':') && !board.facts?.apps[card]?.outside && !runnable.includes(card),
@@ -461,8 +466,8 @@
       <FeatureStart />
     {:else if !shown}
       <div class="empty" role="status">
-        <h2>No apps on this board</h2>
-        <p>Discover starts from a board's apps and shows what is one step away. Add an app in Plan.</p>
+        <h2>No apps in this stack</h2>
+        <p>Discover shows how the stack's apps fit together. Add an app in Plan.</p>
         <button
           class="primary"
           type="button"
@@ -694,7 +699,7 @@
         <span class="dim"
           ><svg width="28" height="8" aria-hidden="true"><path d="M0 4H28" /></svg>{board.feature
             ? 'Other links'
-            : 'One step from the board, dimmed'}</span
+            : 'Not on the board, dimmed'}</span
         >
       </div>
 
@@ -807,6 +812,16 @@
           >
         </span>
         {#if lastStack?.description}<p class="about">{lastStack.description}</p>{/if}
+        {#if lastStack?.outside && typeof lastStack.outside === 'string'}<p class="about">{lastStack.outside}</p>{/if}
+        {#if lastData?.job}<span
+            class="where when"
+            title="{lastData.job.expression || 'No schedule'}
+Schedule on {lastData.job.env.toUpperCase()}. Every environment in Settings"
+            ><Clock size={14} aria-hidden="true" />{lastData.job.words}{lastData.job.from
+              ? ` · from ${lastData.job.from}`
+              : ''} · deployed only</span
+          >{/if}
+        {#if lastData?.deadEnd}<span class="where dead">Dead end · no readers</span>{/if}
         {#if lastApp?.cloned}<span class="where"
             ><Laptop size={14} aria-hidden="true" />Cloned here{lastApp.current ? ` · ${lastApp.current}` : ''}</span
           >{#if lastApp.changed}<span class="where changed"
@@ -1366,6 +1381,10 @@
     align-items: center;
     gap: 8px;
     font: 400 13px var(--sans);
+  }
+  .where.dead {
+    color: var(--warn);
+    font-weight: 600;
   }
   .edited {
     color: var(--ink);

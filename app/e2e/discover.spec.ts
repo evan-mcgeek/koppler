@@ -1,4 +1,4 @@
-// Discover: the board's apps and what is one step from them, from the stack's facts; picking some plans a run.
+// Discover: the whole stack with the board's apps marked, from the stack's facts; picking some plans a run.
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -46,18 +46,15 @@ test.describe('a board with an app', () => {
     board: { env: 'qa', mode: 'auto', zoom: 1, pan: { x: 60, y: 60 }, nodes: { web: at(0, 0) }, edges: [] },
   });
 
-  test('shows the board and one step from it; +N brings in what a card leaves out', async ({ page }) => {
+  test("shows the whole stack, the board's apps solid and the rest drawn back", async ({ page }) => {
     await discover(page);
     const lean = page.locator('.svelte-flow__node-lean');
-    await expect(lean).toHaveCount(3);
+    await expect(lean).toHaveCount(5);
     await expect(card(page, 'web').locator('.lean')).not.toHaveClass(/ring/);
-    await expect(card(page, 'orders').locator('.lean')).toHaveClass(/ring/);
-    await expect(page.locator('.links .link')).toHaveCount(3);
-    await page.getByRole('button', { name: 'Show 1 more link of Orders API' }).click();
-    await expect(card(page, 'payments')).toBeVisible();
-    // Beside the card it came from, never on top of another.
+    await expect(card(page, 'search').locator('.lean')).toHaveClass(/ring/);
+    await expect(page.locator('.links .link')).toHaveCount(5);
     expect(await overlapping(page)).toEqual([]);
-    await expect(page.getByRole('button', { name: 'Show 1 more link of Orders API' })).toHaveCount(0);
+    await expect(page.locator('.lean .more')).toHaveCount(0);
     // A card moved by hand stays where it was put, after a reload too.
     await page.getByRole('button', { name: 'Fit', exact: true }).click();
     await settled(page);
@@ -230,8 +227,9 @@ test.describe('a board with an app', () => {
     // An area dragged over the map picks the cards in it, from beside the first card across the rest, as a hand drags it:
     // on its way it covers one card alone, and that opens no panel either.
     const pane = await page.locator('.svelte-flow__pane').boundingBox();
-    const first = await lean.first().boundingBox();
-    if (!pane || !first) throw new Error('no map');
+    const boxes = await lean.evaluateAll(all => all.map(one => one.getBoundingClientRect()));
+    const first = { x: Math.min(...boxes.map(box => box.x)), y: Math.min(...boxes.map(box => box.y)) };
+    if (!pane) throw new Error('no map');
     await page.mouse.move(first.x - 8, first.y - 8);
     await page.mouse.down();
     await page.mouse.move(pane.x + pane.width - 4, pane.y + pane.height - 4, { steps: 40 });
@@ -272,7 +270,6 @@ test.describe('a board with an app', () => {
       JSON.stringify({ stack: path.join(canvas.dir, 'stack') }),
     );
     await discover(page);
-    await page.getByRole('button', { name: 'Show 1 more link of Catalog API' }).click();
     await expect(page.locator('.links .link.found')).toHaveCount(1);
     await card(page, 'catalog').click();
     const panel = page.getByRole('complementary', { name: 'Catalog API' });
@@ -330,13 +327,12 @@ test.describe('a board with an app', () => {
     await expect(tag).toHaveCount(0);
   });
 
-  test('/ or ⌘K finds a card by name, and brings one not on the map onto it', async ({ page }) => {
+  test('/ or ⌘K finds a card by name, and brings it into view', async ({ page }) => {
     await discover(page);
-    await expect(card(page, 'search')).toHaveCount(0);
     await page.keyboard.press('/');
     const find = page.getByRole('dialog', { name: 'Find a card' });
     await find.getByRole('searchbox').fill('sea');
-    await expect(find.getByRole('option')).toHaveText(['Search API .NET Show']);
+    await expect(find.getByRole('option')).toHaveText(['Search API .NET On the map']);
     await page.screenshot({ path: 'test-results/discover-find.png' });
     await page.keyboard.press('Enter');
     await expect(find).toBeHidden();
@@ -373,7 +369,6 @@ test.describe('a board with an app', () => {
 
   test('Plan a run with these puts the cloned apps on the board and lists the rest', async ({ page }) => {
     await discover(page);
-    await page.getByRole('button', { name: 'Show 1 more link of Catalog API' }).click();
     await card(page, 'orders').click();
     await card(page, 'search').click({ modifiers: ['Shift'] });
     const bar = page.locator('.pickbar');
@@ -430,9 +425,23 @@ test.describe('Read again', () => {
 test.describe('an empty board', () => {
   test.use({ board: { env: 'qa', mode: 'auto', zoom: 1, pan: { x: 60, y: 60 }, nodes: {}, edges: [] } });
 
-  test('says where to start', async ({ page }) => {
+  test('shows the whole stack, every card drawn back', async ({ page }) => {
     await page.getByRole('radio', { name: 'Discover' }).check();
-    await expect(page.getByRole('status').filter({ hasText: 'No apps on this board' })).toBeVisible();
+    await expect(page.locator('.svelte-flow__node-lean')).toHaveCount(4);
+    await expect(page.locator('.lean:not(.ring)')).toHaveCount(0);
+  });
+});
+
+test.describe('a stack with no apps', () => {
+  test.use({
+    stack: { ...STACK, apps: {}, presets: [] },
+    board: { env: 'qa', mode: 'auto', zoom: 1, pan: { x: 60, y: 60 }, nodes: {}, edges: [] },
+  });
+
+  test('says where to start', async ({ page }) => {
+    await page.getByRole('dialog').getByRole('button', { name: 'Cancel' }).click();
+    await page.getByRole('radio', { name: 'Discover' }).check();
+    await expect(page.getByRole('status').filter({ hasText: 'No apps in this stack' })).toBeVisible();
     // With no map to fit, nothing is moving.
     await expect(page.locator('.map[data-moving]')).toHaveCount(0);
     await page.getByRole('button', { name: 'Add apps' }).click();
@@ -458,12 +467,14 @@ test.describe('an outside system with a long description', () => {
     board: { env: 'qa', mode: 'auto', zoom: 1, pan: { x: 60, y: 60 }, nodes: { web: at(0, 0) }, edges: [] },
   });
 
-  test('keeps it inside its card, whole on hover', async ({ page }) => {
+  test('shows only its name and kind on the card, and the description in its panel', async ({ page }) => {
     await discover(page);
     const crm = card(page, 'crm');
-    const row = crm.locator('.meta');
-    expect(await row.evaluate(el => el.scrollWidth - el.clientWidth)).toBeLessThanOrEqual(0);
-    await expect(crm.locator('[title$="deployed only"]')).toHaveCount(1);
+    await expect(crm.locator('.meta')).toHaveCount(0);
+    await crm.click();
+    await expect(page.getByRole('complementary', { name: 'CRM event handler' }).locator('.about')).toHaveText(
+      'Lambda crm-event-handler in acme/orders-api (Orders.Events/infra); CRM OrderChanged__e; deployed only',
+    );
   });
 });
 
@@ -487,8 +498,8 @@ test.describe('a topic nothing reads', () => {
   test('is flagged as a dead end, its links stopping at a bar on the side they would leave by', async ({ page }) => {
     await discover(page);
     const status = card(page, 'queue:status');
-    await expect(status.locator('.dead')).toHaveText('Dead end · no readers');
-    await expect(card(page, 'queue:events').locator('.dead')).toHaveCount(0);
+    await expect(status.locator('.stub')).toHaveCount(1);
+    await expect(card(page, 'queue:events').locator('.stub')).toHaveCount(0);
     const side = async () => {
       const [box, stub] = [await status.locator('.lean').boundingBox(), await status.locator('.stub').boundingBox()];
       if (!box || !stub) return '';
@@ -590,7 +601,7 @@ test.describe('an outside system whose links were read from its own repo', () =>
   });
 });
 
-test.describe('a card opened on a busy map', () => {
+test.describe('a busy map', () => {
   test.use({
     stack: {
       ...STACK,
@@ -613,9 +624,8 @@ test.describe('a card opened on a busy map', () => {
     board: { env: 'qa', mode: 'auto', zoom: 1, pan: { x: 60, y: 60 }, nodes: { web: at(0, 0) }, edges: [] },
   });
 
-  test('is laid out with the rest, so no link loops out past the cards', async ({ page }) => {
+  test('is laid out so no link loops out past the cards', async ({ page }) => {
     await discover(page);
-    await page.getByRole('button', { name: 'Show 1 more link of Receipts' }).click();
     await expect(card(page, 'mail')).toBeVisible();
     await settled(page);
     const outside = await page.evaluate(() => {
@@ -658,11 +668,9 @@ test.describe('a bucket, an API Gateway and a Step Functions the apps use', () =
 
   test('shows each as a card, says what a bucket link does, and lists routes and steps', async ({ page }) => {
     await discover(page);
-    await expect(card(page, 'resource:receipts')).toContainText('Bucket');
-    await expect(card(page, 'resource:api')).toContainText('2 routes');
-    await expect(card(page, 'resource:refunds')).toContainText('2 steps');
-    await expect(page.locator('.mark.label')).toHaveText(['writes']);
-    await page.getByRole('button', { name: 'Show 1 more link of Receipts' }).click();
+    await expect(card(page, 'resource:receipts').locator('.tag')).toHaveText('S3');
+    await expect(card(page, 'resource:api').locator('.tag')).toHaveText('APIGW');
+    await expect(card(page, 'resource:refunds').locator('.tag')).toHaveText('SFN');
     await expect(page.locator('.mark.label')).toHaveText(['writes', 'reads']);
     await settled(page);
     await page.screenshot({ path: 'test-results/discover-resources.png' });
@@ -695,13 +703,14 @@ test.describe('a Lambda in the repo of another app', () => {
     board: { env: 'qa', mode: 'auto', zoom: 1, pan: { x: 60, y: 60 }, nodes: { orders: at(0, 0) }, edges: [] },
   });
 
-  test('shows the repo above its name, as on every app from that repo, and not on the others', async ({ page }) => {
+  test('names its repo in its panel; on the whole stack the card shows only its name and kind', async ({ page }) => {
     await expect(card(page, 'orders')).toBeVisible();
     await page.keyboard.press('d');
-    await expect(card(page, 'changes').locator('.repo')).toHaveText('orders-api /');
-    await expect(card(page, 'orders').locator('.repo')).toHaveText('orders-api /');
-    await expect(card(page, 'payments').locator('.repo')).toHaveCount(0);
-    await card(page, 'changes').screenshot({ path: 'test-results/part-card.png' });
+    await expect(card(page, 'changes').locator('.repo')).toHaveCount(0);
+    await card(page, 'changes').click();
+    await expect(page.getByRole('complementary', { name: 'order-changes' }).locator('.slug')).toHaveText(
+      'acme/orders-api',
+    );
   });
 });
 
@@ -711,9 +720,8 @@ test.describe('an app with changes in its clone', () => {
     board: { env: 'qa', mode: 'auto', zoom: 1, pan: { x: 60, y: 60 }, nodes: { web: at(0, 0) }, edges: [] },
   });
 
-  test('says so on its card, and its panel names who calls it', async ({ page }) => {
+  test('its panel says so and names who calls it', async ({ page }) => {
     await discover(page);
-    await expect(card(page, 'orders')).toContainText('3 changed');
     await expect(card(page, 'web')).not.toContainText('Cloned here');
     await card(page, 'orders').click();
     const panel = page.getByRole('complementary', { name: 'Orders API' });
