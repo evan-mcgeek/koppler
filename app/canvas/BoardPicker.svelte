@@ -157,6 +157,20 @@
     const id = areaOf(entry.preset).id;
     return id ? (board.areas[id]?.name ?? id) : 'No area';
   };
+  /** The board as the page `koppler export --board` writes, saved as a download. */
+  const exportBoard = async (preset: StoredPreset) => {
+    const made = await post<{ file: string; page: string }>('board-export', { name: preset.name });
+    if ('error' in made) {
+      toasts.show(`Could not export ${preset.name}. ${made.error}`, 'warning');
+      return;
+    }
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(new Blob([made.page], { type: 'text/html' }));
+    link.download = made.file;
+    link.click();
+    URL.revokeObjectURL(link.href);
+    toasts.show(`Exported ${preset.name}: ${made.file}, a page to open in any browser.`);
+  };
   const reloadable = (preset: StoredPreset) =>
     typeof preset['source'] === 'string' && /^(https?:|\/)/.test(preset['source']);
   /** The board whose row menu is open, and where. */
@@ -627,6 +641,18 @@
       >
       {#if hasAreas}
         <button type="button" role="menuitem" onclick={() => void startSetting(preset, yours)}>Set area…</button>
+      {/if}
+      {#if preset['feature']}
+        <button
+          type="button"
+          role="menuitem"
+          title="A page to read in any browser, for people who never run Koppler: its steps and app names, nothing else"
+          onclick={() => {
+            rowMenu?.hidePopover();
+            close();
+            void exportBoard(preset);
+          }}>Export</button
+        >
       {/if}
       {#if yours && reloadable(preset)}
         <button
