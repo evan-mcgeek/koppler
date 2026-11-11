@@ -4,7 +4,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import type { Page } from '@playwright/test';
-import { at, card, expect, saved, saveSettles, STACK, test } from './canvas.ts';
+import { at, card, expect, saved, saveSettles, STACK, test, fromBoardMenu } from './canvas.ts';
 
 const layout = { nodes: { web: { x: 0, y: 0 }, orders: { x: 420, y: 0 } } };
 test.use({
@@ -211,7 +211,7 @@ test('a board opened from a file in the terminal shows on the canvas, and Reload
 
   write({ orders: { run: 'cli' }, payments: { run: 'cli' } });
   await page.getByRole('button', { name: /^Board: Payments flow/ }).click();
-  await page.getByRole('button', { name: 'Reload Payments flow' }).click();
+  await fromBoardMenu(page, 'Payments flow', 'Reload');
   await expect(card(page, 'payments')).toBeVisible();
   await expect(page.getByRole('status').filter({ hasText: 'Reloaded Payments flow' })).toBeVisible();
 });

@@ -96,7 +96,7 @@ test("apps group by the chosen areas, then no area; one in two areas lists once,
   expect(appGroups(shop, ['pay'], [], ['payments'])?.hidden).toBe(2);
 });
 
-test('team boards group under their area in the stack order, no area last; a choice hides the others and says which', () => {
+test('boards group under their area in the stack order, by name, no area last; a choice hides the others and says which', () => {
   const board = (name: string, ids: string[], area?: string) => ({
     name,
     nodes: Object.fromEntries(ids.map(id => [id, {}])),
@@ -113,7 +113,7 @@ test('team boards group under their area in the stack order, no area last; a cho
   expect(names(boardGroups(shop, team, undefined))).toEqual([
     ['Payments', ['Checkout']],
     ['Shipping', ['Track a parcel']],
-    ['Accounts', ['Sign up', 'Order emails']],
+    ['Accounts', ['Order emails', 'Sign up']],
     ['No area', ['Smoke test']],
   ]);
   const chosen = boardGroups(shop, team, ['payments']);
@@ -121,7 +121,23 @@ test('team boards group under their area in the stack order, no area last; a cho
     ['Payments', ['Checkout']],
     ['No area', ['Smoke test']],
   ]);
-  expect(chosen.hidden).toEqual({ count: 3, areas: ['Shipping', 'Accounts'] });
+  expect(chosen.hidden).toEqual({ count: 3, team: 3, yours: 0, areas: ['Shipping', 'Accounts'] });
+});
+
+test('boards of both kinds sort by name ignoring case, a team board before its copy, and the hidden ones are counted by kind', () => {
+  const mixed = [
+    { name: 'checkout (local)', nodes: { pay: {} }, mine: true },
+    { name: 'Basket rework', nodes: { pay: {} }, mine: true },
+    { name: 'Checkout', nodes: { pay: {} } },
+    { name: 'Track a parcel', nodes: { ship: {} } },
+    { name: 'Parcel notes', nodes: { ship: {} }, mine: true },
+  ];
+  const names = boardGroups(shop, mixed, undefined).groups.map(g => [g.title, g.boards.map(b => b.name)]);
+  expect(names).toEqual([
+    ['Payments', ['Basket rework', 'Checkout', 'checkout (local)']],
+    ['Shipping', ['Parcel notes', 'Track a parcel']],
+  ]);
+  expect(boardGroups(shop, mixed, ['payments']).hidden).toEqual({ count: 2, team: 1, yours: 1, areas: ['Shipping'] });
 });
 
 test("a choice hides the apps outside it but the board's own, and says the areas they are in", () => {

@@ -62,6 +62,13 @@ const boardMenu = async (page: Page) => {
   return page.getByRole('dialog', { name: 'Boards' });
 };
 const rowOf = (menu: ReturnType<Page['locator']>, name: string) => menu.locator('.row').filter({ hasText: name });
+/** The area heading a board's row sits under. */
+const headingOf = (row: ReturnType<Page['locator']>) =>
+  row.evaluate(at => {
+    let above = at.previousElementSibling;
+    while (above && !above.matches('p.sub')) above = above.previousElementSibling;
+    return above?.querySelector('span')?.textContent;
+  });
 
 test('a board shows only its area; a tie says why in its tooltip, and the row menu sets or clears its area', async ({
   page,
@@ -72,7 +79,8 @@ test('a board shows only its area; a tie says why in its tooltip, and the row me
   // How an area came about is not said in the menu: a board under its area's heading shows nothing more.
   await expect(rowOf(menu, 'Order emails')).not.toContainText('set by hand');
   const mine = rowOf(menu, 'Refund debugging');
-  await expect(mine.locator('.area')).toHaveText('Shipping');
+  // Your own board sits under its area's heading, as the team's do.
+  await expect.poll(() => headingOf(mine)).toBe('Shipping');
   await expect(mine.getByRole('button').first()).toHaveAttribute(
     'title',
     '1 app in Payments, 1 in Shipping. Shipping is smaller',
@@ -90,7 +98,7 @@ test('a board shows only its area; a tie says why in its tooltip, and the row me
   await page.screenshot({ path: 'test-results/areas-set-area.png' });
   await setting.getByRole('menuitemradio', { name: /Worked out from its apps/ }).click();
   await expect.poll(() => read().presets.find(one => one.name === 'Order emails')?.area).toBeUndefined();
-  await expect(menu.locator('p.sub')).toHaveText(['Team boards · Payments', 'Shipping']);
+  await expect(menu.locator('p.sub span:first-child')).toHaveText(['Payments', 'Shipping', 'No area']);
 
   // Right-click a team board, then your own: yours is kept on this Mac.
   await rowOf(menu, 'Checkout').click({ button: 'right' });
@@ -106,7 +114,7 @@ test('a board shows only its area; a tie says why in its tooltip, and the row me
     .getByRole('menu', { name: 'Refund debugging · area' })
     .getByRole('menuitemradio', { name: 'Payments' })
     .click();
-  await expect(rowOf(menu, 'Refund debugging').locator('.area')).toHaveText('Payments');
+  await expect.poll(() => headingOf(rowOf(menu, 'Refund debugging'))).toBe('Payments');
   await expect
     .poll(async () => (await kept(page, canvas.url)).presets?.find(one => one.name === 'Refund debugging')?.area)
     .toBe('payments');
@@ -292,7 +300,9 @@ test('a lock in the Areas tab keeps what it covers, and Remove says which lock h
   await expect
     .poll(
       async () =>
-        ((await (await page.request.get(`${canvas.url}data/status.json`)).json()) as { locks?: string[] }).locks,
+        // Null until the server has written its first status: the poll asks again.
+        ((await (await page.request.get(`${canvas.url}data/status.json`)).json()) as { locks?: string[] } | null)
+          ?.locks,
     )
     .toEqual(expect.arrayContaining(['areas.shipping.name', 'apps.orders.areas']));
   await fromMenu(page, 'Settings', 'Stack settings');

@@ -2,9 +2,8 @@
   import Icon from './Icon.svelte';
   import EyeOff from '@lucide/svelte/icons/eye-off';
   import Ellipsis from '@lucide/svelte/icons/ellipsis';
-  import X from '@lucide/svelte/icons/x';
-  // The board on screen, by name: a menu of the team's boards and the user's own, to open, rename, copy, share or
-  // delete one, start a new one, or open one from a file or a link.
+  // The board on screen, by name: a menu of the boards, the team's and the user's own in one list by area, to open,
+  // rename, copy, share or delete one, start a new one, or open one from a file or a link.
   import type { StoredPreset } from '../src/core/presets.ts';
   import { bar } from './bar.svelte.ts';
   import { areaWhy, boardArea, boardGroups } from '../src/core/areas.ts';
@@ -35,14 +34,32 @@
   });
   const areaOf = (preset: StoredPreset) =>
     boardArea(facts, { nodes: preset.nodes, ...(typeof preset['area'] === 'string' && { area: preset['area'] }) });
-  /** Team boards by area, those the chosen areas hide counted; a search looks through every board. */
-  const teams = $derived(boardGroups(facts, board.team.filter(shows), areaChoice.ids));
-  const shownTeams = $derived(new Set(teams.groups.flatMap(group => group.boards.map(one => one.name))));
-  const hiddenMatches = $derived(board.team.filter(one => shows(one) && !shownTeams.has(one.name)));
+  /** A board in the list: the team's or your own. */
+  type Entry = { name: string; nodes: StoredPreset['nodes']; area?: unknown; mine: boolean; preset: StoredPreset };
+  const entries = $derived<Entry[]>([
+    ...board.team.map(preset => ({
+      name: preset.name,
+      nodes: preset.nodes,
+      area: preset['area'],
+      mine: false,
+      preset,
+    })),
+    ...board.own.map(preset => ({ name: preset.name, nodes: preset.nodes, area: preset['area'], mine: true, preset })),
+  ]);
+  /** Every board by area, those the chosen areas hide counted; a search looks through every board. */
+  const listed = $derived(
+    boardGroups(
+      facts,
+      entries.filter(one => shows(one.preset)),
+      areaChoice.ids,
+    ),
+  );
+  const shownEntries = $derived(new Set(listed.groups.flatMap(group => group.boards)));
+  const hiddenMatches = $derived(entries.filter(one => shows(one.preset) && !shownEntries.has(one)));
   /** The board on screen, kept at the top while the chosen areas hide it. */
   const pinned = $derived(
-    !query.trim() && board.name && !shownTeams.has(board.name)
-      ? board.team.find(one => one.name === board.name)
+    !query.trim() && board.name
+      ? entries.find(one => one.name === board.name && one.mine === mine && !shownEntries.has(one))
       : undefined,
   );
   /** The board on screen's area, when the chosen areas leave it out. */
@@ -55,10 +72,16 @@
   /** "Shipping, Notifications and Accounts". */
   const joined = (names: string[]) =>
     names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names.at(-1) ?? ''}` : (names[0] ?? '');
-  /** What the areas hide besides the board on screen, pinned above them. */
-  const hiddenCount = $derived(teams.hidden.count - (pinned ? 1 : 0));
-  /** "(local)" or "(mine)" after a board's name: set apart, so a long name keeps it. */
-  const SUFFIX = / \((local|mine)\)$/;
+  /** What the chosen areas hide, the board on screen too: "4 boards in Payments and Accounts: 3 team, 1 yours". */
+  const hiddenSaid = $derived.by(() => {
+    const { count, team, yours, areas } = listed.hidden;
+    const where = areas.length <= 3 ? ` in ${joined(areas)}` : '';
+    if (team && yours) return `${String(count)} boards${where}: ${String(team)} team, ${String(yours)} yours`;
+    if (team) return `${String(team)} team ${team === 1 ? 'board' : 'boards'}${where}`;
+    return `${String(yours)} of your boards${where}`;
+  });
+  /** "(local)" after a board's name, a team board's copy: set apart, so a long name keeps it. */
+  const SUFFIX = / \(local\)$/;
   let open = $state(false);
   let named = $state('');
   let link = $state('');
@@ -115,6 +138,11 @@
     const area = areaOf(preset);
     if (area.by === 'hand') return `Set by hand. From its apps: ${areaWhy(facts, preset)}`;
     return area.tie ? areaWhy(facts, preset) : undefined;
+  };
+  /** A board's area by name, said under it where the list is not by area. */
+  const areaName = (entry: Entry) => {
+    const id = areaOf(entry.preset).id;
+    return id ? (board.areas[id]?.name ?? id) : 'No area';
   };
   const reloadable = (preset: StoredPreset) =>
     typeof preset['source'] === 'string' && /^(https?:|\/)/.test(preset['source']);
@@ -257,14 +285,12 @@
 </script>
 
 <!-- eslint-disable @typescript-eslint/no-confusing-void-expression -- {@render} of a snippet returns nothing -->
-{#snippet boardRow(preset: StoredPreset, mine: boolean, elsewhere = false, under = '')}
-  {@const area = hasAreas ? areaOf(preset) : undefined}
+{#snippet boardRow({ preset, mine }: Entry, elsewhere = false, under = '')}
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div
     class="row"
     class:elsewhere
     oncontextmenu={ev => {
-      if (!hasAreas) return;
       ev.preventDefault();
       void openRowMenu(
         preset,
@@ -293,53 +319,24 @@
           ><span class="name">{preset.name.replace(SUFFIX, '')}</span>{#if SUFFIX.test(preset.name)}<span class="suffix"
               >{SUFFIX.exec(preset.name)?.[0]}</span
             >{/if}</span
-        >{#if under}<span class="under">{under}</span>{/if}</span
+        >{#if under || preset['feature']}<span class="under">{under || 'Feature board'}</span>{/if}</span
       >
-      {#if hasAreas && (mine || elsewhere || under) && area?.id}<span class="area">{board.areas[area.id]?.name}</span
-        >{:else if !hasAreas}<span class="meta">{size(preset)}</span>{/if}
+      <!-- A fixed column, so names stay put whether the tag or the … shows. -->
+      <span class="whose"
+        >{#if !mine}<span class="team" title="A team board, from the stack">Team</span>{/if}</span
+      >
     </button>
-    {#if hasAreas}
-      <button
-        class="act more-for"
-        type="button"
-        aria-label="More for {preset.name}"
-        aria-haspopup="menu"
-        title="More"
-        onclick={ev => {
-          const at = ev.currentTarget.getBoundingClientRect();
-          void openRowMenu(preset, mine, { x: at.left, y: at.bottom + 2 }, ev.currentTarget);
-        }}><Icon of={Ellipsis} size={14} /></button
-      >
-    {/if}
-    <!-- With areas, a board's actions are in its row menu, so its name keeps the room. -->
-    {#if mine && !hasAreas && reloadable(preset)}
-      {@const from = String(preset['source'])}
-      <button
-        class="act"
-        type="button"
-        aria-label="Reload {preset.name}"
-        title="Read it again from {from}"
-        onclick={() => void reload(from, preset.name)}>Reload</button
-      >
-    {/if}
-    {#if mine && !hasAreas}
-      <button
-        class="act"
-        type="button"
-        aria-label="Share {preset.name} with the team"
-        title="Propose it as a team board of the stack: a pull request on the stack's repo"
-        onclick={() => void share(preset)}>Share with team</button
-      >
-      <button
-        class="act"
-        type="button"
-        aria-label="Delete {preset.name}"
-        title="Delete"
-        onclick={() => {
-          askDelete(preset);
-        }}><Icon of={X} size={14} /></button
-      >
-    {/if}
+    <button
+      class="act more-for"
+      type="button"
+      aria-label="More for {preset.name}"
+      aria-haspopup="menu"
+      title="More"
+      onclick={ev => {
+        const at = ev.currentTarget.getBoundingClientRect();
+        void openRowMenu(preset, mine, { x: at.left, y: at.bottom + 2 }, ev.currentTarget);
+      }}><Icon of={Ellipsis} size={14} /></button
+    >
   </div>
 {/snippet}
 
@@ -457,29 +454,23 @@
       </div>
     {/if}
     {#if pinned}
-      <p>Current board</p>
-      {@render boardRow(pinned, false, false, 'Outside your areas')}
+      <p class="sub">Current board</p>
+      {@render boardRow(pinned, false, areaName(pinned))}
     {/if}
-    {#if !hasAreas && teams.groups.length}<p>Team boards</p>{/if}
-    {#each teams.groups as group, n (group.title)}
-      {#if hasAreas}<p class="sub">{n === 0 ? `Team boards · ${group.title}` : group.title}</p>{/if}
-      {#each group.boards.filter(one => one !== pinned) as preset (preset.name)}
-        {@render boardRow(preset, false)}
+    {#each listed.groups as group (group.title)}
+      {#if hasAreas}<p class="sub"><span>{group.title}</span><span class="count">{group.boards.length}</span></p>{/if}
+      {#each group.boards as entry (`${String(entry.mine)}:${entry.name}`)}
+        {@render boardRow(entry)}
       {/each}
     {/each}
     {#if query.trim() && hiddenMatches.length}
-      <p>Hidden by your areas</p>
-      {#each hiddenMatches as preset (preset.name)}
-        {@render boardRow(preset, false, true, 'Opening it shows it; your areas stay as they are')}
+      <p class="sub"><span>Hidden by your areas</span><span class="count">{hiddenMatches.length}</span></p>
+      {#each hiddenMatches as entry (`${String(entry.mine)}:${entry.name}`)}
+        {@render boardRow(entry, true, areaName(entry))}
       {/each}
-    {:else if !query.trim() && hiddenCount}
+    {:else if !query.trim() && listed.hidden.count}
       <p class="hidden-line">
-        <Icon of={EyeOff} size={13} /><span class="said"
-          >{hiddenCount}
-          {pinned ? 'more ' : ''}{hiddenCount === 1 ? 'team board' : 'team boards'}{teams.hidden.areas.length <= 3
-            ? ` in ${joined(teams.hidden.areas)}`
-            : ''}</span
-        >
+        <Icon of={EyeOff} size={13} /><span class="said">{hiddenSaid}</span>
         <button
           type="button"
           onclick={() => {
@@ -488,10 +479,6 @@
         >
       </p>
     {/if}
-    {#if board.own.some(shows)}<p>Your boards</p>{/if}
-    {#each board.own.filter(shows) as preset (preset.name)}
-      {@render boardRow(preset, true)}
-    {/each}
     {#if !board.team.length && !board.own.length}
       <p class="none">No boards yet. A board is kept as soon as it has an app.</p>
     {:else if query.trim() && !board.team.some(shows) && !board.own.some(shows)}
@@ -599,7 +586,9 @@
           choose(preset);
         }}>Open</button
       >
-      <button type="button" role="menuitem" onclick={() => void startSetting(preset, yours)}>Set area…</button>
+      {#if hasAreas}
+        <button type="button" role="menuitem" onclick={() => void startSetting(preset, yours)}>Set area…</button>
+      {/if}
       {#if yours && reloadable(preset)}
         <button
           type="button"
@@ -773,10 +762,19 @@
     text-decoration: underline;
     text-underline-offset: 3px;
   }
+  /* An area's heading: its name, and how many boards it holds in mono. */
   .menu p.sub {
-    padding-top: 4px;
-    color: var(--ink-muted);
-    font-weight: 500;
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    padding: 10px 8px 4px;
+    font: 600 12px var(--sans);
+  }
+  .menu p.sub span:first-child {
+    flex: 1;
+  }
+  .count {
+    font: 400 11px var(--mono);
   }
   .menu p.hidden-line {
     display: flex;
@@ -797,20 +795,29 @@
   }
   .line {
     display: flex;
+    align-items: baseline;
     gap: 6px;
     min-width: 0;
   }
   .under {
-    color: var(--ink-muted);
-    font: 400 11px var(--sans);
+    color: var(--muted);
+    font: 400 12px var(--sans);
   }
   .menu p.hidden-line .said {
     flex: 1;
   }
-  .area {
+  /* Whose board: a word in a hairline box on the team's, nothing on yours. Not a state, so no colour. */
+  .whose {
+    display: flex;
     flex: none;
-    color: var(--ink-muted);
-    font: 400 11px var(--mono);
+    justify-content: flex-end;
+    width: 40px;
+  }
+  .team {
+    padding: 1px 5px;
+    border: 1px solid var(--line-strong);
+    color: var(--muted);
+    font: 600 11px/14px var(--sans);
   }
   .elsewhere .name {
     color: var(--ink-muted);
@@ -831,14 +838,22 @@
   /* The board on screen: a filled square before its name. */
   .here {
     flex: none;
-    width: 8px;
-    height: 8px;
+    width: 7px;
+    height: 7px;
   }
   [aria-current='true'] .here {
     background: var(--ink);
   }
   .menu .name {
-    flex: 1;
+    flex: 0 1 auto;
+    overflow: hidden;
+    font-weight: 500;
+    font-size: 14px;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  .menu [aria-current='true'] .name {
+    font-weight: 600;
   }
   .meta {
     flex: none;
@@ -853,7 +868,17 @@
   }
   .menu .row > button:first-child {
     flex: 1;
+    gap: 10px;
     min-width: 0;
+  }
+  /* The whole row lights up, its … too. */
+  .menu .row:hover,
+  .menu .row:focus-within {
+    background: color-mix(in oklab, var(--ink) 7%, transparent);
+  }
+  .menu .row > button:first-child:hover,
+  .menu .row > button:first-child:focus-visible {
+    background: none;
   }
   .menu .row .act {
     flex: none;
@@ -927,6 +952,13 @@
   }
   /* A board's own actions are there when you are at its row. */
   .menu .row .more-for {
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    margin-right: 4px;
+    padding: 0;
+    border: 1px solid var(--line-strong);
+    color: var(--ink);
     opacity: 0;
   }
   .menu .row:hover .more-for,
