@@ -417,9 +417,11 @@
     if (key === '/') {
       ev.preventDefault();
       finding = true;
-    } else if (key === 'e') board.goEdit();
-    else if (key === 'l' && live.running) board.goLive();
-    else if (key === 'f') void fit();
+    } else if (key === 'e') board.toDoor('run');
+    else if (key === 'l' && live.running) {
+      board.toDoor('run');
+      board.goLive();
+    } else if (key === 'f') void fit();
     else if (key === 'p') void presentMap();
     else if (board.feature && (key === 'arrowright' || key === 'arrowleft')) {
       ev.preventDefault();
@@ -472,7 +474,7 @@
           class="primary"
           type="button"
           onclick={() => {
-            board.goEdit();
+            board.toDoor('run');
           }}>Add apps</button
         >
       </div>
@@ -696,11 +698,9 @@
             ></svg
           >No source yet</span
         >
-        <span class="dim"
-          ><svg width="28" height="8" aria-hidden="true"><path d="M0 4H28" /></svg>{board.feature
-            ? 'Other links'
-            : 'Not on the board, dimmed'}</span
-        >
+        {#if board.feature}<span class="dim"
+            ><svg width="28" height="8" aria-hidden="true"><path d="M0 4H28" /></svg>Other links</span
+          >{/if}
       </div>
 
       {#if hiding.apps.length}

@@ -55,8 +55,9 @@ const kept = (temp: string) =>
   ).presets?.find(one => one.name === 'New feature');
 const newFeature = async (page: Page) => {
   await expect(card(page, 'web')).toBeVisible();
+  await page.keyboard.press('ControlOrMeta+1');
   await page.getByRole('button', { name: /^Board:/ }).click();
-  await page.getByRole('button', { name: 'New feature board' }).click();
+  await page.getByRole('button', { name: 'Ask the agent for a new one…' }).click();
   await expect(page.getByRole('radio', { name: 'Discover' })).toBeChecked();
   await expect(page.getByRole('region', { name: 'New feature board' })).toBeVisible();
 };
@@ -148,25 +149,21 @@ test('steps are added from a card, taken off, and kept in phases the panel names
   await expect(page.locator('.links .number text')).toHaveCount(0);
 });
 
-test('feature requests and board switches are restored by undo and redo', async ({ page, canvas }) => {
+test('leaving a feature board for the whole stack is undone back to it, its request kept', async ({ page, canvas }) => {
   await newFeature(page);
   await nextEdit(page);
   await page.getByLabel('Describe the feature').fill('Customers pay for an order.');
   await page.getByRole('button', { name: 'Hand it to the agent' }).click();
   await expect.poll(() => kept(canvas.temp)?.feature?.request).toBe('Customers pay for an order.');
-  await page.getByRole('radio', { name: 'Plan', exact: true }).check();
-  await page.getByRole('button', { name: 'Undo', exact: true }).click();
-  await expect.poll(() => kept(canvas.temp)?.feature?.request).toBe('');
-  await page.getByRole('button', { name: 'Redo', exact: true }).click();
-  await expect.poll(() => kept(canvas.temp)?.feature?.request).toBe('Customers pay for an order.');
-
   await nextEdit(page);
   await page.getByRole('button', { name: /^Board:/ }).click();
-  await page.getByRole('dialog', { name: 'Boards' }).getByRole('button', { name: 'New board', exact: true }).click();
-  await expect(page.getByRole('button', { name: /^Board:/ })).toHaveText('New board');
+  await page
+    .getByRole('dialog', { name: 'Boards' })
+    .getByRole('button', { name: /^Whole stack/ })
+    .click();
+  await expect(page.getByRole('button', { name: /^Board:/ })).toHaveText('Whole stack');
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   await expect(page.getByRole('button', { name: /^Board:/ })).toHaveAccessibleName('Board: New feature');
-  await page.getByRole('radio', { name: 'Discover', exact: true }).check();
   await expect(page.getByLabel('Describe the feature')).toHaveValue('Customers pay for an order.');
 });
 

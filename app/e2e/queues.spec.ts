@@ -51,7 +51,7 @@ test('a queue between two apps shows as a card linked to both', async ({ page })
   await page.screenshot({ path: 'test-results/next-queues.png' });
 });
 
-test("what cannot run here stays off Plan, and Discover shows it: an SNS topic as the board's own, an outside system one step away", async ({
+test('what cannot run here stays off Plan, and Discover shows it: an SNS topic and an outside system on the whole stack', async ({
   page,
 }) => {
   await expect(queue(page)).toHaveCount(2);
@@ -59,7 +59,7 @@ test("what cannot run here stays off Plan, and Discover shows it: an SNS topic a
   await expect(page.locator('.svelte-flow__node-outside')).toHaveCount(0);
   await page.getByRole('radio', { name: 'Discover' }).check();
   await expect(card(page, 'queue:alerts').locator('.lean')).not.toHaveClass(/ring/);
-  await expect(card(page, 'billing').locator('.lean')).toHaveClass(/ring/);
+  await expect(card(page, 'billing').locator('.lean')).not.toHaveClass(/ring/);
 });
 
 test('a picked app lights its links to queues, like its cables', async ({ page }) => {

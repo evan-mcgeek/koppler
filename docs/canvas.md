@@ -158,7 +158,13 @@ The chip opens the agent's messages; with no agent listening, or one gone quiet,
 
 ## Views and shortcuts
 
-**Discover** shows how the whole stack fits together: every app, queue, database, resource and outside system, read from the stack, with the board's apps drawn solid and the rest drawn back.
+Koppler has two front doors, **Discover | Run**, the first control in the bar.
+**Discover** is for understanding and sharing a flow: the whole stack, or a feature board, with nothing to run, so its bar has no status, Activity, Stop or Run.
+**Run** is for running a slice on this Mac: run boards, with **Plan** and **Live**.
+Each door keeps its own boards and comes back to the one it was on: Discover's board menu lists **Whole stack** and the feature boards, with **Ask the agent for a new one…**; Run's lists the run boards.
+Opening a feature board in Discover stops nothing that runs.
+
+**Discover** on **Whole stack** shows how the stack fits together: every app, queue, database, resource and outside system, read from the stack.
 On a big stack, pick your areas to narrow it.
 On the whole stack a card shows only its name and kind; what it is, its branch, its repo, its schedule and a dead end are in its panel when it is picked, and on a feature board's cards.
 Nothing on it runs or changes the board.
@@ -205,7 +211,8 @@ Zoomed out below 60%, cards are short in Plan too: pick one and its fields open 
 
 | Key                                        | What it does                                                                                                     |
 | ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------- |
-| `D` / `E` / `L`                            | Discover, Plan, Live                                                                                             |
+| `Cmd+1` / `Cmd+2` (`Ctrl` elsewhere)       | Discover, Run                                                                                                    |
+| `D` / `E` / `L`                            | Discover, Run's Plan, Run's Live                                                                                 |
 | `P`, then `Esc`                            | Present, and back                                                                                                |
 | `F`                                        | Fit the board in the window                                                                                      |
 | `/`, or `Ctrl+K` (`Cmd` on a Mac)          | Find a card on Discover's map by name; one the map does not show yet is brought onto it                          |

@@ -27,7 +27,7 @@ test('the board picker sits in the bar in every view, and the side panel starts 
     await page.getByRole('radio', { name: view }).check({ force: true });
     await expect(bar.getByRole('button', { name: /^Board:/ })).toBeVisible();
   }
-  await page.getByRole('radio', { name: 'Plan' }).check({ force: true });
+  await page.getByRole('radio', { name: 'Run' }).check({ force: true });
   await expect(panel(page).getByRole('button', { name: /^Board:/ })).toHaveCount(0);
   await expect(panel(page).getByRole('heading').first()).toHaveText(/^Apps/);
   // The menu opens under the board's name, with Find a board ready to type in.

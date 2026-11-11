@@ -36,7 +36,7 @@
         class="text"
         type="button"
         onclick={() => {
-          board.goDiscover();
+          board.toDoor('discover');
         }}>Back to Discover</button
       >
     </p>
