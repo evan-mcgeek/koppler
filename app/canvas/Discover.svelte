@@ -29,6 +29,7 @@
   import { board } from './board.svelte.ts';
   import { AREAS, CARD, discovered, linkKey, type LeanData } from './discover.svelte.ts';
   import FeaturePanel from './FeaturePanel.svelte';
+  import CommentThread from './CommentThread.svelte';
   import DiscoverHome from './DiscoverHome.svelte';
   import FeatureStart from './FeatureStart.svelte';
   import FindCard from './FindCard.svelte';
@@ -439,7 +440,8 @@
       ev.preventDefault();
       discovered.walk(key === 'arrowright' ? 1 : -1);
     } else if (key === 'escape') {
-      if (discovered.current) discovered.step = null;
+      if (discovered.commenting) discovered.commenting = false;
+      else if (discovered.current) discovered.step = null;
       else if (board.present) void presentMap();
       else pick([]);
     }
@@ -517,6 +519,12 @@
         colorMode={isLight(appearance.now.scheme) ? 'light' : 'dark'}
         proOptions={{ hideAttribution: true }}
         onnodeclick={({ node }) => {
+          // Comment, then a click on the card it is about.
+          if (discovered.commenting) {
+            discovered.commenting = false;
+            discovered.thread = { on: { card: node.id } };
+            return;
+          }
           if (discovered.picked.includes(node.id)) discovered.last = node.id;
         }}
         onpaneclick={() => {
@@ -743,7 +751,18 @@
         </div>
       {/if}
 
-      {#if discovered.current}
+      {#if discovered.commenting}
+        <div class="pickbar" role="status" aria-label="Commenting">
+          <span>Click a card or a step to comment on it</span>
+          <button
+            class="text"
+            type="button"
+            onclick={() => {
+              discovered.commenting = false;
+            }}>Cancel</button
+          >
+        </div>
+      {:else if discovered.current}
         {@const { step, number } = discovered.current}
         <div class="pickbar stepbar" role="status" aria-label="Step {number}">
           <span class="said" title="{number} {name(step.from)} → {name(step.to)}{step.note ? `: ${step.note}` : ''}">
@@ -863,7 +882,9 @@
     {/if}
   </div>
 
-  {#if discovered.last}
+  {#if discovered.thread}
+    <CommentThread />
+  {:else if discovered.last}
     {@const card = discovered.last}
     <aside class="panel" aria-labelledby="discover-panel-title">
       <header>

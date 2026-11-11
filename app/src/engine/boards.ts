@@ -13,11 +13,12 @@ import type { Edge } from '../core/plan.ts';
 import { changeData, readClones, readData, readStack, writeData } from '../data.ts';
 import { fail } from '../failure.ts';
 import { locked, readJson, writeJson } from '../json-files.ts';
+import { tempDir } from '../paths.ts';
 import { readUpgraded } from '../upgraded.ts';
 import { appendMessage } from './messages.ts';
 import { alive, readRecord } from './processes.ts';
 import { shareBoard } from './share.ts';
-import { readStackFile } from './stack-file.ts';
+import { commentOnTeamBoard, readStackFile, refreshRegistry } from './stack-file.ts';
 import { currentStack, shelfOf, stackNamed } from './stacks.ts';
 
 export interface QueuedEdit {
@@ -46,7 +47,7 @@ export function editDone(id: unknown): void {
 }
 
 const CHANGES =
-  '[--propose] [--add <app,...>] [--remove <app,...>] [--cable <caller>:<callee>]... [--uncable <caller>:<callee>]... [--branch <app>=<branch>]... [--note <app>="<note>"]... [--arrange] [--request "<words>"] [--phase "<name>"] [--step|--propose-step <from>:<to>[="<note>"]]... [--unstep ["<phase>":]<from>:<to>]... [--drop-phase "<name>"]... [--rename-phase "<old>"="<new>"] [--area <area>|auto]';
+  '[--propose] [--add <app,...>] [--remove <app,...>] [--cable <caller>:<callee>]... [--uncable <caller>:<callee>]... [--branch <app>=<branch>]... [--note <app>="<note>"]... [--arrange] [--request "<words>"] [--phase "<name>"] [--step|--propose-step <from>:<to>[="<note>"]]... [--unstep ["<phase>":]<from>:<to>]... [--drop-phase "<name>"]... [--rename-phase "<old>"="<new>"] [--comment <card>|"<phase>":<from>:<to>="<text>"] [--reply <comment id>="<text>"] [--resolve <comment id>] [--area <area>|auto]';
 const USAGE = `usage: koppler board new "<name>" ${CHANGES}\n       koppler board edit "<name>" ${CHANGES}\n       koppler board share "<name>"\n       koppler board open <file or link>\n       koppler board delete "<name>"\n       koppler board copy "<name>" --to|--from <stack> [--drop-missing]`;
 
 /** Queues a change for an open canvas of the stack in use, dropping ones a day old that no canvas took. */
@@ -224,7 +225,18 @@ function areaEdit(given: string[]): { area: string | null } {
  * A card is an app's id, `queue:<id>` or `database:<id>`.
  */
 function featureEdit(args: string[]): { feature: FeatureEdit } | null {
-  const flags = ['--request', '--phase', '--step', '--propose-step', '--unstep', '--drop-phase', '--rename-phase'];
+  const flags = [
+    '--request',
+    '--phase',
+    '--step',
+    '--propose-step',
+    '--unstep',
+    '--drop-phase',
+    '--rename-phase',
+    '--comment',
+    '--reply',
+    '--resolve',
+  ];
   if (!args.some(arg => flags.includes(arg))) return null;
   const stack = readStack() ?? fail('no stack loaded (koppler init)');
   const edit: FeatureEdit = {};
@@ -274,7 +286,30 @@ function featureEdit(args: string[]): { feature: FeatureEdit } | null {
       if (!from.trim() || !to.join('=').trim())
         fail(`--rename-phase ${value ?? ''}: expected "<old>"="<new>"\n${USAGE}`);
       edit.rename = { from: from.trim(), to: to.join('=').trim() };
-    }
+    } else if (arg === '--comment') {
+      // `<card>="<text>"` on a card, `<phase>:<from>:<to>="<text>"` on a step.
+      const [where = '', ...said] = (value ?? '').split('=');
+      const text = said.join('=').trim();
+      if (!text) fail(`--comment ${value ?? ''}: expected <card>="<text>" or "<phase>":<from>:<to>="<text>"\n${USAGE}`);
+      const on =
+        where.includes(':') && !/^(queue|database):[^:]+$/.test(where) ? { step: pair(arg, where, true) } : null;
+      if (!on && !inStack(stack, where)) fail(`${where} is not in the stack: an app's id, queue:<id> or database:<id>`);
+      const at = new Date().toISOString();
+      const id = `c${Date.now().toString(36)}`;
+      edit.comment = {
+        id,
+        on: on
+          ? { step: { from: on.step.from, to: on.step.to, ...(on.step.phase && { phase: on.step.phase }) } }
+          : { card: where },
+        text,
+        at,
+      };
+    } else if (arg === '--reply') {
+      const [id = '', ...said] = (value ?? '').split('=');
+      const text = said.join('=').trim();
+      if (!id.trim() || !text) fail(`--reply ${value ?? ''}: expected <comment id>="<text>"\n${USAGE}`);
+      edit.reply = { id: id.trim(), by: 'agent', text, at: new Date().toISOString() };
+    } else if (arg === '--resolve' && value?.trim()) edit.resolve = value.trim();
   });
   return { feature: edit };
 }
@@ -386,6 +421,33 @@ export function changeBoard(name: string, edit: BoardEdit, create: boolean, prop
       .split('; ')
       .filter(one => one.startsWith('kept '));
     return [`Nothing to change on ${board.name}${kept.length ? `: ${kept.join('; ')}` : ''}.`];
+  }
+  // Talking about a team feature board is kept with it in the stack, for the team.
+  const talk = ['comment', 'reply', 'resolve'];
+  const given = (part: object) =>
+    Object.entries(part as Record<string, unknown>).flatMap(([key, value]) =>
+      value === undefined ||
+      (Array.isArray(value) && !value.length) ||
+      (typeof value === 'object' && value !== null && !Array.isArray(value) && !Object.keys(value).length)
+        ? []
+        : [key],
+    );
+  const talkOnly =
+    !!edit.feature &&
+    given(edit).every(key => key === 'feature') &&
+    given(edit.feature).every(key => talk.includes(key));
+  if (
+    talkOnly &&
+    edit.feature &&
+    !own.some(one => one.name === board.name) &&
+    team.some(one => one.name === board.name)
+  ) {
+    const kept = commentOnTeamBoard(board.name, edit.feature);
+    if (kept.error !== undefined) fail(kept.error);
+    refreshRegistry();
+    // An open canvas reads the stack again, and shows the thread.
+    writeJson(path.join(tempDir(), 'refresh.json'), { at: new Date().toISOString() });
+    return [`Changed ${board.name}: ${describeEdit(edit, named, false, before)}.`];
   }
   if (propose) {
     const asked = appendMessage({

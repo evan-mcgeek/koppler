@@ -4,8 +4,14 @@
   // Areas checklist.
   import type { NodeProps } from '@xyflow/svelte';
   import { AREAS, discovered, type LeanData } from './discover.svelte.ts';
+  import { live } from './live.svelte.ts';
 
   const { id, data, selected }: NodeProps & { data: LeanData } = $props();
+  /** Its open threads, and whether the agent is at work on the last one. */
+  const talks = $derived(discovered.openOn({ card: id }));
+  const asked = $derived(
+    talks.some(one => one.thread.at(-1)?.by === 'you') && (live.status?.agent?.state ?? 'none') === 'busy',
+  );
   let height = $state(0);
   // Its links meet its edges where it is drawn, however tall its name makes it.
   $effect(() => {
@@ -56,6 +62,19 @@
         >
       </span>
     </span>
+  {/if}
+  {#if talks.length}
+    <button
+      class="talk nodrag"
+      class:asked
+      type="button"
+      aria-label="{talks.length} {talks.length === 1 ? 'comment' : 'comments'} on {data.name}"
+      title={asked ? 'The agent is looking into it' : 'Open the thread'}
+      onclick={ev => {
+        ev.stopPropagation();
+        discovered.thread = { id: talks[0]?.id ?? '' };
+      }}>{talks.length}</button
+    >
   {/if}
   {#if data.outside.length}
     <button
@@ -215,5 +234,27 @@
   }
   .lean.roomy {
     padding-bottom: 14px;
+  }
+  /* Its open threads: an ink marker on its corner, with a warn dot while the agent works on one. */
+  .talk {
+    position: absolute;
+    top: -9px;
+    right: -9px;
+    min-width: 20px;
+    padding: 0 5px;
+    border: 1px solid var(--ink);
+    background: var(--ink);
+    color: var(--desk);
+    font: 600 11px/16px var(--mono);
+    cursor: pointer;
+  }
+  .talk.asked::after {
+    content: '';
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    width: 6px;
+    height: 6px;
+    background: var(--warn);
   }
 </style>

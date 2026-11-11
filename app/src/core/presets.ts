@@ -343,6 +343,10 @@ export function describeEdit(
     ),
     ...kept.map(one => `${proposed ? 'keep' : 'kept'} ${cables([one])} in ${into(one)}: it is a step there already`),
     ...dropped.map(phase => `${proposed ? 'take off' : 'took off'} the phase ${phase}`),
+    edit.feature?.comment &&
+      `${proposed ? 'comment' : 'commented'} on ${'card' in edit.feature.comment.on ? name(edit.feature.comment.on.card) : cables([edit.feature.comment.on.step])} (${edit.feature.comment.id})`,
+    edit.feature?.reply && `${proposed ? 'reply' : 'replied'} in ${edit.feature.reply.id}`,
+    edit.feature?.resolve && `${proposed ? 'resolve' : 'resolved'} ${edit.feature.resolve}`,
     rename && `${proposed ? 'rename' : 'renamed'} the phase ${rename.from} to ${rename.to}`,
     edit.area === null && `${proposed ? 'take' : 'took'} its area from its apps`,
     edit.area && `set its area to ${edit.area}`,

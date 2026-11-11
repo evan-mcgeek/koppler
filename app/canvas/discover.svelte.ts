@@ -11,6 +11,7 @@ import {
   numbered,
   proposedCard,
   stackPath,
+  type Comment,
   type FeatureEdit,
   type Numbered,
   type StepRef,
@@ -358,6 +359,63 @@ class Discovered {
     }
     await board.reload();
     toasts.show(`${board.nameOf(link.from)} calls ${board.nameOf(link.to)}: kept in the stack.`);
+  }
+
+  /** The thread open beside the panel: a comment by its id, or a new one on a card or a step. */
+  thread = $state<{ id: string } | { on: Comment['on'] } | null>(null);
+  /** Comment, then a click on what it is about. */
+  commenting = $state(false);
+  /** The threads not resolved yet, on a card or on a step. */
+  openOn(on: { card: Card } | { step: StepRef }): Comment[] {
+    return (board.feature?.comments ?? []).filter(
+      one =>
+        !one.resolved &&
+        ('card' in on
+          ? 'card' in one.on && one.on.card === on.card
+          : 'step' in one.on &&
+            one.on.step.from === on.step.from &&
+            one.on.step.to === on.step.to &&
+            (one.on.step.phase ?? '') === (on.step.phase ?? '')),
+    );
+  }
+  /** What a comment is about, in words. */
+  about(on: Comment['on']): string {
+    return 'card' in on
+      ? board.nameOf(on.card)
+      : `the step ${board.nameOf(on.step.from)} to ${board.nameOf(on.step.to)}${on.step.phase ? ` in ${on.step.phase}` : ''}`;
+  }
+  /** A team board keeps its threads in the stack, for the team; yours keeps them on this Mac. */
+  async #talk(edit: FeatureEdit): Promise<boolean> {
+    const team = !board.own.some(one => one.name === board.name) && board.team.some(one => one.name === board.name);
+    if (!team) {
+      this.editFeature(edit);
+      return true;
+    }
+    const said = await post<{ ok?: true }>('board-comment', { name: board.name, edit });
+    if ('error' in said) {
+      toasts.show(`Could not keep the comment. ${said.error}`, 'warning');
+      return false;
+    }
+    // Shown at once on the board on screen; threads are no change to its steps, so it stays the team's.
+    this.editFeature(edit);
+    // The team's boards as the stack now has them, for the counts in the menus.
+    void board.reload();
+    return true;
+  }
+  /** A new thread on a card or a step; the agent is asked to answer it. */
+  async comment(on: Comment['on'], text: string): Promise<void> {
+    const id = `c${Date.now().toString(36)}`;
+    if (!(await this.#talk({ comment: { id, on, text, at: new Date().toISOString() } }))) return;
+    this.thread = { id };
+    await runs.askComment(board.name ?? '', id, this.about(on), text);
+  }
+  async reply(id: string, text: string): Promise<void> {
+    const on = board.feature?.comments?.find(one => one.id === id)?.on;
+    if (!on || !(await this.#talk({ reply: { id, by: 'you', text, at: new Date().toISOString() } }))) return;
+    await runs.askComment(board.name ?? '', id, this.about(on), text);
+  }
+  async resolve(id: string): Promise<void> {
+    if (await this.#talk({ resolve: id })) this.thread = null;
   }
 
   /** A change to the feature board, made here as `koppler board edit` makes it. */

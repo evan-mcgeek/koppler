@@ -5,6 +5,7 @@
   // The board on screen, by name: a menu of the boards, the team's and the user's own in one list by area, to open,
   // rename, copy, share or delete one, start a new one, or open one from a file or a link.
   import type { StoredPreset } from '../src/core/presets.ts';
+  import { featureOf, openComments } from '../src/core/feature.ts';
   import { bar } from './bar.svelte.ts';
   import { areaWhy, boardArea, boardGroups } from '../src/core/areas.ts';
   import AreaFilter from './AreaFilter.svelte';
@@ -342,6 +343,11 @@
             >{/if}</span
         >{#if under || preset['flow']}<span class="under">{under || `from ${String(preset['flow'])}`}</span>{/if}</span
       >
+      {#if openComments(featureOf(preset['feature']))}<span
+          class="talks"
+          aria-label="{openComments(featureOf(preset['feature']))} open comments"
+          title="Open comments">{openComments(featureOf(preset['feature']))}</span
+        >{/if}
       <!-- A fixed column, so names stay put whether the tag or the … shows. -->
       <span class="whose"
         >{#if !mine}<span class="team" title="A team board, from the stack">Team</span>{/if}</span
@@ -1090,5 +1096,12 @@
   }
   .gone .name {
     flex: 1;
+  }
+  .talks {
+    flex: none;
+    padding: 0 5px;
+    border: 1px solid var(--line-strong);
+    color: var(--muted);
+    font: 400 11px/16px var(--mono);
   }
 </style>

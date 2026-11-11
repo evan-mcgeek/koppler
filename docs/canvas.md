@@ -194,6 +194,10 @@ Or start from an app, and add a picked card's links with **Add as a step**.
 The panel on the left holds the request and the steps, each in words ("Web Shop calls Orders API"): pick a phase to dim the others, rename or remove it, or take a step off; a picked card's panel opens on the right.
 Each phase's title sits on the map over the card it starts from, above the cards; a click on it picks the phase too, dimming the other phases' cards and links.
 **Walk through the steps**, or click a step's number on the map, to follow the feature one step at a time ("Step 2 of 7"): → and ← move on and back, each step brought into view with its note, its link and two cards in ink and the rest at 45%; **End** or Esc stops.
+**Comment**, then a click on a card or a step's **Here**, opens a thread beside the map; the agent is asked to answer it and does so in the thread, and while it works a warn dot shows on the card's marker.
+An answer that adds a step the feature misses draws it dashed until **Keep step N** makes it solid; **Undo** takes it off and leaves the thread.
+A card with open threads carries an ink marker with their number, a step carries it at its end, and the home and the board menu count each board's; **Resolve** hides a thread and its marker.
+On a team board the threads are kept in the stack, for the team, and make no copy of your own; on yours, only you see them. Share leaves them out unless you include them, and the page shows them to read only.
 
 <img alt="A feature board, Checkout: its steps numbered in two phases on the map and in the panel, and one step the agent proposed, dashed, with Accept and Drop" src="images/feature-board.png">
 

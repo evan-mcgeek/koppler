@@ -377,6 +377,7 @@ const PROMPT_TAGS = new Set([
   'koppler-fix',
   'koppler-facts',
   'koppler-feature',
+  'koppler-comment',
 ]);
 /** A prompt from the standalone page: only the canvas's own kinds, with a bounded text and data object. */
 export function sanitizePrompt(input: unknown): Prompt | null {

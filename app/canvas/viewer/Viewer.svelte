@@ -21,6 +21,11 @@
   /** The card picked for its description: who it is, and its steps in this flow. */
   let shown = $state<string | null>(null);
   const shownCard = $derived(flow?.cards.find(card => card.id === shown));
+  /** The threads the sharer included, on a card or on a step by its number: to read, never to answer. */
+  const talksOn = (on: { card: string } | { step: string }) =>
+    (flow?.comments ?? []).filter(one =>
+      'card' in on ? 'card' in one.on && one.on.card === on.card : 'step' in one.on && one.on.step === on.step,
+    );
   /** "Step 1.2: calls Payments API", "Step 1.1: called by Web Shop". */
   const inFlow = $derived(
     shown === null
@@ -142,6 +147,15 @@
 </script>
 
 <svelte:window onkeydown={keys} />
+
+<!-- eslint-disable @typescript-eslint/no-confusing-void-expression -- {@render} of a snippet returns nothing -->
+{#snippet talks(list: NonNullable<Flow['comments']>)}
+  {#each list as one, at (at)}
+    <div class="talk">
+      {#each one.thread as said, n (n)}<p><b>{said.by === 'agent' ? 'Agent' : 'Comment'}</b> {said.text}</p>{/each}
+    </div>
+  {/each}
+{/snippet}
 
 <header>
   <span class="stack">{data.stack}</span><span class="slash">/</span><span class="flow-name">{flow?.name ?? ''}</span>
@@ -286,6 +300,7 @@
             {#each inFlow as line (line)}<li>{line}</li>{/each}
           </ul>
         {/if}
+        {@render talks(talksOn({ card: shownCard.id }))}
         <button
           type="button"
           class="walk"
@@ -321,6 +336,7 @@
               ><b>{name(one.from)} → {name(one.to)}</b>{#if one.note}<span>{one.note}</span>{/if}</span
             >
           </button>
+          {@render talks(talksOn({ step: one.number }))}
         {/each}
       {/each}
       <p class="note">Cards can be moved and the map dragged; nothing is kept. Open the file again to start over.</p>
@@ -723,5 +739,15 @@
     border-top: 1px solid var(--line);
     color: var(--ink-muted);
     font-size: 13px;
+  }
+  /* A thread the sharer included: to read only. */
+  .talk {
+    margin: 4px 0 10px 34px;
+    padding: 6px 10px;
+    border-left: 2px solid var(--line);
+    font-size: 13px;
+  }
+  .talk p {
+    margin: 2px 0;
   }
 </style>

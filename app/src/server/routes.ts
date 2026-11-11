@@ -18,6 +18,7 @@ import { appendNote } from '../engine/history.ts';
 import {
   addApps,
   addOutside,
+  commentOnTeamBoard,
   editStack,
   setBoardArea,
   removeApp,
@@ -28,6 +29,7 @@ import {
 } from '../engine/stack-file.ts';
 import { shareBoard, shareTarget } from '../engine/share.ts';
 import { boardPage } from '../engine/export.ts';
+import type { FeatureEdit } from '../core/feature.ts';
 import { newToken, pageToken, writePageUrl } from './token.ts';
 import type { StoredPreset } from '../core/presets.ts';
 import { createStack, currentStack, forgetStacks, useStack } from '../engine/stacks.ts';
@@ -246,8 +248,24 @@ export const ROUTES: Record<string, Route> = {
     if (!stack) return { status: 400, body: { error: 'No stack is in use.' } };
     if (!name) return { status: 400, body: { error: 'Which board?' } };
     const env = typeof body['env'] === 'string' && stack.envs.includes(body['env']) ? body['env'] : undefined;
-    const made = await boardPage(stack, name, undefined, env);
+    const made = await boardPage(stack, name, undefined, env, body['comments'] === true);
     return { status: 'error' in made ? 400 : 200, body: made };
+  },
+  // A comment, reply or resolve on a team feature board, kept with it in the stack for the team.
+  '/board-comment': body => {
+    const name = typeof body['name'] === 'string' ? body['name'] : '';
+    const given = (body['edit'] ?? {}) as FeatureEdit;
+    if (!name) return { status: 400, body: { error: 'Which team board?' } };
+    const edit: FeatureEdit = {
+      ...(given.comment && { comment: given.comment }),
+      ...(given.reply && { reply: { ...given.reply, by: 'you' as const } }),
+      ...(typeof given.resolve === 'string' && { resolve: given.resolve }),
+    };
+    const result = commentOnTeamBoard(name, edit);
+    if (result.error !== undefined) return { status: 400, body: result };
+    refreshRegistry();
+    forgetStacks();
+    return { status: 200, body: { ok: true } };
   },
   // A team board's area from the board menu, found by its name in the stack as it is now.
   '/board-area': body => {

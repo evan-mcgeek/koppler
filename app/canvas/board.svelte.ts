@@ -2,7 +2,7 @@
 // waypoints, sliding an end along its side). The geometry is core/cables and core/arrange, unchanged.
 import type { Edge, Node } from '@xyflow/svelte';
 import { resolveExpressions } from '../src/core/expressions.ts';
-import { editFeature, featureOf, type Feature } from '../src/core/feature.ts';
+import { editFeature, featureOf, withoutComments, type Feature } from '../src/core/feature.ts';
 import { databasesOf, withDatabases } from '../src/core/databases.ts';
 import { scheduleWords } from '../src/core/schedule.ts';
 import { changedNote } from '../src/core/discover.ts';
@@ -1554,7 +1554,11 @@ class Board {
     // A team board stays the team's until it is changed; branches, notes, how apps run and a feature's steps count too.
     const told = (preset: { nodes: unknown; edges: { from: string; to: string }[]; feature?: unknown }) =>
       JSON.stringify(
-        [preset.nodes, preset.edges.map(edge => `${edge.from}>${edge.to}`).sort(), featureOf(preset.feature)],
+        [
+          preset.nodes,
+          preset.edges.map(edge => `${edge.from}>${edge.to}`).sort(),
+          withoutComments(featureOf(preset.feature)),
+        ],
         (key, value: unknown) => (key === 'followsClone' ? undefined : value),
       );
     // A feature board with no app cards opens as it is kept.

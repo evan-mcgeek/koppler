@@ -2,7 +2,7 @@
   // Discover's home: the whole stack first, then the feature boards, the team's and yours, and at the foot a question
   // to the agent, which becomes a feature board of your own that it drafts on the map.
   import type { StoredPreset } from '../src/core/presets.ts';
-  import { featureOf } from '../src/core/feature.ts';
+  import { featureOf, openComments } from '../src/core/feature.ts';
   import { board } from './board.svelte.ts';
   import { openFlow } from './boards.ts';
   import { discovered } from './discover.svelte.ts';
@@ -64,7 +64,12 @@
       >{#if here(preset) && drafting !== null}<span class="drafting" role="status"
           >Agent drafting · {drafting} found so far</span
         >{/if}</span
-    ></button
+    >{#if openComments(featureOf(preset['feature']))}<span
+        class="talks"
+        title="Open comments"
+        aria-label="{openComments(featureOf(preset['feature']))} open comments"
+        >{openComments(featureOf(preset['feature']))}</span
+      >{/if}</button
   >
 {/snippet}
 
@@ -234,5 +239,12 @@
   .foot button:disabled {
     color: var(--muted);
     cursor: default;
+  }
+  .talks {
+    flex: none;
+    padding: 0 5px;
+    border: 1px solid var(--line-strong);
+    color: var(--muted);
+    font: 400 11px/16px var(--mono);
   }
 </style>

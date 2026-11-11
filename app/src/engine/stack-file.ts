@@ -1,4 +1,5 @@
 // Changes to the stack file in use: adding and removing apps and outside systems, and setting any field.
+import { editFeature, featureOf, type FeatureEdit } from '../core/feature.ts';
 import { upgradeStack } from '../core/migrations/files.ts';
 import { readUpgraded } from '../upgraded.ts';
 import { execFileSync } from 'node:child_process';
@@ -196,6 +197,24 @@ export function setBoardArea(
   );
   if (at < 0) return { error: `The stack changed: it has no team board called ${name} now. Read it again.` };
   return editStack(`presets[${String(at)}].area`, area ? [area] : undefined, { config });
+}
+
+/**
+ * A comment, a reply or a resolve on a team feature board, kept with it in the stack for the team: talking about a
+ * team board is no change to its steps, so it makes no copy of your own.
+ */
+export function commentOnTeamBoard(
+  name: string,
+  edit: FeatureEdit,
+  { config = loadConfig() }: { config?: Config } = {},
+): { path: string; value: unknown; error?: undefined } | { error: string } {
+  const used = stackInUse(config);
+  if (used.error !== undefined) return used;
+  const { presets } = used.stack as { presets?: unknown };
+  const all = Array.isArray(presets) ? (presets as ({ name?: unknown; feature?: unknown } | null)[]) : [];
+  const at = all.findIndex(one => one?.name === name);
+  if (at < 0) return { error: `The stack changed: it has no team board called ${name} now. Read it again.` };
+  return editStack(`presets[${String(at)}].feature`, [editFeature(featureOf(all[at]?.feature), edit)], { config });
 }
 
 /**

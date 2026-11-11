@@ -528,6 +528,18 @@ class Runs {
     );
   }
 
+  /** A comment on a feature board goes to the agent, which answers in its thread and may propose a step with it. */
+  askComment(board: string, id: string, about: string, text: string): Promise<boolean> {
+    const said = [
+      'Answer this comment on a feature board, using the koppler-run skill.',
+      `BOARD ${board}`,
+      `COMMENT ${id}, on ${about}`,
+      `TEXT ${text}`,
+      `Look into it in the stack and its repos. Answer with koppler board edit "${board}" --reply ${id}="<your answer>". When the answer is a step the feature misses, add --phase "<phase>" --propose-step <from>:<to>="<why>" to the same command: it is drawn dashed until the user keeps or undoes it. Never change the stack yourself.`,
+    ].join('\n');
+    return this.deliver(said, { tag: 'koppler-comment', data: { board, comment: id } }, 'Sent to the agent');
+  }
+
   /** Asks the agent to fill in an app's settings from its repo: it proposes, waits for a yes, and leaves locked ones alone. */
   askFill(id: string, empty: string[], locked: string[]): Promise<boolean> {
     const text = [

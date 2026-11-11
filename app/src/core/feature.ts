@@ -15,12 +15,28 @@ export interface Phase {
   name: string;
   steps: Step[];
 }
+/** One message in a comment's thread: yours or the agent's, and the step the agent proposed with it. */
+export interface Said {
+  by: 'you' | 'agent';
+  /** ISO time. */
+  at: string;
+  text: string;
+  step?: StepRef;
+}
+/** A thread about a card or a step of the feature; resolved, it is hidden. */
+export interface Comment {
+  id: string;
+  on: { card: Card } | { step: StepRef };
+  thread: Said[];
+  resolved?: true;
+}
 export interface Feature {
   /** The request, in the words it came in. */
   request: string;
   /** Cards it starts from before any step names them. */
   cards: Card[];
   phases: Phase[];
+  comments?: Comment[];
 }
 
 /** A step by its link, in one phase when it names one, else in every phase that has it. */
@@ -43,6 +59,12 @@ export interface FeatureEdit {
   rename?: { from: string; to: string };
   /** Phases taken off, by name, with their steps. */
   dropPhase?: string[];
+  /** A new thread on a card or a step. */
+  comment?: { id: string; on: Comment['on']; text: string; at: string };
+  /** A message added to a thread; the agent's carries the step it proposes in the same edit. */
+  reply?: { id: string; by: Said['by']; text: string; at: string };
+  /** A thread resolved, by its id. */
+  resolve?: string;
 }
 
 const MAX_REQUEST = 4000;
@@ -74,12 +96,53 @@ export function featureOf(given: unknown): Feature | null {
           ...(step['proposed'] === true && { proposed: true as const }),
         })),
     }));
+  const stepRef = (value: unknown): StepRef | null =>
+    isObject(value) && isCard(value['from']) && isCard(value['to'])
+      ? {
+          from: value['from'],
+          to: value['to'],
+          ...(words(value['phase'], 120) && { phase: words(value['phase'], 120) }),
+        }
+      : null;
+  const comments = list(given['comments'])
+    .filter(isObject)
+    .slice(0, 200)
+    .flatMap((one): Comment[] => {
+      const id = words(one['id'], 40);
+      const on = isObject(one['on']) ? one['on'] : {};
+      const step = stepRef(on['step']);
+      const where: Comment['on'] | null = isCard(on['card']) ? { card: on['card'] } : step ? { step } : null;
+      const thread = list(one['thread'])
+        .filter(isObject)
+        .slice(0, 100)
+        .flatMap((said): Said[] => {
+          const text = words(said['text'], 2000);
+          const by = said['by'] === 'agent' ? 'agent' : said['by'] === 'you' ? 'you' : null;
+          if (!text || !by) return [];
+          const proposed = stepRef(said['step']);
+          return [{ by, at: words(said['at'], 40), text, ...(proposed && { step: proposed }) }];
+        });
+      if (!id || !where || !thread.length) return [];
+      return [{ id, on: where, thread, ...(one['resolved'] === true && { resolved: true as const }) }];
+    });
   return {
     request: words(given['request'], MAX_REQUEST),
     cards: [...new Set(list(given['cards']).filter(isCard))].slice(0, 200),
     phases,
+    ...(comments.length && { comments }),
   };
 }
+
+/** The threads not resolved yet. */
+export const openComments = (feature: Feature | null): number =>
+  feature?.comments?.filter(one => !one.resolved).length ?? 0;
+
+/** The feature without its threads: what a change to it is judged by, so talking about a board changes no step. */
+export const withoutComments = (feature: Feature | null): Feature | null => {
+  if (!feature) return null;
+  const { comments: _, ...rest } = feature;
+  return rest;
+};
 
 /** How one card reaches another, as the stack says, else as their kinds allow. */
 export function kindBetween(facts: Facts, from: Card, to: Card): Link['kind'] {
@@ -150,6 +213,33 @@ export function editFeature(given: Feature | null, edit: FeatureEdit): Feature {
     steps(kept, all =>
       all.map(({ proposed, ...step }) => (same(kept)(step) || !proposed ? step : { ...step, proposed })),
     );
+  const comments = feature.comments ?? [];
+  if (edit.comment && edit.comment.text.trim() && !comments.some(one => one.id === edit.comment?.id)) {
+    const { id, on, text, at } = edit.comment;
+    feature = { ...feature, comments: [...comments, { id, on, thread: [{ by: 'you', at, text: words(text, 2000) }] }] };
+  }
+  if (edit.reply && edit.reply.text.trim()) {
+    const { id, by, text, at } = edit.reply;
+    // The step the agent proposed with this reply, as the steps now place it.
+    const made = by === 'agent' ? edit.step?.find(one => one.proposed) : undefined;
+    const into = made && (made.phase ?? feature.phases.find(one => one.steps.some(same(made)))?.name);
+    const step = made && { from: made.from, to: made.to, ...(into && { phase: into }) };
+    feature = {
+      ...feature,
+      comments: (feature.comments ?? []).map(one =>
+        one.id === id
+          ? { ...one, thread: [...one.thread, { by, at, text: words(text, 2000), ...(step && { step }) }] }
+          : one,
+      ),
+    };
+  }
+  if (edit.resolve)
+    feature = {
+      ...feature,
+      comments: (feature.comments ?? []).map(one =>
+        one.id === edit.resolve ? { ...one, resolved: true as const } : one,
+      ),
+    };
   return feature;
 }
 
