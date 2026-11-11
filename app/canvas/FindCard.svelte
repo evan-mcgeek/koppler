@@ -35,7 +35,7 @@
     return all
       .map(card => ({
         card,
-        ...discovered.data(card, false, 0),
+        ...discovered.data(card, false),
         on: shown.has(card),
         hidden: discovered.hiding.apps.includes(card),
       }))

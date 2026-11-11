@@ -1,4 +1,4 @@
-// Discover: the map of the board's apps and what they touch, from the stack's facts. Nothing on it runs or changes the
+// Discover: the map of the stack, the board's apps marked, from the stack's facts. Nothing on it runs or changes the
 // board; it keeps only which cards were opened and where its cards sit, per board.
 import type { Point } from '../src/core/arrange.ts';
 import { DIRECTIONS, type Direction, type Laid } from '../src/core/layout.ts';
@@ -30,7 +30,6 @@ export interface LeanData extends Record<string, unknown> {
   /** An app cloned on this Mac. */
   cloned: boolean;
   onBoard: boolean;
-  hidden: number;
   /** The apps it links to that the chosen areas leave out, each with its areas. */
   outside: string[];
   /** An app that can run here. */
@@ -45,6 +44,8 @@ export interface LeanData extends Record<string, unknown> {
   edited: { tag: 'New' | 'Changed'; says: string } | null;
   /** Its clone's branch and changed files, when the repo's main branch does not have them. */
   changed: string;
+  /** On the whole stack: only its name and kind; the rest is in its panel. */
+  compact: boolean;
   /** A scheduled job: its schedule on the environment read, in words and as written, and the app whose repo it ships from. */
   job?: { words: string; expression: string; env: string; from: string };
 }
@@ -65,7 +66,7 @@ const RESOURCE_TAGS: Record<string, string> = { s3: 'S3', apigw: 'APIGW', sfn: '
 const counted = (n: number, one: string) => `${String(n)} ${one}${n === 1 ? '' : 's'}`;
 
 class Discovered {
-  /** The map: the board's apps, what they touch, and what was brought in from each opened card. */
+  /** The map: the whole stack, or a feature's cards and what was brought in from each opened card. */
   /** The board's own cards: its apps, and the outside systems put on it by hand. */
   #own = $derived([...board.nodes.map(node => node.id), ...board.pinned]);
   /** What the map always shows, whatever the areas: the board's own cards, and a feature's. */
@@ -134,7 +135,7 @@ class Discovered {
   /** An app's name, and its areas in brackets. */
   #withAreas = (card: Card) => `${board.nameOf(card)} (${areaNames(card).join(', ')})`;
   /** What a card shows. */
-  data(card: Card, onBoard: boolean, hidden: number, outside: Card[] = []): LeanData {
+  data(card: Card, onBoard: boolean, outside: Card[] = []): LeanData {
     const facts = board.facts;
     const proposed = !!board.feature && proposedCard(board.feature, card);
     const slug = facts?.apps[card]?.slug ?? '';
@@ -150,8 +151,7 @@ class Discovered {
       : null;
     const base = {
       onBoard,
-      // A feature board shows its flow: a card's other links are listed in its panel, to add as steps.
-      hidden: board.feature ? 0 : hidden,
+      compact: !board.feature,
       outside: outside.map(this.#withAreas),
       cloned: false,
       app: false,
@@ -300,7 +300,7 @@ class Discovered {
     board.discover = { ...board.discover, at: {}, layout: next % DIRECTIONS.length };
   }
 
-  /** Brings in the links a card leaves out: laid out again with the rest, or beside it once cards were moved by hand. */
+  /** On a feature board, brings in a card's links: laid out again with the rest, or beside it once cards were moved by hand. */
   open(card: Card): void {
     const before = new Set(this.map.cards.map(one => one.card));
     const at = { ...this.positions };
@@ -412,8 +412,8 @@ class Discovered {
 
   /** The picked apps that run here go on the board in Plan; the rest stay deployed and are listed there. */
   planRun(): void {
-    const apps = this.picked.filter(card => this.data(card, false, 0).app);
-    const leftOut = this.picked.filter(card => !this.data(card, false, 0).app);
+    const apps = this.picked.filter(card => this.data(card, false).app);
+    const leftOut = this.picked.filter(card => !this.data(card, false).app);
     for (const id of apps) board.add(id);
     board.fromDiscover = { picked: this.picked.length, running: apps, leftOut };
     this.picked = [];

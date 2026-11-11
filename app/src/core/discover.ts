@@ -1,5 +1,5 @@
-// Discover: how the stack fits together, read from its facts. The board's apps, everything one step away from them, and
-// one step further from each card whose hidden links were brought in.
+// Discover: how the stack fits together, read from its facts. The whole stack, with the board's apps marked; a feature
+// board shows only its flow, and one step around each card brought in.
 import { inAreas } from './areas.ts';
 import type { Point } from './arrange.ts';
 import type { Call, Stack } from './stack.ts';
@@ -124,25 +124,23 @@ const withVia = (use: unknown) => {
 
 export interface MapCard {
   card: Card;
-  /** One of the board's cards, or a queue or database one of them uses; the rest are one step away, drawn dimmed. */
+  /** One of the board's cards, or a queue or database one of them uses; the rest are drawn dimmed. */
   onBoard: boolean;
-  /** Links to cards not on the map: the +N chip that brings them in. */
-  hidden: number;
   /** The apps it links to that the chosen areas leave out. */
   outside?: Card[];
 }
 
 /**
- * What Discover shows for a board: its apps, the cards one step from them, and one step from each card in `open`;
- * the links between the cards shown, and how many each card leaves out. Apps outside the chosen `areas` are left out,
- * but the board's own.
+ * What Discover shows for a board: the whole stack, or with `whole` off only the board's cards and one step from each
+ * card in `open`; and the links between the cards shown. Apps outside the chosen `areas` are left out, but the board's
+ * own.
  */
 export function mapOf(
   facts: Facts,
   board: readonly Card[],
   open: readonly Card[] = [],
-  /** The cards one step from the board too; a feature board shows only its own until one is opened. */
-  around = true,
+  /** Every card of the stack; a feature board shows only its own until one is opened. */
+  whole = true,
   areas?: readonly string[],
 ): { cards: MapCard[]; links: Link[] } {
   const away = (card: Card) => !board.includes(card) && !!facts.apps[card] && !inAreas(facts.apps[card], areas);
@@ -160,7 +158,11 @@ export function mapOf(
           : !!facts.apps[card];
   const onBoard = board.filter(exists);
   const shown = new Set<Card>(onBoard);
-  for (const card of [...(around ? onBoard : []), ...open.filter(card => exists(card) && !away(card))]) {
+  if (whole) {
+    for (const id of Object.keys(facts.apps)) if (!away(id)) shown.add(id);
+    for (const link of all) shown.add(link.from).add(link.to);
+  }
+  for (const card of whole ? [] : open.filter(card => exists(card) && !away(card))) {
     shown.add(card);
     for (const other of near(card)) shown.add(other);
   }
@@ -184,7 +186,6 @@ export function mapOf(
     return {
       card,
       onBoard: own(card),
-      hidden: new Set(near(card).filter(other => !shown.has(other))).size,
       ...(outside.length && { outside }),
     };
   });

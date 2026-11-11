@@ -1,7 +1,7 @@
 <script lang="ts">
   // A card on the Discover map: its name, its kind, and where its code is or what it is. On the board it is solid;
-  // one step away it is drawn back. A +N chip on it brings in the links it leaves out; a dashed +N hidden counts those
-  // the chosen areas leave out, and opens the Areas checklist.
+  // the rest of the stack is drawn back. A dashed +N hidden counts the links the chosen areas leave out, and opens the
+  // Areas checklist.
   import GitBranch from '@lucide/svelte/icons/git-branch';
   import Clock from '@lucide/svelte/icons/clock';
   import type { NodeProps } from '@xyflow/svelte';
@@ -21,17 +21,20 @@
   class:proposed={data.proposed}
   class:picked={selected}
   class:job={!!data.job}
+  class:compact={data.compact}
   class:roomy={data.outside.length > 0 && discovered.direction !== 'DOWN'}
   title={data.name}
   bind:offsetHeight={height}
 >
-  {#if data.repo}<span class="repo">{data.repo} /</span>{/if}
+  {#if data.repo && !data.compact}<span class="repo">{data.repo} /</span>{/if}
   <span class="top">
     <span class="name">{data.name}</span>
     {#if data.edited}<span class="edited" title={data.edited.says}>{data.edited.tag}</span>{/if}
     <span class="tag">{data.tag}</span>
   </span>
-  {#if data.job}
+  {#if data.compact}
+    <!-- Name and kind only: what it is, where its code is and its schedule are in its panel. -->
+  {:else if data.job}
     <span class="job">
       <span
         class="when"
@@ -50,9 +53,9 @@ Schedule on {data.job.env.toUpperCase()}. Every environment in Settings"
     </span>
   {/if}
   {#if data.deadEnd}
-    <span class="dead">Dead end · no readers</span>
+    {#if !data.compact}<span class="dead">Dead end · no readers</span>{/if}
     <!-- Where its links would go on: they stop here. -->
-    {#if !data.hidden}<span class="stub" class:down={discovered.direction === 'DOWN'} aria-hidden="true"></span>{/if}
+    <span class="stub" class:down={discovered.direction === 'DOWN'} aria-hidden="true"></span>
   {/if}
   {#if data.proposed}
     <span class="proposal">
@@ -78,18 +81,6 @@ Schedule on {data.job.env.toUpperCase()}. Every environment in Settings"
         >
       </span>
     </span>
-  {/if}
-  {#if data.hidden}
-    <button
-      class="more nodrag"
-      type="button"
-      title="Show {data.hidden} more {data.hidden === 1 ? 'link' : 'links'}"
-      aria-label="Show {data.hidden} more {data.hidden === 1 ? 'link' : 'links'} of {data.name}"
-      onclick={ev => {
-        ev.stopPropagation();
-        discovered.open(id);
-      }}>+{data.hidden}</button
-    >
   {/if}
   {#if data.outside.length}
     <button
@@ -158,7 +149,10 @@ Schedule on {data.job.env.toUpperCase()}. Every environment in Settings"
     color: var(--ink);
     cursor: pointer;
   }
-  /* One step from the board: no fill, a hairline edge, the name and tag drawn back. */
+  .lean.compact {
+    min-height: 0;
+  }
+  /* Not on the board: no fill, a hairline edge, the name and tag drawn back. */
   .lean.ring {
     border-color: var(--line);
     background: var(--desk);
@@ -303,21 +297,6 @@ Schedule on {data.job.env.toUpperCase()}. Every environment in Settings"
     width: 16px;
     height: 2px;
   }
-  /* On the edge facing the hidden links: clicking brings exactly those in, and the chip goes. */
-  .more {
-    position: absolute;
-    top: 50%;
-    right: -14px;
-    padding: 1px 5px;
-    border: 1px solid var(--line-strong);
-    background: var(--desk);
-    color: var(--ink);
-    font: 600 11px/18px var(--mono);
-    transform: translateY(-50%);
-    cursor: pointer;
-  }
-  .more:hover,
-  .more:focus-visible,
   .away:hover,
   .away:focus-visible {
     border-color: var(--ink);

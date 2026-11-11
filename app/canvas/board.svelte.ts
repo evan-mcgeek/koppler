@@ -1263,7 +1263,7 @@ class Board {
 
   /** The Live view: the same board, in the same places, as read-only cards with their state. */
   live = $state(false);
-  /** Discover: how the stack fits together around the board, read from its facts. Nothing runs from it. */
+  /** Discover: how the stack fits together, the board's apps marked, read from its facts. Nothing runs from it. */
   discovering = $state(false);
   /** What Discover handed to Plan: how many were picked, the apps put on the board, and the cards that stay deployed. */
   fromDiscover = $state.raw<{ picked: number; running: string[]; leftOut: string[] } | null>(null);

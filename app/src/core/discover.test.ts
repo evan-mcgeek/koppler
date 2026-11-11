@@ -69,7 +69,7 @@ describe('linksOf with resources', () => {
       { from: 'shop', to: 'resource:refunds', kind: 'starts', sure: 'confirmed' },
       { from: 'resource:refunds', to: 'cards', kind: 'call', sure: 'confirmed' },
     ]);
-    expect(mapOf(withResources, ['shop']).cards.map(one => one.card)).toEqual([
+    expect(mapOf(withResources, ['shop'], ['shop'], false).cards.map(one => one.card)).toEqual([
       'shop',
       'resource:receipts',
       'resource:refunds',
@@ -93,24 +93,18 @@ describe('deadEnds', () => {
 });
 
 describe('mapOf', () => {
-  it('shows the board and one step around it, its apps queues and databases as its own, and counts what each card leaves out', () => {
-    const { cards, links } = mapOf(facts, ['orders']);
+  it("shows the whole stack, the board's apps and the queues and databases they use as its own", () => {
+    const { cards, links } = mapOf(facts, ['orders', 'gone']);
     expect(cards).toEqual([
-      { card: 'orders', onBoard: true, hidden: 0 },
-      { card: 'web', onBoard: false, hidden: 0 },
-      { card: 'payments', onBoard: false, hidden: 2 },
-      { card: 'queue:events', onBoard: true, hidden: 0 },
-      { card: 'database:orders-db', onBoard: true, hidden: 0 },
+      { card: 'orders', onBoard: true },
+      { card: 'web', onBoard: false },
+      { card: 'payments', onBoard: false },
+      { card: 'psp', onBoard: false },
+      { card: 'reports', onBoard: false },
+      { card: 'queue:events', onBoard: true },
+      { card: 'database:orders-db', onBoard: true },
     ]);
-    expect(links).toHaveLength(5);
-  });
-
-  it('brings in one step more around a card that is opened, and leaves out what does not exist', () => {
-    const { cards } = mapOf(facts, ['orders', 'gone'], ['payments']);
-    expect(cards.map(one => one.card).sort()).toEqual(
-      ['database:orders-db', 'orders', 'payments', 'psp', 'queue:events', 'reports', 'web'].sort(),
-    );
-    expect(cards.find(one => one.card === 'payments')?.hidden).toBe(0);
+    expect(links).toHaveLength(7);
   });
 });
 
@@ -127,25 +121,33 @@ describe('mapOf with areas chosen', () => {
   } as unknown as Facts;
 
   it("leaves out the apps outside them with their links, but the board's own, and says which each card links to", () => {
-    const { cards, links } = mapOf(zoned, ['web', 'ship'], ['mail'], true, ['payments']);
+    const { cards, links } = mapOf(zoned, ['web', 'ship'], [], true, ['payments']);
     expect(cards).toEqual([
-      { card: 'web', onBoard: true, hidden: 0, outside: ['mail'] },
-      { card: 'ship', onBoard: true, hidden: 0, outside: ['carrier'] },
-      { card: 'orders', onBoard: false, hidden: 1 },
+      { card: 'web', onBoard: true, outside: ['mail'] },
+      { card: 'ship', onBoard: true, outside: ['carrier'] },
+      { card: 'orders', onBoard: false },
+      { card: 'pay', onBoard: false },
     ]);
-    expect(links).toEqual([{ from: 'web', to: 'orders', kind: 'call', sure: 'confirmed', unsourced: true }]);
+    expect(links.map(link => `${link.from}>${link.to}`)).toEqual(['web>orders', 'orders>pay']);
   });
 
   it('shows every app with no choice', () => {
-    expect(mapOf(zoned, ['web'], [], true, []).cards.map(one => one.card)).toEqual(['web', 'orders', 'mail']);
+    expect(mapOf(zoned, ['web'], [], true, []).cards.map(one => one.card)).toEqual([
+      'web',
+      'orders',
+      'pay',
+      'mail',
+      'ship',
+      'carrier',
+    ]);
   });
 });
 
 describe('mapOf on a feature board', () => {
   it('shows only its own cards until one is opened', () => {
     expect(mapOf(facts, ['web', 'orders'], [], false).cards).toEqual([
-      { card: 'web', onBoard: true, hidden: 0 },
-      { card: 'orders', onBoard: true, hidden: 3 },
+      { card: 'web', onBoard: true },
+      { card: 'orders', onBoard: true },
     ]);
     expect(mapOf(facts, ['web', 'orders'], ['orders'], false).cards).toHaveLength(5);
   });

@@ -227,7 +227,7 @@
         if (opening) return;
         made[one.id] = true;
         // A queue or database a feature step names is said by its name too.
-        const name = (id: string) => (id.includes(':') ? discovered.data(id, false, 0).name : board.nameOf(id));
+        const name = (id: string) => (id.includes(':') ? discovered.data(id, false).name : board.nameOf(id));
         if (one.delete) {
           board.deleteBoard(one.board);
           toasts.show(`The agent deleted ${one.board}. Recently deleted brings it back.`);

@@ -10,7 +10,7 @@
   const env = $derived(board.env.toUpperCase());
   const apps = $derived((from?.leftOut ?? []).filter(card => !card.includes(':') && !board.facts?.apps[card]?.outside));
   const never = $derived((from?.leftOut ?? []).filter(card => !apps.includes(card)));
-  const info = (card: string) => discovered.data(card, false, 0);
+  const info = (card: string) => discovered.data(card, false);
   const clone = async (card: string) => {
     const slug = board.facts?.apps[card]?.slug;
     if (!slug) return;

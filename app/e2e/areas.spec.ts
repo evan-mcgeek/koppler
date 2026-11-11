@@ -134,11 +134,10 @@ test('Discover leaves out the apps outside the areas, and says so on the cards t
   await expect(page.locator('[data-link*="catalog"]')).toHaveCount(0);
   // A card does not say its areas: the choice above says which are shown.
   await expect(card(page, 'orders').locator('.areas')).toHaveCount(0);
-  // A dashed +N hidden, apart from the solid +N that brings in what is one step out.
+  // A dashed +N hidden names the links the areas leave out.
   const chip = card(page, 'web').getByRole('button', { name: '1 link of Web Shop hidden by your areas' });
   await expect(chip).toHaveText('+1 hidden');
   await expect(chip).toHaveAttribute('title', 'Not in your areas: Catalog API (Shipping)');
-  await expect(card(page, 'orders').getByRole('button', { name: 'Show 1 more link of Orders API' })).toBeVisible();
   const strip = page.getByRole('region', { name: 'Hidden by your areas' });
   await expect(strip.locator('.said')).toHaveText(
     'Showing Payments and apps with no area. 1 app in Shipping is hidden.',
