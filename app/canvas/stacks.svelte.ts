@@ -21,7 +21,7 @@ class Stacks {
       sub: `${board.stack} still has something running. It is stopped and reverted first, then Koppler switches.`,
       notices: [{ text: `Your boards and history for ${board.stack} are kept and come back when you switch back.` }],
       ok: 'Stop, revert and switch',
-      text: `Stop and revert this stack using the koppler-run skill (stop every process the agent started, revert every temporary code change), then switch Koppler to the stack "${to.name}": koppler history done <this run's id>, then koppler use "${to.dir}". Report what was stopped and reverted.`,
+      text: `Stop and revert this stack using the koppler:plan skill (stop every process the agent started, revert every temporary code change), then switch Koppler to the stack "${to.name}": koppler history done <this run's id>, then koppler use "${to.dir}". Report what was stopped and reverted.`,
       sent: 'Sent. Koppler switches once everything is stopped',
       data: { switchTo: to.dir },
     });
@@ -109,7 +109,7 @@ class Stacks {
       sub: `${board.stack} still has something running. It is stopped and reverted first; then choose Add a stack again.`,
       notices: [{ text: `Your boards and history for ${board.stack} are kept and come back when you switch back.` }],
       ok: 'Stop and revert',
-      text: 'Stop and revert this stack using the koppler-run skill (stop every process the agent started, revert every temporary code change), so the user can start a new stack. Report what was stopped and reverted.',
+      text: 'Stop and revert this stack using the koppler:plan skill (stop every process the agent started, revert every temporary code change), so the user can start a new stack. Report what was stopped and reverted.',
       sent: 'Stopping and reverting',
     });
   }

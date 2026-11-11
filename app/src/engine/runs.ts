@@ -150,7 +150,7 @@ async function gatherSession(stop: Run): Promise<void> {
       console.log(`Session gathered in ${dir}; nothing went wrong, so no review is queued.`);
       return;
     }
-    const review = `The session ended with a full Stop. Review it using the koppler-run skill: read ${dir}/summary.md and the files next to it, find every problem the user ran into, fix them in Koppler, verify each fix, and report.`;
+    const review = `The session ended with a full Stop. Review it using the koppler:plan skill: read ${dir}/summary.md and the files next to it, find every problem the user ran into, fix them in Koppler, verify each fix, and report.`;
     const prompt = { tag: 'koppler-review', at: stamp(), text: review, data: { dir } };
     fs.appendFileSync(path.join(tempDir(), 'prompts.jsonl'), JSON.stringify(prompt) + '\n', { mode: 0o600 });
     console.log(`Session gathered in ${dir}; a review request is queued for the agent.`);

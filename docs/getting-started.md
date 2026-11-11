@@ -9,6 +9,7 @@ npm install -g koppler
 Koppler needs macOS or Linux, git and Node 22 or newer.
 Until it is on npm, install it from a clone: `npm install -g ./koppler/app`.
 The [agent add-on](../README.md#the-agent-add-on) is optional.
+For Tab completion of every command and flag, add one line to your shell's startup file: `source <(koppler completion zsh)` in `~/.zshrc`, `source <(koppler completion bash)` in `~/.bashrc`, or `koppler completion fish | source` in `~/.config/fish/config.fish`.
 
 ## 2. Find your repos and a stack
 
@@ -40,10 +41,10 @@ It also runs whenever a stack loads, and the canvas shows anything missing.
 ## 4. Open the canvas
 
 ```bash
-koppler canvas
+koppler
 ```
 
-It starts the canvas server when needed and opens it in your browser.
+On its own, `koppler` starts the canvas server when needed and opens it in your browser, as `koppler canvas` does.
 The agent chip in the toolbar shows whether an agent session is connected; you only need one for notes, checklists and fixes.
 
 <img alt="One feature, Checkout, worked on across four apps: the mobile app and web shop cabled to a local Orders API, which calls a local Payments API; each runs its feature/checkout branch, Orders API has its deployed QA database and a local SQS queue, two apps carry a note for the agent, and everything runs" src="images/board.png">
@@ -65,4 +66,4 @@ Press **Stop** to stop everything Koppler started and undo every temporary chang
 
 - [The canvas](canvas.md) in detail.
 - [Secrets and safety](security.md) before you store your first secret.
-- [Stack format](../plugin/skills/koppler-run/references/stack.md) to describe your apps.
+- [Stack format](../plugin/skills/plan/references/stack.md) to describe your apps.

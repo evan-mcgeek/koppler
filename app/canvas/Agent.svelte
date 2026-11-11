@@ -14,14 +14,14 @@
     question: ['Agent needs you', 'The agent asked something about your run. Click to answer.'],
     quiet: [
       'Agent quiet',
-      'It took a request and has neither finished it nor listened again since. If its session is done, run /koppler-run connect there; click for the steps.',
+      'It took a request and has neither finished it nor listened again since. If its session is done, run /koppler:plan connect there; click for the steps.',
     ],
     none: [
       'No agent listening',
       'Runs work without one. Notes, checklists and fix requests wait until an agent connects; click to see how.',
     ],
   };
-  const COMMAND = '/koppler-run connect';
+  const COMMAND = '/koppler:plan connect';
   const id = $props.id();
   let chip = $state<HTMLButtonElement>();
   let pop = $state<HTMLDivElement>();

@@ -80,7 +80,7 @@
             Sent while no agent was connected. Of several runs and Stops only the newest is acted on. One gets them when
             you run this in your agent session:
           </p>
-          <Command command="/koppler-run connect" />
+          <Command command="/koppler:plan connect" />
           <ul>
             {#each inbox.waiting as one (one.key)}
               <li>

@@ -98,7 +98,7 @@ test('what was sent while no agent listened is listed in the panel, and can be d
     /Stop and revert\s*5 minutes ago/,
     /Fix Orders API\s*5 minutes ago/,
   ]);
-  await expect(waiting).toContainText('/koppler-run connect');
+  await expect(waiting).toContainText('/koppler:plan connect');
   await page.screenshot({ path: 'test-results/next-waiting.png' });
   await waiting.getByRole('button', { name: 'Drop: Fix Orders API' }).click();
   await expect(panel.getByRole('region', { name: 'Waiting for an agent (1)' })).toBeVisible();

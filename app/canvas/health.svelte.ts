@@ -133,7 +133,7 @@ class Health {
       }));
     if (!failures.length) return;
     const text = [
-      'Fix what the Koppler flow check found, using the koppler-run skill.',
+      'Fix what the Koppler flow check found, using the koppler:plan skill.',
       `ENV ${board.env.toUpperCase()}`,
       'FAILED:',
       ...failures.map(one => `  ${one.connection}: ${one.result}. ${one.detail}`),
