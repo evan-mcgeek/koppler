@@ -202,6 +202,9 @@ It writes one page that opens in any browser with nothing to install or load: pi
 It holds each flow's request, steps and app names, with an app's description when it has one (its settings' Description, a few words on what it does), and nothing else of the stack: no addresses, settings or code.
 Run in the stack repo's CI (`koppler export site/index.html --stack .`), it stays as current as the stack, behind your company's own sign-in.
 To send one feature board, your own or the team's, without sharing it first, pick **Export** in its **…** menu in the board menu: the page of that board alone is saved to your downloads (`koppler export --board "<name>"` writes the same).
+**Share** in Discover's bar does the same for the feature board on screen (it is off on Whole stack): pick the environment the page is about, then **Save the page**.
+The page is a snapshot of today, says **View only**, the environment and the date, and "Made with koppler" in plain words; a picked card shows its description and its steps in the flow, never a host, route or setting, and nothing a viewer does is saved.
+Share says when you last shared the board from this Mac; share again after changes.
 
 **Plan** shows every field of a card; **Live** shows what runs, with short cards.
 Live is there only while something runs; once the last app stops, the board goes back to Plan.

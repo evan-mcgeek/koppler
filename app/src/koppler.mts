@@ -572,13 +572,16 @@ const COMMANDS: Command[] = [
   {
     name: 'export',
     who: 'you',
-    args: '[<file>] [--stack <dir>] [--board <name>]',
+    args: '[<file>] [--stack <dir>] [--board <name> [--env <env>]]',
     about: "the team's feature boards as one page to read, for people who never run Koppler: flows, steps, app names",
     run: exportCommand,
     example: 'koppler export site/index.html --stack .',
     forms: [
       ['[<file>] [--stack <dir>]', 'every team feature board, one flow each'],
-      ['[<file>] --board <name>', "one feature board, your own or the team's, as a page of its own"],
+      [
+        '[<file>] --board <name> [--env <env>]',
+        "one feature board, your own or the team's, as a page of its own; --env prints the environment on it",
+      ],
     ],
   },
   {

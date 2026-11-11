@@ -80,6 +80,7 @@ export async function boardPage(
   stack: Stack,
   name: string,
   own: readonly StoredPreset[] = (readData('state')?.['presets'] ?? []) as StoredPreset[],
+  env?: string,
 ): Promise<{ file: string; page: string } | { error: string }> {
   const found = boardNamed<{ name: string } & Record<string, unknown>>(own, stack.presets ?? [], name);
   if ('error' in found) return found;
@@ -87,7 +88,7 @@ export async function boardPage(
   const title = stack.name ?? 'Stack';
   return {
     file: fileNameOf(`${title} ${found.board.name}`),
-    page: pageWith({ stack: title, exported: new Date().toISOString(), flows }),
+    page: pageWith({ stack: title, exported: new Date().toISOString(), ...(env && { env }), flows }),
   };
 }
 
@@ -96,10 +97,13 @@ export async function exportCommand(args: string[]): Promise<void> {
   const stack = stackFrom(dir);
   const name = stack.name ?? 'Stack';
   const board = flagValue(args, '--board');
-  const given = positional(args, ['--stack', '--board'])[0];
+  const env = flagValue(args, '--env');
+  if (env !== undefined && !stack.envs.includes(env))
+    fail(`${env} is not an environment of the stack: ${stack.envs.join(', ')}`);
+  const given = positional(args, ['--stack', '--board', '--env'])[0];
   if (board !== undefined) {
     // A stack read from a folder has no boards of your own: those are kept for the stack in use.
-    const made = await boardPage(stack, board, dir ? [] : undefined);
+    const made = await boardPage(stack, board, dir ? [] : undefined, env);
     if ('error' in made) fail(made.error);
     const file = path.resolve(given ?? made.file);
     fs.writeFileSync(file, made.page);

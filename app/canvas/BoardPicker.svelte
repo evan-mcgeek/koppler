@@ -10,7 +10,7 @@
   import AreaFilter from './AreaFilter.svelte';
   import { chosen as areaChoice } from './areas.svelte.ts';
   import { board } from './board.svelte.ts';
-  import { ago, openBoard, openFile, openFlow, openLink } from './boards.ts';
+  import { ago, openBoard, openFile, openFlow, openLink, savePage } from './boards.ts';
   import { tick } from 'svelte';
   import { post } from './data.ts';
   import { runs } from './run.svelte.ts';
@@ -159,17 +159,8 @@
   };
   /** The board as the page `koppler export --board` writes, saved as a download. */
   const exportBoard = async (preset: StoredPreset) => {
-    const made = await post<{ file: string; page: string }>('board-export', { name: preset.name });
-    if ('error' in made) {
-      toasts.show(`Could not export ${preset.name}. ${made.error}`, 'warning');
-      return;
-    }
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(new Blob([made.page], { type: 'text/html' }));
-    link.download = made.file;
-    link.click();
-    URL.revokeObjectURL(link.href);
-    toasts.show(`Exported ${preset.name}: ${made.file}, a page to open in any browser.`);
+    const file = await savePage(preset.name);
+    if (file) toasts.show(`Exported ${preset.name}: ${file}, a page to open in any browser.`);
   };
   const reloadable = (preset: StoredPreset) =>
     typeof preset['source'] === 'string' && /^(https?:|\/)/.test(preset['source']);

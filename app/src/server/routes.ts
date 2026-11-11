@@ -245,7 +245,8 @@ export const ROUTES: Record<string, Route> = {
     const name = typeof body['name'] === 'string' ? body['name'] : '';
     if (!stack) return { status: 400, body: { error: 'No stack is in use.' } };
     if (!name) return { status: 400, body: { error: 'Which board?' } };
-    const made = await boardPage(stack, name);
+    const env = typeof body['env'] === 'string' && stack.envs.includes(body['env']) ? body['env'] : undefined;
+    const made = await boardPage(stack, name, undefined, env);
     return { status: 'error' in made ? 400 : 200, body: made };
   },
   // A team board's area from the board menu, found by its name in the stack as it is now.

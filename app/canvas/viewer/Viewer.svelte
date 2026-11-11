@@ -18,6 +18,21 @@
   const steps = $derived(flow?.phases.flatMap(phase => phase.steps) ?? []);
   const current = $derived(step === null ? null : (steps[step] ?? null));
   const name = (id: string) => flow?.cards.find(card => card.id === id)?.name ?? id;
+  /** The card picked for its description: who it is, and its steps in this flow. */
+  let shown = $state<string | null>(null);
+  const shownCard = $derived(flow?.cards.find(card => card.id === shown));
+  /** "Step 1.2: calls Payments API", "Step 1.1: called by Web Shop". */
+  const inFlow = $derived(
+    shown === null
+      ? []
+      : steps.flatMap(one =>
+          one.from === shown
+            ? [`Step ${one.number}: calls ${name(one.to)}`]
+            : one.to === shown
+              ? [`Step ${one.number}: called by ${name(one.from)}`]
+              : [],
+        ),
+  );
   const exported = $derived(
     new Date(data.exported).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }),
   );
@@ -37,6 +52,7 @@
   function open(index: number) {
     picked = index;
     step = null;
+    shown = null;
     at = structuredClone(data.flows[index]?.at ?? {});
     requestAnimationFrame(() => {
       fit();
@@ -89,8 +105,10 @@
         y: start.from.y + (move.clientY - start.y) / view.z,
       };
     };
-    target.onpointerup = () => {
+    target.onpointerup = up => {
       target.onpointermove = null;
+      // Let go where it was taken: a click, which shows the card's description.
+      if (Math.hypot(up.clientX - start.x, up.clientY - start.y) < 4) shown = shown === id ? null : id;
     };
   }
   function pan(event: PointerEvent) {
@@ -126,8 +144,10 @@
 <svelte:window onkeydown={keys} />
 
 <header>
-  <span class="mark">koppler</span><span class="slash">/</span><span class="stack">{data.stack}</span>
-  <span class="stamp">Exported {exported} · view only</span>
+  <span class="stack">{data.stack}</span><span class="slash">/</span><span class="flow-name">{flow?.name ?? ''}</span>
+  <span class="only">View only</span>
+  <span class="stamp">{data.env ? `${data.env.toUpperCase()} · ` : ''}{exported}</span>
+  <span class="made">Made with koppler</span>
 </header>
 <div class="layout">
   <nav aria-label="Flows">
@@ -188,6 +208,7 @@
             class="card"
             class:dim={current && current.from !== card.id && current.to !== card.id}
             class:on={current && (current.from === card.id || current.to === card.id)}
+            class:shown={shown === card.id}
             data-id={card.id}
             style:left="{place.x}px"
             style:top="{place.y}px"
@@ -254,6 +275,26 @@
     </div>
   </main>
   <aside aria-label="Steps">
+    {#if shownCard}
+      <section class="about" aria-label={shownCard.name}>
+        <h2>{shownCard.name}</h2>
+        <small>{shownCard.kind}</small>
+        {#if shownCard.description}<p>{shownCard.description}</p>{/if}
+        {#if inFlow.length}
+          <small>In this flow</small>
+          <ul>
+            {#each inFlow as line (line)}<li>{line}</li>{/each}
+          </ul>
+        {/if}
+        <button
+          type="button"
+          class="walk"
+          onclick={() => {
+            shown = null;
+          }}>Close</button
+        >
+      </section>
+    {/if}
     {#if flow}
       <h1>{flow.name}</h1>
       {#if flow.request}<div class="request"><small>What it is for</small>{flow.request}</div>{/if}
@@ -314,23 +355,32 @@
     padding: 0 20px;
     border-bottom: 1px solid var(--line);
   }
-  .mark {
-    font:
-      700 20px 'Barlow Semi Condensed',
-      Barlow,
-      sans-serif;
-  }
   .slash {
     color: var(--ink-muted);
   }
   .stack {
     font-weight: 600;
   }
-  .stamp {
-    margin-left: auto;
+  .flow-name {
+    font-weight: 600;
+  }
+  /* Said once, plainly: the page reads, it changes nothing. */
+  .only {
+    padding: 1px 6px;
+    border: 1px solid var(--line);
+    color: var(--ink-muted);
+    font:
+      600 12px Barlow,
+      sans-serif;
+  }
+  .stamp,
+  .made {
     color: var(--ink-muted);
     font-size: 13px;
     white-space: nowrap;
+  }
+  .made {
+    margin-left: auto;
   }
   .layout {
     display: grid;
@@ -478,8 +528,36 @@
   .card.dim {
     opacity: 0.3;
   }
-  .card.on {
+  .card.on,
+  .card.shown {
     border-color: var(--ink);
+  }
+  /* A picked card: what it is, and its part in the flow. */
+  .about {
+    margin-bottom: 18px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--line);
+  }
+  .about h2 {
+    margin: 0;
+    color: var(--ink);
+    font:
+      600 20px 'Barlow Semi Condensed',
+      Barlow,
+      sans-serif;
+  }
+  .about small {
+    display: block;
+    margin-top: 8px;
+    color: var(--ink-muted);
+    font-size: 13px;
+  }
+  .about p {
+    margin: 8px 0 0;
+  }
+  .about ul {
+    margin: 4px 0 10px;
+    padding-left: 18px;
   }
   .phase {
     position: absolute;
