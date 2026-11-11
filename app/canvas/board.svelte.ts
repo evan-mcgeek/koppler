@@ -1271,7 +1271,52 @@ class Board {
     if (this.discovering) return;
     this.goEdit();
     this.commit();
+    if (!this.feature) this.doors = { ...this.doors, run: this.name ?? undefined };
     this.discovering = true;
+  }
+  /** Each door's last board: Run's run board, and Discover's feature board (none: the whole stack). */
+  doors = $state.raw<{ run?: string | undefined; discover?: string | undefined }>({});
+  /** A board of yours or the team's, by name; yours first. */
+  boardNamed(name: string | undefined): StoredPreset | undefined {
+    return name === undefined ? undefined : [...this.own, ...this.team].find(one => one.name === name);
+  }
+  /** The run board Run was last on, or a new one. A feature board in its place is never left running anything. */
+  #backToRun(): void {
+    const last = this.boardNamed(this.doors.run);
+    if (last && !last['feature'] && !this.openBoard(last).error) return;
+    this.newBoard();
+  }
+  /**
+   * Through a door. Discover opens on its last feature board, or the whole stack; Run on its last run board, in Plan.
+   * Nothing running stops: Discover runs nothing, and Run comes back to the board that runs.
+   */
+  toDoor(to: 'discover' | 'run'): void {
+    if (to === 'discover') {
+      if (this.discovering) return;
+      const flow = this.boardNamed(this.doors.discover);
+      this.goDiscover();
+      if (flow?.['feature']) this.openBoard(flow);
+      return;
+    }
+    if (this.feature) {
+      this.commit();
+      this.doors = { ...this.doors, discover: this.name ?? undefined };
+      this.#backToRun();
+    }
+    this.goEdit();
+  }
+  /** Discover on a feature board, or the whole stack with none; what runs is left as it is. */
+  openFlow(flow: StoredPreset | null): { notes: string[]; error?: undefined } | { error: string } {
+    this.goDiscover();
+    if (!flow) {
+      this.doors = { ...this.doors, discover: undefined };
+      if (this.feature) this.#backToRun();
+      return { notes: [] };
+    }
+    this.commit();
+    const opened = this.openBoard(flow);
+    if (!opened.error) this.doors = { ...this.doors, discover: flow.name };
+    return opened;
   }
   #edit = '';
   #keptEdit: SavedBoard = {};
@@ -1607,10 +1652,12 @@ class Board {
   }
   /** A feature board: named at once, empty until its request or first app, and shown in Discover. */
   newFeature(): void {
+    if (!this.feature) this.doors = { ...this.doors, run: this.name ?? undefined };
     this.newBoard();
     this.name = this.uniqueName('New feature');
     this.feature = { request: '', cards: [], phases: [] };
     this.goDiscover();
+    this.doors = { ...this.doors, discover: this.name };
   }
   /** A board to start from: empty, and named once it holds an app. */
   newBoard(): void {
@@ -1849,6 +1896,11 @@ class Board {
     this.#seen = this.own.map(one => one.name);
     this.scratch = saved?.['scratch'] === true;
     this.discovering = saved?.['discovering'] === true;
+    const doors = (saved?.['doors'] ?? {}) as { run?: unknown; discover?: unknown };
+    this.doors = {
+      ...(typeof doors.run === 'string' && { run: doors.run }),
+      ...(typeof doors.discover === 'string' && { discover: doors.discover }),
+    };
     this.dismissed = (Array.isArray(saved?.['dismissed']) ? saved['dismissed'] : []) as string[];
     this.trash = (Array.isArray(saved?.['trash']) ? saved['trash'] : []) as Deleted[];
     this.recent = (Array.isArray(saved?.['recent']) ? saved['recent'] : []) as Opened[];
@@ -1862,6 +1914,8 @@ class Board {
     this.cardNotes = notesOf(saved?.['cardNotes']);
     this.discover = discoverOf(saved?.['discover']);
     this.feature = featureOf(saved?.['feature']);
+    // A feature board is Discover's: one kept open in Plan before the doors opens there.
+    if (this.feature) this.discovering = true;
     this.handArea = typeof saved?.['area'] === 'string' ? saved['area'] : null;
     this.pinned = (Array.isArray(saved?.['outside']) ? saved['outside'] : []) as string[];
     const { zoom, pan } = saved ?? {};
@@ -1978,6 +2032,7 @@ class Board {
       recent: this.recent,
       scratch: this.scratch || undefined,
       discovering: this.discovering || undefined,
+      doors: Object.keys(this.doors).length ? this.doors : undefined,
       dismissed: this.dismissed.length ? this.dismissed : undefined,
       env: this.env,
       ...(this.view && { zoom: this.view.zoom, pan: { x: this.view.x, y: this.view.y } }),

@@ -10,7 +10,7 @@
   import AreaFilter from './AreaFilter.svelte';
   import { chosen as areaChoice } from './areas.svelte.ts';
   import { board } from './board.svelte.ts';
-  import { ago, openBoard, openFile, openLink } from './boards.ts';
+  import { ago, openBoard, openFile, openFlow, openLink } from './boards.ts';
   import { tick } from 'svelte';
   import { post } from './data.ts';
   import { runs } from './run.svelte.ts';
@@ -36,16 +36,25 @@
     boardArea(facts, { nodes: preset.nodes, ...(typeof preset['area'] === 'string' && { area: preset['area'] }) });
   /** A board in the list: the team's or your own. */
   type Entry = { name: string; nodes: StoredPreset['nodes']; area?: unknown; mine: boolean; preset: StoredPreset };
-  const entries = $derived<Entry[]>([
-    ...board.team.map(preset => ({
-      name: preset.name,
-      nodes: preset.nodes,
-      area: preset['area'],
-      mine: false,
-      preset,
-    })),
-    ...board.own.map(preset => ({ name: preset.name, nodes: preset.nodes, area: preset['area'], mine: true, preset })),
-  ]);
+  /** Each door lists its own boards: Discover the feature boards, Run the run boards. */
+  const entries = $derived<Entry[]>(
+    [
+      ...board.team.map(preset => ({
+        name: preset.name,
+        nodes: preset.nodes,
+        area: preset['area'],
+        mine: false,
+        preset,
+      })),
+      ...board.own.map(preset => ({
+        name: preset.name,
+        nodes: preset.nodes,
+        area: preset['area'],
+        mine: true,
+        preset,
+      })),
+    ].filter(one => !!one.preset['feature'] === board.discovering),
+  );
   /** Every board by area, those the chosen areas hide counted; a search looks through every board. */
   const listed = $derived(
     boardGroups(
@@ -94,8 +103,12 @@
     toasts.show(why ? `Cannot reload ${name}. ${why}` : `Reloaded ${name} from ${from}.`, why ? 'warning' : 'message');
   };
   const shared = $derived(!mine && board.team.some(one => one.name === board.name));
+  /** Discover with no feature board open shows the whole stack. */
+  const whole = $derived(board.discovering && !board.feature);
   const label = $derived(
-    board.name ?? (board.scratch && board.nodes[0] ? `${board.nodes[0].data.name} alone` : 'New board'),
+    whole
+      ? 'Whole stack'
+      : (board.name ?? (board.scratch && board.nodes[0] ? `${board.nodes[0].data.name} alone` : 'New board')),
   );
   const options = () => [...(list?.querySelectorAll<HTMLButtonElement>('.row > button:first-child') ?? [])];
   const close = () => list?.hidePopover();
@@ -216,7 +229,10 @@
   };
   const choose = (preset: StoredPreset) => {
     close();
-    if (preset.name !== board.name) openBoard(preset);
+    if (preset.name === board.name) return;
+    // A feature board opens in Discover with what runs left as it is.
+    if (board.discovering) openFlow(preset);
+    else openBoard(preset);
   };
   const size = (preset: StoredPreset) => {
     const apps = Object.keys(preset.nodes).length;
@@ -333,7 +349,7 @@
           ><span class="name">{preset.name.replace(SUFFIX, '')}</span>{#if SUFFIX.test(preset.name)}<span class="suffix"
               >{SUFFIX.exec(preset.name)?.[0]}</span
             >{/if}</span
-        >{#if under || preset['feature']}<span class="under">{under || 'Feature board'}</span>{/if}</span
+        >{#if under}<span class="under">{under}</span>{/if}</span
       >
       <!-- A fixed column, so names stay put whether the tag or the … shows. -->
       <span class="whose"
@@ -362,16 +378,17 @@
   aria-label="Board: {label}"
   aria-haspopup="dialog"
   aria-expanded={open}
-  title={mine
-    ? 'Your board, saved on this Mac as you change it'
-    : shared
-      ? 'Team board, from the stack. Changing it makes a copy of your own.'
-      : 'Saved as soon as it has an app'}
+  title={whole
+    ? 'Every app of the stack, and how they fit together'
+    : mine
+      ? 'Your board, saved on this Mac as you change it'
+      : shared
+        ? 'Team board, from the stack. Changing it makes a copy of your own.'
+        : 'Saved as soon as it has an app'}
   popovertarget={id}
 >
   <span class="name">{label.replace(SUFFIX, '')}</span>
   {#if SUFFIX.test(label)}<span class="suffix" title="Changed on this Mac">{SUFFIX.exec(label)?.[0]}</span>{/if}
-  {#if board.feature}<span class="kind">Feature board</span>{/if}
   {#if outside}<span class="out-area" title="Outside the areas you chose; nothing on it is hidden">{outside}</span>{/if}
 </button>
 <div
@@ -467,6 +484,21 @@
           >{/if}
       </div>
     {/if}
+    {#if board.discovering && !query.trim()}
+      <div class="row whole-row">
+        <button
+          type="button"
+          aria-current={whole}
+          onclick={() => {
+            close();
+            openFlow(null);
+          }}
+          ><span class="here" aria-hidden="true"></span><span class="what"
+            ><span class="line"><span class="name">Whole stack</span></span></span
+          ></button
+        >
+      </div>
+    {/if}
     {#if pinned}
       <p class="sub">Current board</p>
       {@render boardRow(pinned, false, areaName(pinned))}
@@ -493,38 +525,45 @@
         >
       </p>
     {/if}
-    {#if !board.team.length && !board.own.length}
-      <p class="none">No boards yet. A board is kept as soon as it has an app.</p>
-    {:else if query.trim() && !board.team.some(shows) && !board.own.some(shows)}
+    {#if !entries.length}
+      <p class="none">
+        {board.discovering
+          ? 'No feature boards yet: ask the agent for one.'
+          : 'No boards yet. A board is kept as soon as it has an app.'}
+      </p>
+    {:else if query.trim() && !entries.some(one => shows(one.preset))}
       <p class="none">No board is called that.</p>
     {/if}
     <div class="strip">
       <div class="acts">
+        {#if board.discovering}
+          <button
+            type="button"
+            title="A feature board: describe it, and the agent proposes the apps and links it uses"
+            onclick={() => {
+              close();
+              board.newFeature();
+            }}>Ask the agent for a new one…</button
+          >
+        {:else}
+          <button
+            type="button"
+            onclick={() => {
+              close();
+              board.newBoard();
+            }}>New board</button
+          >
+        {/if}
         <button
           type="button"
-          onclick={() => {
-            close();
-            board.newBoard();
-          }}>New board</button
-        >
-        <button
-          type="button"
-          title="A board for one feature: its request, and the steps it takes through the stack, read in Discover"
-          onclick={() => {
-            close();
-            board.newFeature();
-          }}>New feature board</button
-        >
-        <button
-          type="button"
-          disabled={!board.nodes.length}
+          disabled={whole || !board.nodes.length}
           onclick={() => {
             close();
             board.duplicate();
           }}>Duplicate</button
         >
       </div>
-      {#if mine}
+      {#if mine && !whole}
         <form onsubmit={rename}>
           <input type="text" aria-label="Name of this board" maxlength="80" bind:value={named} />
           <button type="submit" disabled={named.trim() === board.name}>Rename</button>
@@ -688,11 +727,6 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-  }
-  .kind {
-    flex: none;
-    color: var(--ink-muted);
-    font: 400 12px var(--sans);
   }
   .suffix {
     flex: none;

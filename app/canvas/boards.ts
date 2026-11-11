@@ -37,6 +37,11 @@ function leave(to: string, open: () => void): void {
 export const openBoard = (preset: StoredPreset): void => {
   leave(preset.name, () => say(preset.name, board.openBoard(preset)));
 };
+/** A feature board in Discover, or the whole stack: nothing that runs has to stop for it. */
+export const openFlow = (flow: StoredPreset | null): void => {
+  const out = board.openFlow(flow);
+  if (flow) say(flow.name, out);
+};
 
 export async function openFile(file: File | undefined): Promise<void> {
   if (!file) return;

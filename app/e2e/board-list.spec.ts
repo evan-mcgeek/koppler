@@ -6,6 +6,7 @@ const apps = STACK.apps as Record<string, object>;
 const own = [
   { name: 'Checkout (local)', version: 1, nodes: { payments: { run: 'cli' } }, edges: [] },
   { name: 'Parcel notes', version: 1, nodes: { catalog: { run: 'cli' } }, edges: [] },
+  // A feature board: Discover's, never in Run's list.
   { name: 'basket rework', version: 1, nodes: { payments: { run: 'cli' } }, edges: [], feature: {} },
 ];
 const team = [...(STACK.presets ?? []), { name: 'Smoke test', version: 1, nodes: { web: { run: 'cli' } }, edges: [] }];
@@ -40,9 +41,8 @@ test.describe('a stack with areas', () => {
     page,
   }) => {
     const menu = await menuOf(page);
-    await expect(menu.locator('p.sub')).toHaveText(['Payments3', 'Shipping2', 'No area2']);
+    await expect(menu.locator('p.sub')).toHaveText(['Payments2', 'Shipping2', 'No area2']);
     await expect(rows(menu)).toHaveText([
-      /^basket rework\s*Feature board\s*$/,
       /^Checkout\s*Team\s*$/,
       /^Checkout\s*\(local\)\s*$/,
       /^Browse\s*Team\s*$/,
@@ -64,7 +64,7 @@ test.describe('a stack with areas', () => {
     await list.locator('[data-area]').filter({ hasText: 'Payments' }).hover();
     await list.getByRole('button', { name: 'Only' }).filter({ visible: true }).click();
     await page.keyboard.press('Escape');
-    await expect(menu.locator('p.sub')).toHaveText(['Payments3', 'No area2']);
+    await expect(menu.locator('p.sub')).toHaveText(['Payments2', 'No area2']);
     await expect(menu.locator('.hidden-line .said')).toHaveText('2 boards in Shipping: 1 team, 1 yours');
     await page.screenshot({ path: 'test-results/board-list-hidden.png' });
   });
@@ -77,7 +77,6 @@ test.describe('a stack with no areas', () => {
     const menu = await menuOf(page);
     await expect(menu.locator('p.sub')).toHaveCount(0);
     await expect(rows(menu)).toHaveText([
-      /^basket rework\s*Feature board\s*$/,
       /^Browse\s*Team\s*$/,
       /^Checkout\s*Team\s*$/,
       /^Checkout\s*\(local\)\s*$/,

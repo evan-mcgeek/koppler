@@ -46,12 +46,12 @@ test.describe('a board with an app', () => {
     board: { env: 'qa', mode: 'auto', zoom: 1, pan: { x: 60, y: 60 }, nodes: { web: at(0, 0) }, edges: [] },
   });
 
-  test("shows the whole stack, the board's apps solid and the rest drawn back", async ({ page }) => {
+  test('shows the whole stack, every card solid: no board is on it', async ({ page }) => {
     await discover(page);
     const lean = page.locator('.svelte-flow__node-lean');
     await expect(lean).toHaveCount(5);
     await expect(card(page, 'web').locator('.lean')).not.toHaveClass(/ring/);
-    await expect(card(page, 'search').locator('.lean')).toHaveClass(/ring/);
+    await expect(page.locator('.lean.ring')).toHaveCount(0);
     await expect(page.locator('.links .link')).toHaveCount(5);
     expect(await overlapping(page)).toEqual([]);
     await expect(page.locator('.lean .more')).toHaveCount(0);
@@ -425,10 +425,10 @@ test.describe('Read again', () => {
 test.describe('an empty board', () => {
   test.use({ board: { env: 'qa', mode: 'auto', zoom: 1, pan: { x: 60, y: 60 }, nodes: {}, edges: [] } });
 
-  test('shows the whole stack, every card drawn back', async ({ page }) => {
+  test('shows the whole stack, every card solid', async ({ page }) => {
     await page.getByRole('radio', { name: 'Discover' }).check();
     await expect(page.locator('.svelte-flow__node-lean')).toHaveCount(4);
-    await expect(page.locator('.lean:not(.ring)')).toHaveCount(0);
+    await expect(page.locator('.lean.ring')).toHaveCount(0);
   });
 });
 

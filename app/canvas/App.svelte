@@ -305,6 +305,12 @@
       document.querySelector<HTMLButtonElement>('header button[aria-label^="Board:"]')?.click();
       return;
     }
+    // ⌘1 Discover, ⌘2 Run, from anywhere.
+    if ((ev.metaKey || ev.ctrlKey) && !ev.altKey && (ev.key === '1' || ev.key === '2') && !board.present) {
+      ev.preventDefault();
+      board.toDoor(ev.key === '1' ? 'discover' : 'run');
+      return;
+    }
     if (!(ev.metaKey || ev.ctrlKey) || ev.key !== 'Enter' || !board.nodes.length || runs.review) return;
     ev.preventDefault();
     runs.start();
@@ -454,47 +460,66 @@
     }}><Mark size={22} /><span class="word">koppler</span></button
   >
   {#if board.stack}
-    <span class="names"><StackPicker /></span>
-    <span class="slash board-slash" aria-hidden="true">/</span>
-    <span class="boards"><BoardPicker /></span>
     <div
-      class="seg views"
+      class="door"
       role="radiogroup"
-      aria-label="Board view"
-      title="Discover (D): how the stack fits together. Plan (E): what runs and how it is wired. Live (L): what is running."
+      aria-label="Door"
+      title="Discover (⌘1): understand and share a flow. Run (⌘2): run a slice of it on this Mac."
     >
       <label
         ><input
           type="radio"
-          name="view"
+          name="door"
           checked={board.discovering}
           onchange={() => {
-            board.goDiscover();
+            board.toDoor('discover');
           }}
         />Discover</label
       >
       <label
         ><input
           type="radio"
-          name="view"
-          checked={!board.discovering && !board.live}
+          name="door"
+          checked={!board.discovering}
           onchange={() => {
-            board.goEdit();
+            board.toDoor('run');
           }}
-        />Plan</label
-      >
-      <label aria-disabled={!live.running} title={live.running ? undefined : 'Nothing is running'}
-        ><input
-          type="radio"
-          name="view"
-          disabled={!live.running}
-          checked={board.live && !board.discovering}
-          onchange={() => {
-            board.goLive();
-          }}
-        />Live</label
+        />Run</label
       >
     </div>
+    <span class="names"><StackPicker /></span>
+    <span class="slash board-slash" aria-hidden="true">/</span>
+    <span class="boards"><BoardPicker /></span>
+    {#if !board.discovering}
+      <div
+        class="seg views"
+        role="radiogroup"
+        aria-label="Board view"
+        title="Plan (E): what runs and how it is wired. Live (L): what is running."
+      >
+        <label
+          ><input
+            type="radio"
+            name="view"
+            checked={!board.live}
+            onchange={() => {
+              board.goEdit();
+            }}
+          />Plan</label
+        >
+        <label aria-disabled={!live.running} title={live.running ? undefined : 'Nothing is running'}
+          ><input
+            type="radio"
+            name="view"
+            disabled={!live.running}
+            checked={board.live}
+            onchange={() => {
+              board.goLive();
+            }}
+          />Live</label
+        >
+      </div>
+    {/if}
     <div class="seg env" role="radiogroup" aria-label="Environment">
       {#each board.envs as env (env)}
         <label class:prod={board.protected}
@@ -871,8 +896,8 @@
     height: 6px;
     background: var(--warn, var(--ink));
   }
-  /* As the bar runs short of room it gives way one step at a time, in this order; Run, Stop, the view switch and the
-     environment keep their words at every width. */
+  /* As the bar runs short of room it gives way one step at a time, in this order; the door, Run, Stop, the view switch
+     and the environment keep their words at every width. */
   header:global(.l1) :global(.settings .words),
   header:global(.l1) .read-again .words,
   header:global(.l2) .word,
@@ -917,6 +942,39 @@
   .env label,
   .views label {
     padding: 6px 11px;
+  }
+  /* The door decides what the rest of the bar is about: in ink, larger than the switches after it. */
+  .door {
+    display: flex;
+    flex: none;
+    margin-left: 4px;
+    border: 1px solid var(--ink);
+  }
+  .door label {
+    position: relative;
+    padding: 6px 14px;
+    color: var(--muted);
+    font: 600 14px var(--sans);
+    white-space: nowrap;
+    cursor: pointer;
+  }
+  .door label:has(input:checked) {
+    background: var(--ink);
+    color: var(--desk);
+  }
+  .door label:has(input:focus-visible) {
+    outline: 2px solid var(--ink);
+    outline-offset: 2px;
+  }
+  .door input {
+    position: absolute;
+    inset: 0;
+    margin: 0;
+    opacity: 0;
+    cursor: pointer;
+  }
+  .door label:not(:has(input:checked)):hover {
+    color: var(--ink);
   }
   .env label.prod:has(input:checked) {
     background: var(--prod-stripes);

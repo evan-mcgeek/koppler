@@ -345,7 +345,7 @@
       type="button"
       title="{said}. Scheduled jobs run deployed only; they read and write the same {shared.store}. Click to see them in Discover."
       onclick={() => {
-        board.goDiscover();
+        board.openFlow(null);
         discovered.open(shared.card);
         discovered.picked = shared.jobs.map(job => job.id);
       }}

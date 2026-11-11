@@ -58,7 +58,7 @@
   /** A search that finds a job opens the group. */
   const jobsShown = $derived(jobsOpen || (!!search.trim() && jobs.length > 0));
   const seeInDiscover = (app: StackApp) => {
-    board.goDiscover();
+    board.openFlow(null);
     discovered.picked = [app.id];
     discovered.last = app.id;
   };
@@ -87,7 +87,7 @@
   const pick = (app: StackApp, on: boolean) => {
     if (on) board.show(app.id);
     else if (app.outside) {
-      board.goDiscover();
+      board.openFlow(null);
       discovered.picked = [app.id];
       discovered.last = app.id;
     } else if (!app.cloned) void copyClone(app);

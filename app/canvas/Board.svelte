@@ -131,7 +131,7 @@
     } else if (key === 'f') void fit();
     else if (key === 'p') void presentBoard();
     else if (key === 'escape' && board.present) void presentBoard();
-    else if (key === 'd') board.goDiscover();
+    else if (key === 'd') board.toDoor('discover');
     else if (key === 'e') board.goEdit();
     else if (key === 'l' && live.running) board.goLive();
   };

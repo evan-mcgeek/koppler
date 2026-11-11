@@ -69,8 +69,8 @@ class Discovered {
   /** The map: the whole stack, or a feature's cards and what was brought in from each opened card. */
   /** The board's own cards: its apps, and the outside systems put on it by hand. */
   #own = $derived([...board.nodes.map(node => node.id), ...board.pinned]);
-  /** What the map always shows, whatever the areas: the board's own cards, and a feature's. */
-  #always = $derived(board.feature ? [...featureCards(board.feature), ...this.#own] : this.#own);
+  /** What the map always shows, whatever the areas: a feature board's own cards. The whole stack keeps none. */
+  #always = $derived(board.feature ? [...featureCards(board.feature), ...this.#own] : []);
   /** The apps the chosen areas leave off the map, and the areas they are in. */
   hiding = $derived(
     hiddenBy(
@@ -84,7 +84,11 @@ class Discovered {
     if (!facts) return { cards: [], links: [] as Link[] };
     const feature = board.feature;
     const areas = chosen.narrows ? chosen.ids : undefined;
-    if (!feature) return mapOf(facts, this.#own, board.discover.open, true, areas);
+    // The whole stack: every card as it is, none a board's.
+    if (!feature) {
+      const whole = mapOf(facts, [], [], true, areas);
+      return { cards: whole.cards.map(one => ({ ...one, onBoard: true })), links: whole.links };
+    }
     const shown = mapOf(facts, this.#always, board.discover.open, false, areas);
     // A step the stack has no link for yet is drawn as found, until it is accepted and recorded.
     const missing = numbered(feature)
@@ -414,6 +418,8 @@ class Discovered {
   planRun(): void {
     const apps = this.picked.filter(card => this.data(card, false).app);
     const leftOut = this.picked.filter(card => !this.data(card, false).app);
+    // The apps go to Run's board, never onto a feature board.
+    board.toDoor('run');
     for (const id of apps) board.add(id);
     board.fromDiscover = { picked: this.picked.length, running: apps, leftOut };
     this.picked = [];

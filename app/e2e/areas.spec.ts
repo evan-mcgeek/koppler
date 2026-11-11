@@ -273,7 +273,12 @@ test.describe('a feature board whose steps reach outside the areas', () => {
   });
 
   test("counts no step's app as hidden", async ({ page }) => {
-    await only(page, panel(page), 'Payments');
+    // A feature board opens in Discover: the areas are picked in the board menu.
+    await page
+      .getByRole('banner')
+      .getByRole('button', { name: /^Board:/ })
+      .click();
+    await only(page, page.getByRole('dialog', { name: 'Boards' }), 'Payments');
     await discover(page);
     await expect(card(page, 'catalog')).toBeVisible();
     await expect(page.getByRole('region', { name: 'Hidden by your areas' })).toHaveCount(0);
