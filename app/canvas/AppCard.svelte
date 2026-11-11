@@ -10,6 +10,7 @@
   import GripVertical from '@lucide/svelte/icons/grip-vertical';
   import Clock from '@lucide/svelte/icons/clock';
   import { discovered } from './discover.svelte.ts';
+  import { openFlow } from './boards.ts';
   import Command from './Command.svelte';
   import CardFields from './CardFields.svelte';
   import Fold from './Fold.svelte';
@@ -246,6 +247,19 @@
         <Icon of={anyOpen ? ChevronsDownUp : ChevronsUpDown} size={14} />{anyOpen ? 'Fold all' : 'Open all'}
       </button>
     {/if}
+    <button
+      type="button"
+      aria-label="Show {data.name} in Discover"
+      title="Its place in the flow this board came from, or in the whole stack"
+      onclick={() => {
+        const flow = board.boardNamed(board.flow ?? undefined);
+        openFlow(flow?.['feature'] ? flow : null);
+        discovered.picked = [id];
+        discovered.last = id;
+      }}
+    >
+      Show in Discover
+    </button>
     <button
       type="button"
       aria-label="Settings for {data.name}"

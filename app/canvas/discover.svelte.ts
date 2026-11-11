@@ -412,12 +412,18 @@ class Discovered {
   }
 
   /** The picked apps that run here go on the board in Plan; the rest stay deployed and are listed there. */
-  planRun(): void {
+  /** The run boards the picked apps can go to: yours and the team's, never a feature board. */
+  get runBoards(): string[] {
+    return [...new Set([...board.own, ...board.team].filter(one => !one['feature']).map(one => one.name))];
+  }
+  /** On a new run board named after the flow, or on the run board `to`. Only apps cross; the rest stay deployed. */
+  planRun(to?: string): void {
     const apps = this.picked.filter(card => this.data(card, false).app);
     const leftOut = this.picked.filter(card => !this.data(card, false).app);
-    // The apps go to Run's board, never onto a feature board.
-    board.toDoor('run');
+    board.planIn(to, board.feature ? board.name : null);
     for (const id of apps) board.add(id);
+    // A new run board is laid out along its calls once its cards have their sizes, as Arrange does.
+    if (!to) board.opened = 'arrange';
     board.fromDiscover = { picked: this.picked.length, running: apps, leftOut };
     this.picked = [];
     board.goEdit();

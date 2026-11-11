@@ -342,6 +342,8 @@ class Board {
   feature = $state.raw<Feature | null>(null);
   /** The area the board was put in by hand, by id; null when its apps say. */
   handArea = $state<string | null>(null);
+  /** The feature board a run board was planned from in Discover: its Flow chip leads back to it. */
+  flow = $state<string | null>(null);
   /** The outside systems put on the board by hand: Discover draws them as the board's own. */
   pinned = $state.raw<string[]>([]);
   infraBoxes = $derived(
@@ -1305,6 +1307,25 @@ class Board {
     }
     this.goEdit();
   }
+  /**
+   * Run on the run board `to`, or on a new one planned from `flow` and named after it; what runs is left as it is.
+   * A run board keeps the flow it came from.
+   */
+  planIn(to: string | undefined, flow: string | null): void {
+    this.commit();
+    if (this.feature) this.doors = { ...this.doors, discover: this.name ?? undefined };
+    const kept = this.boardNamed(to);
+    if (kept && !kept['feature'] && !this.openBoard(kept).error) {
+      if (!this.flow && flow) this.flow = flow;
+    } else {
+      this.newBoard();
+      if (flow) {
+        this.name = this.uniqueName(`${flow} run`);
+        this.flow = flow;
+      }
+    }
+    this.goEdit();
+  }
   /** Discover on a feature board, or the whole stack with none; what runs is left as it is. */
   openFlow(flow: StoredPreset | null): { notes: string[]; error?: undefined } | { error: string } {
     this.goDiscover();
@@ -1351,6 +1372,7 @@ class Board {
       pinned: this.pinned,
       feature: this.feature,
       area: this.handArea,
+      flow: this.flow,
       cardNotes: this.cardNotes,
       discover: this.discover,
       edges: this.edges.map(({ id, source, target, type, data }) => ({ id, source, target, type, data })),
@@ -1371,6 +1393,7 @@ class Board {
       pinned,
       feature,
       area,
+      flow,
       cardNotes,
       discover,
     } = JSON.parse(back) as {
@@ -1385,11 +1408,13 @@ class Board {
       pinned: string[];
       feature?: Feature | null;
       area?: string | null;
+      flow?: string | null;
       cardNotes?: Record<string, string>;
       discover?: DiscoverState;
     };
     this.name = name;
     this.handArea = area ?? null;
+    this.flow = flow ?? null;
     this.discover = discoverOf(discover);
     this.pinned = pinned;
     this.feature = featureOf(feature);
@@ -1473,6 +1498,7 @@ class Board {
       ...(discoverKept(this.discover) && { discover: this.discover }),
       ...(this.feature && { feature: this.feature }),
       ...(this.handArea && { area: this.handArea }),
+      ...(this.flow && { flow: this.flow }),
     };
   }
   /** Where the cards sit and which sides the cables use, kept with a board so it opens as it was left. */
@@ -1681,6 +1707,7 @@ class Board {
     this.discover = { open: [], at: {} };
     this.feature = null;
     this.handArea = null;
+    this.flow = null;
     this.pinned = [];
   }
   /**
@@ -1694,6 +1721,7 @@ class Board {
       this.discover = discoverOf(given['discover']);
       this.feature = featureOf(given['feature']);
       this.handArea = typeof given['area'] === 'string' ? given['area'] : null;
+      this.flow = typeof given['flow'] === 'string' ? given['flow'] : null;
       return { notes: [] };
     }
     const checked = check(given, this.#facts());
@@ -1722,6 +1750,7 @@ class Board {
     this.discover = discoverOf(given['discover']);
     this.feature = featureOf(given['feature']);
     this.handArea = typeof given['area'] === 'string' ? given['area'] : null;
+    this.flow = typeof given['flow'] === 'string' ? given['flow'] : null;
     this.pinned = Array.isArray(given['outside'])
       ? (given['outside'] as unknown[]).filter((id): id is string => typeof id === 'string')
       : [];
@@ -1906,6 +1935,7 @@ class Board {
     // A feature board is Discover's: one kept open in Plan before the doors opens there.
     if (this.feature) this.discovering = true;
     this.handArea = typeof saved?.['area'] === 'string' ? saved['area'] : null;
+    this.flow = typeof saved?.['flow'] === 'string' ? saved['flow'] : null;
     this.pinned = (Array.isArray(saved?.['outside']) ? saved['outside'] : []) as string[];
     const { zoom, pan } = saved ?? {};
     this.view = zoom && pan ? { x: pan.x, y: pan.y, zoom } : undefined;
@@ -1995,6 +2025,7 @@ class Board {
       this.discover,
       this.feature,
       this.handArea,
+      this.flow,
       this.pinned,
     ];
   }
@@ -2076,6 +2107,7 @@ class Board {
       discover: discoverKept(this.discover) ? this.discover : undefined,
       feature: this.feature ?? undefined,
       area: this.handArea ?? undefined,
+      flow: this.flow ?? undefined,
       outside: this.pinned.length ? this.pinned : undefined,
       infra: Object.fromEntries(
         this.infra.map(({ id, position }) => [id, { x: Math.round(position.x), y: Math.round(position.y) }]),

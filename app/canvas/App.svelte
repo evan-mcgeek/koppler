@@ -32,6 +32,7 @@
   import AddOutside from './AddOutside.svelte';
   import CardPanel from './CardPanel.svelte';
   import Discover from './Discover.svelte';
+  import FlowChip from './FlowChip.svelte';
   import LeftOut from './LeftOut.svelte';
   import SettingsPanel from './SettingsPanel.svelte';
   import Repos from './Repos.svelte';
@@ -764,6 +765,7 @@
                 <SvelteFlowProvider><Discover /></SvelteFlowProvider>
               {:else}
                 <SvelteFlowProvider><Board /></SvelteFlowProvider>
+                {#if !board.present && !board.live}<FlowChip />{/if}
               {/if}
               <Toast />
             </div>

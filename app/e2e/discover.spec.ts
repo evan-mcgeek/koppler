@@ -378,6 +378,11 @@ test.describe('a board with an app', () => {
     const bar = page.locator('.pickbar');
     await expect(bar).toContainText('2 picked: Orders API, Search API');
     await bar.getByRole('button', { name: 'Plan a run with these' }).click();
+    // From the whole stack: a new run board, the default.
+    await page
+      .getByRole('dialog', { name: 'Plan a run with 1 app' })
+      .getByRole('button', { name: 'Open in Run' })
+      .click();
     await expect(page.getByRole('radio', { name: 'Plan' })).toBeChecked();
     await expect(card(page, 'orders')).toBeVisible();
     await expect(card(page, 'search')).toHaveCount(0);

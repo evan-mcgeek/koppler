@@ -154,7 +154,15 @@
             if (discovered.step === number) row.scrollIntoView({ block: 'nearest' });
           }}
         >
-          <span class="at">{number}</span>
+          <button
+            class="at"
+            type="button"
+            aria-label="Pick the apps of step {number}"
+            title="Pick its two cards, to plan a run with them (Shift adds them to the pick)"
+            onclick={ev => {
+              discovered.picked = [...new Set([...(ev.shiftKey ? discovered.picked : []), step.from, step.to])];
+            }}>{number}</button
+          >
           <span class="what">
             <span class="from">{name(step.from)}</span>
             <span class="verb">{VERB[step.kind] ?? 'calls'} {name(step.to)}</span>
@@ -362,9 +370,21 @@
   }
   .at {
     flex: none;
+    align-self: start;
     width: 30px;
+    padding: 0;
+    border: 0;
+    background: none;
     color: var(--ink-muted);
     font: 400 11px/20px var(--mono);
+    text-align: left;
+    cursor: pointer;
+  }
+  .at:hover,
+  .at:focus-visible {
+    color: var(--ink);
+    text-decoration: underline;
+    outline: none;
   }
   .what {
     display: grid;

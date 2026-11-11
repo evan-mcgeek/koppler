@@ -335,7 +335,7 @@
           ><span class="name">{preset.name.replace(SUFFIX, '')}</span>{#if SUFFIX.test(preset.name)}<span class="suffix"
               >{SUFFIX.exec(preset.name)?.[0]}</span
             >{/if}</span
-        >{#if under}<span class="under">{under}</span>{/if}</span
+        >{#if under || preset['flow']}<span class="under">{under || `from ${String(preset['flow'])}`}</span>{/if}</span
       >
       <!-- A fixed column, so names stay put whether the tag or the … shows. -->
       <span class="whose"
