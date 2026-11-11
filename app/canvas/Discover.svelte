@@ -363,8 +363,10 @@
   /** What a drag on the empty map does, and Space held to move it, as on a board. */
   const tools = toolState();
   const panning = $derived(tools.panning);
+  // Moving until its motion ends, as every refit is: whoever waits for the map to be still waits for this one too.
   const fit = async () => {
-    await flow.fitView(FIT);
+    moving++;
+    await flow.fitView(FIT).finally(() => moving--);
   };
   const presentMap = () => present(fit);
   // A map first laid out here is brought into view once it is.

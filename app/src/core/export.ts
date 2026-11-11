@@ -27,6 +27,9 @@ export interface Exported {
   flows: Flow[];
 }
 
+/** A board as the stack or this Mac keeps it: only its name is sure. */
+type Board = { name: string } & Record<string, unknown>;
+
 /** A card's size on the page, as the layout sees it. */
 export const CARD = { w: 200, h: 60 };
 
@@ -56,10 +59,10 @@ function cardOf(stack: Stack, id: Card): FlowCard {
   };
 }
 
-/** Each team feature board, as a flow: its accepted steps in their phases, and the cards they name. */
-export function flowsOf(stack: Stack): Flow[] {
-  return (stack.presets ?? []).flatMap(preset => {
-    const feature = featureOf((preset as Record<string, unknown>)['feature']);
+/** Each feature board, the team's unless others are given, as a flow: its accepted steps in their phases, and the cards they name. */
+export function flowsOf(stack: Stack, boards: readonly Board[] = stack.presets ?? []): Flow[] {
+  return boards.flatMap(preset => {
+    const feature = featureOf(preset['feature']);
     if (!feature) return [];
     const accepted = {
       ...feature,
@@ -78,7 +81,7 @@ export function flowsOf(stack: Stack): Flow[] {
         })),
       }));
     const cards = featureCards(accepted).map(id => cardOf(stack, id));
-    const saved = ((preset as Record<string, unknown>)['discover'] as { at?: Record<Card, unknown> } | undefined)?.at;
+    const saved = (preset['discover'] as { at?: Record<Card, unknown> } | undefined)?.at;
     const at = Object.fromEntries(
       cards.flatMap(card => {
         const point = saved?.[card.id] as Partial<Point> | undefined;
@@ -89,6 +92,23 @@ export function flowsOf(stack: Stack): Flow[] {
     );
     return [{ name: preset.name, request: feature.request, phases, cards, at }];
   });
+}
+
+/** A board to export by name: its exact name first, then ignoring case; your own before the team's either way. */
+export function boardNamed<B extends Board>(
+  own: readonly B[],
+  team: readonly B[],
+  name: string,
+): { board: B } | { error: string } {
+  const all = [...own, ...team];
+  const board = all.find(one => one.name === name) ?? all.find(one => one.name.toLowerCase() === name.toLowerCase());
+  if (!board) {
+    const features = all.filter(one => featureOf(one['feature'])).map(one => one.name);
+    return { error: `No board called "${name}". Boards with a feature: ${features.join(', ') || 'none'}` };
+  }
+  if (!featureOf(board['feature']))
+    return { error: `${board.name} is not a feature board: only a feature board has steps to put in the page` };
+  return { board };
 }
 
 /** Cards with no place yet go in a row under the placed ones, so the author's arrangement stays as it is. */

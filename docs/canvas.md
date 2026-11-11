@@ -191,6 +191,7 @@ To show the flows to people who never run Koppler, such as a product team, share
 It writes one page that opens in any browser with nothing to install or load: pick a flow, move its cards about, and walk its steps.
 It holds each flow's request, steps and app names, with an app's description when it has one (its settings' Description, a few words on what it does), and nothing else of the stack: no addresses, settings or code.
 Run in the stack repo's CI (`koppler export site/index.html --stack .`), it stays as current as the stack, behind your company's own sign-in.
+To send one feature board, your own or the team's, without sharing it first, pick **Export** in its **…** menu in the board menu: the page of that board alone is saved to your downloads (`koppler export --board "<name>"` writes the same).
 
 **Plan** shows every field of a card; **Live** shows what runs, with short cards.
 Live is there only while something runs; once the last app stops, the board goes back to Plan.
