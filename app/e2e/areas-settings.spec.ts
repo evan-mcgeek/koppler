@@ -327,3 +327,29 @@ test('a lock in the Areas tab keeps what it covers, and Remove says which lock h
   await expect(row('payments').getByRole('button', { name: 'Move Payments' })).toBeDisabled();
   await expect(row('shipping').getByRole('button', { name: 'Remove' })).toHaveAttribute('title', 'Locked: the areas');
 });
+
+test('an area set on your own board while a team board is read again is kept', async ({ page, canvas }) => {
+  const read = stackFile(canvas.dir);
+  const menu = await boardMenu(page);
+  // The stack comes back slowly after a team board changes, as on a busy Mac.
+  await page.route('**/data/registry.json*', async route => {
+    await new Promise(done => setTimeout(done, 1500));
+    await route.continue();
+  });
+  await rowOf(menu, 'Checkout').click({ button: 'right' });
+  await page.getByRole('menu', { name: 'Checkout' }).getByRole('menuitem', { name: 'Set area…' }).click();
+  await menu.getByRole('menu', { name: 'Checkout · area' }).getByRole('menuitemradio', { name: 'Shipping' }).click();
+  await expect.poll(() => read().presets.find(one => one.name === 'Checkout')?.area).toBe('shipping');
+  // While it is read again, your own board gets an area.
+  await rowOf(menu, 'Refund debugging').click({ button: 'right' });
+  await page.getByRole('menu', { name: 'Refund debugging' }).getByRole('menuitem', { name: 'Set area…' }).click();
+  await menu
+    .getByRole('menu', { name: 'Refund debugging · area' })
+    .getByRole('menuitemradio', { name: 'Payments' })
+    .click();
+  await page.waitForTimeout(2500);
+  await expect
+    .poll(async () => (await kept(page, canvas.url)).presets?.find(one => one.name === 'Refund debugging')?.area)
+    .toBe('payments');
+  await expect.poll(() => headingOf(rowOf(menu, 'Refund debugging'))).toBe('Payments');
+});
