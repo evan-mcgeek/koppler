@@ -334,6 +334,10 @@
     void flow.fitView({ nodes: [{ id: card }], duration: 200, maxZoom: flow.getZoom(), minZoom: flow.getZoom() });
   };
   let finding = $state(false);
+  /** Plan a run with these, asked: a new run board (by default), or one of the run boards to add to. */
+  let planning = $state(false);
+  let addTo = $state('');
+  let target = $state<'new' | 'add'>('new');
   /** A card found that was not on the map: shown once the layout has placed it. */
   let bringing = $state<Card | null>(null);
   const found = (card: Card) => {
@@ -798,12 +802,62 @@
               class="primary"
               type="button"
               onclick={() => {
-                discovered.planRun();
+                target = 'new';
+                addTo = discovered.runBoards[0] ?? '';
+                planning = true;
               }}>Plan a run with these</button
             >
           {:else}
             <span class="nothing">Nothing to run: pick an app</span>
           {/if}
+        </div>
+      {/if}
+      {#if planning && runnable.length && !discovered.current}
+        <div
+          class="plan"
+          role="dialog"
+          tabindex="-1"
+          aria-label="Plan a run with {runnable.length} {runnable.length === 1 ? 'app' : 'apps'}"
+        >
+          <form
+            onsubmit={ev => {
+              ev.preventDefault();
+              planning = false;
+              discovered.planRun(target === 'add' ? addTo : undefined);
+            }}
+          >
+            <strong>Plan a run with {runnable.length} {runnable.length === 1 ? 'app' : 'apps'}</strong>
+            <p>{board.feature ? `From the ${board.name ?? ''} flow. ` : ''}The rest stay deployed.</p>
+            <label class="choice"
+              ><input type="radio" name="plan-to" value="new" bind:group={target} />New run board{#if board.feature}<span
+                  class="named">{board.name} run</span
+                >{/if}</label
+            >
+            {#if discovered.runBoards.length}
+              <label class="choice"
+                ><input type="radio" name="plan-to" value="add" bind:group={target} />Add to a run board
+                <select
+                  aria-label="Run board to add to"
+                  bind:value={addTo}
+                  onfocus={() => {
+                    target = 'add';
+                  }}
+                >
+                  {#each discovered.runBoards as name (name)}<option value={name}>{name}</option>{/each}
+                </select></label
+              >
+            {/if}
+            <span class="acts">
+              <button
+                class="text"
+                type="button"
+                onclick={() => {
+                  planning = false;
+                }}>Cancel</button
+              >
+              <button class="primary" type="submit">Open in Run</button>
+            </span>
+          </form>
         </div>
       {/if}
     {/if}
@@ -1254,6 +1308,56 @@ Schedule on {lastData.job.env.toUpperCase()}. Every environment in Settings"
     font: 400 13px var(--sans);
     white-space: nowrap;
     transform: translateX(-50%);
+  }
+  /* Where the picked apps go: a new run board, or one to add to. Above the pick bar, as its next question. */
+  .plan form {
+    display: grid;
+    gap: 8px;
+  }
+  .plan {
+    position: absolute;
+    left: 50%;
+    bottom: calc(120px + var(--strip));
+    z-index: 6;
+    display: grid;
+    gap: 8px;
+    width: min(380px, calc(100% - 32px));
+    padding: 14px 16px;
+    border: 1px solid var(--ink);
+    background: var(--panel);
+    color: var(--ink);
+    font: 400 13px var(--sans);
+    transform: translateX(-50%);
+  }
+  .plan p {
+    margin: 0 0 4px;
+    color: var(--muted);
+  }
+  .plan .choice {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+  }
+  .plan .named {
+    margin-left: auto;
+    color: var(--muted);
+  }
+  .plan select {
+    margin-left: auto;
+    max-width: 170px;
+    padding: 3px 6px;
+    border: 1px solid var(--line-strong);
+    border-radius: 0;
+    background: var(--desk);
+    color: var(--ink);
+    font: 400 13px var(--sans);
+  }
+  .plan .acts {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 4px;
   }
   /* One size for every step, so its arrows stay under the pointer: two lines, each cut short, the whole in its title. */
   .stepbar {

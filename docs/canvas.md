@@ -181,7 +181,9 @@ Resources are what the stack's `resources` name: an S3 bucket's link says whethe
 **Read again** reads the code once more: your clones, and, with your `gh` login, the repos not cloned here, from a copy Koppler keeps for reading only (`koppler sync --github`).
 An app whose repo holds other apps of the stack too (a Lambda in an API's repo) names that repo in its panel.
 A queue or topic something sends to that nothing reads or passes on is flagged **Dead end · no readers**: its links stop at a bar.
-Pick several cards (Shift-click) and **Plan a run with these** puts the cloned ones on the board; the rest stay deployed and are listed in **Left out**, with a clone command for each app.
+Pick several cards (Shift-click, or a step's number in a feature board's panel for its two apps) and **Plan a run with these** asks where they go: a **New run board**, named after the flow and laid out, or **Add to a run board**; then Run opens on it.
+Only the cloned apps cross; the rest stay deployed and are listed in **Left out**, with a clone command for each app, and the flow's steps and descriptions stay in Discover.
+A run board planned from a feature board keeps it: a **Flow** chip on the board leads back with **Open in Discover**, the board menu says "from <flow>" under its name, and a card's **Show in Discover** opens that flow with the card picked.
 
 <img alt="Discover on QA: the whole stack with the board's apps drawn solid, Orders API picked and its links listed in the panel" src="images/discover.png">
 
