@@ -1,9 +1,7 @@
 <script lang="ts">
-  // A card on the Discover map: its name, its kind, and where its code is or what it is. On the board it is solid;
-  // the rest of the stack is drawn back. A dashed +N hidden counts the links the chosen areas leave out, and opens the
+  // A card on the Discover map: its name and its kind; the rest is in its panel. On a feature board, the cards it does
+  // not use are drawn back. A dashed +N hidden counts the links the chosen areas leave out, and opens the
   // Areas checklist.
-  import GitBranch from '@lucide/svelte/icons/git-branch';
-  import Clock from '@lucide/svelte/icons/clock';
   import type { NodeProps } from '@xyflow/svelte';
   import { AREAS, discovered, type LeanData } from './discover.svelte.ts';
 
@@ -20,40 +18,17 @@
   class:ring={!data.onBoard}
   class:proposed={data.proposed}
   class:picked={selected}
-  class:job={!!data.job}
-  class:compact={data.compact}
   class:roomy={data.outside.length > 0 && discovered.direction !== 'DOWN'}
   title={data.name}
   bind:offsetHeight={height}
 >
-  {#if data.repo && !data.compact}<span class="repo">{data.repo} /</span>{/if}
   <span class="top">
     <span class="name">{data.name}</span>
     {#if data.edited}<span class="edited" title={data.edited.says}>{data.edited.tag}</span>{/if}
     <span class="tag">{data.tag}</span>
   </span>
-  {#if data.compact}
-    <!-- Name and kind only: what it is, where its code is and its schedule are in its panel. -->
-  {:else if data.job}
-    <span class="job">
-      <span
-        class="when"
-        title="{data.job.expression || 'No schedule'}
-Schedule on {data.job.env.toUpperCase()}. Every environment in Settings"
-        ><Clock size={13} aria-hidden="true" />{data.job.words}</span
-      >
-      {#if data.job.from}<span class="from">from {data.job.from}</span>{/if}
-    </span>
-    <span class="deployed"><span>Deployed only</span><span class="env">{data.job.env.toUpperCase()}</span></span>
-  {:else}
-    <span class="meta">
-      {#if data.changed}<GitBranch size={12} aria-hidden="true" /><span class="here changed" title={data.changed}
-          >{data.changed}</span
-        >{:else if !data.cloned}<span class="what" title={data.meta}>{data.meta}</span>{/if}
-    </span>
-  {/if}
+  <!-- Name and kind only: what it is, its repo, branch, schedule and a dead end are in its panel. -->
   {#if data.deadEnd}
-    {#if !data.compact}<span class="dead">Dead end · no readers</span>{/if}
     <!-- Where its links would go on: they stop here. -->
     <span class="stub" class:down={discovered.direction === 'DOWN'} aria-hidden="true"></span>
   {/if}
@@ -101,40 +76,6 @@ Schedule on {data.job.env.toUpperCase()}. Every environment in Settings"
 
 <style>
   /* A job: its schedule and whose repo it ships from between hairlines, and a foot saying it is always deployed. */
-  .job {
-    display: grid;
-    gap: 3px;
-    margin: 2px -11px 0;
-    padding: 7px 11px 6px;
-    border-top: 1px solid var(--line);
-  }
-  .when {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    color: var(--ink);
-    font: 12px var(--mono);
-  }
-  .when :global(svg) {
-    flex: none;
-    color: var(--ink-muted);
-  }
-  .from {
-    color: var(--ink-muted);
-    font: 12px var(--sans);
-  }
-  .deployed {
-    display: flex;
-    justify-content: space-between;
-    margin: 0 -11px -9px;
-    padding: 7px 11px;
-    border-top: 1px solid var(--line);
-    color: var(--ink-muted);
-    font: 12px var(--sans);
-  }
-  .deployed .env {
-    font: 11px var(--mono);
-  }
   .lean {
     position: relative;
     display: flex;
@@ -142,15 +83,11 @@ Schedule on {data.job.env.toUpperCase()}. Every environment in Settings"
     gap: 5px;
     box-sizing: border-box;
     width: 200px;
-    min-height: 64px;
     padding: 9px 11px;
     border: 1px solid var(--line-strong);
     background: var(--panel);
     color: var(--ink);
     cursor: pointer;
-  }
-  .lean.compact {
-    min-height: 0;
   }
   /* Not on the board: no fill, a hairline edge, the name and tag drawn back. */
   .lean.ring {
@@ -186,15 +123,6 @@ Schedule on {data.job.env.toUpperCase()}. Every environment in Settings"
     outline: 2px solid var(--ink);
     outline-offset: 2px;
   }
-  /* A piece of a repo that holds other apps too: the repo above its name. */
-  .repo {
-    margin-bottom: -3px;
-    overflow: hidden;
-    color: var(--ink-muted);
-    font: 400 11px var(--sans);
-    white-space: nowrap;
-    text-overflow: ellipsis;
-  }
   .top {
     display: flex;
     align-items: flex-start;
@@ -228,42 +156,6 @@ Schedule on {data.job.env.toUpperCase()}. Every environment in Settings"
     color: var(--desk);
     font: 600 10px var(--sans);
     white-space: nowrap;
-  }
-  .meta {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    color: var(--ink-muted);
-    font: 400 12px var(--sans);
-    white-space: nowrap;
-  }
-  /* A long description stays inside its card. */
-  .what,
-  .changed {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  .here {
-    color: var(--ink);
-  }
-  .ring .here {
-    color: var(--ink-muted);
-  }
-  /* Flagged, not drawn as a link: a short line out that stops at a bar. */
-  .dead {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    color: var(--warn);
-    font: 600 12px var(--sans);
-    white-space: nowrap;
-  }
-  .dead::before {
-    content: '';
-    width: 10px;
-    height: 2px;
-    background: var(--warn);
   }
   .stub {
     position: absolute;

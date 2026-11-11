@@ -116,7 +116,7 @@ These appear next to the app that uses them, and show or hide with it.
 
 - **Tunnels** carry an app to a deployed database or service. Koppler opens one per host and port, shared by the apps that need it, and moves a clashing one to a free port. Each can be left out of a run, and one that runs can be restarted from its card when calls through it hang.
 - **Queues** an app on the board publishes to or reads from show which apps do: SQS queues and Kafka topics, the ones Koppler can run here. A switch on the card picks **Deployed** (local apps use the environment's queue) or **Local** (Koppler starts an SQS emulator or a Kafka broker in Docker and points every app on that queue at it). A queue can be hidden and shown again from its app.
-- A scheduled job (an app with a `schedule`) is always the deployed one: Discover draws it beside the app whose repo it ships from, joined by a dashed "same repo" line; its panel, and its card on a feature board, give its schedule in words for the environment read (the expression on hover) and "deployed only". A phase that starts from a job carries its schedule.
+- A scheduled job (an app with a `schedule`) is always the deployed one: Discover draws it beside the app whose repo it ships from, joined by a dashed "same repo" line; its panel gives its schedule in words for the environment read (the expression on hover) and "deployed only". A phase that starts from a job carries its schedule.
   Plan and Live draw no job card: an app on the board that uses a deployed database or queue a job uses says so in one line ("2 jobs use Orders DB: …"), which opens them in Discover. The Apps list keeps jobs folded under **Scheduled jobs** at its foot, not counted; search "job" lists only them. In a job's settings, **Runs as** is **On a schedule**, with a schedule for each environment read back in words.
 - Everything that never runs here is in Discover, not on the board: outside systems (a payment provider, a CRM), SNS topics and event buses, and what feeds a queue from further up. Click an outside system in the Apps list to open it there; add one with **Add outside system…** under the list.
 - Every link with a direction leaves its sender as a small dot and lands in the receiver's ring, with a chevron pointing in: into a queue publishes, into an app from a queue reads, into another app calls. Database and tunnel links go both ways: a dot at each end.
@@ -168,7 +168,7 @@ Discover's home, on its left, lists **Whole stack** first, then the team's featu
 
 **Discover** on **Whole stack** shows how the stack fits together: every app, queue, database, resource and outside system, read from the stack.
 On a big stack, pick your areas to narrow it.
-On the whole stack a card shows only its name and kind; what it is, its branch, its repo, its schedule and a dead end are in its panel when it is picked, and on a feature board's cards.
+A card on the map shows only its name and kind; what it is, its branch, its repo, where the deployed one answers, its schedule and a dead end are in its panel when it is picked.
 Nothing on it runs or changes the board.
 Its tools are the board's: Select and Hand, Undo, Arrange (each press the next layout), Fit, zoom and Present, with the same keys; dragging over the map picks the cards in it, and the overview sits in the corner.
 A dashed link was found in the code and is not in the stack yet, and **Confirm** in the panel keeps it there.
@@ -179,19 +179,19 @@ A call whose place in the code is known (where it was found, or the settings fil
 A **?** on a link means the stack records the call without saying where it comes from (no setting, file or place in the code): **No source yet**.
 Resources are what the stack's `resources` name: an S3 bucket's link says whether the app **reads**, **writes** or **both**; an API Gateway's panel lists its routes and what each hands to; a Step Functions panel lists what starts it and its steps in order.
 **Read again** reads the code once more: your clones, and, with your `gh` login, the repos not cloned here, from a copy Koppler keeps for reading only (`koppler sync --github`).
-An app whose repo holds other apps of the stack too (a Lambda in an API's repo) names that repo above its name on a feature board.
+An app whose repo holds other apps of the stack too (a Lambda in an API's repo) names that repo in its panel.
 A queue or topic something sends to that nothing reads or passes on is flagged **Dead end · no readers**: its links stop at a bar.
 Pick several cards (Shift-click) and **Plan a run with these** puts the cloned ones on the board; the rest stay deployed and are listed in **Left out**, with a clone command for each app.
 
 <img alt="Discover on QA: the whole stack with the board's apps drawn solid, Orders API picked and its links listed in the panel" src="images/discover.png">
 
-A **feature board** (New feature board in the boards menu) is for one feature: the request it came from, and which of the stack's links it uses, as numbered steps in phases.
+A **feature board** (**Ask the agent for a new one…** in Discover's board menu, or **Ask about** on its home) is for one feature: the request it came from, and which of the stack's links it uses, as numbered steps in phases.
 One link can be a step in several phases, each with its own number and note.
 Describe the feature and **Hand it to the agent**: its proposals show dashed, each with Accept and Drop, until you accept them; accepting a link the stack does not have yet records it there.
 Or start from an app, and add a picked card's links with **Add as a step**.
-The panel on the right holds the request and the steps: pick a phase to dim the others, rename or remove it, or take a step off.
+The panel on the left holds the request and the steps, each in words ("Web Shop calls Orders API"): pick a phase to dim the others, rename or remove it, or take a step off; a picked card's panel opens on the right.
 Each phase's title sits on the map over the card it starts from, above the cards; a click on it picks the phase too, dimming the other phases' cards and links.
-**Walk through the steps**, or click a step's number on the map, to follow the feature one step at a time: → and ← move on and back, each step brought into view with its note, and Esc stops.
+**Walk through the steps**, or click a step's number on the map, to follow the feature one step at a time ("Step 2 of 7"): → and ← move on and back, each step brought into view with its note, its link and two cards in ink and the rest at 45%; **End** or Esc stops.
 
 <img alt="A feature board, Checkout: its steps numbered in two phases on the map and in the panel, and one step the agent proposed, dashed, with Accept and Drop" src="images/feature-board.png">
 

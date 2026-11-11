@@ -8,6 +8,18 @@
   import { discovered } from './discover.svelte.ts';
 
   const { feature }: { feature: Feature } = $props();
+  /** What a step does, in words: "calls", "publishes to". */
+  const VERB: Record<string, string> = {
+    call: 'calls',
+    publish: 'publishes to',
+    read: 'reads',
+    uses: 'uses',
+    feeds: 'feeds',
+    bucket: 'uses',
+    route: 'routes to',
+    starts: 'starts',
+  };
+  const team = $derived(!board.own.some(one => one.name === board.name));
   const name = (card: string) => discovered.data(card, false).name;
   const steps = $derived(numbered(feature));
   const recorded = $derived.by(() => {
@@ -31,6 +43,10 @@
 
 <aside class="panel" aria-labelledby="feature-title">
   <h2 id="feature-title">{board.name}</h2>
+  <p class="kind">
+    {team ? 'Team' : 'Your'} feature board · {steps.length}
+    {steps.length === 1 ? 'step' : 'steps'}
+  </p>
   <div class="request">
     <span class="label">The request</span>
     {#if editing}
@@ -140,7 +156,8 @@
         >
           <span class="at">{number}</span>
           <span class="what">
-            <span>{name(step.from)} → {name(step.to)}</span>
+            <span class="from">{name(step.from)}</span>
+            <span class="verb">{VERB[step.kind] ?? 'calls'} {name(step.to)}</span>
             {#if step.note}<span class="note">{step.note}</span>{/if}
             {#if step.proposed}
               <span class="ask"
@@ -218,10 +235,10 @@
     display: flex;
     flex: none;
     flex-direction: column;
-    width: 340px;
+    width: 300px;
     overflow-y: auto;
     padding: 16px 18px;
-    border-left: 1px solid var(--line);
+    border-right: 1px solid var(--line);
     background: var(--panel);
     color: var(--ink);
   }
@@ -229,6 +246,18 @@
     margin: 0;
     font: 600 26px/1.1 var(--display);
     overflow-wrap: anywhere;
+  }
+  .kind {
+    margin: 4px 0 12px;
+    color: var(--muted);
+    font: 400 12px var(--sans);
+  }
+  .from {
+    font: 500 14px var(--sans);
+  }
+  .verb {
+    color: var(--muted);
+    font: 400 13px var(--sans);
   }
   .request {
     display: grid;

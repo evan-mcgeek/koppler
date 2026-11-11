@@ -29,6 +29,7 @@
   import { board } from './board.svelte.ts';
   import { AREAS, CARD, discovered, linkKey, type LeanData } from './discover.svelte.ts';
   import FeaturePanel from './FeaturePanel.svelte';
+  import DiscoverHome from './DiscoverHome.svelte';
   import FeatureStart from './FeatureStart.svelte';
   import FindCard from './FindCard.svelte';
   import { heldKeys } from './held-keys.ts';
@@ -319,6 +320,11 @@
   const list = (names: string[]) =>
     names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${String(names.at(-1))}` : (names[0] ?? '');
   const lastStack = $derived(discovered.last ? board.facts?.apps[discovered.last] : undefined);
+  /** Where the picked app's deployed one answers, on the environment Discover reads. */
+  const lastHost = $derived.by(() => {
+    const envs = lastStack?.envs as Record<string, { deployedUrl?: string }> | undefined;
+    return envs?.[board.env]?.deployedUrl ?? lastStack?.deployedUrl ?? '';
+  });
   const hiding = $derived(discovered.hiding);
   const chosenNames = $derived(chosen.ids.map(id => board.areas[id]?.name ?? id));
   /** Brings a card to the middle of the map and picks it. */
@@ -460,6 +466,10 @@
 />
 
 <div class="discover">
+  <!-- On the left: a feature board's steps, else the home of the whole stack and the feature boards. -->
+  {#if !board.present}
+    {#if board.feature && map.cards.length}<FeaturePanel feature={board.feature} />{:else}<DiscoverHome />{/if}
+  {/if}
   <div
     class="map"
     class:narrowed={shown && hiding.apps.length > 0}
@@ -733,6 +743,9 @@
         {@const { step, number } = discovered.current}
         <div class="pickbar stepbar" role="status" aria-label="Step {number}">
           <span class="said" title="{number} {name(step.from)} → {name(step.to)}{step.note ? `: ${step.note}` : ''}">
+            <span class="of"
+              >Step {discovered.steps.findIndex(one => one.number === number) + 1} of {discovered.steps.length}</span
+            >
             <span class="what"><strong>{number}</strong> {name(step.from)} → {name(step.to)}</span>
             <span class="note">{step.note ?? ''}</span>
           </span>
@@ -757,11 +770,11 @@
           <button
             class="icon"
             type="button"
-            aria-label="Stop"
-            title="Stop (Esc)"
+            aria-label="End"
+            title="End the walk-through (Esc)"
             onclick={() => {
               discovered.step = null;
-            }}><X size={16} /></button
+            }}>End</button
           >
         </div>
       {:else if discovered.picked.length}
@@ -832,6 +845,9 @@ Schedule on {lastData.job.env.toUpperCase()}. Every environment in Settings"
                 : ''}</span
             >{/if}{:else if lastStack && !lastStack.outside}<span class="where">On GitHub</span>{/if}
         {#if lastStack?.slug}<span class="slug">{lastStack.slug}</span>{/if}
+        {#if lastHost}<span class="slug host" title="Where the deployed one answers on {board.env.toUpperCase()}"
+            >{lastHost}</span
+          >{/if}
         {#if lastEdited}<span class="edited">{lastEdited.says}</span>{/if}
       </header>
       {#each groups as group (group.title)}
@@ -924,8 +940,6 @@ Schedule on {lastData.job.env.toUpperCase()}. Every environment in Settings"
         </section>
       {/if}
     </aside>
-  {:else if board.feature && map.cards.length}
-    <FeaturePanel feature={board.feature} />
   {/if}
   <FindCard
     open={finding}
@@ -1061,7 +1075,7 @@ Schedule on {lastData.job.env.toUpperCase()}. Every environment in Settings"
   .end.faded,
   .mark.faded,
   .phase.faded {
-    opacity: 0.25;
+    opacity: 0.45;
   }
   .phase {
     cursor: pointer;
@@ -1184,7 +1198,7 @@ Schedule on {lastData.job.env.toUpperCase()}. Every environment in Settings"
     stroke-width: 2;
   }
   :global(.svelte-flow__node.dimmed) {
-    opacity: 0.25;
+    opacity: 0.45;
   }
   .legend {
     position: absolute;
@@ -1252,6 +1266,10 @@ Schedule on {lastData.job.env.toUpperCase()}. Every environment in Settings"
     gap: 2px;
     min-width: 0;
     margin-right: 10px;
+  }
+  .stepbar .of {
+    color: var(--muted);
+    font: 600 11px var(--sans);
   }
   .stepbar .what,
   .stepbar .note {
