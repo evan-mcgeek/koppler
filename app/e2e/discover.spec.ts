@@ -212,7 +212,10 @@ test.describe('a board with an app', () => {
       page
         .getByRole('toolbar')
         .getByRole('button')
-        .evaluateAll(all => all.map(one => one.getAttribute('aria-label') ?? one.textContent.trim()));
+        // The zoom shows its level, which follows the room the map has.
+        .evaluateAll(all =>
+          all.map(one => (one.getAttribute('aria-label') ?? one.textContent.trim()).replace(/^\d+%$/, '%')),
+        );
     await expect(card(page, 'web')).toBeVisible();
     const onBoard = await tools();
     await discover(page);
