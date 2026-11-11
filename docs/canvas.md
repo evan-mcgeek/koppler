@@ -163,6 +163,8 @@ Koppler has two front doors, **Discover | Run**, the first control in the bar.
 **Run** is for running a slice on this Mac: run boards, with **Plan** and **Live**.
 Each door keeps its own boards and comes back to the one it was on: Discover's board menu lists **Whole stack** and the feature boards, with **Ask the agent for a new one…**; Run's lists the run boards.
 Opening a feature board in Discover stops nothing that runs.
+Discover's home, on its left, lists **Whole stack** first, then the team's feature boards and yours, each with its phases and steps.
+**Ask about** the stack at its foot hands a question to the agent: it becomes a feature board of your own named after the question, and the agent's finds show on the map, dashed, until you accept them; while it works, the board says **Agent drafting** and how many it has found.
 
 **Discover** on **Whole stack** shows how the stack fits together: every app, queue, database, resource and outside system, read from the stack.
 On a big stack, pick your areas to narrow it.

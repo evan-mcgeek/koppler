@@ -1525,13 +1525,18 @@ class Board {
     if (this.scratch && this.nodes.length < 2) return;
     this.scratch = false;
     const team = this.team.find(one => one.name === this.name);
-    // A team board stays the team's until it is changed; branches, notes and how apps run count as changes too.
-    const told = (preset: { nodes: unknown; edges: { from: string; to: string }[] }) =>
+    // A team board stays the team's until it is changed; branches, notes, how apps run and a feature's steps count too.
+    const told = (preset: { nodes: unknown; edges: { from: string; to: string }[]; feature?: unknown }) =>
       JSON.stringify(
-        [preset.nodes, preset.edges.map(edge => `${edge.from}>${edge.to}`).sort()],
+        [preset.nodes, preset.edges.map(edge => `${edge.from}>${edge.to}`).sort(), featureOf(preset.feature)],
         (key, value: unknown) => (key === 'followsClone' ? undefined : value),
       );
-    const asOpened = team && check(team, this.#facts()).preset;
+    // A feature board with no app cards opens as it is kept.
+    const asOpened =
+      team &&
+      (Object.keys(team.nodes).length
+        ? check(team, this.#facts()).preset
+        : { nodes: {}, edges: [], feature: team['feature'] });
     if (team && asOpened && told(this.#onScreen(team.name) as never) === told(asOpened)) return;
     // One copy per team board: changing it again updates that copy.
     const copy =
@@ -1651,10 +1656,10 @@ class Board {
     return back;
   }
   /** A feature board: named at once, empty until its request or first app, and shown in Discover. */
-  newFeature(): void {
+  newFeature(named = 'New feature'): void {
     if (!this.feature) this.doors = { ...this.doors, run: this.name ?? undefined };
     this.newBoard();
-    this.name = this.uniqueName('New feature');
+    this.name = this.uniqueName(named);
     this.feature = { request: '', cards: [], phases: [] };
     this.goDiscover();
     this.doors = { ...this.doors, discover: this.name };

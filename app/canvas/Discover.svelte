@@ -1011,13 +1011,6 @@ Schedule on {lastData.job.env.toUpperCase()}. Every environment in Settings"
     font: 400 11px var(--mono);
     white-space: nowrap;
   }
-  /* Too narrow for the legend beside the pick bar: it goes to the top. */
-  @container (width < 900px) {
-    .legend {
-      top: 16px;
-      bottom: auto;
-    }
-  }
   :global(.svelte-flow__node.unplaced) {
     visibility: hidden;
   }
@@ -1205,6 +1198,13 @@ Schedule on {lastData.job.env.toUpperCase()}. Every environment in Settings"
     background: var(--desk);
     color: var(--ink);
     font: 400 12px var(--sans);
+  }
+  /* Too narrow for the legend beside the pick bar: it goes to the top. */
+  @container (width < 900px) {
+    .legend {
+      top: 16px;
+      bottom: auto;
+    }
   }
   .legend span {
     display: flex;
