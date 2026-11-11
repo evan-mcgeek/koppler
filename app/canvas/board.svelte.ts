@@ -1834,11 +1834,27 @@ class Board {
   }
 
   /** The stack read again after it changed (Settings saved), in place: the page, and full screen, stay. */
-  async reload(): Promise<void> {
+  /** The read under way: reads run one after another, so an older one never lands over a newer one. */
+  #reading: Promise<void> = Promise.resolve();
+  reload(): Promise<void> {
+    this.#reading = this.#reading.catch(() => undefined).then(() => this.#readAgain());
+    return this.#reading;
+  }
+  async #readAgain(): Promise<void> {
     this.commit();
-    await save(this.saved());
+    let sent = JSON.stringify(this.saved());
+    await save(JSON.parse(sent) as SavedBoard);
     const [dir, asked] = [this.dir, this.#looking()];
-    const loaded = await load();
+    let loaded = await load();
+    // A change made while it was read is not lost: it is saved, and read back with the rest.
+    for (let tries = 0; loaded && tries < 3; tries++) {
+      this.commit();
+      const now = JSON.stringify(this.saved());
+      if (now === sent) break;
+      sent = now;
+      await save(JSON.parse(now) as SavedBoard);
+      loaded = await load();
+    }
     if (!loaded) return;
     const now = this.#looking();
     this.open(loaded);
