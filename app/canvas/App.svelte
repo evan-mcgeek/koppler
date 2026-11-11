@@ -32,7 +32,6 @@
   import AddOutside from './AddOutside.svelte';
   import CardPanel from './CardPanel.svelte';
   import Discover from './Discover.svelte';
-  import DiscoverHome from './DiscoverHome.svelte';
   import LeftOut from './LeftOut.svelte';
   import SettingsPanel from './SettingsPanel.svelte';
   import Repos from './Repos.svelte';
@@ -757,9 +756,7 @@
   <main inert={!!loading}>
     {#await opened then found}
       {#if found}
-        {#if board.present}{:else if board.discovering}<DiscoverHome />{:else if side}<Side />{:else}<Rail
-            open={openSide}
-          />{/if}
+        {#if board.present || board.discovering}{:else if side}<Side />{:else}<Rail open={openSide} />{/if}
         <div class="stage">
           <div class="work">
             <div class="board">

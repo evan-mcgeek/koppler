@@ -44,8 +44,6 @@ export interface LeanData extends Record<string, unknown> {
   edited: { tag: 'New' | 'Changed'; says: string } | null;
   /** Its clone's branch and changed files, when the repo's main branch does not have them. */
   changed: string;
-  /** On the whole stack: only its name and kind; the rest is in its panel. */
-  compact: boolean;
   /** A scheduled job: its schedule on the environment read, in words and as written, and the app whose repo it ships from. */
   job?: { words: string; expression: string; env: string; from: string };
 }
@@ -155,7 +153,6 @@ class Discovered {
       : null;
     const base = {
       onBoard,
-      compact: !board.feature,
       outside: outside.map(this.#withAreas),
       cloned: false,
       app: false,
