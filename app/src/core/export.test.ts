@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fileNameOf, flowsOf, lineOf, placeRest } from './export.ts';
+import { boardNamed, fileNameOf, flowsOf, lineOf, placeRest } from './export.ts';
 import type { Stack } from './stack.ts';
 
 const app = (name: string, extra: object = {}) => ({ name, kind: 'node', slug: `acme/${name}`, ...extra });
@@ -109,6 +109,37 @@ describe('flowsOf', () => {
       'queue:events': { x: 600, y: 0 },
       orders: { x: 0, y: 140 },
     });
+  });
+});
+
+describe('boardNamed', () => {
+  const team = (stack.presets ?? []) as ({ name: string } & Record<string, unknown>)[];
+  const mine = {
+    name: 'checkout',
+    version: 1,
+    nodes: {},
+    edges: [],
+    feature: { request: 'Mine', cards: [], phases: [] },
+  };
+
+  it("finds a board by its exact name first, then ignoring case, your own before the team's", () => {
+    expect(boardNamed([mine], team, 'checkout')).toEqual({ board: mine });
+    expect(boardNamed([mine], team, 'Checkout')).toEqual({ board: team[1] });
+    expect(boardNamed([], team, 'REFUND')).toEqual({ board: team[2] });
+  });
+
+  it('refuses a board that is not there, naming those there are, and one that is no feature board', () => {
+    expect(boardNamed([mine], team, 'Nope')).toEqual({
+      error: 'No board called "Nope". Boards with a feature: checkout, Checkout, Refund',
+    });
+    expect(boardNamed([], team, 'Everyday')).toEqual({
+      error: 'Everyday is not a feature board: only a feature board has steps to put in the page',
+    });
+  });
+
+  it("gives one flow for the board found, your own as well as the team's", () => {
+    const found = boardNamed([mine], team, 'Refund');
+    expect('board' in found && flowsOf(stack, [found.board]).map(flow => flow.name)).toEqual(['Refund']);
   });
 });
 

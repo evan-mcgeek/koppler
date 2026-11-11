@@ -1,12 +1,13 @@
-// `koppler export`: the team's flows as one self-contained page that loads nothing.
+// `koppler export`: the team's flows, or one board of yours or the team's, as one self-contained page that loads nothing.
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import Bundled from 'elkjs/lib/elk.bundled.js';
 import type { ELK } from 'elkjs/lib/elk-api.js';
 import { flagValue, positional } from '../cli/output.ts';
-import { readStack } from '../data.ts';
-import { CARD, fileNameOf, flowsOf, placeRest, type Exported, type Flow } from '../core/export.ts';
+import { readData, readStack } from '../data.ts';
+import { boardNamed, CARD, fileNameOf, flowsOf, placeRest, type Exported, type Flow } from '../core/export.ts';
+import type { StoredPreset } from '../core/presets.ts';
 import { layOut } from '../core/layout.ts';
 import { migrateStack } from '../core/migrations/stack/index.ts';
 import type { Stack } from '../core/stack.ts';
@@ -74,16 +75,47 @@ export function pageWith(data: Exported): string {
 const htmlText = (text: string) =>
   text.replace(/[&<>"]/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[char] ?? char);
 
+/** One board's page: your own board by that name, else the team's; or why there is none. */
+export async function boardPage(
+  stack: Stack,
+  name: string,
+  own: readonly StoredPreset[] = (readData('state')?.['presets'] ?? []) as StoredPreset[],
+): Promise<{ file: string; page: string } | { error: string }> {
+  const found = boardNamed<{ name: string } & Record<string, unknown>>(own, stack.presets ?? [], name);
+  if ('error' in found) return found;
+  const flows = await Promise.all(flowsOf(stack, [found.board]).map(withPlaces));
+  const title = stack.name ?? 'Stack';
+  return {
+    file: fileNameOf(`${title} ${found.board.name}`),
+    page: pageWith({ stack: title, exported: new Date().toISOString(), flows }),
+  };
+}
+
 export async function exportCommand(args: string[]): Promise<void> {
-  const stack = stackFrom(flagValue(args, '--stack'));
+  const dir = flagValue(args, '--stack');
+  const stack = stackFrom(dir);
   const name = stack.name ?? 'Stack';
+  const board = flagValue(args, '--board');
+  const given = positional(args, ['--stack', '--board'])[0];
+  if (board !== undefined) {
+    // A stack read from a folder has no boards of your own: those are kept for the stack in use.
+    const made = await boardPage(stack, board, dir ? [] : undefined);
+    if ('error' in made) fail(made.error);
+    const file = path.resolve(given ?? made.file);
+    fs.writeFileSync(file, made.page);
+    console.log(`WROTE ${file}: 1 flow`);
+    console.log(
+      "Open it in any browser. It holds the flow's name, steps and app names, and nothing else of the stack.",
+    );
+    return;
+  }
   const flows = await Promise.all(flowsOf(stack).map(withPlaces));
-  const file = path.resolve(positional(args, ['--stack'])[0] ?? fileNameOf(name));
+  const file = path.resolve(given ?? fileNameOf(name));
   fs.writeFileSync(file, pageWith({ stack: name, exported: new Date().toISOString(), flows }));
   console.log(`WROTE ${file}: ${String(flows.length)} ${flows.length === 1 ? 'flow' : 'flows'}`);
   console.log(
     flows.length
       ? "Open it in any browser. It holds the flows' names, steps and app names, and nothing else of the stack."
-      : 'The stack has no team feature boards yet: share one (koppler board share) and export again.',
+      : 'The stack has no team feature boards yet: share one (koppler board share) or export your own (--board), and export again.',
   );
 }

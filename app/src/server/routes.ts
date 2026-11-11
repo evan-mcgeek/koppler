@@ -27,6 +27,7 @@ import {
   stackSource,
 } from '../engine/stack-file.ts';
 import { shareBoard, shareTarget } from '../engine/share.ts';
+import { boardPage } from '../engine/export.ts';
 import { newToken, pageToken, writePageUrl } from './token.ts';
 import type { StoredPreset } from '../core/presets.ts';
 import { createStack, currentStack, forgetStacks, useStack } from '../engine/stacks.ts';
@@ -237,6 +238,15 @@ export const ROUTES: Record<string, Route> = {
     refreshRegistry();
     forgetStacks();
     return { status: 200, body: result };
+  },
+  // A feature board as the page `koppler export --board` writes, for the board menu to save: yours first, then the team's.
+  '/board-export': async body => {
+    const stack = readStack();
+    const name = typeof body['name'] === 'string' ? body['name'] : '';
+    if (!stack) return { status: 400, body: { error: 'No stack is in use.' } };
+    if (!name) return { status: 400, body: { error: 'Which board?' } };
+    const made = await boardPage(stack, name);
+    return { status: 'error' in made ? 400 : 200, body: made };
   },
   // A team board's area from the board menu, found by its name in the stack as it is now.
   '/board-area': body => {
