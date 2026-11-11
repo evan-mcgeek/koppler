@@ -633,7 +633,8 @@ async function startApps(up: Up): Promise<void> {
         const onPrompt = (said: string) => {
           step(id, 'Start', 'user', said);
         };
-        await run([id, '--env', env, ...how], { ...(setEnv && { setEnv }), onPrompt });
+        // A run writes its own steps on the card; started outside one, the app sheds an earlier run's.
+        await run([id, '--env', env, ...how], { ...(setEnv && { setEnv }), onPrompt }, !!up.board);
       } catch (error) {
         if (!(error instanceof Failure)) throw error;
         console.error(error.message);

@@ -71,3 +71,32 @@ test('An app whose first seconds log an error says so on its card, with the line
     fs.rmSync(d, { recursive: true, force: true });
   }
 });
+
+test('An app started outside a run sheds the steps an earlier run left on its card; other apps keep theirs.', async () => {
+  const d = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-restart-steps-'));
+  const bin = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'dist', 'koppler.mjs');
+  const env = { ...process.env, KOPPLER_STATE: d, KOPPLER_TEMP: d, KOPPLER_CONFIG_DIR: d };
+  delete env.CLAUDE_CODE_SESSION_ID;
+  const run = (...args) => { const r = spawnSync('node', [bin, ...args], { encoding: 'utf8', env, timeout: 60000 }); return { out: (r.stdout + r.stderr).trim(), code: r.status }; };
+  fs.mkdirSync(path.join(d, 'repo'));
+  const stack = { envs: ['qa'], apps: {
+    api: { name: 'API', kind: 'other', slug: 'x/api', start: 'exec sleep 30' },
+    web: { name: 'Web', kind: 'other', slug: 'x/web', start: 'exec sleep 30' },
+  } };
+  fs.writeFileSync(path.join(d, 'registry.json'), JSON.stringify(stack));
+  allowStack(d, stack);
+  fs.writeFileSync(path.join(d, 'local.json'), JSON.stringify({ apps: { api: { path: path.join(d, 'repo') }, web: { path: path.join(d, 'repo') } } }));
+  const failed = [{ label: 'Branch', state: 'done' }, { label: 'Start', state: 'failed', detail: 'It stopped before it reached the device; its log says why.' }];
+  const web = [{ label: 'Start', state: 'done', detail: 'Running.' }];
+  fs.writeFileSync(path.join(d, 'progress.json'), JSON.stringify({ run: 'old00001', env: 'qa', apps: { api: failed, web } }));
+  try {
+    const r = run('run', 'api');
+    assert.equal(r.code, 0, r.out);
+    const after = JSON.parse(fs.readFileSync(path.join(d, 'progress.json'), 'utf8'));
+    assert.equal(Object.hasOwn(after.apps, 'api'), false, JSON.stringify(after));
+    assert.deepEqual(after.apps.web, web);
+  } finally {
+    run('stop', '--all', '--yes');
+    fs.rmSync(d, { recursive: true, force: true });
+  }
+});

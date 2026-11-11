@@ -421,8 +421,12 @@ function forgetSteps(name: string): void {
     const { steps: _gone, ...rest } = app;
     writeJson(status, { ...shown, apps: { ...shown.apps, [name]: rest } });
   }
+  forgetRunSteps(name);
+}
+/** The steps a run left on an app's card go; the agent's checklist stays. */
+export function forgetRunSteps(name: string): void {
   const file = path.join(tempDir(), 'progress.json');
-  const progress = readJson<{ apps?: Loose } | null>(file, null);
+  const progress = readJson<{ apps?: Record<string, unknown> } | null>(file, null);
   if (progress?.apps && Object.hasOwn(progress.apps, name)) {
     const { [name]: _gone, ...apps } = progress.apps;
     writeJson(file, { ...progress, apps });
