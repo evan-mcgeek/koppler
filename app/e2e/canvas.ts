@@ -193,6 +193,8 @@ export const test = base.extend<{
     page.on('pageerror', e => errors.push(String(e)));
     await page.goto(canvas.url + start);
     await use(page);
+    // The canvas server stops before the page closes: a test's routes must not fetch from it then.
+    await page.unrouteAll({ behavior: 'ignoreErrors' });
     expect(errors, 'no script errors on the page').toEqual([]);
   },
 });
