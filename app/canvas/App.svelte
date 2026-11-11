@@ -33,6 +33,7 @@
   import CardPanel from './CardPanel.svelte';
   import Discover from './Discover.svelte';
   import FlowChip from './FlowChip.svelte';
+  import Share from './Share.svelte';
   import LeftOut from './LeftOut.svelte';
   import SettingsPanel from './SettingsPanel.svelte';
   import Repos from './Repos.svelte';
@@ -559,6 +560,7 @@
       </BarMenu>
     {/if}
     {#if board.discovering}
+      <Share />
       <button
         class="read-again"
         type="button"

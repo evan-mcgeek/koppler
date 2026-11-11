@@ -49,6 +49,12 @@ test('export --board writes one board of your own, or the team one by that name,
     assert.equal(team.status, 0, team.stderr);
     assert.match(fs.readFileSync(path.join(dir, 'acme-shop-team-flow-flows.html'), 'utf8'), /Team request/);
 
+    // --env prints the environment it is about on the page; one the stack does not have is refused.
+    const onQa = koppler('export', 'qa.html', '--board', 'Team flow', '--env', 'qa');
+    assert.equal(onQa.status, 0, onQa.stderr);
+    assert.match(fs.readFileSync(path.join(dir, 'qa.html'), 'utf8'), /"env":"qa"/);
+    assert.match(koppler('export', '--board', 'Team flow', '--env', 'prod').stderr, /prod is not an environment of the stack: qa/);
+
     assert.match(koppler('export', '--board', 'Everyday').stderr, /Everyday is not a feature board/);
     assert.match(koppler('export', '--board', 'Nope').stderr, /No board called "Nope"\. Boards with a feature: My look, Team flow/);
   } finally {

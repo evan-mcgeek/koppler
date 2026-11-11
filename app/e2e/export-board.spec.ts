@@ -31,6 +31,10 @@ test.use({
 test('a board of your own exports from its row menu as a page with its phases and steps', async ({
   page,
 }, testInfo) => {
+  // Feature boards are Discover's: once the board is up, ⌘1 goes there.
+  await expect(page.locator('.svelte-flow__node[data-id="web"]')).toBeVisible();
+  await page.keyboard.press('ControlOrMeta+1');
+  await expect(page.getByRole('radio', { name: 'Discover' })).toBeChecked();
   await page
     .getByRole('banner')
     .getByRole('button', { name: /^Board:/ })

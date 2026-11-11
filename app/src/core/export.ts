@@ -24,6 +24,8 @@ export interface Exported {
   stack: string;
   /** ISO date. */
   exported: string;
+  /** The environment the page was made for, when one board was shared from a canvas. */
+  env?: string;
   flows: Flow[];
 }
 

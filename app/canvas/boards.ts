@@ -90,3 +90,18 @@ export function ago(iso: string): string {
   for (const [unit, size] of UNITS) if (Math.abs(secs) >= size) return format.format(Math.round(secs / size), unit);
   return 'just now';
 }
+
+/** A feature board as the page `koppler export --board` writes, saved as a download; its file name, or null. */
+export async function savePage(name: string, env?: string): Promise<string | null> {
+  const made = await post<{ file: string; page: string }>('board-export', { name, ...(env && { env }) });
+  if ('error' in made) {
+    toasts.show(`Could not export ${name}. ${made.error}`, 'warning');
+    return null;
+  }
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(new Blob([made.page], { type: 'text/html' }));
+  link.download = made.file;
+  link.click();
+  URL.revokeObjectURL(link.href);
+  return made.file;
+}
