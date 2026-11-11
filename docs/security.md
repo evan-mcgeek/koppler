@@ -21,7 +21,7 @@ Anything running as you can read the environment of your own processes (on macOS
 Koppler keeps the values out of every helper it starts beside the app (build tools, Docker, the AWS CLI), but it cannot hide them from the app itself.
 So a protected environment's secret is protected while it is stored, and no longer once you have started an app with it.
 
-Back this up with deny rules in your agent's settings; [secrets.md](../plugin/skills/koppler-run/references/secrets.md) lists them.
+Back this up with deny rules in your agent's settings; [secrets.md](../plugin/skills/plan/references/secrets.md) lists them.
 
 ## Nothing runs without your yes
 
@@ -51,4 +51,4 @@ Your clone paths, board, presets, run state, notes and secret values stay on you
 
 ## Letting the agent run without prompts
 
-Read-only commands are safe to allow without a prompt; [permissions.md](../plugin/skills/koppler-run/references/permissions.md) lists them and the ones that should keep asking.
+Read-only commands are safe to allow without a prompt; [permissions.md](../plugin/skills/plan/references/permissions.md) lists them and the ones that should keep asking.

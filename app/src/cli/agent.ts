@@ -9,7 +9,15 @@ import { fail } from '../failure.ts';
 import { APP, CODE } from '../paths.ts';
 import { flagValue } from './output.ts';
 
-const SKILL = 'koppler-run';
+/**
+ * The skills, each by its folder in the plugin (`/koppler:plan`, `/koppler:discover` there) and the name it is linked
+ * under for an agent that takes skills without the plugin, which has no `koppler:` to tell them apart.
+ */
+const SKILLS = [
+  { dir: 'plan', as: 'koppler-plan' },
+  { dir: 'discover', as: 'koppler-discover' },
+  { dir: 'help', as: 'koppler-help' },
+];
 const USAGE = 'usage: koppler agent init [--agent claude,copilot,vscode,opencode] [--dry-run]';
 interface Server {
   command: string;
@@ -112,16 +120,16 @@ const AGENTS: Record<string, Agent> = {
 };
 
 /** The skill this Koppler carries: packed into the package, or in the clone it runs from. */
-function skillSource(): string {
-  const found = [path.join(APP, 'skills', SKILL), path.join(APP, '..', 'plugin', 'skills', SKILL)].find(dir =>
+function skillSource(skill: string): string {
+  const found = [path.join(APP, 'skills', skill), path.join(APP, '..', 'plugin', 'skills', skill)].find(dir =>
     exists(path.join(dir, 'SKILL.md')),
   );
-  return found ?? fail(`the ${SKILL} skill is not in this Koppler (${APP})`);
+  return found ?? fail(`the ${skill} skill is not in this Koppler (${APP})`);
 }
 
 /** Links the skill into a skills folder; a folder there that is not a link is the user's, and stays. */
-function linkSkill(dir: string, source: string, dry: boolean): string {
-  const at = path.join(dir, SKILL);
+function linkSkill(dir: string, name: string, source: string, dry: boolean): string {
+  const at = path.join(dir, name);
   let stat: fs.Stats | null = null;
   try {
     stat = fs.lstatSync(at);
@@ -137,6 +145,14 @@ function linkSkill(dir: string, source: string, dry: boolean): string {
   return `skill linked at ${at}`;
 }
 
+/** Removes the link an older Koppler made for its one skill, once it points nowhere. */
+function dropOldLink(dir: string, dry: boolean): string {
+  const at = path.join(dir, 'koppler-run');
+  if (!fs.lstatSync(at, { throwIfNoEntry: false })?.isSymbolicLink() || exists(at)) return '';
+  if (!dry) fs.unlinkSync(at);
+  return `${dry ? 'would remove' : 'removed'} the old skill link at ${at}`;
+}
+
 /** `koppler agent init`: every agent found here, or the ones named, gets the skill and the MCP server. */
 export function agentCommand(args: string[]): void {
   if (args[0] !== 'init') fail(USAGE);
@@ -146,7 +162,7 @@ export function agentCommand(args: string[]): void {
   const chosen = Object.entries(AGENTS).filter(([id, agent]) => (named ? named.includes(id) : agent.here()));
   if (!chosen.length)
     fail(`found none of Claude Code, GitHub Copilot CLI, VS Code or OpenCode here; name one with --agent (${USAGE})`);
-  const source = fs.realpathSync(skillSource());
+  const sources = SKILLS.map(skill => ({ ...skill, source: fs.realpathSync(skillSource(skill.dir)) }));
   const server: Server = onPath('koppler')
     ? { command: 'koppler', args: ['mcp'] }
     : { command: process.execPath, args: [path.join(CODE, 'koppler.mjs'), 'mcp'] };
@@ -155,7 +171,9 @@ export function agentCommand(args: string[]): void {
     const skill = agent.plugin?.()
       ? 'skill comes with the koppler plugin'
       : skills
-        ? linkSkill(skills, source, dry)
+        ? [...sources.map(({ as, source }) => linkSkill(skills, as, source, dry)), dropOldLink(skills, dry)]
+            .filter(Boolean)
+            .join(', ')
         : 'skill shared with GitHub Copilot CLI';
     console.log(`${agent.name}: ${skill}; ${agent.mcp(server, dry)}`);
   }

@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { unknownFields } from './stack.ts';
 
-const references = new URL('../../../plugin/skills/koppler-run/references/', import.meta.url);
+const references = new URL('../../../plugin/skills/plan/references/', import.meta.url);
 const read = (name: string) => fs.readFileSync(new URL(name, references), 'utf8');
 /** The backticked names in each row's first cell of the table under a header row that starts with `head`. */
 const firstColumn = (text: string, head: string) => {

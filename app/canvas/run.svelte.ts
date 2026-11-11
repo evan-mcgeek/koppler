@@ -393,7 +393,7 @@ class Runs {
         ...(agent === 'none' && (byAgent || manual)
           ? [
               {
-                text: 'No agent is listening, so this waits until one is. Run /koppler-run connect in your agent session.',
+                text: 'No agent is listening, so this waits until one is. Run /koppler:plan connect in your agent session.',
               },
             ]
           : []),
@@ -474,7 +474,7 @@ class Runs {
       confirm: () => {
         const confirmed = Object.fromEntries(VERBS.map(([verb]) => [verb, steps[verb]]));
         const text =
-          'Set up and run this stack using the koppler-run skill.\n' +
+          'Set up and run this stack using the koppler:plan skill.\n' +
           this.#describe(graph) +
           '\nPLAN the user confirmed on the canvas (do exactly this; check it first with koppler plan):\n' +
           describe(steps, { name })
@@ -497,7 +497,7 @@ class Runs {
   /** Hands what the stack misses for an environment to the agent, which proposes the additions and waits for a yes. */
   askFacts(env: string, gaps: string[]): Promise<boolean> {
     const text = [
-      'Find the missing facts for this environment in the stack, using the koppler-run skill.',
+      'Find the missing facts for this environment in the stack, using the koppler:plan skill.',
       `ENV ${env.toUpperCase()}`,
       'MISSING:',
       ...gaps.map(gap => `  ${gap}`),
@@ -515,7 +515,7 @@ class Runs {
   /** Hands a feature's request to the agent, which proposes its steps on the board for the user to accept. */
   askFeature(name: string, request: string): Promise<boolean> {
     const text = [
-      'Propose the steps of this feature board from its request, using the koppler-run skill.',
+      'Propose the steps of this feature board from its request, using the koppler:discover skill.',
       `BOARD ${name}`,
       `REQUEST ${request}`,
       `Find which apps, queues and databases it goes through, in order and in phases, from the stack and its repos. Propose each with koppler board edit "${name}" --phase "<phase>" --propose-step <from>:<to>="<why>"; the user accepts each on the board. Never change the stack yourself.`,
@@ -531,7 +531,7 @@ class Runs {
   /** A comment on a feature board goes to the agent, which answers in its thread and may propose a step with it. */
   askComment(board: string, id: string, about: string, text: string): Promise<boolean> {
     const said = [
-      'Answer this comment on a feature board, using the koppler-run skill.',
+      'Answer this comment on a feature board, using the koppler:discover skill.',
       `BOARD ${board}`,
       `COMMENT ${id}, on ${about}`,
       `TEXT ${text}`,
@@ -543,7 +543,7 @@ class Runs {
   /** Asks the agent to fill in an app's settings from its repo: it proposes, waits for a yes, and leaves locked ones alone. */
   askFill(id: string, empty: string[], locked: string[]): Promise<boolean> {
     const text = [
-      "Fill in this app's settings in the stack from its repo, using the koppler-run skill.",
+      "Fill in this app's settings in the stack from its repo, using the koppler:plan skill.",
       `APP ${name(id)} (${id})`,
       `EMPTY ${empty.join(', ') || 'none'}`,
       `LOCKED ${locked.join(', ') || 'none'} (never change these)`,
@@ -564,7 +564,7 @@ class Runs {
   askToFix(id: string, step: string): Promise<boolean> {
     const env = board.env.toUpperCase();
     const text = [
-      'Fix this failed start, using the koppler-run skill.',
+      'Fix this failed start, using the koppler:plan skill.',
       `ENV ${env}`,
       `APP ${name(id)} (${id})`,
       `FAILED ${step}`,
@@ -733,7 +733,7 @@ class Runs {
           ]
         : [],
       ok: running ? 'Stop and revert' : 'Revert',
-      text: 'Stop and revert this stack using the koppler-run skill: stop every process the agent started (apps, tunnels, background tasks; leave anything started from an IDE or by me) and revert every temporary code change (do-not-commit edits and added launch profiles). Report what was stopped and reverted.',
+      text: 'Stop and revert this stack using the koppler:plan skill: stop every process the agent started (apps, tunnels, background tasks; leave anything started from an IDE or by me) and revert every temporary code change (do-not-commit edits and added launch profiles). Report what was stopped and reverted.',
       sent: 'Stopping and reverting',
     });
   }

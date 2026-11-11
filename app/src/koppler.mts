@@ -976,7 +976,7 @@ const COMMANDS: Command[] = [
     name: 'agent',
     who: 'agent',
     args: 'init [--agent claude,copilot,vscode,opencode] [--dry-run]',
-    about: 'link the skill into each agent on this Mac and register koppler mcp with it',
+    about: 'link the plan, discover and help skills into each agent on this Mac and register koppler mcp with it',
     run: agentCommand,
     example: 'koppler agent init',
   },
@@ -1001,6 +1001,7 @@ function help(command?: Command): void {
     'Koppler plugs your local code into the real stack: the apps you change run on this Mac, wired together; the rest keeps calling a deployed environment.',
     '',
     'usage: koppler <command> [options]',
+    '       koppler alone starts the canvas and its server, and opens it',
     '',
     section('For you', 'you'),
     '',
@@ -1039,8 +1040,10 @@ function closest(word: string): string | null {
 
 /** Runs what was asked for. The help, the version and a finished command return; anything else is thrown. */
 async function main([name, ...args]: string[]): Promise<void> {
+  // `koppler` alone starts Koppler: the canvas and its server, opened in the browser.
+  if (!name) return main(['canvas']);
   const own = args.includes('--') ? args.slice(0, args.indexOf('--')) : args;
-  if (!name || name === 'help' || name === '--help' || name === '-h') {
+  if (name === 'help' || name === '--help' || name === '-h') {
     if (name === 'help' && args[0] && !named(args[0]))
       fail(`usage: no command "${args[0]}"; koppler --help lists them`);
     help(named(args[0]));

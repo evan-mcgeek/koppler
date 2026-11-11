@@ -17,7 +17,7 @@ test('with no agent the bar says so and its messages show how to connect one; a 
   await chip.click();
   await how.click();
   const steps = page.getByRole('dialog', { name: 'Connect an agent' });
-  await expect(steps.locator('code')).toHaveText('/koppler-run connect');
+  await expect(steps.locator('code')).toHaveText('/koppler:plan connect');
   await page.screenshot({ path: 'test-results/next-agent.png' });
   // Where the browser blocks copying, the box says so instead of claiming it copied.
   await steps.getByRole('button', { name: 'Copy' }).click();
@@ -25,7 +25,7 @@ test('with no agent the bar says so and its messages show how to connect one; a 
   await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
   await steps.getByRole('button', { name: 'Copy' }).click();
   await expect(steps.getByRole('button', { name: 'Copied' })).toBeVisible();
-  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('/koppler-run connect');
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('/koppler:plan connect');
 
   // Something waits for an agent: the bar warns, with how many.
   let status: object = { apps: {}, agent: { state: 'none' }, queued: 2 };
@@ -70,7 +70,7 @@ test('with no agent the bar says so and its messages show how to connect one; a 
   status = { apps: {}, agent: { state: 'busy', busy: ago(14) } };
   await expect(chip).toHaveText('Agent quiet, 14 min');
   await expect(chip).toHaveAttribute('data-state', 'quiet');
-  await expect(chip).toHaveAttribute('title', /run \/koppler-run connect there/);
+  await expect(chip).toHaveAttribute('title', /run \/koppler:plan connect there/);
   await how.click();
   await expect(steps).toBeVisible();
   await page.screenshot({ path: 'test-results/next-agent-quiet.png' });

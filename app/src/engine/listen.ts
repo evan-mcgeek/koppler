@@ -148,12 +148,12 @@ export async function listen(argv: string[]): Promise<void> {
     if (!takeOver && current?.disconnected)
       return {
         refused:
-          'This session was disconnected from the canvas. It no longer gets Sends; run /koppler-run connect here to connect again.',
+          'This session was disconnected from the canvas. It no longer gets Sends; run /koppler:plan connect here to connect again.',
       };
     if (!takeOver && (as ? current?.session && current.session !== as : other)) {
       const from = current?.since ? ` (since ${current.since})` : '';
       return {
-        refused: `Another session is connected to the canvas now${from}. This one no longer gets Sends; run /koppler-run connect here to take it back.`,
+        refused: `Another session is connected to the canvas now${from}. This one no longer gets Sends; run /koppler:plan connect here to take it back.`,
       };
     }
     const since = other || !current?.since ? stamp() : current.since;

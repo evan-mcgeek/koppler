@@ -29,7 +29,7 @@ function leave(to: string, open: () => void): void {
       { text: 'Left alone: anything you started yourself or from your IDE, your AWS sign-ins and stored credentials.' },
     ],
     ok: 'Stop, revert and open',
-    text: 'Stop and revert this stack using the koppler-run skill (stop every process the agent started, revert every temporary code change). Report what was stopped and reverted.',
+    text: 'Stop and revert this stack using the koppler:plan skill (stop every process the agent started, revert every temporary code change). Report what was stopped and reverted.',
     sent: `Stopping and reverting, and ${to} is open`,
     then: open,
   });
