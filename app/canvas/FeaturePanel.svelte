@@ -91,6 +91,15 @@
         }}>Walk through the steps</button
       >
     {/if}
+    <button
+      class="text walk"
+      type="button"
+      aria-pressed={discovered.commenting}
+      title="Then a click on the card or the step it is about"
+      onclick={() => {
+        discovered.commenting = !discovered.commenting;
+      }}>Comment</button
+    >
   </p>
 
   {#each feature.phases as one, at (one.name)}
@@ -146,6 +155,8 @@
         {/if}
       </header>
       {#each steps.filter(step => step.phase === at) as { step, number } (number)}
+        {@const ref = { from: step.from, to: step.to, phase: one.name }}
+        {@const talks = discovered.openOn({ step: ref })}
         <div
           class="step"
           class:proposed={step.proposed}
@@ -185,6 +196,26 @@
               >
             {/if}
           </span>
+          {#if discovered.commenting}
+            <button
+              class="text here"
+              type="button"
+              aria-label="Comment on step {number}"
+              onclick={() => {
+                discovered.commenting = false;
+                discovered.thread = { on: { step: ref } };
+              }}>Here</button
+            >
+          {:else if talks.length}
+            <button
+              class="talk"
+              type="button"
+              aria-label="{talks.length} {talks.length === 1 ? 'comment' : 'comments'} on step {number}"
+              onclick={() => {
+                discovered.thread = { id: talks[0]?.id ?? '' };
+              }}>{talks.length}</button
+            >
+          {/if}
           {#if !step.proposed}
             <button
               class="off"
@@ -259,6 +290,21 @@
     margin: 4px 0 12px;
     color: var(--muted);
     font: 400 12px var(--sans);
+  }
+  /* A step's open threads, counted at its end. */
+  .talk {
+    flex: none;
+    align-self: start;
+    min-width: 20px;
+    padding: 0 5px;
+    border: 1px solid var(--ink);
+    background: var(--panel);
+    color: var(--ink);
+    font: 600 11px/18px var(--mono);
+    cursor: pointer;
+  }
+  .here {
+    align-self: start;
   }
   .from {
     font: 500 14px var(--sans);

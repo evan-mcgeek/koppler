@@ -4,7 +4,7 @@ import type { StoredPreset } from '../src/core/presets.ts';
 import { board } from './board.svelte.ts';
 import { runs } from './run.svelte.ts';
 import { toasts } from './toast.svelte.ts';
-import { post } from './data.ts';
+import { post, save } from './data.ts';
 
 interface Fetched {
   presets?: unknown;
@@ -92,8 +92,15 @@ export function ago(iso: string): string {
 }
 
 /** A feature board as the page `koppler export --board` writes, saved as a download; its file name, or null. */
-export async function savePage(name: string, env?: string): Promise<string | null> {
-  const made = await post<{ file: string; page: string }>('board-export', { name, ...(env && { env }) });
+export async function savePage(name: string, env?: string, comments = false): Promise<string | null> {
+  // The page is made from the boards as kept: the last change on screen is kept first.
+  board.commit();
+  await save(board.saved());
+  const made = await post<{ file: string; page: string }>('board-export', {
+    name,
+    ...(env && { env }),
+    ...(comments && { comments }),
+  });
   if ('error' in made) {
     toasts.show(`Could not export ${name}. ${made.error}`, 'warning');
     return null;

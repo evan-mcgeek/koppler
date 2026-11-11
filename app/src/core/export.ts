@@ -19,6 +19,8 @@ export interface Flow {
   cards: FlowCard[];
   /** Where the board's author left the cards that have a place. */
   at: Record<Card, Point>;
+  /** Its open threads, when the sharer chose to include them: on a card, or on a step by its number. */
+  comments?: { on: { card: Card } | { step: string }; thread: { by: 'you' | 'agent'; text: string }[] }[];
 }
 export interface Exported {
   stack: string;
@@ -62,7 +64,7 @@ function cardOf(stack: Stack, id: Card): FlowCard {
 }
 
 /** Each feature board, the team's unless others are given, as a flow: its accepted steps in their phases, and the cards they name. */
-export function flowsOf(stack: Stack, boards: readonly Board[] = stack.presets ?? []): Flow[] {
+export function flowsOf(stack: Stack, boards: readonly Board[] = stack.presets ?? [], talk = false): Flow[] {
   return boards.flatMap(preset => {
     const feature = featureOf(preset['feature']);
     if (!feature) return [];
@@ -92,7 +94,20 @@ export function flowsOf(stack: Stack, boards: readonly Board[] = stack.presets ?
           : [];
       }),
     );
-    return [{ name: preset.name, request: feature.request, phases, cards, at }];
+    // Only the words of open threads leave: no ids, no times, and a step's by its number on the page.
+    const numberOf = (ref: { from: Card; to: Card; phase?: string }) =>
+      phases
+        .filter(phase => !ref.phase || phase.name === ref.phase)
+        .flatMap(phase => phase.steps)
+        .find(step => step.from === ref.from && step.to === ref.to)?.number;
+    const comments = (talk ? (feature.comments ?? []) : [])
+      .filter(one => !one.resolved)
+      .flatMap(one => {
+        const number = 'step' in one.on ? numberOf(one.on.step) : undefined;
+        const on = 'card' in one.on ? { card: one.on.card } : number ? { step: number } : null;
+        return on ? [{ on, thread: one.thread.map(({ by, text }) => ({ by, text })) }] : [];
+      });
+    return [{ name: preset.name, request: feature.request, phases, cards, at, ...(comments.length && { comments }) }];
   });
 }
 

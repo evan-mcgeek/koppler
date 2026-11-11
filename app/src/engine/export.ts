@@ -81,10 +81,11 @@ export async function boardPage(
   name: string,
   own: readonly StoredPreset[] = (readData('state')?.['presets'] ?? []) as StoredPreset[],
   env?: string,
+  talk = false,
 ): Promise<{ file: string; page: string } | { error: string }> {
   const found = boardNamed<{ name: string } & Record<string, unknown>>(own, stack.presets ?? [], name);
   if ('error' in found) return found;
-  const flows = await Promise.all(flowsOf(stack, [found.board]).map(withPlaces));
+  const flows = await Promise.all(flowsOf(stack, [found.board], talk).map(withPlaces));
   const title = stack.name ?? 'Stack';
   return {
     file: fileNameOf(`${title} ${found.board.name}`),

@@ -1,5 +1,6 @@
 <script lang="ts">
   // Share in Discover's bar: a feature board as a view-only page, a snapshot of today, for anyone to open in a browser.
+  import { openComments } from '../src/core/feature.ts';
   import { board } from './board.svelte.ts';
   import { savePage } from './boards.ts';
   import { toasts } from './toast.svelte.ts';
@@ -8,6 +9,9 @@
   let pop = $state<HTMLDivElement>();
   let button = $state<HTMLButtonElement>();
   let env = $state(board.env);
+  /** The threads go on the page only when asked: they are working notes between you and the agent. */
+  let talk = $state<'out' | 'in'>('out');
+  const open = $derived(openComments(board.feature));
   let busy = $state(false);
   /** When this board was last shared from this Mac, to say so to the sharer. */
   const key = $derived(`koppler-shared:${board.dir}:${board.name ?? ''}`);
@@ -23,7 +27,7 @@
   const share = async () => {
     if (!board.name || busy) return;
     busy = true;
-    const file = await savePage(board.name, env);
+    const file = await savePage(board.name, env, talk === 'in' && open > 0);
     busy = false;
     if (!file) return;
     shared = new Date().toISOString();
@@ -55,6 +59,7 @@
   onbeforetoggle={ev => {
     if (ev.newState !== 'open') return;
     env = board.env;
+    talk = 'out';
     try {
       shared = localStorage.getItem(key) ?? '';
     } catch {
@@ -76,6 +81,15 @@
       {#each board.envs as one (one)}
         <label><input type="radio" name="{id}-env" value={one} bind:group={env} />{one.toUpperCase()}</label>
       {/each}
+    </span>
+  </div>
+  <div class="row">
+    <span class="label">Comments</span>
+    <span class="seg" role="radiogroup" aria-label="Comments on the page">
+      <label><input type="radio" name="{id}-talk" value="out" bind:group={talk} />Leave out</label>
+      <label title={open ? undefined : 'No open comments on this board'}
+        ><input type="radio" name="{id}-talk" value="in" disabled={!open} bind:group={talk} />Include</label
+      >
     </span>
   </div>
   <p class="snap">

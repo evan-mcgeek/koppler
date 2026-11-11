@@ -1,6 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import type { Facts } from './discover.ts';
-import { editFeature, featureCards, featureOf, kindBetween, numbered, proposedCard, stackPath } from './feature.ts';
+import {
+  editFeature,
+  featureCards,
+  featureOf,
+  kindBetween,
+  numbered,
+  openComments,
+  proposedCard,
+  stackPath,
+  withoutComments,
+} from './feature.ts';
 
 const facts = {
   apps: {
@@ -145,5 +155,63 @@ describe('kindBetween and stackPath', () => {
       'apps.orders.uses.orders-db',
     );
     expect(stackPath(facts, { from: 'web', to: 'lokalise', kind: 'call' })).toBeNull();
+  });
+});
+
+describe('comments on a feature board', () => {
+  const base = editFeature(null, { phase: ['Pay'], step: [{ from: 'web', to: 'payments', kind: 'call' }] });
+  const at = '2026-11-10T10:42:00.000Z';
+
+  it('opens a thread on a card or a step, takes replies, and is resolved', () => {
+    let feature = editFeature(base, {
+      comment: { id: 'c1', on: { card: 'psp' }, text: "The provider's webhook back to Payments API is missing.", at },
+    });
+    feature = editFeature(feature, {
+      comment: { id: 'c2', on: { step: { from: 'web', to: 'payments', phase: 'Pay' } }, text: 'Which route?', at },
+    });
+    feature = editFeature(feature, {
+      reply: { id: 'c1', by: 'agent', text: 'Found it: POST /webhooks/payment.', at },
+      step: [{ from: 'psp', to: 'payments', kind: 'call', proposed: true }],
+    });
+    expect(feature.comments?.map(one => [one.id, one.thread.length])).toEqual([
+      ['c1', 2],
+      ['c2', 1],
+    ]);
+    // The change the agent made with its reply is the reply's, to keep or undo.
+    expect(feature.comments?.[0]?.thread[1]).toEqual({
+      by: 'agent',
+      at,
+      text: 'Found it: POST /webhooks/payment.',
+      step: { from: 'psp', to: 'payments', phase: 'Pay' },
+    });
+    feature = editFeature(feature, { resolve: 'c2' });
+    expect(feature.comments?.find(one => one.id === 'c2')?.resolved).toBe(true);
+    expect(openComments(feature)).toBe(1);
+  });
+
+  it('keeps only what makes sense when read back, and a reply to no thread changes nothing', () => {
+    const read = featureOf({
+      ...base,
+      comments: [
+        {
+          id: 'c1',
+          on: { card: 'psp' },
+          thread: [
+            { by: 'you', at, text: 'Missing webhook' },
+            { by: 'x', text: '' },
+          ],
+        },
+        { id: '', on: {}, thread: [] },
+      ],
+    });
+    expect(read?.comments).toEqual([
+      { id: 'c1', on: { card: 'psp' }, thread: [{ by: 'you', at, text: 'Missing webhook' }] },
+    ]);
+    expect(editFeature(read, { reply: { id: 'nope', by: 'agent', text: 'Hi', at } }).comments).toEqual(read?.comments);
+  });
+
+  it('is the same feature without its comments, so comments alone change no steps', () => {
+    const talked = editFeature(base, { comment: { id: 'c1', on: { card: 'web' }, text: 'Why?', at } });
+    expect(withoutComments(talked)).toEqual(withoutComments(base));
   });
 });
