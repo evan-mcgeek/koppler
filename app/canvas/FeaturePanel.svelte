@@ -5,6 +5,7 @@
   import { linksOf } from '../src/core/discover.ts';
   import { numbered, type Feature } from '../src/core/feature.ts';
   import { board } from './board.svelte.ts';
+  import { stacks } from './stacks.svelte.ts';
   import { discovered } from './discover.svelte.ts';
 
   const { feature }: { feature: Feature } = $props();
@@ -44,7 +45,7 @@
 <aside class="panel" aria-labelledby="feature-title">
   <h2 id="feature-title">{board.name}</h2>
   <p class="kind">
-    {team ? 'Team' : 'Your'} feature board · {steps.length}
+    {team && stacks.shared ? 'Team feature board' : 'Feature board'} · {steps.length}
     {steps.length === 1 ? 'step' : 'steps'}
   </p>
   <div class="request">

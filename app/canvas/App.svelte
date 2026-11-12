@@ -924,7 +924,7 @@
     border-right-width: 0;
   }
   /* 5: the stack's name shortens; 6: the stack leaves the bar for the board menu's first row; 7: the board's name
-     shortens, keeping "(local)". */
+     shortens. */
   header:global(.l5) .names :global(.picker) {
     max-width: 100px;
   }

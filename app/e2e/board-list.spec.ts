@@ -1,10 +1,12 @@
-// The board menu: one list of the team's boards and your own, by area, a Team tag on the team's.
+// The board menu: one list of the team's boards and your own, by area, a Team tag on the team's when the stack is
+// shared. A team board an older Koppler copied is one board.
 import type { Page } from '@playwright/test';
 import { expect, fromMenu, STACK, test } from './canvas.ts';
 
 const apps = STACK.apps as Record<string, object>;
 const own = [
   { name: 'Checkout (local)', version: 1, nodes: { payments: { run: 'cli' } }, edges: [] },
+  { name: 'Refunds', version: 1, nodes: { payments: { run: 'cli' } }, edges: [] },
   { name: 'Parcel notes', version: 1, nodes: { catalog: { run: 'cli' } }, edges: [] },
   // A feature board: Discover's, never in Run's list.
   { name: 'basket rework', version: 1, nodes: { payments: { run: 'cli' } }, edges: [], feature: {} },
@@ -35,16 +37,17 @@ test.describe('a stack with areas', () => {
       presets: team,
     } as typeof STACK,
     board,
+    teamStack: true,
   });
 
-  test('lists both kinds under each area by name, a team board before its copy, and counts what the areas hide', async ({
+  test('lists both kinds under each area by name, a copied team board once, and counts what the areas hide', async ({
     page,
   }) => {
     const menu = await menuOf(page);
     await expect(menu.locator('p.sub')).toHaveText(['Payments2', 'Shipping2', 'No area2']);
     await expect(rows(menu)).toHaveText([
       /^Checkout\s*Team\s*$/,
-      /^Checkout\s*\(local\)\s*$/,
+      /^Refunds\s*$/,
       /^Browse\s*Team\s*$/,
       /^Parcel notes\s*$/,
       /^Smoke test\s*Team\s*$/,
@@ -71,7 +74,7 @@ test.describe('a stack with areas', () => {
 });
 
 test.describe('a stack with no areas', () => {
-  test.use({ stack: { ...STACK, presets: team }, board });
+  test.use({ stack: { ...STACK, presets: team }, board, teamStack: true });
 
   test('is one flat list by name, with the same row and tag', async ({ page }) => {
     const menu = await menuOf(page);
@@ -79,8 +82,8 @@ test.describe('a stack with no areas', () => {
     await expect(rows(menu)).toHaveText([
       /^Browse\s*Team\s*$/,
       /^Checkout\s*Team\s*$/,
-      /^Checkout\s*\(local\)\s*$/,
       /^Parcel notes\s*$/,
+      /^Refunds\s*$/,
       /^Smoke test\s*Team\s*$/,
       /^Web Shop\s*$/,
     ]);
@@ -101,5 +104,21 @@ test.describe('a stack with no areas', () => {
     const again = await menuOf(page);
     await again.locator('.row').filter({ hasText: 'Browse' }).hover();
     await page.screenshot({ path: 'test-results/board-list-paper.png' });
+  });
+});
+
+test.describe('a stack only on this Mac', () => {
+  test.use({ stack: { ...STACK, presets: team }, board });
+
+  test("marks no board as the team's", async ({ page }) => {
+    const menu = await menuOf(page);
+    await expect(rows(menu)).toHaveText([
+      /^Browse\s*$/,
+      /^Checkout\s*$/,
+      /^Parcel notes\s*$/,
+      /^Refunds\s*$/,
+      /^Smoke test\s*$/,
+      /^Web Shop\s*$/,
+    ]);
   });
 });

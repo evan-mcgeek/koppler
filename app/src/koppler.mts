@@ -23,7 +23,7 @@ import { exportCommand } from './engine/export.ts';
 import { down } from './engine/down.ts';
 import { investigate } from './engine/investigate.ts';
 import { discardChanges, linkStack, linkedStatus, proposeChanges, updateStack } from './engine/linked.ts';
-import { boardCommand } from './engine/boards.ts';
+import { boardCommand, foldCopiesHere } from './engine/boards.ts';
 import { askToConnect, listen } from './engine/listen.ts';
 import { lockedPaths, setLock } from './engine/locks.ts';
 import { sayCommand } from './engine/messages.ts';
@@ -142,7 +142,9 @@ function boardsOf(name: string | undefined): { stack: ReturnType<typeof loaded>;
 /** Stacks on this Mac, or switch to one; --boards lists the boards of a stack (the team's presets and your own). */
 function use(args: string[]): void {
   if (args.includes('--boards')) {
-    const { stack, own: shelf } = boardsOf(positional(args, ['--area'])[0]);
+    const named = positional(args, ['--area'])[0];
+    if (named === undefined) foldCopiesHere();
+    const { stack, own: shelf } = boardsOf(named);
     const wanted = args.includes('--area') ? args[args.indexOf('--area') + 1] : undefined;
     if (args.includes('--area') && (!wanted || !Object.hasOwn(stack.areas ?? {}, wanted)))
       fail(`--area needs one of the stack's areas: ${Object.keys(stack.areas ?? {}).join(', ') || 'it has none'}`);
@@ -163,7 +165,7 @@ function use(args: string[]): void {
         const area = board.area
           ? `, ${stack.areas?.[board.area]?.name ?? board.area}${board.areaBy === 'hand' ? ' (set by hand)' : ''}`
           : '';
-        console.log(`${board.name}  (${board.from === 'team' ? 'team preset' : 'your board'}${area})`);
+        console.log(`${board.name}  (${board.from === 'team' ? 'team board' : 'your board'}${area})`);
       }
     return;
   }

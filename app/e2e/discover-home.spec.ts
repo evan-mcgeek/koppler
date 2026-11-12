@@ -44,10 +44,11 @@ test('the home lists the whole stack first, then the feature boards, and opens e
   const rows = home(page).locator('.row');
   await expect(rows).toHaveText([
     /^Whole stack\s*4 apps and resources$/,
-    /^Checkout flow\s*1 phase · 2 steps$/,
     /^Browse flow\s*1 phase · 1 step$/,
+    /^Checkout flow\s*1 phase · 2 steps$/,
   ]);
-  await expect(home(page).locator('.head')).toHaveText(['Team feature boards', 'Your feature boards']);
+  // One list, the team's and yours, by name.
+  await expect(home(page).locator('.head')).toHaveText(['Feature boards']);
   await expect(rows.first()).toHaveAttribute('aria-current', 'true');
   await expect(page.locator('.svelte-flow__node.unplaced')).toHaveCount(0);
   await expect(page.locator('.svelte-flow__node')).toHaveCount(4);
@@ -57,7 +58,7 @@ test('the home lists the whole stack first, then the feature boards, and opens e
   await expect(page.getByRole('button', { name: 'Board: Checkout flow' })).toBeVisible();
   // A feature board's steps take the left; the board menu leads back to the whole stack.
   const steps = page.getByRole('complementary', { name: 'Checkout flow' });
-  await expect(steps.locator('.kind')).toHaveText('Team feature board · 2 steps');
+  await expect(steps.locator('.kind')).toHaveText('Feature board · 2 steps');
   await expect(steps.locator('.step')).toHaveText([
     /^1\.1\s*Web Shop\s*calls Orders API/,
     /^1\.2\s*Orders API\s*calls Payments API/,

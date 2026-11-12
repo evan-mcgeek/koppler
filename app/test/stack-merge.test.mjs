@@ -223,12 +223,12 @@ test('use <stack> --boards lists that stack’s boards, its team’s and its own
 
   const other = koppler('use', 'Acme Shop QA', '--boards');
   assert.equal(other.status, 0, other.stderr);
-  assert.equal(other.stdout.trim(), 'Payments  (team preset)\nQA smoke  (your board)');
+  assert.equal(other.stdout.trim(), 'Payments  (team board)\nQA smoke  (your board)');
   assert.deepEqual(JSON.parse(koppler('use', 'acme shop qa', '--boards', '--json').stdout).map(one => one.name), ['Payments', 'QA smoke']);
   // The stack in use is the same as before, and naming it lists its boards as --boards alone does.
   assert.match(koppler('use').stdout, /^\* Acme Shop /m);
   assert.equal(koppler('use', 'Acme Shop', '--boards').stdout, koppler('use', '--boards').stdout);
-  assert.equal(koppler('use', '--boards').stdout.trim(), 'Team checkout  (team preset)\nMine  (your board)');
+  assert.equal(koppler('use', '--boards').stdout.trim(), 'Team checkout  (team board)\nMine  (your board)');
   assert.match(koppler('use', 'Nope', '--boards').stderr, /no stack called Nope/);
   fs.rmSync(dir, { recursive: true, force: true });
 });

@@ -8,9 +8,10 @@ It is served on your machine only, and its address stays the same across restart
 The board holds the apps you want running locally.
 Every board you build is saved as you change it, per stack.
 Team boards are boards the stack shares with everyone who uses it; one click opens one.
-A team board you change becomes your own copy.
-**Share with team** proposes your board as a team board of the stack: a pull request on the stack's repo on GitHub, made from the team's `stack.json` as it is there, so nothing else on your Mac goes with it, not even the notes on your cards. Your team gets it once the pull request is merged.
-A stack that is not on GitHub keeps the board among its team boards in its file here, for you to commit.
+Each board is one board: changing a team board changes it in the stack's file, for the team too once the stack is shared (a linked stack sends it with `koppler stack propose`, a stack in a repo with a commit).
+A team board copied by an older Koppler, as `<name> (local)`, becomes the one team board again, with your copy's changes.
+**Share with team** proposes your board as a team board of the stack: a pull request on the stack's repo on GitHub, made from the team's `stack.json` as it is there, so nothing else on your Mac goes with it; the notes on its cards go with the board. Your team gets it once the pull request is merged.
+A stack that is not on GitHub keeps the board among its team boards in its file here, for you to commit; it is then one board, no longer yours too.
 The same is `koppler board share "<name>"` in the terminal.
 A board file can also be opened, dropped on the page or linked from GitHub.
 `koppler board new "<name>"` makes a board from the terminal, and `koppler board edit "<name>"` changes one, even one open on the canvas.
@@ -25,7 +26,7 @@ An app's areas are under its name in its settings: each one can be taken out, an
 With some areas picked, the Apps list groups its apps under them, then the apps in no area, which always show; the apps on the board always show too, under **On this board** when they are outside your areas.
 An app in two areas lists once, with "also" and the other one under its name, and a dashed line says how many apps your areas hide, with **Show all**.
 The board menu is one list: the team's boards and your own together under each area, the one most of their apps are in unless it was set by hand, with **No area** last and each heading's count beside it.
-Inside an area boards go by name, a team board just before its **(local)** copy; a team board carries a small **Team** tag, your own none, and a feature board says so under its name.
+Inside an area boards go by name; in a stack shared with a team (in a repo, or linked) a team board carries a small **Team** tag, your own none, and a feature board says so under its name.
 When your areas hide boards, a dashed line counts them by kind ("4 boards in Payments and Accounts: 3 team, 1 yours"); with no areas the menu is one list by name.
 **Find a board** looks through every board: one your areas hide shows under **Hidden by your areas**, and opening it leaves your choice as it is, with its area beside its name in the bar.
 In Plan and Live a card says its areas after its kind, only while your areas hide some.
@@ -35,7 +36,7 @@ A dashed line under the map says which areas it shows and how many apps it hides
 **Find a card** (`/`) marks an app your areas hide as **Hidden by your areas**, with its areas; picking it adds those areas to your choice and brings it onto the map.
 When a board's apps tie between areas, its tooltip in the board menu says which area it went to and why.
 Right-click a board in the menu, or point at it and click **…**, for **Set area…**: pick an area, or **Worked out from its apps** to take it from its apps again.
-In a stack with areas, that menu also holds your own boards' **Share with the team…** and **Delete…**.
+That menu also holds **Delete…**, and on your own boards **Share with the team…**; deleting a team board takes it out of the stack's file.
 Your own boards keep their area on this Mac; a team board's area is in the stack, so changing it changes it for the team, and its settings under **Team boards** set it too.
 Areas are a view only: what runs, the environments and the secrets stay the same.
 
@@ -197,7 +198,7 @@ Each phase's title sits on the map over the card it starts from, above the cards
 **Comment**, then a click on a card or a step's **Here**, opens a thread beside the map; the agent is asked to answer it and does so in the thread, and while it works a warn dot shows on the card's marker.
 An answer that adds a step the feature misses draws it dashed until **Keep step N** makes it solid; **Undo** takes it off and leaves the thread.
 A card with open threads carries an ink marker with their number, a step carries it at its end, and the home and the board menu count each board's; **Resolve** hides a thread and its marker.
-On a team board the threads are kept in the stack, for the team, and make no copy of your own; on yours, only you see them. Share leaves them out unless you include them, and the page shows them to read only.
+On a team board the threads are kept in the stack, for the team; on yours, only you see them. Share leaves them out unless you include them, and the page shows them to read only.
 
 <img alt="A feature board, Checkout: its steps numbered in two phases on the map and in the panel, and one step the agent proposed, dashed, with Accept and Drop" src="images/feature-board.png">
 

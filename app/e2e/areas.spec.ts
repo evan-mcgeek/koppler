@@ -4,6 +4,7 @@ import { card, expect, overlapping, STACK, test } from './canvas.ts';
 
 const apps = STACK.apps as Record<string, object>;
 test.use({
+  teamStack: true,
   stack: {
     ...STACK,
     areas: { payments: { name: 'Payments' }, shipping: { name: 'Shipping' } },

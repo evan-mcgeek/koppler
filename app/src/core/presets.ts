@@ -11,10 +11,6 @@ type Loose = Record<string, unknown>;
 const isObject = (value: unknown): value is Loose =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
-/** A board's apps as the team gets them: a card's note stays with whoever wrote it. */
-export const withoutNotes = (nodes: Record<string, Loose>): Record<string, Loose> =>
-  Object.fromEntries(Object.entries(nodes).map(([id, { note: _, ...node }]) => [id, node]));
-
 /** A preset as it is stored: read from a file, a link or the stack, so only its outline is certain. */
 export interface StoredPreset extends Loose {
   name: string;
@@ -50,6 +46,25 @@ export function migrate(input: unknown): Migrated {
     preset: { ...(done.value as StoredPreset), version: VERSION },
     migratedFrom: done.applied.length ? done.from : null,
   };
+}
+
+/**
+ * Your boards that are a team board kept twice, by an older Koppler that copied a team board when it was changed:
+ * "Checkout (local)", or "Checkout" itself. Each folds into the team board, which takes the copy's content when it
+ * differs.
+ */
+export function foldCopies(team: StoredPreset[], own: StoredPreset[]): { put: StoredPreset[]; dropped: string[] } {
+  const put = new Map<string, StoredPreset>();
+  const dropped: string[] = [];
+  for (const copy of own) {
+    const name = copy.name.replace(/ \((local|mine)\)$/, '');
+    const shared = team.find(one => one.name === name);
+    if (!shared) continue;
+    dropped.push(copy.name);
+    const folded = { ...copy, name };
+    if (JSON.stringify(folded) !== JSON.stringify(shared)) put.set(name, folded);
+  }
+  return { put: [...put.values()], dropped };
 }
 
 /** What a preset is checked against: this stack's apps, the clones on this machine and their branches. */

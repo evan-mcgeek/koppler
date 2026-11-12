@@ -15,6 +15,7 @@ const flow = {
 };
 test.use({
   stack: { ...STACK, presets: [...(STACK.presets ?? []), flow] },
+  teamStack: true,
   board: { env: 'qa', mode: 'auto', zoom: 1, pan: { x: 60, y: 60 }, nodes: { web: at(0, 0) }, edges: [] },
 });
 

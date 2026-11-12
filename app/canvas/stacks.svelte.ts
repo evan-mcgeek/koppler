@@ -7,6 +7,10 @@ import { runs } from './run.svelte.ts';
 import { toasts } from './toast.svelte.ts';
 
 class Stacks {
+  /** The stack in use is shared with a team (in a repo, or linked): only then is a board marked as the team's. */
+  get shared(): boolean {
+    return !!live.status?.stacks?.find(one => one.dir === board.dir)?.shared;
+  }
   /** The stack being switched to from this page, until the page reloads with it. */
   switching = $state<string | null>(null);
 

@@ -16,7 +16,7 @@ const board = {
   nodes: { web: at(0, 0), orders: at(420, 0) },
   edges: [{ from: 'web', to: 'orders', fromSide: 'right', toSide: 'left' }],
   // Not shown by the new canvas yet: it must not lose them.
-  presets: [{ name: 'Checkout', version: 1, nodes: { web: { run: 'cli' } }, edges: [] }],
+  presets: [{ name: 'Basket', version: 1, nodes: { web: { run: 'cli' } }, edges: [] }],
   infra: { 'tunnel:db.qa.acme.example:5432': { x: 40, y: 400 } },
 };
 test.use({ board });
@@ -60,7 +60,7 @@ test('what is changed on the board comes back after a reload', async ({ page, ca
   const now = (await (await page.request.get(`${canvas.url}data/state.json`)).json()) as typeof board & {
     preset?: string;
   };
-  expect(now.presets.map(preset => preset.name)).toEqual(['Checkout', 'Web Shop + 1']);
+  expect(now.presets.map(preset => preset.name)).toEqual(['Basket', 'Web Shop + 1']);
   expect(now.preset).toBe('Web Shop + 1');
   expect(now.infra).toEqual(board.infra);
 });
@@ -133,5 +133,5 @@ test('a board made in the terminal while the canvas is open is kept when the can
   await page.mouse.move(700, 700);
   await page.mouse.wheel(40, 30);
   await kept;
-  expect(names()).toEqual(expect.arrayContaining(['Checkout', 'Payments work']));
+  expect(names()).toEqual(expect.arrayContaining(['Basket', 'Payments work']));
 });

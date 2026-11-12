@@ -27,6 +27,7 @@ const SHOP = {
   ],
 } as typeof STACK;
 test.use({
+  teamStack: true,
   stack: SHOP,
   board: {
     env: 'qa',

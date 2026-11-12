@@ -23,6 +23,7 @@
   import Queue from './Queue.svelte';
   import Tunnel from './Tunnel.svelte';
   import { board, CARD_PANEL, FAR_ZOOM, type CardNode, type InfraNode } from './board.svelte.ts';
+  import { stacks } from './stacks.svelte.ts';
   import { wiring } from './wiring.svelte.ts';
   import { undo } from './undo.svelte.ts';
   import { ago, openBoard } from './boards.ts';
@@ -736,7 +737,9 @@
                 }}
               >
                 <span class="name">{preset.name}</span>
-                <span class="meta">{team ? 'Team board' : 'Your board'}{at ? `, opened ${ago(at)}` : ''}</span>
+                <span class="meta"
+                  >{team && stacks.shared ? 'Team board' : 'Board'}{at ? `, opened ${ago(at)}` : ''}</span
+                >
               </button>
             </li>
           {/each}

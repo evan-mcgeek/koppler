@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { check, migrate, VERSION, withHidden, type StackFacts, type StoredPreset } from './presets.ts';
+import { check, foldCopies, migrate, VERSION, withHidden, type StackFacts, type StoredPreset } from './presets.ts';
 
 const stack: StackFacts = {
   known: id => ['app', 'api', 'db-api', 'far'].includes(id),
@@ -162,4 +162,20 @@ test('apps the stack cannot show stay on the board as kept, with their cables an
   });
   expect(withHidden(stored, now, () => true)).toBe(now);
   expect(withHidden(undefined, now, () => false)).toBe(now);
+});
+
+test("a copy of yours of a team board folds into it: the copy's content, under the team board's name", () => {
+  const board = (name: string, apps: string[]) => ({
+    name,
+    version: 1,
+    nodes: Object.fromEntries(apps.map(id => [id, { run: 'cli' }])),
+    edges: [],
+  });
+  const team = [board('Checkout', ['web']), board('Search', ['web'])];
+  const own = [board('Checkout (local)', ['web', 'orders']), board('Search', ['web']), board('Mine', ['web'])];
+  expect(foldCopies(team, own)).toEqual({
+    put: [board('Checkout', ['web', 'orders'])],
+    dropped: ['Checkout (local)', 'Search'],
+  });
+  expect(foldCopies(team, [board('Mine', ['web'])])).toEqual({ put: [], dropped: [] });
 });

@@ -180,42 +180,35 @@ export function editStack(
   return { error: first };
 }
 
-/**
- * Sets a team board's area by hand, or takes it from its apps again (`null`). The board is found by its name in the
- * file as it is now, so a stack changed since it was read cannot put the area on another board.
- */
-export function setBoardArea(
-  name: string,
-  area: string | null,
-  { config = loadConfig() }: { config?: Config } = {},
-): { path: string; value: unknown; error?: undefined } | { error: string } {
-  const used = stackInUse(config);
-  if (used.error !== undefined) return used;
-  const { presets } = used.stack as { presets?: unknown };
-  const at = (Array.isArray(presets) ? (presets as ({ name?: unknown } | null)[]) : []).findIndex(
-    one => one?.name === name,
-  );
-  if (at < 0) return { error: `The stack changed: it has no team board called ${name} now. Read it again.` };
-  return editStack(`presets[${String(at)}].area`, area ? [area] : undefined, { config });
-}
+type Edited = { path: string; value: unknown; error?: undefined } | { error: string };
 
 /**
- * A comment, a reply or a resolve on a team feature board, kept with it in the stack for the team: talking about a
- * team board is no change to its steps, so it makes no copy of your own.
+ * Changes the team board called `name`: its field `at` (the whole board when none), or takes it out of the stack. It
+ * is found by its name in the file as it is now, so a stack changed since it was read cannot change another board.
  */
-export function commentOnTeamBoard(
+export function changeTeamBoard(
   name: string,
-  edit: FeatureEdit,
+  change: (board: Record<string, unknown>) => { at?: string; value: unknown },
   { config = loadConfig() }: { config?: Config } = {},
-): { path: string; value: unknown; error?: undefined } | { error: string } {
+): Edited {
   const used = stackInUse(config);
   if (used.error !== undefined) return used;
   const { presets } = used.stack as { presets?: unknown };
-  const all = Array.isArray(presets) ? (presets as ({ name?: unknown; feature?: unknown } | null)[]) : [];
-  const at = all.findIndex(one => one?.name === name);
-  if (at < 0) return { error: `The stack changed: it has no team board called ${name} now. Read it again.` };
-  return editStack(`presets[${String(at)}].feature`, [editFeature(featureOf(all[at]?.feature), edit)], { config });
+  const all = Array.isArray(presets) ? (presets as (Record<string, unknown> | null)[]) : [];
+  const index = all.findIndex(one => one?.['name'] === name);
+  if (index < 0) return { error: `The stack changed: it has no team board called ${name} now. Read it again.` };
+  const { at, value } = change(all[index] ?? {});
+  const place = `presets[${String(index)}]${at ? `.${at}` : ''}`;
+  return editStack(place, value === undefined ? undefined : [value], { config });
 }
+
+/** Sets a team board's area by hand, or takes it from its apps again (`null`). */
+export const setBoardArea = (name: string, area: string | null, options: { config?: Config } = {}): Edited =>
+  changeTeamBoard(name, () => ({ at: 'area', value: area || undefined }), options);
+
+/** A comment, a reply or a resolve on a team feature board, kept with it in the stack for the team. */
+export const commentOnTeamBoard = (name: string, edit: FeatureEdit, options: { config?: Config } = {}): Edited =>
+  changeTeamBoard(name, board => ({ at: 'feature', value: editFeature(featureOf(board['feature']), edit) }), options);
 
 /**
  * Adds a system the apps call that never runs here (a SaaS API, a managed service), with the apps that call it, so it

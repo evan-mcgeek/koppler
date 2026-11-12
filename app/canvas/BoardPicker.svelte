@@ -11,6 +11,7 @@
   import AreaFilter from './AreaFilter.svelte';
   import { chosen as areaChoice } from './areas.svelte.ts';
   import { board } from './board.svelte.ts';
+  import { stacks } from './stacks.svelte.ts';
   import { ago, openBoard, openFile, openFlow, openLink, savePage } from './boards.ts';
   import { tick } from 'svelte';
   import { post } from './data.ts';
@@ -90,8 +91,6 @@
     if (team) return `${String(team)} team ${team === 1 ? 'board' : 'boards'}${where}`;
     return `${String(yours)} of your boards${where}`;
   });
-  /** "(local)" after a board's name, a team board's copy: set apart, so a long name keeps it. */
-  const SUFFIX = / \(local\)$/;
   let open = $state(false);
   let named = $state('');
   let link = $state('');
@@ -104,6 +103,8 @@
     toasts.show(why ? `Cannot reload ${name}. ${why}` : `Reloaded ${name} from ${from}.`, why ? 'warning' : 'message');
   };
   const shared = $derived(!mine && board.team.some(one => one.name === board.name));
+  /** A stack nobody else uses has no team: its boards carry no Team mark. */
+  const teamed = $derived(stacks.shared);
   /** Discover with no feature board open shows the whole stack. */
   const whole = $derived(board.discovering && !board.feature);
   const label = $derived(
@@ -283,7 +284,12 @@
     runs.review = {
       title: `Delete board "${preset.name}"?`,
       sub: `${size(preset)} and ${String(cables)} ${cables === 1 ? 'cable' : 'cables'}, with their branches and notes.${onScreen ? ' It is the board on screen, so the screen empties.' : ''}`,
-      notices: [{ text: 'It moves to Recently deleted at the bottom of the board menu, where you can restore it.' }],
+      notices: [
+        ...(board.own.includes(preset)
+          ? []
+          : [{ text: "It leaves the stack's file: once that is shared, the team loses it too." }]),
+        { text: 'It moves to Recently deleted at the bottom of the board menu, where you can restore it.' },
+      ],
       groups: [],
       ok: 'Delete board',
       prod: true,
@@ -337,11 +343,9 @@
       }}
     >
       <span class="here" aria-hidden="true"></span><span class="what"
-        ><span class="line"
-          ><span class="name">{preset.name.replace(SUFFIX, '')}</span>{#if SUFFIX.test(preset.name)}<span class="suffix"
-              >{SUFFIX.exec(preset.name)?.[0]}</span
-            >{/if}</span
-        >{#if under || preset['flow']}<span class="under">{under || `from ${String(preset['flow'])}`}</span>{/if}</span
+        ><span class="line"><span class="name">{preset.name}</span></span>{#if under || preset['flow']}<span
+            class="under">{under || `from ${String(preset['flow'])}`}</span
+          >{/if}</span
       >
       {#if openComments(featureOf(preset['feature']))}<span
           class="talks"
@@ -350,7 +354,7 @@
         >{/if}
       <!-- A fixed column, so names stay put whether the tag or the … shows. -->
       <span class="whose"
-        >{#if !mine}<span class="team" title="A team board, from the stack">Team</span>{/if}</span
+        >{#if !mine && teamed}<span class="team" title="A team board, from the stack">Team</span>{/if}</span
       >
     </button>
     <button
@@ -380,12 +384,13 @@
     : mine
       ? 'Your board, saved on this Mac as you change it'
       : shared
-        ? 'Team board, from the stack. Changing it makes a copy of your own.'
+        ? teamed
+          ? "Team board, kept in the stack. Changing it changes the stack's file, for the team too."
+          : "Kept in the stack's file, saved as you change it"
         : 'Saved as soon as it has an app'}
   popovertarget={id}
 >
-  <span class="name">{label.replace(SUFFIX, '')}</span>
-  {#if SUFFIX.test(label)}<span class="suffix" title="Changed on this Mac">{SUFFIX.exec(label)?.[0]}</span>{/if}
+  <span class="name">{label}</span>
   {#if outside}<span class="out-area" title="Outside the areas you chose; nothing on it is hidden">{outside}</span>{/if}
 </button>
 <div
@@ -422,7 +427,13 @@
     <div class="set-area">
       <div class="set-head">
         <strong>{heading}</strong>
-        <span>{yours ? 'Your board, on this Mac.' : 'Team board. Changing it changes it for the team.'}</span>
+        <span
+          >{yours
+            ? 'Your board, on this Mac.'
+            : teamed
+              ? 'Team board. Changing it changes it for the team.'
+              : "Kept in the stack's file."}</span
+        >
       </div>
       <div
         bind:this={areaMenu}
@@ -560,7 +571,7 @@
           }}>Duplicate</button
         >
       </div>
-      {#if mine && !whole}
+      {#if (mine || shared) && !whole}
         <form onsubmit={rename}>
           <input type="text" aria-label="Name of this board" maxlength="80" bind:value={named} />
           <button type="submit" disabled={named.trim() === board.name}>Rename</button>
@@ -671,15 +682,15 @@
             void share(preset);
           }}>Share with the team…</button
         >
-        <button
-          type="button"
-          role="menuitem"
-          onclick={() => {
-            rowMenu?.hidePopover();
-            askDelete(preset);
-          }}>Delete…</button
-        >
       {/if}
+      <button
+        type="button"
+        role="menuitem"
+        onclick={() => {
+          rowMenu?.hidePopover();
+          askDelete(preset);
+        }}>Delete…</button
+      >
     {/if}
   </div>
 </div>
@@ -724,11 +735,6 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-  }
-  .suffix {
-    flex: none;
-    color: var(--ink-muted);
-    font: 400 13px var(--sans);
   }
   .menu {
     position: fixed;
