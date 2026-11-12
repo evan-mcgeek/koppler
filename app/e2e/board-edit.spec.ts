@@ -28,6 +28,14 @@ test.use({
   },
 });
 
+/** A team board as the stack's file keeps it. */
+const teamBoard = (dir: string, name: string) =>
+  (
+    JSON.parse(fs.readFileSync(path.join(dir, 'stack', 'stack.json'), 'utf8')) as {
+      presets: { name: string; nodes: Record<string, object> }[];
+    }
+  ).presets.find(one => one.name === name);
+
 const koppler = ({ dir, temp }: { dir: string; temp: string }, ...args: string[]) => {
   const entry = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'dist', 'koppler.mjs');
   const env = {
@@ -83,15 +91,15 @@ test('the board on screen takes the change as it comes, and the cards it does no
   expect(await card(page, 'web').boundingBox()).toEqual(web);
 });
 
-test('a board that is not on screen is changed where it is kept', async ({ page, canvas }) => {
+test('a team board that is not on screen is changed where it is kept, in the stack', async ({ page, canvas }) => {
   await expect(card(page, 'web')).toBeVisible();
   koppler(canvas, 'board', 'edit', 'Checkout', '--remove', 'payments');
   await expect(page.getByRole('status')).toContainText('The agent changed Checkout: removed Payments API.');
   await expect.poll(() => waiting(canvas.temp)).toBe(0);
   await expect(page.locator('.svelte-flow__node-app')).toHaveCount(2);
-  await expect
-    .poll(() => Object.keys(state(canvas.temp).presets.find(one => one.name === 'Checkout')?.nodes ?? {}))
-    .toEqual(['web', 'orders']);
+  await saveSettles(page);
+  expect(Object.keys(teamBoard(canvas.dir, 'Checkout')?.nodes ?? {})).toEqual(['web', 'orders']);
+  expect(state(canvas.temp).presets.map(one => one.name)).toEqual(['Shop']);
 });
 
 test('a board made from the terminal joins your boards on an open canvas, which opens it, says so and keeps it', async ({
@@ -376,15 +384,15 @@ test.describe('a team board with an app not cloned here', () => {
     expect(own(canvas.temp)).toEqual(['Shop']);
   });
 
-  test('takes the app off when the terminal removes it, in a board of your own', async ({ page, canvas }) => {
+  test('takes the app off when the terminal removes it, in the team board', async ({ page, canvas }) => {
     await expect(card(page, 'web')).toBeVisible();
     await openCheckout(page);
     koppler(canvas, 'board', 'edit', 'Checkout', '--remove', 'payments');
     await expect(page.getByRole('status')).toContainText('The agent changed Checkout: removed Payments API.');
     await expect.poll(() => waiting(canvas.temp)).toBe(0);
     await saveSettles(page);
-    const checkout = state(canvas.temp).presets.find(one => one.name === 'Checkout');
-    expect(Object.keys(checkout?.nodes ?? {}).sort()).toEqual(['orders', 'web']);
+    expect(Object.keys(teamBoard(canvas.dir, 'Checkout')?.nodes ?? {}).sort()).toEqual(['orders', 'web']);
+    expect(own(canvas.temp)).toEqual(['Shop']);
   });
 });
 

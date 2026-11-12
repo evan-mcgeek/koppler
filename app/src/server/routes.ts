@@ -18,6 +18,7 @@ import { appendNote } from '../engine/history.ts';
 import {
   addApps,
   addOutside,
+  changeTeamBoard,
   commentOnTeamBoard,
   editStack,
   setBoardArea,
@@ -31,7 +32,7 @@ import { shareBoard, shareTarget } from '../engine/share.ts';
 import { boardPage } from '../engine/export.ts';
 import type { FeatureEdit } from '../core/feature.ts';
 import { newToken, pageToken, writePageUrl } from './token.ts';
-import type { StoredPreset } from '../core/presets.ts';
+import { migrate, type StoredPreset } from '../core/presets.ts';
 import { createStack, currentStack, forgetStacks, useStack } from '../engine/stacks.ts';
 import { CODE, tempDir } from '../paths.ts';
 import { cableTest, opens } from './cable-test.ts';
@@ -250,6 +251,21 @@ export const ROUTES: Record<string, Route> = {
     const env = typeof body['env'] === 'string' && stack.envs.includes(body['env']) ? body['env'] : undefined;
     const made = await boardPage(stack, name, undefined, env, body['comments'] === true);
     return { status: 'error' in made ? 400 : 200, body: made };
+  },
+  // A team board changed on the canvas, kept where it lives: in the stack, found by its name there; none takes it out.
+  '/board-team': body => {
+    const name = typeof body['name'] === 'string' ? body['name'] : '';
+    const preset = body['preset'] === null ? undefined : migrate(body['preset']);
+    if (!name) return { status: 400, body: { error: 'Which team board?' } };
+    if (preset?.error !== undefined) return { status: 400, body: { error: preset.error } };
+    // Taken out already, from the terminal: nothing left to do.
+    if (!preset && !(readStack()?.presets ?? []).some(one => one.name === name))
+      return { status: 200, body: { ok: true } };
+    const result = changeTeamBoard(name, () => ({ value: preset?.preset }));
+    if (result.error !== undefined) return { status: 400, body: result };
+    refreshRegistry();
+    forgetStacks();
+    return { status: 200, body: { ok: true } };
   },
   // A comment, reply or resolve on a team feature board, kept with it in the stack for the team.
   '/board-comment': body => {

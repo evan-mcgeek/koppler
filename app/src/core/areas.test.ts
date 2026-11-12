@@ -124,9 +124,9 @@ test('boards group under their area in the stack order, by name, no area last; a
   expect(chosen.hidden).toEqual({ count: 3, team: 3, yours: 0, areas: ['Shipping', 'Accounts'] });
 });
 
-test('boards of both kinds sort by name ignoring case, a team board before its copy, and the hidden ones are counted by kind', () => {
+test('boards of both kinds sort by name ignoring case, and the hidden ones are counted by kind', () => {
   const mixed = [
-    { name: 'checkout (local)', nodes: { pay: {} }, mine: true },
+    { name: 'checkout notes', nodes: { pay: {} }, mine: true },
     { name: 'Basket rework', nodes: { pay: {} }, mine: true },
     { name: 'Checkout', nodes: { pay: {} } },
     { name: 'Track a parcel', nodes: { ship: {} } },
@@ -134,7 +134,7 @@ test('boards of both kinds sort by name ignoring case, a team board before its c
   ];
   const names = boardGroups(shop, mixed, undefined).groups.map(g => [g.title, g.boards.map(b => b.name)]);
   expect(names).toEqual([
-    ['Payments', ['Basket rework', 'Checkout', 'checkout (local)']],
+    ['Payments', ['Basket rework', 'Checkout', 'checkout notes']],
     ['Shipping', ['Parcel notes', 'Track a parcel']],
   ]);
   expect(boardGroups(shop, mixed, ['payments']).hidden).toEqual({ count: 2, team: 1, yours: 1, areas: ['Shipping'] });

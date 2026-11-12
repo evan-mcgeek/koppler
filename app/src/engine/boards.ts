@@ -1,24 +1,32 @@
-// Changing a board from the terminal. The change goes into state.json at once, and waits in board-edits.json for an
-// open canvas to make it on its own copy too, so the canvas shows it and never saves its older copy over it.
+// Changing a board from the terminal, where it is kept: one of yours in state.json, a team board in the stack. The
+// change also waits in board-edits.json for an open canvas to make it on its own copy too, so the canvas shows it and
+// never saves its older copy over it.
 import path from 'node:path';
 import { flagValue } from '../cli/output.ts';
 import { featureOf, inStack, kindBetween, type FeatureEdit } from '../core/feature.ts';
 import { notRunHere } from '../core/stack.ts';
 import { upgradeBoardFile } from '../core/migrations/files.ts';
 import { withoutMissingApps } from '../core/missing-apps.ts';
-import { describeEdit, editPreset, migrate, VERSION, type BoardEdit, type StoredPreset } from '../core/presets.ts';
+import {
+  describeEdit,
+  editPreset,
+  foldCopies,
+  migrate,
+  VERSION,
+  type BoardEdit,
+  type StoredPreset,
+} from '../core/presets.ts';
 import { canvas } from '../cli/running.ts';
 import { fetchPresets } from '../server/sanitize.ts';
 import type { Edge } from '../core/plan.ts';
 import { changeData, readClones, readData, readStack, writeData } from '../data.ts';
 import { fail } from '../failure.ts';
 import { locked, readJson, writeJson } from '../json-files.ts';
-import { tempDir } from '../paths.ts';
 import { readUpgraded } from '../upgraded.ts';
 import { appendMessage } from './messages.ts';
 import { alive, readRecord } from './processes.ts';
 import { shareBoard } from './share.ts';
-import { commentOnTeamBoard, readStackFile, refreshRegistry } from './stack-file.ts';
+import { changeTeamBoard, readStackFile, refreshRegistry } from './stack-file.ts';
 import { currentStack, shelfOf, stackNamed } from './stacks.ts';
 
 export interface QueuedEdit {
@@ -69,6 +77,29 @@ const byName = (boards: StoredPreset[], name: string): StoredPreset | undefined 
 /** Your own board, by name, as kept for this stack. */
 const ownBoard = (name: string): StoredPreset | undefined =>
   byName((readData('state')?.['presets'] ?? []) as StoredPreset[], name);
+
+/** A team board, by name, as the stack in use keeps it. */
+const teamBoard = (name: string): StoredPreset | undefined =>
+  byName((readStack()?.presets ?? []) as StoredPreset[], name);
+
+/**
+ * A board kept twice, as a team board and as a copy of yours an older Koppler made when it was changed, becomes the
+ * one team board, with the copy's changes. A stack that refuses the change keeps both.
+ */
+export function foldCopiesHere(): void {
+  const team = (readStack()?.presets ?? []) as StoredPreset[];
+  const own = (readData('state')?.['presets'] ?? []) as StoredPreset[];
+  const { put, dropped } = foldCopies(team, own);
+  if (!dropped.length) return;
+  for (const board of put) if (changeTeamBoard(board.name, () => ({ value: board })).error !== undefined) return;
+  if (put.length) refreshRegistry();
+  const named = (name: unknown) => (typeof name === 'string' ? name.replace(/ \((local|mine)\)$/, '') : name);
+  changeData('state', now => ({
+    ...now,
+    ...(dropped.includes(now['preset'] as string) && { preset: named(now['preset']) }),
+    presets: ((now['presets'] ?? []) as StoredPreset[]).filter(one => !dropped.includes(one.name)),
+  }));
+}
 
 /**
  * `koppler board copy`: one of your boards or a team board, as it is, into another stack's own boards (--to), or one
@@ -136,18 +167,27 @@ async function share(name: string): Promise<void> {
   const board = ownBoard(name) ?? fail(`${name} is not one of your boards; koppler use --boards lists them`);
   const shared = await shareBoard(dir, board);
   if (shared.error !== undefined) fail(shared.error);
-  if (shared.local)
+  if (shared.local) {
+    // Kept in the stack, it is one board: no longer one of yours too.
+    changeData('state', state => ({
+      ...state,
+      presets: ((state['presets'] ?? []) as StoredPreset[]).filter(one => one.name !== board.name),
+    }));
     console.log(
       `KEPT ${board.name} among the stack's team boards in ${dir}; commit the stack there so your team gets it.`,
     );
-  else console.log(`PROPOSED ${board.name} to the team on ${shared.repo}: ${shared.url}`);
+  } else console.log(`PROPOSED ${board.name} to the team on ${shared.repo}: ${shared.url}`);
 }
 
-/** One of your boards goes to Recently deleted, where the board picker can bring it back. */
+/** A board goes to Recently deleted, where the board picker can bring it back; a team board leaves the stack. */
 function deleteBoard(name: string): void {
-  const board =
-    ownBoard(name) ??
-    fail(`${name} is not one of your boards; koppler use --boards lists them (a team board is kept in the stack)`);
+  const mine = ownBoard(name);
+  const board = mine ?? teamBoard(name) ?? fail(`no board called ${name}; koppler use --boards lists them`);
+  if (!mine) {
+    const gone = changeTeamBoard(board.name, () => ({ value: undefined }));
+    if (gone.error !== undefined) fail(gone.error);
+    refreshRegistry();
+  }
   changeData('state', state => {
     const own = (state['presets'] ?? []) as StoredPreset[];
     const trash = (state['trash'] ?? []) as unknown[];
@@ -165,6 +205,7 @@ function deleteBoard(name: string): void {
 
 export function boardCommand(args: string[]): void | Promise<void> {
   const [what, name] = args;
+  foldCopiesHere();
   if (what === 'delete' && name?.trim() && !name.startsWith('-')) {
     deleteBoard(name);
     return;
@@ -422,33 +463,6 @@ export function changeBoard(name: string, edit: BoardEdit, create: boolean, prop
       .filter(one => one.startsWith('kept '));
     return [`Nothing to change on ${board.name}${kept.length ? `: ${kept.join('; ')}` : ''}.`];
   }
-  // Talking about a team feature board is kept with it in the stack, for the team.
-  const talk = ['comment', 'reply', 'resolve'];
-  const given = (part: object) =>
-    Object.entries(part as Record<string, unknown>).flatMap(([key, value]) =>
-      value === undefined ||
-      (Array.isArray(value) && !value.length) ||
-      (typeof value === 'object' && value !== null && !Array.isArray(value) && !Object.keys(value).length)
-        ? []
-        : [key],
-    );
-  const talkOnly =
-    !!edit.feature &&
-    given(edit).every(key => key === 'feature') &&
-    given(edit.feature).every(key => talk.includes(key));
-  if (
-    talkOnly &&
-    edit.feature &&
-    !own.some(one => one.name === board.name) &&
-    team.some(one => one.name === board.name)
-  ) {
-    const kept = commentOnTeamBoard(board.name, edit.feature);
-    if (kept.error !== undefined) fail(kept.error);
-    refreshRegistry();
-    // An open canvas reads the stack again, and shows the thread.
-    writeJson(path.join(tempDir(), 'refresh.json'), { at: new Date().toISOString() });
-    return [`Changed ${board.name}: ${describeEdit(edit, named, false, before)}.`];
-  }
   if (propose) {
     const asked = appendMessage({
       kind: 'question',
@@ -471,18 +485,28 @@ export function changeBoard(name: string, edit: BoardEdit, create: boolean, prop
       'The user answers in the canvas inbox; the answer comes back as a koppler-reply prompt.',
     ];
   }
-  // Written over the file as it is now: a board the canvas saved meanwhile stays.
-  changeData('state', now => {
-    const kept = (now['presets'] ?? []) as StoredPreset[];
-    const mine = kept.some(one => one.name === board.name);
-    return { ...now, presets: mine ? kept.map(one => (one.name === board.name ? changed : one)) : [...kept, changed] };
-  });
-  enqueue({ board: board.name, edit, ...(create && { create: true as const }) });
   const canvas = readRecord('canvas');
   const said = describeEdit(edit, named, false, before);
+  const shown = canvas && alive(canvas);
+  // A team board is changed where it is kept, in the stack.
+  if (!own.some(one => one.name === board.name) && team.some(one => one.name === board.name)) {
+    const kept = changeTeamBoard(board.name, () => ({ value: changed }));
+    if (kept.error !== undefined) fail(kept.error);
+    refreshRegistry();
+  } else
+    // Written over the file as it is now: a board the canvas saved meanwhile stays.
+    changeData('state', now => {
+      const kept = (now['presets'] ?? []) as StoredPreset[];
+      const mine = kept.some(one => one.name === board.name);
+      return {
+        ...now,
+        presets: mine ? kept.map(one => (one.name === board.name ? changed : one)) : [...kept, changed],
+      };
+    });
+  enqueue({ board: board.name, edit, ...(create && { create: true as const }) });
   return [
     `${create ? 'MADE' : 'CHANGED'} ${board.name}${said ? `: ${said}` : ''}`,
-    canvas && alive(canvas)
+    shown
       ? create
         ? `An open canvas switches to ${board.name} as soon as it is in view.`
         : 'An open canvas shows the change as soon as it is in view.'

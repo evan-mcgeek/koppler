@@ -20,7 +20,6 @@ import {
   editPreset,
   migrate,
   VERSION as PRESET_VERSION,
-  withoutNotes,
   type BoardEdit,
   type OpenedNode,
   type StackFacts,
@@ -28,7 +27,8 @@ import {
   withHidden,
 } from '../src/core/presets.ts';
 import type { Registry } from '../src/data.ts';
-import { load, save, type Loaded, type SavedBoard } from './data.ts';
+import { load, post, save, type Loaded, type SavedBoard } from './data.ts';
+import { toasts } from './toast.svelte.ts';
 import { engine } from './elk.ts';
 
 export interface CableData extends Record<string, unknown> {
@@ -1531,11 +1531,17 @@ class Board {
       ),
     };
   }
-  /** Keeps the board on screen among the user's boards; a team board that is changed becomes their own copy. */
+  /** Keeps the board on screen where it lives: one of the user's here, a team board in the stack. */
   #keep(): void {
+    const kept = (name: string, stored: StoredPreset | undefined) => {
+      const { area: _, ...was }: Partial<StoredPreset> = stored ?? {};
+      return { ...was, ...this.#asPreset(name) };
+    };
     const put = (name: string) => {
-      const { area: _, ...was }: Partial<StoredPreset> = this.own.find(one => one.name === name) ?? {};
-      const now = { ...was, ...this.#asPreset(name) };
+      const now = kept(
+        name,
+        this.own.find(one => one.name === name),
+      );
       const next = this.own.some(one => one.name === name)
         ? this.own.map(one => (one.name === name ? now : one))
         : [...this.own, now];
@@ -1547,33 +1553,64 @@ class Board {
       return;
     }
     if (!this.nodes.length && !this.feature) return;
+    const team = this.team.find(one => one.name === this.name);
+    if (team) {
+      // Kept when it changes: branches, notes, how apps run and a feature's steps count, where cards sit does not.
+      const told = (preset: { nodes: unknown; edges: { from: string; to: string }[]; feature?: unknown }) =>
+        JSON.stringify(
+          [
+            preset.nodes,
+            preset.edges.map(edge => `${edge.from}>${edge.to}`).sort(),
+            withoutComments(featureOf(preset.feature)),
+          ],
+          (key, value: unknown) => (key === 'followsClone' ? undefined : value),
+        );
+      // A feature board with no app cards opens as it is kept.
+      const asOpened = Object.keys(team.nodes).length
+        ? check(team, this.#facts()).preset
+        : { nodes: {}, edges: [], feature: team['feature'] };
+      if (!asOpened || told(this.#onScreen(team.name) as never) !== told(asOpened))
+        this.#putTeam(team.name, kept(team.name, team));
+      return;
+    }
     // A board for one app alone is not kept; a second app makes it a board of the user's.
     if (this.scratch && this.nodes.length < 2) return;
     this.scratch = false;
-    const team = this.team.find(one => one.name === this.name);
-    // A team board stays the team's until it is changed; branches, notes, how apps run and a feature's steps count too.
-    const told = (preset: { nodes: unknown; edges: { from: string; to: string }[]; feature?: unknown }) =>
-      JSON.stringify(
-        [
-          preset.nodes,
-          preset.edges.map(edge => `${edge.from}>${edge.to}`).sort(),
-          withoutComments(featureOf(preset.feature)),
-        ],
-        (key, value: unknown) => (key === 'followsClone' ? undefined : value),
-      );
-    // A feature board with no app cards opens as it is kept.
-    const asOpened =
-      team &&
-      (Object.keys(team.nodes).length
-        ? check(team, this.#facts()).preset
-        : { nodes: {}, edges: [], feature: team['feature'] });
-    if (team && asOpened && told(this.#onScreen(team.name) as never) === told(asOpened)) return;
-    // One copy per team board: changing it again updates that copy.
-    const copy =
-      team && this.own.find(one => one.name === `${team.name} (local)` || one.name === `${team.name} (mine)`);
     const first = this.nodes[0]?.data.name ?? 'Untitled';
     const apps = this.nodes.length > 1 ? `${first} + ${String(this.nodes.length - 1)}` : first;
-    put(copy?.name ?? this.uniqueName(team ? `${team.name} (local)` : this.name || apps));
+    put(this.uniqueName(this.name || apps));
+  }
+  /** Team boards changed here, waiting to be kept in the stack: by the name each has there, none to take it out. */
+  #teamWaiting: { name: string; preset: StoredPreset | null }[] = [];
+  #teamSending = false;
+  /** A team board as it is now, replacing the one of that name in the stack, or taking it out (null). */
+  #putTeam(name: string, preset: StoredPreset | null): void {
+    const stack = this.#resolved;
+    const at = this.team.findIndex(one => one.name === name);
+    if (!stack || at < 0) return;
+    const presets = preset
+      ? this.team.map((one, n) => (n === at ? preset : one))
+      : this.team.filter((_, n) => n !== at);
+    this.#resolved = { ...stack, presets: presets as Registry['presets'] };
+    // A board changed again before it was sent goes once, as it is now.
+    const waiting = this.#teamWaiting.find(one => one.preset?.name === name);
+    if (waiting) waiting.preset = preset;
+    else this.#teamWaiting.push({ name, preset });
+    void this.#sendTeam();
+  }
+  /** One at a time, in order: a stack that refuses one is read again, so the page shows what it keeps. */
+  async #sendTeam(): Promise<void> {
+    if (this.#teamSending) return;
+    this.#teamSending = true;
+    for (let change = this.#teamWaiting.shift(); change; change = this.#teamWaiting.shift()) {
+      const said = await post<{ ok: true }>('board-team', change);
+      if ('error' in said) {
+        toasts.show(`Could not keep ${change.name} in the stack. ${said.error}`, 'warning');
+        this.#teamWaiting = [];
+        void this.reload();
+      }
+    }
+    this.#teamSending = false;
   }
   /** A board name no board has yet. */
   uniqueName(base: string): string {
@@ -1590,12 +1627,14 @@ class Board {
   rename(to: string): string | null {
     const name = to.trim().slice(0, 80);
     const from = this.name;
-    if (!this.own.some(one => one.name === from)) return 'Only a board of your own can be renamed.';
+    const team = this.own.some(one => one.name === from) ? undefined : this.team.find(one => one.name === from);
+    if (!team && !this.own.some(one => one.name === from)) return 'Keep the board first: put an app on it.';
     if (!name) return 'Give the board a name first.';
     if (name === from) return null;
     if ([...this.team, ...this.own].some(one => one.name === name))
       return `A board is already called ${name}. Pick another name.`;
-    this.own = this.own.map(one => (one.name === from ? { ...one, name } : one));
+    if (team) this.#putTeam(team.name, { ...team, name });
+    else this.own = this.own.map(one => (one.name === from ? { ...one, name } : one));
     this.name = name;
     return null;
   }
@@ -1608,11 +1647,12 @@ class Board {
     this.own = [...this.own, this.#asPreset(name)];
     this.name = name;
   }
-  /** Moves one of the user's boards to the recently deleted; the board on screen empties when it is that one. */
+  /** Moves a board to the recently deleted, a team board out of the stack; the board on screen empties when it is that one. */
   deleteBoard(name: string): void {
-    const gone = this.own.find(one => one.name === name);
+    const gone = this.own.find(one => one.name === name) ?? this.team.find(one => one.name === name);
     if (!gone) return;
-    this.own = this.own.filter(one => one !== gone);
+    if (this.own.includes(gone)) this.own = this.own.filter(one => one !== gone);
+    else this.#putTeam(name, null);
     this.trash = [{ ...gone, deleted: new Date().toISOString() }, ...this.trash].slice(0, 20);
     if (this.name === name) this.newBoard();
   }
@@ -1660,16 +1700,17 @@ class Board {
       ...(discover ? { discover } : {}),
     };
   }
-  /** A board just kept among the stack's team boards, shown as one without loading the stack again. */
+  /** A board of yours just kept among the stack's team boards: one board, shown without loading the stack again. */
   keptForTeam(at: number, preset: StoredPreset): void {
     const presets = [...((this.#registry?.presets ?? []) as StoredPreset[])];
     presets[at] = preset;
     if (this.#resolved) this.#resolved = { ...this.#resolved, presets: presets as Registry['presets'] };
+    this.own = this.own.filter(one => one.name !== preset.name);
   }
   asShared(preset: StoredPreset): string {
     const { name, nodes, edges } = preset;
     const version = migrate(preset).preset?.version ?? PRESET_VERSION;
-    return JSON.stringify({ name, version, koppler: BOARD_FORMAT.version, nodes: withoutNotes(nodes), edges }, null, 2);
+    return JSON.stringify({ name, version, koppler: BOARD_FORMAT.version, nodes, edges }, null, 2);
   }
 
   /** The notes about this board the user dismissed. */
@@ -1998,21 +2039,20 @@ class Board {
     const on = new Set(this.nodes.map(({ id }) => id));
     return Object.keys(this.#stored()?.nodes ?? {}).filter(id => !on.has(id) && !this.app(id)?.cloned);
   }
-  /** Takes apps kept hidden off the board on screen; a team board becomes the user's own, as a change from the terminal makes it. */
+  /** Takes apps kept hidden off the board on screen, where it is kept. */
   dropHidden(ids: string[]): void {
     const stored = this.#stored();
     if (!stored || !ids.length) return;
     const changed = editPreset(stored, { remove: ids });
-    this.own = this.own.includes(stored)
-      ? this.own.map(one => (one === stored ? changed : one))
-      : [...this.own, changed];
+    if (this.own.includes(stored)) this.own = this.own.map(one => (one === stored ? changed : one));
+    else this.#putTeam(stored.name, changed);
   }
   /** The board on screen as it is kept, the user's own before the team's. */
   #stored(): StoredPreset | undefined {
     return [...this.own, ...this.team].find(one => one.name === this.name);
   }
 
-  /** Keeps the board on screen among the user's boards (a changed team board becomes their copy), before it is saved. */
+  /** Keeps the board on screen where it lives, before it is saved. */
   commit(): void {
     // Mid-drag the board is not kept yet: letting go is the change.
     if (!this.live && !this.nodes.some(node => node.dragging)) this.#keep();
@@ -2283,8 +2323,9 @@ class Board {
       if (!stored) return false;
       const changed = { ...editPreset(stored, change), name };
       if (JSON.stringify(changed) === JSON.stringify(stored)) return false;
-      const mine = this.own.some(one => one.name === name);
-      this.own = mine ? this.own.map(one => (one.name === name ? changed : one)) : [...this.own, changed];
+      if (this.team.includes(stored)) this.#putTeam(name, changed);
+      else if (this.own.includes(stored)) this.own = this.own.map(one => (one === stored ? changed : one));
+      else this.own = [...this.own, changed];
       return true;
     }
     const before = this.content();

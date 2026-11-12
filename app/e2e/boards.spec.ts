@@ -1,6 +1,10 @@
 // The new canvas's boards: the one on screen is kept by name, and the team's and the user's own open from the picker.
+import fs from 'node:fs';
+import path from 'node:path';
 import type { Page } from '@playwright/test';
 import { card, expect, saveSettles, STACK, test, fromList, fromBoardMenu, openSection } from './canvas.ts';
+
+test.use({ teamStack: true });
 
 const picker = (page: Page) => page.getByRole('button', { name: /^Board: / });
 const boards = (page: Page) => page.getByRole('dialog', { name: 'Boards' });
@@ -12,8 +16,15 @@ const kept = async (page: Page, url: string) =>
     presets?: { name: string; nodes: Record<string, { branch?: string }>; layout?: { nodes?: object } }[];
     // Nothing kept yet, as just after the board on screen was deleted.
   } | null;
+/** The team boards as the stack's file keeps them. */
+const team = (dir: string) =>
+  (
+    JSON.parse(fs.readFileSync(path.join(dir, 'stack', 'stack.json'), 'utf8')) as {
+      presets: { name: string; nodes: Record<string, { branch?: string }>; layout?: { nodes?: object } }[];
+    }
+  ).presets;
 
-test('a team board opens arranged, and changing it makes a copy of your own', async ({ page, canvas }) => {
+test('a team board opens arranged, and changing it changes it in the stack', async ({ page, canvas }) => {
   await expect(picker(page)).toHaveText('New board');
   await picker(page).click();
   await expect(opens(page)).toHaveText([/^Browse\s*Team\s*$/, /^Checkout\s*Team\s*$/]);
@@ -42,23 +53,24 @@ test('a team board opens arranged, and changing it makes a copy of your own', as
   await card(page, 'orders').getByLabel('Branch').click();
   await card(page, 'orders').getByLabel('Branch').fill('feature/checkout');
   await card(page, 'orders').getByLabel('Branch').blur();
-  await expect(picker(page)).toHaveText('Checkout (local)');
   await expect
-    .poll(async () => (await kept(page, canvas.url))?.presets?.map(one => one.name))
-    .toEqual(['Checkout (local)']);
-  const mine = (await kept(page, canvas.url))?.presets?.[0];
-  expect(mine?.nodes['orders']?.branch).toBe('feature/checkout');
-  expect(Object.keys(mine?.layout?.nodes ?? {}).sort()).toEqual(['orders', 'payments', 'web']);
+    .poll(() => team(canvas.dir).find(one => one.name === 'Checkout')?.nodes['orders']?.branch)
+    .toBe('feature/checkout');
+  await expect(picker(page)).toHaveText('Checkout');
+  const shared = team(canvas.dir).find(one => one.name === 'Checkout');
+  expect(Object.keys(shared?.layout?.nodes ?? {}).sort()).toEqual(['orders', 'payments', 'web']);
+  await saveSettles(page);
+  expect((await kept(page, canvas.url))?.presets ?? []).toEqual([]);
 });
 
-test('your own board comes back as you left it, and a new board starts empty', async ({ page, canvas }) => {
+test('a board comes back as you left it, and a new board starts empty', async ({ page, canvas }) => {
   await picker(page).click();
   await boards(page)
     .getByRole('button', { name: /^Browse/ })
     .click();
   await expect(page.locator('.svelte-flow__node-app')).toHaveCount(2);
   await (await fromList(page, 'Payments API')).getByRole('button', { name: 'Add Payments API to the board' }).click();
-  await expect(picker(page)).toHaveText('Browse (local)');
+  await expect(picker(page)).toHaveText('Browse');
   await saveSettles(page);
   const where = await card(page, 'payments').boundingBox();
 
@@ -67,23 +79,25 @@ test('your own board comes back as you left it, and a new board starts empty', a
   await expect(page.locator('.svelte-flow__node-app')).toHaveCount(0);
   await expect(picker(page)).toHaveText('New board');
   await saveSettles(page);
-  // The copy is untouched by the empty board that followed it.
-  expect(Object.keys((await kept(page, canvas.url))?.presets?.[0]?.nodes ?? {})).toHaveLength(3);
+  // The board is untouched by the empty board that followed it.
+  await expect
+    .poll(() => Object.keys(team(canvas.dir).find(one => one.name === 'Browse')?.nodes ?? {}))
+    .toHaveLength(3);
 
   await picker(page).click();
-  // A team board's copy sits right after it.
-  await expect(opens(page)).toHaveText([/^Browse\s*Team\s*$/, /^Browse\s*\(local\)\s*$/, /^Checkout\s*Team\s*$/]);
+  // One board, changed where it is kept.
+  await expect(opens(page)).toHaveText([/^Browse\s*Team\s*$/, /^Checkout\s*Team\s*$/]);
   await boards(page)
-    .getByRole('button', { name: /^Browse \(local\)/ })
+    .getByRole('button', { name: /^Browse/ })
     .click();
   await expect(page.locator('.svelte-flow__node-app')).toHaveCount(3);
   await expect(page.locator('.svelte-flow__edge')).toHaveCount(1);
-  // Undo goes back to the empty board, by name too, and leaves the copy alone.
+  // Undo goes back to the empty board, by name too, and leaves the board alone.
   await page.getByRole('button', { name: 'Undo' }).click();
   await expect(page.locator('.svelte-flow__node-app')).toHaveCount(0);
   await expect(picker(page)).toHaveText('New board');
   await page.getByRole('button', { name: 'Redo' }).click();
-  await expect(picker(page)).toHaveText('Browse (local)');
+  await expect(picker(page)).toHaveText('Browse');
   await expect(card(page, 'payments')).toBeVisible();
   expect(where).not.toBeNull();
 });
@@ -133,7 +147,7 @@ test.describe('a board asking for another branch than a clone with uncommitted c
     await expect(choice.getByRole('radio', { name: 'Set aside' })).toBeChecked();
   });
 
-  test('keeps the branch the board asks for, in the open board and in a copy of it', async ({ page, canvas }) => {
+  test('keeps the branch the board asks for, in the open board and where it is kept', async ({ page, canvas }) => {
     const state = async () =>
       (await (await page.request.get(`${canvas.url}data/state.json`)).json()) as {
         nodes?: Record<string, { branch?: string; asked?: string }>;
@@ -151,16 +165,17 @@ test.describe('a board asking for another branch than a clone with uncommitted c
     await page.reload();
     await expect(card(page, 'orders').getByLabel('Branch')).toHaveValue('main');
     await (await fromList(page, 'Payments API')).getByRole('button', { name: 'Add Payments API to the board' }).click();
-    await expect(picker(page)).toHaveText('Orders (local)');
+    await expect(picker(page)).toHaveText('Orders');
+    const branch = () => team(canvas.dir).find(one => one.name === 'Orders')?.nodes['orders']?.branch;
     await expect
-      .poll(async () => (await state())?.presets?.find(one => one.name === 'Orders (local)')?.nodes['orders']?.branch)
-      .toBe('feature/checkout');
+      .poll(() => Object.keys(team(canvas.dir).find(one => one.name === 'Orders')?.nodes ?? {}))
+      .toContain('payments');
+    expect(branch()).toBe('feature/checkout');
     // A branch picked on the card replaces the one the board asked for.
     await card(page, 'orders').getByLabel('Branch').fill('fix/other');
     await card(page, 'orders').getByLabel('Branch').blur();
-    await expect
-      .poll(async () => (await state())?.presets?.find(one => one.name === 'Orders (local)')?.nodes['orders']?.branch)
-      .toBe('fix/other');
+    await expect.poll(branch).toBe('fix/other');
+    await saveSettles(page);
     expect((await state())?.nodes?.['orders']?.asked).toBeUndefined();
   });
 });
@@ -196,7 +211,7 @@ test('a board of your own is renamed, copied, shared, deleted and restored', asy
 
   // The empty board offers the boards; the deleted one waits to be restored.
   const offered = page.getByRole('list', { name: 'Or open a board' }).getByRole('button');
-  await expect(offered).toHaveText([/Checkout\s*Team board/, /Browse\s*Team board/, /Orders work\s*Your board/]);
+  await expect(offered).toHaveText([/Checkout\s*Team board/, /Browse\s*Team board/, /Orders work\s*Board/]);
   await page.screenshot({ path: 'test-results/next-boards-empty.png' });
   await picker(page).click();
   await boards(page).getByText('Recently deleted (1)').click();
@@ -244,24 +259,14 @@ test('a board opens from a file dropped on the page, and from a link the server 
   await expect(picker(page)).toHaveText('From a link');
 });
 
-test('a board of your own is shared with the team: it joins the stack as a team board', async ({ page, canvas }) => {
-  const fs = await import('node:fs');
-  const path = await import('node:path');
-  const { STACK } = await import('./canvas.ts');
-  fs.mkdirSync(path.join(canvas.dir, 'stack'), { recursive: true });
-  fs.mkdirSync(path.join(canvas.dir, 'config'), { recursive: true });
+test('a board of your own is shared with the team: it moves into the stack, one board', async ({ page, canvas }) => {
   const file = path.join(canvas.dir, 'stack', 'stack.json');
-  fs.writeFileSync(file, JSON.stringify(STACK));
-  fs.writeFileSync(
-    path.join(canvas.dir, 'config', 'config.json'),
-    JSON.stringify({ stack: path.join(canvas.dir, 'stack') }),
-  );
   await (await fromList(page, 'Web Shop')).getByRole('button', { name: 'Add Web Shop to the board' }).click();
   await (await fromList(page, 'Orders API')).getByRole('button', { name: 'Add Orders API to the board' }).click();
   await expect(picker(page)).toHaveText('Web Shop');
-  // A card's note is the user's own: it stays on this Mac.
+  // A card's note is part of the board: it goes with it.
   await openSection(page, 'web', 'Note for the agent');
-  await card(page, 'web').getByLabel('Note for the agent').fill('my private finding');
+  await card(page, 'web').getByLabel('Note for the agent').fill('use the test account');
   await page.getByRole('searchbox').focus();
   await saveSettles(page);
   await picker(page).click();
@@ -274,24 +279,26 @@ test('a board of your own is shared with the team: it joins the stack as a team 
   await expect(page.getByRole('status').filter({ hasText: 'Web Shop is a team board now' })).toContainText(
     "Commit the stack's repo",
   );
-  const kept = JSON.parse(fs.readFileSync(file, 'utf8')) as {
+  const inFile = JSON.parse(fs.readFileSync(file, 'utf8')) as {
     presets: { name: string; nodes: Record<string, { note?: string }>; layout?: object }[];
   };
-  const shared = kept.presets.find(one => one.name === 'Web Shop');
+  const shared = inFile.presets.find(one => one.name === 'Web Shop');
   expect(Object.keys(shared?.nodes ?? {}).sort()).toEqual(['orders', 'web']);
-  expect(shared?.nodes['web']?.note).toBeUndefined();
+  expect(shared?.nodes['web']?.note).toBe('use the test account');
   expect(shared?.layout).toBeTruthy();
-  // The menu lists it with the team's boards, and the team board opens without the note.
+  // The menu lists it once, with the team's boards, and it opens with the note.
   await picker(page).click();
-  await expect(opens(page).filter({ hasText: 'Web Shop' })).toHaveText([/^Web Shop\s*Team\s*$/, /^Web Shop\s*$/]);
+  await expect(opens(page).filter({ hasText: 'Web Shop' })).toHaveText([/^Web Shop\s*Team\s*$/]);
+  await expect.poll(async () => (await kept(page, canvas.url))?.presets?.map(one => one.name) ?? []).toEqual([]);
   await boards(page)
     .getByRole('button', { name: /^Checkout/ })
     .click();
   await expect(picker(page)).toHaveText('Checkout');
   await picker(page).click();
-  await opens(page).filter({ hasText: 'Web Shop' }).first().click();
+  await opens(page).filter({ hasText: 'Web Shop' }).click();
   await expect(picker(page)).toHaveText('Web Shop');
-  await expect(card(page, 'web').getByRole('button', { name: 'Add a note for the agent' })).toBeVisible();
+  await openSection(page, 'web', 'Note for the agent');
+  await expect(card(page, 'web').getByLabel('Note for the agent')).toHaveValue('use the test account');
 });
 
 test('with something running, opening another board first stops and reverts it', async ({ page }) => {

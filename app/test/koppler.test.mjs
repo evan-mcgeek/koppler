@@ -408,7 +408,13 @@ test('A board is changed from the terminal: kept at once, queued for an open can
   const koppler = (...args) => { const r = spawnSync('node', [entry, ...args], { encoding: 'utf8', env }); return { out: (r.stdout + r.stderr).trim(), code: r.status }; };
   const write = (name, value) => fs.writeFileSync(path.join(dir, `${name}.json`), JSON.stringify(value));
   const read = name => JSON.parse(fs.readFileSync(path.join(dir, `${name}.json`), 'utf8'));
-  write('registry', { name: 'Acme', envs: ['qa'], apps: { web: { name: 'Web' }, orders: { name: 'Orders' }, pay: { name: 'Pay' }, bank: { name: 'Bank', outside: 'hosted' } }, presets: [{ name: 'Team', nodes: { web: { run: 'cli' } }, edges: [] }] });
+  const acme = { name: 'Acme', envs: ['qa'], apps: { web: { name: 'Web' }, orders: { name: 'Orders' }, pay: { name: 'Pay' }, bank: { name: 'Bank', outside: 'hosted' } }, presets: [{ name: 'Team', nodes: { web: { run: 'cli' } }, edges: [] }] };
+  // The stack in use is a file: its team boards are kept there.
+  fs.mkdirSync(path.join(dir, 'stack'));
+  fs.writeFileSync(path.join(dir, 'stack', 'stack.json'), JSON.stringify(acme));
+  write('config', { stack: path.join(dir, 'stack') });
+  const team = () => JSON.parse(fs.readFileSync(path.join(dir, 'stack', 'stack.json'), 'utf8')).presets;
+  write('registry', { ...acme, source: path.join(dir, 'stack', 'stack.json') });
   write('local', { apps: { web: { path: '/w' }, orders: { path: '/o' }, pay: { path: '/p' } } });
   const mine = { name: 'Shop', version: 1, nodes: { web: { run: 'cli', note: 'old' }, pay: { run: 'ide' } }, edges: [{ from: 'web', to: 'pay' }], layout: { nodes: { web: { x: 0, y: 0 }, pay: { x: 400, y: 100 } }, sides: { 'web>pay': ['right', 'left'] } } };
   write('state', { preset: 'Shop', presets: [mine], nodes: { web: { x: 0, y: 0 } } });
@@ -427,10 +433,12 @@ test('A board is changed from the terminal: kept at once, queued for an open can
   assert.equal(queued.board, 'Shop');
   assert.deepEqual(queued.edit.add, ['orders']);
 
-  // A team board changed becomes the user's own copy; the team's stays as the stack has it.
-  assert.equal(koppler('board', 'edit', 'Team', '--add', 'orders').code, 0);
-  assert.deepEqual(read('state').presets.map(one => one.name), ['Shop', 'Team']);
-  assert.deepEqual(read('registry').presets[0].nodes, { web: { run: 'cli' } });
+  // A team board is changed where it is kept, in the stack, and queued for an open canvas too: no copy of the user's.
+  const shared = koppler('board', 'edit', 'Team', '--add', 'orders');
+  assert.equal(shared.code, 0, shared.out);
+  assert.deepEqual(read('state').presets.map(one => one.name), ['Shop']);
+  assert.deepEqual(Object.keys(team()[0].nodes), ['web', 'orders']);
+  assert.deepEqual(Object.keys(read('registry').presets[0].nodes), ['web', 'orders']);
   assert.equal(read('board-edits').edits.length, 2);
 
   // What cannot be done is refused, and nothing is kept.
@@ -461,7 +469,7 @@ test('A board is changed from the terminal: kept at once, queued for an open can
   assert.equal(read('state').presets.find(one => one.name === 'Shop').layout, undefined);
   assert.equal(read('board-edits').edits.at(-1).edit.arrange, true);
   assert.deepEqual(read('state').presets.find(one => one.name === 'Empty one').nodes, {});
-  // Deleted: one of the user's boards goes to Recently deleted, queued for an open canvas; a team board is not theirs to delete.
+  // Deleted: a board goes to Recently deleted, queued for an open canvas.
   const gone = koppler('board', 'delete', 'empty ONE');
   assert.equal(gone.code, 0, gone.out);
   assert.match(gone.out, /DELETED Empty one; Recently deleted/);
@@ -469,11 +477,12 @@ test('A board is changed from the terminal: kept at once, queued for an open can
   assert.equal(read('state').trash[0].name, 'Empty one');
   assert.ok(read('state').trash[0].deleted);
   assert.deepEqual([read('board-edits').edits.at(-1).board, read('board-edits').edits.at(-1).delete], ['Empty one', true]);
-  // Team was copied as the user's own above: that copy goes, and the team's stays in the stack, not theirs to delete.
+  // A team board leaves the stack.
   assert.equal(koppler('board', 'delete', 'Team').code, 0);
-  assert.deepEqual(read('registry').presets.map(one => one.name), ['Team']);
-  assert.match(koppler('board', 'delete', 'Team').out, /Team is not one of your boards/);
-  assert.match(koppler('board', 'delete', 'Nope').out, /Nope is not one of your boards/);
+  assert.deepEqual(team(), []);
+  assert.equal(read('state').trash[0].name, 'Team');
+  assert.match(koppler('board', 'delete', 'Team').out, /no board called Team/);
+  assert.match(koppler('board', 'delete', 'Nope').out, /no board called Nope/);
   fs.rmSync(dir, { recursive: true });
 });
 
@@ -501,7 +510,7 @@ test('Areas from the terminal: each board lists with its area, --area keeps one 
 
   const all = koppler('use', '--boards');
   assert.equal(all.code, 0, all.out);
-  assert.equal(all.out, 'Checkout  (team preset, Payments)\nSmoke test  (team preset)\nCarrier timeouts  (your board, Shipping)');
+  assert.equal(all.out, 'Checkout  (team board, Payments)\nSmoke test  (team board)\nCarrier timeouts  (your board, Shipping)');
   assert.equal(koppler('use', '--boards', '--area', 'shipping').out, 'Carrier timeouts  (your board, Shipping)');
   assert.deepEqual(JSON.parse(koppler('use', '--boards', '--area', 'payments', '--json').out), [
     { name: 'Checkout', from: 'team', area: 'payments', areaBy: 'apps' },

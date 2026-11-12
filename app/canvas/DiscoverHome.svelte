@@ -1,5 +1,5 @@
 <script lang="ts">
-  // Discover's home: the whole stack first, then the feature boards, the team's and yours, and at the foot a question
+  // Discover's home: the whole stack first, then the feature boards in one list by name, and at the foot a question
   // to the agent, which becomes a feature board of your own that it drafts on the map.
   import type { StoredPreset } from '../src/core/presets.ts';
   import { featureOf, openComments } from '../src/core/feature.ts';
@@ -19,9 +19,11 @@
       0,
     );
   });
-  const flows = (presets: StoredPreset[]) => presets.filter(one => one['feature']);
-  const team = $derived(flows(board.team));
-  const own = $derived(flows(board.own));
+  const flows = $derived(
+    [...board.team, ...board.own]
+      .filter(one => one['feature'])
+      .sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase())),
+  );
   const counted = (n: number, one: string) => `${String(n)} ${one}${n === 1 ? '' : 's'}`;
   /** "2 phases · 7 steps", or what it waits on. */
   const said = (preset: StoredPreset) => {
@@ -87,13 +89,9 @@
       ></span
     ></button
   >
-  {#if team.length}
-    <p class="head">Team feature boards</p>
-    {#each team as preset (preset.name)}{@render row(preset)}{/each}
-  {/if}
-  {#if own.length}
-    <p class="head">Your feature boards</p>
-    {#each own as preset (preset.name)}{@render row(preset)}{/each}
+  {#if flows.length}
+    <p class="head">Feature boards</p>
+    {#each flows as preset (preset.name)}{@render row(preset)}{/each}
   {/if}
   <span class="spacer"></span>
   <form class="ask" onsubmit={ask}>

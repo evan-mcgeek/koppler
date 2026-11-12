@@ -4,7 +4,7 @@
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { migrate, withoutNotes, type StoredPreset } from '../core/presets.ts';
+import { migrate, type StoredPreset } from '../core/presets.ts';
 import { validateStack } from '../core/stack.ts';
 import { fileUrl, proposeFile, readFile, gh, type GithubFile } from '../github.ts';
 import { sourceOf } from './linked.ts';
@@ -56,7 +56,7 @@ export function withBoard(stack: Record<string, unknown>, board: StoredPreset): 
   return { ...stack, presets: at < 0 ? [...presets, board] : presets.map((one, n) => (n === at ? board : one)) };
 }
 
-/** What of a board the team gets: its apps, cables and places, never this Mac's own notes on it. */
+/** What of a board the team gets: its apps and their notes, cables and places. */
 export function teamBoard(preset: StoredPreset): { board: StoredPreset; error?: undefined } | Failed {
   const checked = migrate(preset);
   if (checked.error !== undefined) return { error: checked.error };
@@ -66,7 +66,7 @@ export function teamBoard(preset: StoredPreset): { board: StoredPreset; error?: 
     board: {
       name,
       ...(version !== undefined && { version }),
-      nodes: withoutNotes(nodes),
+      nodes,
       edges,
       ...(layout ? { layout } : {}),
       ...(outside ? { outside } : {}),

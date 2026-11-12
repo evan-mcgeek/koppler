@@ -403,8 +403,13 @@ test.describe('Read again', () => {
     board: { env: 'qa', mode: 'auto', zoom: 1, pan: { x: 60, y: 60 }, nodes: { web: at(0, 0) }, edges: [] },
   });
 
-  test('reads the code again, from GitHub for a repo not cloned here, and says when it could not', async ({ page }) => {
+  test('reads the code again, from GitHub for a repo not cloned here, and says when it could not', async ({
+    page,
+    canvas,
+  }) => {
     await expect(card(page, 'web')).toBeVisible();
+    // No stack is set up: reading the code again fails, and says why.
+    fs.rmSync(path.join(canvas.dir, 'config', 'config.json'));
     const button = page.getByRole('button', { name: 'Read again' });
     // Only Discover reads the code.
     await expect(button).toHaveCount(0);

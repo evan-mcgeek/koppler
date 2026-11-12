@@ -206,12 +206,8 @@ export function hiddenBy(
   return { apps, areas: areas.map(area => nameOf(stack, area)) };
 }
 
-/** A board's name to sort by: a copy's "(local)" set aside, so it sits right after the team board it copies. */
-const sortName = (name: string) => name.replace(/ \(local\)$/, '').toLowerCase();
-
 /**
- * Boards under their area, in the stack's order, then those in no area; inside each, by name ignoring case, a team
- * board before its copy. With a choice, only the chosen areas' groups and the no-area one, and what the others hold.
+ * Boards under their area, in the stack's order, then those in no area; inside each, by name ignoring case. With a choice, only the chosen areas' groups and the no-area one, and what the others hold.
  */
 export function boardGroups<B extends { name: string; nodes: Record<string, unknown>; area?: unknown; mine?: boolean }>(
   stack: Stack,
@@ -225,7 +221,7 @@ export function boardGroups<B extends { name: string; nodes: Record<string, unkn
     boardArea(stack, { nodes: board.nodes, ...(typeof board.area === 'string' && { area: board.area }) }).id;
   const sorted = [...boards].sort(
     (a, b) =>
-      sortName(a.name).localeCompare(sortName(b.name)) ||
+      a.name.toLowerCase().localeCompare(b.name.toLowerCase()) ||
       Number(!!a.mine) - Number(!!b.mine) ||
       a.name.localeCompare(b.name),
   );

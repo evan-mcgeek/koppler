@@ -6,6 +6,7 @@ import fs from 'node:fs';
 import type http from 'node:http';
 import path from 'node:path';
 import { readClones, readData, type DataName } from '../data.ts';
+import { foldCopiesHere } from '../engine/boards.ts';
 import { APP_ID } from '../ids.ts';
 import { CODE, tempDir } from '../paths.ts';
 import { awsProfiles, cloneChoices } from './choices.ts';
@@ -102,6 +103,8 @@ export function serveFile(what: string, url: URL, res: http.ServerResponse): voi
   }
   const asked = DATA_FILE.exec(what)?.[1] as DataName | undefined;
   if (asked) {
+    // A board kept twice by an older Koppler is one board before the page reads either file.
+    if (asked === 'registry' || asked === 'state') foldCopiesHere();
     // One not written yet (no board saved, no stack) is null, not an error the page's console reports.
     res.writeHead(200, JSON_HEADERS).end(JSON.stringify(readData(asked)));
     return;

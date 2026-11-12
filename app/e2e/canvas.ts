@@ -86,6 +86,8 @@ export const test = base.extend<{
   dirty: string[];
   libraries: Record<string, string[]>;
   start: string;
+  /** The stack is shared with a team (in a repo, or linked), so its team boards carry the Team tag. */
+  teamStack: boolean;
   canvas: Canvas;
 }>({
   // `stack`, `board`, `uncloned` (apps with no clone on this machine), `dirty` (apps whose clone has three
@@ -98,6 +100,7 @@ export const test = base.extend<{
   libraries: [{}, { option: true }],
   // What follows the canvas address when it is opened, such as a board named in its hash.
   start: ['', { option: true }],
+  teamStack: [false, { option: true }],
   canvas: async ({ stack, board, uncloned, dirty, libraries }, use) => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-e2e-')),
       temp = path.join(dir, 'state', 'run'),
@@ -106,6 +109,11 @@ export const test = base.extend<{
     const write = (name: string, value: unknown) => {
       fs.writeFileSync(path.join(temp, `${name}.json`), JSON.stringify(value));
     };
+    // The stack in use is a file, where its team boards are kept.
+    fs.mkdirSync(path.join(dir, 'stack'), { recursive: true });
+    fs.mkdirSync(path.join(dir, 'config'));
+    fs.writeFileSync(path.join(dir, 'stack', 'stack.json'), JSON.stringify(stack));
+    fs.writeFileSync(path.join(dir, 'config', 'config.json'), JSON.stringify({ stack: path.join(dir, 'stack') }));
     write('registry', { ...stack, source: path.join(dir, 'stack') });
     write('local', {
       roots: [dir],
@@ -188,9 +196,17 @@ export const test = base.extend<{
       fs.rmSync(dir, { recursive: true, force: true });
     }
   },
-  page: async ({ page, canvas, start }, use) => {
+  page: async ({ page, canvas, start, teamStack }, use) => {
     const errors: string[] = [];
     page.on('pageerror', e => errors.push(String(e)));
+    if (teamStack)
+      await page.route('**/data/status.json', async route => {
+        const status = (await (await route.fetch()).json()) as Record<string, unknown>;
+        const dir = path.join(canvas.dir, 'stack');
+        await route.fulfill({
+          json: { ...status, stacks: [{ dir, path: dir, name: 'Acme Shop', apps: 0, envs: [], shared: true }] },
+        });
+      });
     await page.goto(canvas.url + start);
     await use(page);
     // The canvas server stops before the page closes: a test's routes must not fetch from it then.
