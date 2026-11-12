@@ -51,7 +51,7 @@ export function readStackFile(source: string): { stack: StackFile | null; error?
 }
 
 const NOT_SET_UP =
-  'Run facts not collected yet: read the repo (launchSettings/README/infra) and fill run, url, prereqs before using.';
+  'Run facts not collected yet: read the repo (launchSettings/README/infra) and fill start, url, prereqs before using.';
 
 /** Adds picked clones to stack.json as apps that are not set up yet. Only clones from the index can be added. */
 export function addApps(

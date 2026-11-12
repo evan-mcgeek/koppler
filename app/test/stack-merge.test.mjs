@@ -213,3 +213,39 @@ test('stack publish moves the private stack in use into a folder of a clone and 
   assert.deepEqual(read(path.join(temp, 'state.json')).presets.map(one => one.name), ['Checkout']);
   fs.rmSync(dir, { recursive: true, force: true });
 });
+
+test('use <stack> --boards lists that stack’s boards, its team’s and its own, and keeps the stack in use', () => {
+  const { dir, temp, qa, koppler, write } = sandbox();
+  const shelf = path.join(temp, 'stacks', crypto.createHash('sha1').update(path.resolve(qa)).digest('hex').slice(0, 12));
+  fs.mkdirSync(shelf, { recursive: true });
+  write(path.join(shelf, 'state.json'), { presets: [{ name: 'QA smoke', version: 1, nodes: { orders: { run: 'cli' } }, edges: [] }] });
+  write(path.join(temp, 'state.json'), { presets: [{ name: 'Mine', version: 1, nodes: { web: { run: 'cli' } }, edges: [] }] });
+
+  const other = koppler('use', 'Acme Shop QA', '--boards');
+  assert.equal(other.status, 0, other.stderr);
+  assert.equal(other.stdout.trim(), 'Payments  (team preset)\nQA smoke  (your board)');
+  assert.deepEqual(JSON.parse(koppler('use', 'acme shop qa', '--boards', '--json').stdout).map(one => one.name), ['Payments', 'QA smoke']);
+  // The stack in use is the same as before, and naming it lists its boards as --boards alone does.
+  assert.match(koppler('use').stdout, /^\* Acme Shop /m);
+  assert.equal(koppler('use', 'Acme Shop', '--boards').stdout, koppler('use', '--boards').stdout);
+  assert.equal(koppler('use', '--boards').stdout.trim(), 'Team checkout  (team preset)\nMine  (your board)');
+  assert.match(koppler('use', 'Nope', '--boards').stderr, /no stack called Nope/);
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('a stack written with the old run, config and note merges in, its facts carried to start and the notes', () => {
+  const { dir, shop, qa, koppler, read, write } = sandbox();
+  const old = read(path.join(qa, 'stack.json'));
+  Object.assign(old, { koppler: '0.3.2' });
+  Object.assign(old.apps.pay, { run: { cli: 'npm run dev' }, config: 'Settings from SSM', note: 'Takes the payments' });
+  write(path.join(qa, 'stack.json'), old);
+
+  const merged = koppler('stack', 'merge', 'Acme Shop QA', '--keep', 'apps.orders.url=ours', '--apply');
+  assert.equal(merged.status, 0, merged.stderr);
+  const stack = read(path.join(shop, 'stack.json'));
+  assert.equal(stack.apps.pay.start, 'npm run dev');
+  assert.equal(stack.apps.pay.description, 'Takes the payments');
+  assert.equal(['run', 'config', 'note'].some(field => field in stack.apps.pay), false);
+  assert.deepEqual(stack.notes, ['Pay: Settings from SSM']);
+  fs.rmSync(dir, { recursive: true, force: true });
+});

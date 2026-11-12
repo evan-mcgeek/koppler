@@ -175,14 +175,14 @@ test("0.2.1: a stack 0.2.0 left alone gets its databases, each tunnel's command 
         if (need.tunnel?.startsWith('aurora'))
           Object.assign(need, { cmd: `open ${need.tunnel}`, note: `${app.name} reads it` });
   const done = migrateStack(stamped as never);
-  expect(done.applied?.map(one => one.migration.version)).toEqual(['0.2.1', '0.2.2', '0.3.2']);
+  expect(done.applied?.map(one => one.migration.version)).toEqual(['0.2.1', '0.2.2', '0.3.2', '0.5.1']);
   const stack = done.value as unknown as OldStack & { databases: Record<string, Record<string, unknown>> };
   expect(stack.databases['orders']).toMatchObject({
     cmd: 'open aurora.qa.acme.example',
     envs: { prod: { cmd: 'open aurora.prod.acme.example' } },
   });
   expect(stack.apps['payments']?.uses).toEqual({ orders: { note: 'Payments API reads it' } });
-  expect(stack).toMatchObject({ koppler: '0.3.2' });
+  expect(stack).toMatchObject({ koppler: '0.5.1' });
 });
 
 test('a database its tunnel only calls "Database" is named after its host, without the environment', () => {
@@ -248,9 +248,10 @@ test('0.2.2: a stack that still names a removed app on its team boards and in ot
   expect(done.applied?.map(one => [one.migration.version, one.changes])).toEqual([
     ['0.2.2', ['mentions of removed apps taken out']],
     ['0.3.2', []],
+    ['0.5.1', []],
   ]);
   expect(done.value).toMatchObject({
-    koppler: '0.3.2',
+    koppler: '0.5.1',
     apps: { web: { after: ['cart'], consumes: { cart: {} } } },
     presets: [{ nodes: { web: { run: 'cli' }, cart: {} }, edges: [{ from: 'web', to: 'cart' }] }, left.presets[1]],
   });
@@ -292,9 +293,10 @@ test('0.3.2: a call whose how is written in words becomes how unknown, with the 
         'app on prod -> api: how "baked in at build" kept as its note',
       ],
     ],
+    ['0.5.1', []],
   ]);
   expect(done.value).toMatchObject({
-    koppler: '0.3.2',
+    koppler: '0.5.1',
     apps: {
       app: {
         consumes: {
@@ -309,4 +311,133 @@ test('0.3.2: a call whose how is written in words becomes how unknown, with the 
   // A stack already in this format is left as it is.
   expect(migrateStack(done.value as never).value).toEqual(done.value);
   expect(migrateStack(done.value as never).applied ?? []).toEqual([]);
+});
+
+test("0.5.1: an app's old run, config and note give their facts to start, description and the stack's notes", () => {
+  const old = {
+    koppler: '0.3.2',
+    envs: ['qa', 'prod'],
+    notes: ['Orders API: settings come from SSM; LOCAL_ env vars override them'],
+    apps: {
+      orders: {
+        name: 'Orders API',
+        kind: 'dotnet',
+        slug: 'acme/orders',
+        run: {
+          cli: 'dotnet run --project src/Orders --launch-profile <profile>',
+          ide: 'Rider: select profile <profile>',
+        },
+        config: 'settings come from SSM; LOCAL_ env vars override them',
+        note: 'Takes the orders from the web shop',
+        prereqs: [{ sso: 'shop-dev' }],
+        // The profile its sign-in already sets goes; the rest is kept in words.
+        overrides: {
+          set: { AWS_PROFILE: 'shop-dev', REGION: 'eu-west-1' },
+          note: 'Port 5000 is taken by AirPlay on macOS',
+        },
+        uses: { 'orders-db': { setting: 'ConnectionStrings__Orders' } },
+      },
+      web: {
+        name: 'Web',
+        kind: 'node',
+        slug: 'acme/web',
+        run: { cli: 'npm run dev' },
+        note: 'The shop.\nIts checkout page posts to Orders API.',
+        envs: { prod: { run: 'npm run start:prod', config: 'built with the PROD config' } },
+      },
+      cart: {
+        name: 'Cart',
+        kind: 'node',
+        slug: 'acme/cart',
+        start: 'npm start',
+        run: { cli: 'npm run dev' },
+        config: '',
+      },
+      odd: { name: 'Odd', kind: 'node', slug: 'acme/odd', run: { cli: 'make', tool: 'make' } },
+    },
+    databases: {
+      'orders-db': {
+        name: 'Orders DB',
+        kind: 'postgres',
+        tunnel: 'orders-db.qa.acme.example',
+        port: 5432,
+        env: 'ConnectionStrings__Orders',
+      },
+      'carts-db': {
+        name: 'Carts DB',
+        kind: 'postgres',
+        tunnel: 'carts-db.qa.acme.example',
+        port: 5432,
+        env: 'CARTS_DB',
+      },
+    },
+  };
+  const done = migrateStack(old);
+  expect(done.applied?.map(one => [one.migration.version, one.changes])).toEqual([
+    [
+      '0.5.1',
+      [
+        "orders: run kept in the stack's notes",
+        'orders: note became description',
+        "orders: config kept in the stack's notes",
+        "orders: overrides kept in the stack's notes, what its sign-in sets dropped",
+        'web: run became start',
+        'web on prod: run became start',
+        "web on prod: config kept in the stack's notes",
+        "web: note kept in the stack's notes",
+        "cart: run kept in the stack's notes",
+        'odd: run left as it was, its shape is not one Koppler knew',
+        "databases.orders-db: env dropped, its apps' uses hold it",
+        "databases.carts-db: env kept in the stack's notes",
+      ],
+    ],
+  ]);
+  const stack = done.value as typeof old & { apps: Record<string, Record<string, unknown>> };
+  expect(stack.koppler).toBe('0.5.1');
+  // A command with a placeholder is a template: it is kept in words, and the kind's own start stays in charge.
+  expect(stack.apps['orders']).toEqual({
+    name: 'Orders API',
+    kind: 'dotnet',
+    slug: 'acme/orders',
+    description: 'Takes the orders from the web shop',
+    prereqs: [{ sso: 'shop-dev' }],
+    uses: { 'orders-db': { setting: 'ConnectionStrings__Orders' } },
+  });
+  expect((stack as unknown as { databases: Record<string, object> }).databases['orders-db']).not.toHaveProperty('env');
+  expect(stack.apps['web']).toEqual({
+    name: 'Web',
+    kind: 'node',
+    slug: 'acme/web',
+    start: 'npm run dev',
+    envs: { prod: { start: 'npm run start:prod' } },
+  });
+  // An app that already has a start keeps it; its old run is kept in words, and a blank config goes.
+  expect(stack.apps['cart']).toEqual({ name: 'Cart', kind: 'node', slug: 'acme/cart', start: 'npm start' });
+  // A run of a shape Koppler never wrote is left alone, for a person to look at.
+  expect(stack.apps['odd']['run']).toEqual({ cli: 'make', tool: 'make' });
+  // No fact is lost: the rest goes to the stack's notes, once each; one already there is not added again.
+  expect(stack.notes).toEqual([
+    'Orders API: settings come from SSM; LOCAL_ env vars override them',
+    'Orders API starts with `dotnet run --project src/Orders --launch-profile <profile>`; in an IDE: Rider: select profile <profile>',
+    'Orders API runs with REGION=eu-west-1',
+    'Orders API: Port 5000 is taken by AirPlay on macOS',
+    'Web on prod: built with the PROD config',
+    'Web: The shop.\nIts checkout page posts to Orders API.',
+    'Cart starts with `npm run dev`',
+    'Carts DB: its apps read it from CARTS_DB',
+  ]);
+  // A stack already in this format is left as it is.
+  expect(migrateStack(done.value as never).applied ?? []).toEqual([]);
+});
+
+test('0.5.1 leaves a stack with no old fields alone, its notes as they were written', () => {
+  const plain = {
+    koppler: '0.3.2',
+    envs: ['qa'],
+    notes: 'One note.',
+    apps: { web: { name: 'Web', kind: 'node', slug: 'acme/web' } },
+  };
+  const done = migrateStack(plain);
+  expect(done.applied?.map(one => [one.migration.version, one.changes])).toEqual([['0.5.1', []]]);
+  expect(done.value).toEqual({ ...plain, koppler: '0.5.1' });
 });

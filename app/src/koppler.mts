@@ -48,7 +48,10 @@ import {
   readStackAt,
   removeApp,
 } from './engine/stack-file.ts';
-import { createStack, currentStack, stackNamed } from './engine/stacks.ts';
+import { createStack, currentStack, shelfOf, stackNamed } from './engine/stacks.ts';
+import { readStackFile } from './engine/stack-file.ts';
+import { readUpgraded } from './upgraded.ts';
+import { upgradeBoardFile } from './core/migrations/files.ts';
 import { quote } from './core/launch.ts';
 import type { Side } from './core/stack-merge.ts';
 import { init as initStack, stacksCommand, sync, useCommand } from './engine/sync.ts';
@@ -121,18 +124,29 @@ function refresh(args: string[]): void {
   );
 }
 
-/** Stacks on this Mac, or switch to one; --boards lists the boards of the stack in use (the team's presets and your own). */
+/** The stack a list of boards is for, and your own boards there: the one in use, or another read where it lies. */
+function boardsOf(name: string | undefined): { stack: ReturnType<typeof loaded>; own: unknown[] } {
+  const other = name === undefined ? undefined : stackNamed(name);
+  if (other && 'error' in other) fail(other.error);
+  if (!other || path.resolve(other.dir) === path.resolve(currentStack() ?? ''))
+    return { stack: loaded(), own: (readData('state')?.['presets'] ?? []) as unknown[] };
+  const read = readStackFile(path.join(other.dir, 'stack.json'));
+  if (read.error !== undefined) fail(read.error);
+  const stack = read.stack ?? fail(`cannot read ${other.name}`);
+  // Another stack's own boards wait on its shelf while it is not in use.
+  const shelved = readUpgraded(path.join(shelfOf(other.dir), 'state.json'), upgradeBoardFile);
+  if (shelved.error !== undefined) fail(`${other.name}'s boards: ${shelved.error}`);
+  return { stack: stack as unknown as ReturnType<typeof loaded>, own: (shelved.value?.['presets'] ?? []) as unknown[] };
+}
+
+/** Stacks on this Mac, or switch to one; --boards lists the boards of a stack (the team's presets and your own). */
 function use(args: string[]): void {
   if (args.includes('--boards')) {
-    const stack = loaded();
+    const { stack, own: shelf } = boardsOf(positional(args, ['--area'])[0]);
     const wanted = args.includes('--area') ? args[args.indexOf('--area') + 1] : undefined;
     if (args.includes('--area') && (!wanted || !Object.hasOwn(stack.areas ?? {}, wanted)))
       fail(`--area needs one of the stack's areas: ${Object.keys(stack.areas ?? {}).join(', ') || 'it has none'}`);
-    const own = (readData('state')?.['presets'] ?? []) as {
-      name: string;
-      nodes?: Record<string, unknown>;
-      area?: string;
-    }[];
+    const own = shelf as { name: string; nodes?: Record<string, unknown>; area?: string }[];
     const boards = [
       ...(stack.presets ?? []).map(preset => ({ ...preset, from: 'team' })),
       ...own.map(preset => ({ ...preset, from: 'yours' })),
