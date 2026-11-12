@@ -70,7 +70,13 @@ test('stack check reports each field the format does not know, with what replace
   const { dir, koppler } = sandbox();
   const old = path.join(dir, 'old.json');
   const orders = { name: 'Orders API', kind: 'dotnet', slug: 'acme/orders-api', url: 'http://localhost:5000', run: { cli: 'dotnet run' }, config: 'Settings from SSM', note: 'A free-text remark' };
+  // A file from before those fields went is checked as Koppler reads it, brought up to date first: it passes.
   fs.writeFileSync(old, JSON.stringify({ $schema: './stack.schema.json', name: 'Shop', envs: ['qa', 'prod'], apps: { 'orders-api': orders } }));
+  const migrated = koppler('stack', 'check', old);
+  assert.equal(migrated.status, 0, migrated.stderr);
+  assert.match(migrated.stdout, /old\.json: OK/);
+  // Written in this format, they are fields it does not know, each with what replaced it.
+  fs.writeFileSync(old, JSON.stringify({ $schema: './stack.schema.json', koppler: STACK_FORMAT.version, name: 'Shop', envs: ['qa', 'prod'], apps: { 'orders-api': orders } }));
   const checked = koppler('stack', 'check', old);
   assert.equal(checked.status, 1, checked.stdout);
   assert.deepEqual(checked.stderr.trim().split('\n').slice(1), [

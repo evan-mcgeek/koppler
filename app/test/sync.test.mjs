@@ -126,7 +126,7 @@ test('The picker\'s candidates and adding the picked ones: only clones from the 
   assert.deepEqual(addApps([{ slug: 'acme/orders-api' }, { slug: 'evil/not-scanned', name: 'x', kind: 'node' }], opts), { added: [] });
   assert.match(addApps([{ slug: 'gitlab.com/acme/team/docs' }], opts).error, /Say what kind of app/);
   assert.deepEqual(addApps([{ slug: 'acme/shop-app', name: '  Shop App  ' }, { slug: 'gitlab.com/acme/team/docs', kind: 'web' }], opts), { added: ['shop-app', 'docs'] });
-  assert.deepEqual(stack().apps['shop-app'], { name: 'Shop App', kind: 'flutter', slug: 'acme/shop-app', pending: 'Run facts not collected yet: read the repo (launchSettings/README/infra) and fill run, url, prereqs before using.' });
+  assert.deepEqual(stack().apps['shop-app'], { name: 'Shop App', kind: 'flutter', slug: 'acme/shop-app', pending: 'Run facts not collected yet: read the repo (launchSettings/README/infra) and fill start, url, prereqs before using.' });
   assert.equal(stack().apps.docs.kind, 'web');
   assert.deepEqual(validateStack(stack()), []);
   fsx.rmSync(dir, { recursive: true });

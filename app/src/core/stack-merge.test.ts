@@ -97,6 +97,30 @@ describe('mergeStacks', () => {
     expect(mergeStacks(a, b).conflicts.map(one => one.path)).toEqual(['envs', 'envAliases["qa.eu"]']);
   });
 
+  it('keeps every note of both: ours, then each of theirs ours lacks, as added, not as a conflict', () => {
+    const done = mergeStacks(
+      { ...ours, notes: ['Orders API: settings from SSM', 'Web: runs on 3000'] },
+      { ...theirs, notes: ['Web: runs on 3000', 'Pay: starts with npm run dev'] },
+    );
+    expect(done.stack['notes']).toEqual([
+      'Orders API: settings from SSM',
+      'Web: runs on 3000',
+      'Pay: starts with npm run dev',
+    ]);
+    expect(done.added).toContain('notes[2]');
+    expect(done.conflicts.map(one => one.path)).not.toContain('notes');
+    // One note written as text is a list of one; a lock on the notes keeps ours whole.
+    expect(mergeStacks({ ...ours, notes: 'One' }, { ...theirs, notes: ['Two'] }).stack['notes']).toEqual([
+      'One',
+      'Two',
+    ]);
+    const locked = mergeStacks({ ...ours, notes: ['One'] }, { ...theirs, notes: ['Two'] }, { locked: ['notes'] });
+    expect(locked.stack['notes']).toEqual(['One']);
+    expect(locked.conflicts.filter(one => one.path === 'notes')).toEqual([
+      { path: 'notes', ours: ['One'], theirs: ['Two'], kept: 'ours', locked: true },
+    ]);
+  });
+
   it('keeps every board of ours, even two with one name', () => {
     const twice = { ...ours, presets: [ours.presets[0], { ...ours.presets[0], nodes: {} }] };
     expect((mergeStacks(twice, theirs, { prefer: 'ours' }).stack as typeof ours).presets).toHaveLength(3);

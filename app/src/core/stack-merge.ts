@@ -90,6 +90,15 @@ export function mergeStacks(
   };
   const merge = (a: unknown, b: unknown, at: Path): unknown => {
     if (same(a, b)) return a;
+    if (at.length === 1 && at[0] === 'notes' && !isLocked(at)) {
+      // The stack's notes are facts, each kept: ours, then each of theirs ours lacks.
+      const lines = (notes: unknown): unknown[] =>
+        Array.isArray(notes) ? notes : typeof notes === 'string' ? [notes] : [];
+      const mine = lines(a);
+      const fresh = lines(b).filter(line => !mine.includes(line));
+      fresh.forEach((_, n) => added.push(pathText([...at, mine.length + n])));
+      return fresh.length ? [...mine, ...fresh] : a;
+    }
     if (at.length === 1 && at[0] === 'presets' && Array.isArray(a) && Array.isArray(b)) {
       // Team boards are told apart by name: every one of ours stays, in its place.
       const ourBoards: unknown[] = a;
