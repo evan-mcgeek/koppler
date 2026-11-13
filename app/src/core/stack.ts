@@ -264,7 +264,7 @@ const App = z.looseObject(
       .regex(/^(?=.*\S)[^\r\n]*$/, 'one line of words')
       .optional()
       .describe('What it does, in a few words, for someone who does not build it'),
-    kind: required.describe('What it is built with: dotnet, node, web, flutter, lambda, other'),
+    kind: required.describe('What it is built with: dotnet, node, web, flutter, lambda, workflow, other'),
     areas: z
       .array(z.string(), { error: 'a list of area ids' })
       .optional()
@@ -606,15 +606,19 @@ export const StackSchema = z.looseObject(
 
 export type Stack = z.infer<typeof StackSchema>;
 export type App = z.infer<typeof App>;
-/** Why an app never runs on this Mac: an outside system, or a scheduled job; null when it does. */
-export const notRunHere = (app: { outside?: unknown; schedule?: unknown } | undefined): string | null =>
+/** Why an app never runs on this Mac: an outside system, a scheduled job or a workflow; null when it does. */
+export const notRunHere = (
+  app: { outside?: unknown; schedule?: unknown; kind?: unknown } | undefined,
+): string | null =>
   app?.schedule
     ? 'a scheduled job runs deployed only'
-    : app?.outside
-      ? typeof app.outside === 'string'
-        ? app.outside
-        : 'an outside system'
-      : null;
+    : app?.kind === 'workflow'
+      ? 'a workflow runs on GitHub Actions or by hand'
+      : app?.outside
+        ? typeof app.outside === 'string'
+          ? app.outside
+          : 'an outside system'
+        : null;
 export type Prereq = z.infer<typeof Prereq>;
 export type Database = z.infer<typeof Database>;
 export type Secret = z.infer<typeof Secret>;

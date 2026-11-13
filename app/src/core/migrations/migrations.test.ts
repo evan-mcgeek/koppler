@@ -175,14 +175,14 @@ test("0.2.1: a stack 0.2.0 left alone gets its databases, each tunnel's command 
         if (need.tunnel?.startsWith('aurora'))
           Object.assign(need, { cmd: `open ${need.tunnel}`, note: `${app.name} reads it` });
   const done = migrateStack(stamped as never);
-  expect(done.applied?.map(one => one.migration.version)).toEqual(['0.2.1', '0.2.2', '0.3.2', '0.5.1']);
+  expect(done.applied?.map(one => one.migration.version)).toEqual(['0.2.1', '0.2.2', '0.3.2', '0.5.1', '0.5.2']);
   const stack = done.value as unknown as OldStack & { databases: Record<string, Record<string, unknown>> };
   expect(stack.databases['orders']).toMatchObject({
     cmd: 'open aurora.qa.acme.example',
     envs: { prod: { cmd: 'open aurora.prod.acme.example' } },
   });
   expect(stack.apps['payments']?.uses).toEqual({ orders: { note: 'Payments API reads it' } });
-  expect(stack).toMatchObject({ koppler: '0.5.1' });
+  expect(stack).toMatchObject({ koppler: STACK_FORMAT.version });
 });
 
 test('a database its tunnel only calls "Database" is named after its host, without the environment', () => {
@@ -249,9 +249,10 @@ test('0.2.2: a stack that still names a removed app on its team boards and in ot
     ['0.2.2', ['mentions of removed apps taken out']],
     ['0.3.2', []],
     ['0.5.1', []],
+    ['0.5.2', []],
   ]);
   expect(done.value).toMatchObject({
-    koppler: '0.5.1',
+    koppler: STACK_FORMAT.version,
     apps: { web: { after: ['cart'], consumes: { cart: {} } } },
     presets: [{ nodes: { web: { run: 'cli' }, cart: {} }, edges: [{ from: 'web', to: 'cart' }] }, left.presets[1]],
   });
@@ -294,9 +295,10 @@ test('0.3.2: a call whose how is written in words becomes how unknown, with the 
       ],
     ],
     ['0.5.1', []],
+    ['0.5.2', []],
   ]);
   expect(done.value).toMatchObject({
-    koppler: '0.5.1',
+    koppler: STACK_FORMAT.version,
     apps: {
       app: {
         consumes: {
@@ -391,9 +393,10 @@ test("0.5.1: an app's old run, config and note give their facts to start, descri
         "databases.carts-db: env kept in the stack's notes",
       ],
     ],
+    ['0.5.2', []],
   ]);
   const stack = done.value as typeof old & { apps: Record<string, Record<string, unknown>> };
-  expect(stack.koppler).toBe('0.5.1');
+  expect(stack.koppler).toBe(STACK_FORMAT.version);
   // A command with a placeholder is a template: it is kept in words, and the kind's own start stays in charge.
   expect(stack.apps['orders']).toEqual({
     name: 'Orders API',
@@ -438,6 +441,42 @@ test('0.5.1 leaves a stack with no old fields alone, its notes as they were writ
     apps: { web: { name: 'Web', kind: 'node', slug: 'acme/web' } },
   };
   const done = migrateStack(plain);
-  expect(done.applied?.map(one => [one.migration.version, one.changes])).toEqual([['0.5.1', []]]);
-  expect(done.value).toEqual({ ...plain, koppler: '0.5.1' });
+  expect(done.applied?.map(one => [one.migration.version, one.changes])).toEqual([
+    ['0.5.1', []],
+    ['0.5.2', []],
+  ]);
+  expect(done.value).toEqual({ ...plain, koppler: STACK_FORMAT.version });
+});
+
+test('0.5.2: an app of kind other that is a GitHub Actions workflow becomes kind workflow, and no other', () => {
+  const old = {
+    koppler: '0.5.1',
+    envs: ['qa'],
+    apps: {
+      sync: {
+        name: 'Sync keys',
+        kind: 'other',
+        deployedUrl: 'https://github.com/acme/web/actions/workflows/sync-keys.yml',
+      },
+      script: { name: 'Translation script', kind: 'other' },
+      pulls: { name: 'Lokalise PRs', kind: 'other', deployedUrl: 'https://github.com/acme/web/pulls' },
+      ci: {
+        name: 'CI',
+        kind: 'other',
+        outside: 'GitHub',
+        deployedUrl: 'https://github.com/acme/web/actions/workflows/ci.yml',
+      },
+      api: { name: 'Orders API', kind: 'dotnet', deployedUrl: 'https://github.com/acme/web/actions/workflows/x.yml' },
+    },
+  };
+  const done = migrateStack(old);
+  expect(done.applied?.map(one => [one.migration.version, one.changes])).toEqual([
+    ['0.5.2', ['sync: kind other became workflow']],
+  ]);
+  expect(done.value).toEqual({
+    ...old,
+    koppler: '0.5.2',
+    apps: { ...old.apps, sync: { ...old.apps.sync, kind: 'workflow' } },
+  });
+  expect(migrateStack({ ...done.value }).applied).toEqual([]);
 });

@@ -169,6 +169,9 @@ Discover's home, on its left, lists **Whole stack** first, then the team's featu
 
 **Discover** on **Whole stack** shows how the stack fits together: every app, queue, database, resource and outside system, read from the stack.
 On a big stack, pick your areas to narrow it.
+**Show** at the map's top right hides whole kinds of card: services and clients, jobs and functions (a schedule, a Lambda or a workflow), outside systems, queues and topics (each queue type on its own too), databases and cloud resources.
+A link that ran through hidden cards is drawn dotted, straight between the cards still shown; the choice is kept in this browser, per stack, and a feature board's own cards always show.
+Discover's home counts the whole stack by kind: "26 services · 8 jobs · 32 outside systems".
 A card on the map shows only its name and kind; what it is, its branch, its repo, where the deployed one answers, its schedule and a dead end are in its panel when it is picked.
 Nothing on it runs or changes the board.
 Its tools are the board's: Select and Hand, Undo, Arrange (each press the next layout), Fit, zoom and Present, with the same keys; dragging over the map picks the cards in it, and the overview sits in the corner.

@@ -4,6 +4,7 @@ import type { Point } from '../src/core/arrange.ts';
 import { DIRECTIONS, type Direction, type Laid } from '../src/core/layout.ts';
 import { hiddenBy } from '../src/core/areas.ts';
 import { scheduleWords } from '../src/core/schedule.ts';
+import { hides, withoutHidden } from '../src/core/categories.ts';
 import { deadEnds, linksOf, mapOf, placesOf, type Card, type Link } from '../src/core/discover.ts';
 import {
   editFeature,
@@ -21,6 +22,7 @@ import { board } from './board.svelte.ts';
 import { post } from './data.ts';
 import { live } from './live.svelte.ts';
 import { runs } from './run.svelte.ts';
+import { hidden } from './shown.svelte.ts';
 import { toasts } from './toast.svelte.ts';
 
 /** What a card on the map says: its name, kind, and where its code is or what it is. */
@@ -65,7 +67,6 @@ const RESOURCE_TAGS: Record<string, string> = { s3: 'S3', apigw: 'APIGW', sfn: '
 const counted = (n: number, one: string) => `${String(n)} ${one}${n === 1 ? '' : 's'}`;
 
 class Discovered {
-  /** The map: the whole stack, or a feature's cards and what was brought in from each opened card. */
   /** The board's own cards: its apps, and the outside systems put on it by hand. */
   #own = $derived([...board.nodes.map(node => node.id), ...board.pinned]);
   /** What the map always shows, whatever the areas: a feature board's own cards. The whole stack keeps none. */
@@ -78,7 +79,15 @@ class Discovered {
       this.#always,
     ),
   );
+  /** The map with the kinds of card hidden in the Show menu taken off, but the board's own. */
   map = $derived.by(() => {
+    const facts = board.facts;
+    const all = this.#all;
+    if (!facts || !hidden.ids.length) return all;
+    return withoutHidden(all, card => !this.#always.includes(card) && hides(facts, hidden.ids, card));
+  });
+  /** The map: the whole stack, or a feature's cards and what was brought in from each opened card. */
+  #all = $derived.by(() => {
     const facts = board.facts;
     if (!facts) return { cards: [], links: [] as Link[] };
     const feature = board.feature;

@@ -2,6 +2,7 @@
   // Discover's home: the whole stack first, then the feature boards in one list by name, and at the foot a question
   // to the agent, which becomes a feature board of your own that it drafts on the map.
   import type { StoredPreset } from '../src/core/presets.ts';
+  import { CATEGORIES, countsOf } from '../src/core/categories.ts';
   import { featureOf, openComments } from '../src/core/feature.ts';
   import { board } from './board.svelte.ts';
   import { openFlow } from './boards.ts';
@@ -10,14 +11,10 @@
 
   let question = $state('');
   const whole = $derived(!board.feature);
-  /** Every card the whole stack holds: its apps, queues, databases and resources. */
+  /** What the whole stack holds, by category: "4 services · 1 queue". */
   const size = $derived.by(() => {
-    const facts = board.facts;
-    if (!facts) return 0;
-    return [facts.apps, facts.queues, facts.databases, facts.resources].reduce(
-      (n, part) => n + Object.keys(part ?? {}).length,
-      0,
-    );
+    const counts = board.facts ? countsOf(board.facts) : {};
+    return CATEGORIES.flatMap(one => (counts[one.id] ? [counted(counts[one.id] ?? 0, one.one)] : [])).join(' · ');
   });
   const flows = $derived(
     [...board.team, ...board.own]
@@ -84,9 +81,7 @@
       if (!whole) openFlow(null);
     }}
     ><span class="here" aria-hidden="true"></span><span class="what"
-      ><span class="name">Whole stack</span><span class="sub"
-        >{size} {size === 1 ? 'app or resource' : 'apps and resources'}</span
-      ></span
+      ><span class="name">Whole stack</span><span class="sub">{size || 'Nothing yet'}</span></span
     ></button
   >
   {#if flows.length}

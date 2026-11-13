@@ -36,6 +36,8 @@
   import { heldKeys } from './held-keys.ts';
   import LeanCard from './LeanCard.svelte';
   import BoardTools from './BoardTools.svelte';
+  import ShowFilter from './ShowFilter.svelte';
+  import { hidden } from './shown.svelte.ts';
   import Overview from './Overview.svelte';
   import { dragging, FIT, present, toolState, type Tool } from './tools.svelte.ts';
   import { undo } from './undo.svelte.ts';
@@ -194,6 +196,7 @@
           // On a feature board its steps are drawn in ink and every other link drawn back.
           board: board.feature ? !!step : onBoard.has(link.from) && onBoard.has(link.to),
           found: link.sure === 'found' || !!step?.step.proposed,
+          through: !!link.through,
           unsourced: !!link.unsourced && !step,
           // A bucket's link says whether it reads, writes or both.
           label: link.kind === 'bucket' && !step ? link.via : undefined,
@@ -386,6 +389,17 @@
     discovered.arrange();
     fitWhenLaid = true;
   };
+  // Kinds of card hidden or shown again: those back take a free place, and the view fits what is left.
+  let kinds: string | null = null;
+  $effect(() => {
+    const now = hidden.ids.join();
+    if (kinds !== null && now !== kinds)
+      untrack(() => {
+        discovered.placeReturning();
+        fitWhenLaid = true;
+      });
+    kinds = now;
+  });
   // The cards move first, once their layout is worked out; the view follows.
   $effect(() => {
     if (!discovered.layout || !fitWhenLaid) return;
@@ -561,6 +575,7 @@
                 class="link"
                 class:board={one.board}
                 class:found={one.found}
+                class:through={one.through}
                 class:faded={one.faded}
                 data-link={one.key}
               >
@@ -668,6 +683,9 @@
             {/each}
           </svg>
         </ViewportPortal>
+        <Panel position="top-right">
+          <ShowFilter />
+        </Panel>
         <Panel position="bottom-center">
           <BoardTools
             tool={tools.tool}
@@ -724,6 +742,9 @@
             ></svg
           >No source yet</span
         >
+        {#if map.links.some(link => link.through)}<span
+            ><svg width="28" height="8" aria-hidden="true"><path d="M0 4H28" class="dots" /></svg>Through hidden cards</span
+          >{/if}
         {#if board.feature}<span class="dim"
             ><svg width="28" height="8" aria-hidden="true"><path d="M0 4H28" /></svg>Other links</span
           >{/if}
@@ -1134,6 +1155,12 @@ Schedule on {lastData.job.env.toUpperCase()}. Every environment in Settings"
   }
   .link.found .wire {
     stroke-dasharray: 5 4;
+  }
+  .link.through .wire,
+  .legend .dots {
+    stroke-dasharray: 0.5 5;
+    stroke-linecap: round;
+    stroke-width: 2.5;
   }
   .end .dot {
     fill: var(--tone);

@@ -64,6 +64,8 @@ export const KINDS: Record<string, Kind> = {
     serves: true,
     needs: [DOCKER, { tool: 'sam', fix: 'brew install aws-sam-cli (or: uv tool install aws-sam-cli)' }],
   },
+  // A GitHub Actions workflow or a script run by hand: never started here, shown in Discover with its calls.
+  workflow: { label: 'Workflow', runIn: RUN_IN, serves: false },
   // Anything else: started by the command in its `start` field.
   other: { label: 'Other', runIn: RUN_IN, serves: true },
 };
