@@ -20,6 +20,8 @@ export interface Link {
   via?: string;
   /** A call the stack records without saying where it comes from: no setting, file or place in the code. */
   unsourced?: true;
+  /** Drawn in place of links through cards the Show menu hides: those cards, in order. */
+  through?: Card[];
 }
 
 export type Facts = Pick<Stack, 'apps'> &

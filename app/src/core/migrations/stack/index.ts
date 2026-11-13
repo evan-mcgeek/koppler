@@ -6,12 +6,20 @@ import { databasesNamedOnceAgain } from './0.2.1.ts';
 import { noRemovedApps } from './0.2.2.ts';
 import { howsKopplerApplies } from './0.3.2.ts';
 import { oldAppFields } from './0.5.1.ts';
+import { workflowKind } from './0.5.2.ts';
 
 export const STACK_FORMAT: Format = {
   name: 'The stack',
   key: 'koppler',
-  version: '0.5.1',
-  migrations: [databasesNamedOnce, databasesNamedOnceAgain, noRemovedApps, howsKopplerApplies, oldAppFields],
+  version: '0.5.2',
+  migrations: [
+    databasesNamedOnce,
+    databasesNamedOnceAgain,
+    noRemovedApps,
+    howsKopplerApplies,
+    oldAppFields,
+    workflowKind,
+  ],
 };
 
 /** A stack as written, in this Koppler's format: what every reader of the stack works with. */

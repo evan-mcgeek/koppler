@@ -43,7 +43,7 @@ test('the home lists the whole stack first, then the feature boards, and opens e
   await page.keyboard.press('ControlOrMeta+1');
   const rows = home(page).locator('.row');
   await expect(rows).toHaveText([
-    /^Whole stack\s*4 apps and resources$/,
+    /^Whole stack\s*4 services$/,
     /^Browse flow\s*1 phase · 1 step$/,
     /^Checkout flow\s*1 phase · 2 steps$/,
   ]);
