@@ -104,7 +104,7 @@
   </p>
 
   {#each feature.phases as one, at (one.name)}
-    <section class:dim={discovered.phase !== null && discovered.phase !== at}>
+    <section class:dim={discovered.shownPhase !== null && discovered.shownPhase !== at}>
       <header>
         {#if renaming === one.name}
           <form
@@ -122,7 +122,7 @@
           <button
             class="phase"
             type="button"
-            aria-pressed={discovered.phase === at}
+            aria-pressed={discovered.shownPhase === at}
             title="Show only this phase on the map"
             onclick={() => {
               discovered.phase = discovered.phase === at ? null : at;

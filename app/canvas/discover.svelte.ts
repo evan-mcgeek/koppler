@@ -105,7 +105,9 @@ class Discovered {
   /** The link's step to show: the picked one, else the one in the picked phase, else its first. */
   stepOf(link: { from: Card; to: Card }): Numbered | undefined {
     const all = this.stepsOf(link);
-    return all.find(one => one.number === this.current?.number) ?? all.find(one => one.phase === this.phase) ?? all[0];
+    return (
+      all.find(one => one.number === this.current?.number) ?? all.find(one => one.phase === this.shownPhase) ?? all[0]
+    );
   }
   /** The phase picked in the feature's panel: the others dim. */
   phase = $state<number | null>(null);
@@ -113,6 +115,8 @@ class Discovered {
   step = $state<string | null>(null);
   /** The picked step, while the feature still has it. */
   current = $derived(this.step === null ? undefined : this.steps.find(one => one.number === this.step));
+  /** The phase marked: the picked step's, else the one picked. */
+  shownPhase = $derived(this.current ? this.current.phase : this.phase);
   /** Picks the step `by` places on from the picked one, or the first or last when none is; it stops at either end. */
   walk(by: 1 | -1) {
     const all = this.steps.map(one => one.number);
