@@ -29,7 +29,7 @@ export type Facts = Pick<Stack, 'apps'> &
   };
 
 /** Whether a recorded call says where it comes from. */
-const sourced = (call: Call | undefined) =>
+export const sourced = (call: Call | undefined) =>
   !!call && (!!call.env || !!call.file || !!call.key || !!call.found || (!!call.how && call.how !== 'unknown'));
 const via = (use: unknown): string | undefined => {
   const said = (use as { via?: unknown } | null | undefined)?.via;

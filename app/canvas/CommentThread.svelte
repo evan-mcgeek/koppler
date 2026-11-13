@@ -45,7 +45,7 @@
   <aside class="thread" aria-label="Comment on {discovered.about(on)}">
     <header>
       <h2>{'card' in on ? board.nameOf(on.card) : discovered.about(on)}</h2>
-      {#if comment}
+      {#if comment && !board.viewOnly}
         <button class="text" type="button" onclick={() => void discovered.resolve(comment.id)}>Resolve</button>
       {/if}
       <button class="close" type="button" aria-label="Close" onclick={close}><X size={16} /></button>
@@ -79,27 +79,27 @@
     {#if looking}
       <p class="looking" role="status"><span class="dot" aria-hidden="true"></span>The agent is looking into it</p>
     {/if}
-    <form onsubmit={send}>
-      <!-- svelte-ignore a11y_autofocus -->
-      <textarea
-        aria-label={comment ? 'Reply' : 'Comment'}
-        rows="3"
-        maxlength="2000"
-        autofocus
-        placeholder={comment ? 'Reply' : "Say what's missing or wrong"}
-        bind:value={text}
-        onkeydown={ev => {
-          if (ev.key === 'Escape') {
-            ev.stopPropagation();
-            close();
-          }
-        }}
-      ></textarea>
-      <span class="foot">
-        <span>The agent answers here</span>
-        <button class="primary" type="submit" disabled={!text.trim()}>{comment ? 'Reply' : 'Comment'}</button>
-      </span>
-    </form>
+    {#if !board.viewOnly}<form onsubmit={send}>
+        <!-- svelte-ignore a11y_autofocus -->
+        <textarea
+          aria-label={comment ? 'Reply' : 'Comment'}
+          rows="3"
+          maxlength="2000"
+          autofocus
+          placeholder={comment ? 'Reply' : "Say what's missing or wrong"}
+          bind:value={text}
+          onkeydown={ev => {
+            if (ev.key === 'Escape') {
+              ev.stopPropagation();
+              close();
+            }
+          }}
+        ></textarea>
+        <span class="foot">
+          <span>The agent answers here</span>
+          <button class="primary" type="submit" disabled={!text.trim()}>{comment ? 'Reply' : 'Comment'}</button>
+        </span>
+      </form>{/if}
   </aside>
 {/if}
 

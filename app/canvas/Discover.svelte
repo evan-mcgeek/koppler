@@ -430,8 +430,8 @@
     if (key === '/') {
       ev.preventDefault();
       finding = true;
-    } else if (key === 'e') board.toDoor('run');
-    else if (key === 'l' && live.running) {
+    } else if (key === 'e' && !board.viewOnly) board.toDoor('run');
+    else if (key === 'l' && live.running && !board.viewOnly) {
       board.toDoor('run');
       board.goLive();
     } else if (key === 'f') void fit();
@@ -706,8 +706,10 @@
 
       <div class="legend" aria-label="Legend">
         {#if board.feature}
-          <span class="lit"
-            ><svg width="28" height="8" aria-hidden="true"><path d="M0 4H28" /></svg>Used by {board.name}</span
+          <span class="lit" title="Used by {board.name}"
+            ><svg width="28" height="8" aria-hidden="true"><path d="M0 4H28" /></svg><span class="cut"
+              >Used by {board.name}</span
+            ></span
           >
         {/if}
         <span><svg width="28" height="8" aria-hidden="true"><path d="M0 4H28" /></svg>Confirmed</span>
@@ -816,7 +818,7 @@
               discovered.last = null;
             }}>Clear</button
           >
-          {#if runnable.length}
+          {#if board.viewOnly}{:else if runnable.length}
             <button
               class="primary"
               type="button"
@@ -918,7 +920,7 @@ Schedule on {lastData.job.env.toUpperCase()}. Every environment in Settings"
               ><GitBranch size={14} aria-hidden="true" />{lastApp.changed}{callers.length
                 ? `. ${list(callers)} ${callers.length === 1 ? 'calls' : 'call'} it.`
                 : ''}</span
-            >{/if}{:else if lastStack && !lastStack.outside}<span class="where">On GitHub</span>{/if}
+            >{/if}{:else if lastStack && !lastStack.outside && !board.viewOnly}<span class="where">On GitHub</span>{/if}
         {#if lastStack?.slug}<span class="slug">{lastStack.slug}</span>{/if}
         {#if lastHost}<span class="slug host" title="Where the deployed one answers on {board.env.toUpperCase()}"
             >{lastHost}</span
@@ -959,16 +961,18 @@ Schedule on {lastData.job.env.toUpperCase()}. Every environment in Settings"
                         >Step{numbers.length > 1 ? 's' : ''}
                         {numbers.join(', ')}{step.step.proposed ? ', proposed' : ''}</span
                       >{:else}<span>Not in this feature</span>
-                      <button
-                        class="text"
-                        type="button"
-                        onclick={() => {
-                          discovered.addStep(link);
-                        }}>Add as a step</button
-                      >{/if}
+                      {#if !board.viewOnly}<button
+                          class="text"
+                          type="button"
+                          onclick={() => {
+                            discovered.addStep(link);
+                          }}>Add as a step</button
+                        >{/if}{/if}
                   </span>
                 {/if}
-                {#if link.sure === 'found' && !discovered.stepOf(link)?.step.proposed}
+                {#if board.viewOnly}{#if link.sure === 'found'}<span class="detail"
+                      ><span>Found in code, not confirmed</span></span
+                    >{/if}{:else if link.sure === 'found' && !discovered.stepOf(link)?.step.proposed}
                   <span class="detail">
                     <span>Found in code, not confirmed</span>
                     <button class="text" type="button" onclick={() => void discovered.confirm(link)}>Confirm</button>
@@ -1267,6 +1271,14 @@ Schedule on {lastData.job.env.toUpperCase()}. Every environment in Settings"
   .legend .unknown text {
     fill: var(--ink);
     font: 600 10px var(--mono);
+  }
+  /* A long board name is cut short, so the legend stays clear of the step bar beside it. */
+  .legend .cut {
+    display: block;
+    overflow: hidden;
+    max-width: 200px;
+    white-space: nowrap;
+    text-overflow: ellipsis;
   }
   .legend .lit path {
     stroke: var(--ink);

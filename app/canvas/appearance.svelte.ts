@@ -136,6 +136,18 @@ class Appearance {
   get deployed(): string {
     return this.now.deployed ?? SCHEMES[this.now.scheme].deployed;
   }
+  /** Opens in this scheme, unless one was picked in this browser before; it is kept only once picked. */
+  openIn(scheme: string): void {
+    let picked = false;
+    try {
+      picked = !!localStorage.getItem(KEY);
+    } catch {
+      // A browser that keeps nothing has no pick of its own.
+    }
+    if (picked || !(scheme in SCHEMES)) return;
+    this.now = { scheme: scheme as Scheme };
+    this.#apply();
+  }
   /** A scheme brings its own local and deployed colours: picks made by hand are dropped. */
   pickScheme(scheme: Scheme): void {
     this.#keep({ scheme });

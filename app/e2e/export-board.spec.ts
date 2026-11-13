@@ -50,15 +50,14 @@ test('a board of your own exports from its row menu as a page with its phases an
   // Opened on its own, it loads nothing else.
   await page.route('**/*', route => (route.request().url().startsWith('file:') ? route.continue() : route.abort()));
   await page.goto(`file://${file}`);
-  await expect(page.getByRole('navigation', { name: 'Flows' }).getByRole('button')).toHaveText([
-    /My checkout\s*2 steps/,
-  ]);
-  const steps = page.getByRole('complementary', { name: 'Steps' });
+  const steps = page.getByRole('complementary', { name: 'My checkout' });
   await expect(steps).toContainText('How a customer pays, for the write-up.');
   await expect(steps).toContainText('Order');
   await expect(steps).toContainText('Pay');
+  // One flow: the bar names it, with no other to pick.
+  await expect(page.getByRole('banner').getByRole('button', { name: 'Flows' })).toHaveCount(0);
   await steps.getByRole('button', { name: 'Walk through the steps' }).click();
-  await expect(page.getByRole('status', { name: 'Step 1.1' })).toContainText('Web Shop to Orders API: Sends the order');
+  await expect(page.getByRole('status', { name: 'Step 1.1' })).toContainText('Web Shop → Orders API');
   await page.keyboard.press('ArrowRight');
   await expect(page.getByRole('status', { name: 'Step 2.1' })).toContainText('Takes the money');
 });
