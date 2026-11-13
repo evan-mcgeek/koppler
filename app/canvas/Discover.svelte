@@ -89,7 +89,7 @@
   });
   /** A phase picked: the cards of its steps; the rest dim. */
   const inPhase = $derived.by(() => {
-    const phase = discovered.phase === null ? undefined : board.feature?.phases[discovered.phase];
+    const phase = discovered.shownPhase === null ? undefined : board.feature?.phases[discovered.shownPhase];
     return phase ? new Set(phase.steps.flatMap(step => [step.from, step.to])) : null;
   });
   /** Walking through the steps: the two cards of the step on screen; the rest dim. */
@@ -179,7 +179,7 @@
         ? ''
         : `M${String(end.x + nx * 18 - ny * 5)} ${String(end.y + ny * 18 + nx * 5)}L${String(end.x + nx * 13)} ${String(end.y + ny * 13)}L${String(end.x + nx * 18 + ny * 5)} ${String(end.y + ny * 18 - nx * 5)}`;
       const step = discovered.stepOf(link);
-      const phase = discovered.phase;
+      const phase = discovered.shownPhase;
       return [
         {
           key: linkKey(link),
@@ -619,11 +619,11 @@
             {#each phases as phase (phase.at)}
               <g
                 class="phase"
-                class:faded={discovered.phase !== null && discovered.phase !== phase.at}
+                class:faded={discovered.shownPhase !== null && discovered.shownPhase !== phase.at}
                 transform="translate({phase.x} {phase.y})"
                 role="button"
                 tabindex="0"
-                aria-pressed={discovered.phase === phase.at}
+                aria-pressed={discovered.shownPhase === phase.at}
                 aria-label="Phase {phase.at + 1}: {phase.name}. Show only this phase"
                 onclick={() => {
                   discovered.phase = discovered.phase === phase.at ? null : phase.at;

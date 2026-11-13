@@ -213,10 +213,15 @@ test("a step's number on the map picks its row in the panel", async ({ page, can
   await expect(page.locator('.links .link:not(.faded)')).toHaveCount(1);
   await page.keyboard.press('ArrowLeft');
   await expect(bar).toHaveAccessibleName('Step 1.1');
+  // The phase of the step in view is the one marked, and the other phase steps back.
+  const marked = panel.locator('button.phase[aria-pressed="true"]');
+  await expect(marked).toHaveText(/Pay/);
   for (const number of ['1.2', '2.1', '2.2', '2.2']) {
     await page.keyboard.press('ArrowRight');
     await expect(bar).toHaveAccessibleName(`Step ${number}`);
     await expect(row(number)).toHaveAttribute('aria-current', 'true');
+    await expect(marked).toHaveText(number.startsWith('1') ? /Pay/ : /Settle/);
+    await expect(panel.locator('section.dim')).toHaveCount(1);
   }
   // Both ends of the step are brought into the map, clear of the panel.
   const edge = await page.getByLabel('Discover map').evaluate(el => el.getBoundingClientRect().right);
@@ -247,6 +252,8 @@ test("a step's number on the map picks its row in the panel", async ({ page, can
   await page.keyboard.press('Escape');
   await expect(bar).toHaveCount(0);
   await expect(page.locator('.links .link.faded')).toHaveCount(0);
+  await expect(marked).toHaveCount(0);
+  await expect(panel.locator('section.dim')).toHaveCount(0);
 
   // The request, changed in the panel, stays as wide as the panel and grows with its words, not by a handle.
   await panel.getByTitle('Change the request').click();
