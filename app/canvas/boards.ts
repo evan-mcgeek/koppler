@@ -2,6 +2,7 @@
 // board while something runs goes through a Stop and revert first, as leaving a stack does.
 import type { StoredPreset } from '../src/core/presets.ts';
 import { board } from './board.svelte.ts';
+import { appearance } from './appearance.svelte.ts';
 import { runs } from './run.svelte.ts';
 import { toasts } from './toast.svelte.ts';
 import { post, save } from './data.ts';
@@ -100,6 +101,8 @@ export async function savePage(name: string, env?: string, comments = false): Pr
     name,
     ...(env && { env }),
     ...(comments && { comments }),
+    // The page opens in the scheme the canvas is in.
+    scheme: appearance.now.scheme,
   });
   if ('error' in made) {
     toasts.show(`Could not export ${name}. ${made.error}`, 'warning');

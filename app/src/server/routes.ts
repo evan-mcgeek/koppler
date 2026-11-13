@@ -243,13 +243,15 @@ export const ROUTES: Record<string, Route> = {
     return { status: 200, body: result };
   },
   // A feature board as the page `koppler export --board` writes, for the board menu to save: yours first, then the team's.
-  '/board-export': async body => {
+  '/board-export': body => {
     const stack = readStack();
     const name = typeof body['name'] === 'string' ? body['name'] : '';
     if (!stack) return { status: 400, body: { error: 'No stack is in use.' } };
     if (!name) return { status: 400, body: { error: 'Which board?' } };
     const env = typeof body['env'] === 'string' && stack.envs.includes(body['env']) ? body['env'] : undefined;
-    const made = await boardPage(stack, name, undefined, env, body['comments'] === true);
+    const scheme =
+      typeof body['scheme'] === 'string' && /^[a-z]{1,20}$/.test(body['scheme']) ? body['scheme'] : undefined;
+    const made = boardPage(stack, name, undefined, { env, talk: body['comments'] === true, scheme });
     return { status: 'error' in made ? 400 : 200, body: made };
   },
   // A team board changed on the canvas, kept where it lives: in the stack, found by its name there; none takes it out.

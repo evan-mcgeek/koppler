@@ -45,7 +45,7 @@ const stack = {
   ],
 };
 
-test('the exported page shows the flows, walks their steps, and lets cards be moved, with nothing loaded', async ({
+test("the exported page is Discover to read: the flows, their walk-through, cards that move, the reader's scheme, and nothing loaded", async ({
   page,
 }) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-export-'));
@@ -71,46 +71,64 @@ test('the exported page shows the flows, walks their steps, and lets cards be mo
   page.on('pageerror', error => errors.push(error.message));
   await page.goto(`file://${file}`);
 
-  const flows = page.getByRole('navigation', { name: 'Flows' });
-  await expect(flows.getByRole('button')).toHaveText([/Checkout\s*2 steps/, /Browse\s*1 step/]);
-  await expect(page.getByRole('img', { name: 'Web Shop, Service' })).toBeVisible();
-  // An app's description, when the stack has one, says what it does in place of its kind.
-  await expect(page.getByRole('img', { name: 'Orders API, Keeps every order' })).toBeVisible();
-  // The agent's proposal is no step of the flow, and its card is not drawn.
-  await expect(page.locator('.card')).toHaveCount(3);
-  const steps = page.getByRole('complementary', { name: 'Steps' });
+  // Discover itself: the flow's steps on the left, its map, and the bar says it is to read.
+  const header = page.getByRole('banner');
+  await expect(header).toContainText('View only');
+  await expect(header).toContainText('Made with koppler');
+  const steps = page.getByRole('complementary', { name: 'Checkout' });
   await expect(steps).toContainText('A customer pays for the order.');
+  const cards = page.locator('.svelte-flow__node');
+  // The agent's proposal is no step of the flow, and its card is not drawn.
+  await expect(cards).toHaveCount(3);
+  await expect(page.locator('.svelte-flow__node[data-id="search"]')).toHaveCount(0);
+  // Nothing on it changes the flow.
+  for (const name of ['Rename Order', 'Remove Order', 'Comment', 'Add a phase', 'Take step 1.1 off'])
+    await expect(page.getByRole('button', { name, exact: true })).toHaveCount(0);
+  await expect(page.locator('textarea, input[type="text"]')).toHaveCount(0);
   await page.screenshot({ path: 'test-results/export.png' });
 
+  // A picked card says what it does, and nothing of where it runs.
+  await page.locator('.svelte-flow__node[data-id="orders"]').click();
+  const about = page.getByRole('complementary', { name: 'Orders API' });
+  await expect(about).toContainText('Keeps every order');
+  await expect(about).not.toContainText('On GitHub');
+  await expect(page.getByRole('button', { name: 'Plan a run with these' })).toHaveCount(0);
+  await about.getByRole('button', { name: 'Close' }).click();
+
   await steps.getByRole('button', { name: 'Walk through the steps' }).click();
-  const bar = page.getByRole('status', { name: 'Step 1.1' });
-  await expect(bar).toContainText('Web Shop to Orders API: Sends the order');
+  await expect(page.getByRole('status', { name: 'Step 1.1' })).toContainText('Web Shop → Orders API');
   await page.keyboard.press('ArrowRight');
   await expect(page.getByRole('status', { name: 'Step 2.1' })).toContainText('Takes the money');
-  await expect(page.locator('.card.dim')).toHaveCount(1);
+  await expect(steps.locator('button.phase[aria-pressed="true"]')).toHaveText(/Pay/);
   await page.keyboard.press('Escape');
   await expect(page.getByRole('status', { name: /^Step / })).toHaveCount(0);
 
-  // A card moves where it is dragged, and its link follows.
-  const orders = page.getByRole('img', { name: /^Orders API/ });
+  // A card moves where it is dragged, and its links follow.
+  const orders = page.locator('.svelte-flow__node[data-id="orders"]');
   const before = await orders.boundingBox();
-  const link = await page.locator('.link path').first().getAttribute('d');
+  const links = () => page.locator('.links').innerHTML();
+  const drawn = await links();
   if (!before) throw new Error('no Orders API card');
   await page.mouse.move(before.x + 30, before.y + 20);
   await page.mouse.down();
-  await page.mouse.move(before.x + 30, before.y + 120, { steps: 6 });
+  await page.mouse.move(before.x + 30, before.y + 140, { steps: 8 });
   await page.mouse.up();
-  expect((await orders.boundingBox())?.y).toBeGreaterThan(before.y + 60);
-  expect(await page.locator('.link path').first().getAttribute('d')).not.toBe(link);
+  await expect.poll(async () => (await orders.boundingBox())?.y ?? 0).toBeGreaterThan(before.y + 60);
+  expect(await links()).not.toBe(drawn);
 
-  // A flow its author never arranged is laid out for the page.
-  await flows.getByRole('button', { name: /Browse/ }).click();
-  await expect(page.getByRole('img', { name: 'Catalog API, Service' })).toBeInViewport();
+  // The other flow, from the bar; one its author never arranged is laid out for the page.
+  await header.getByRole('button', { name: 'Flows' }).click();
+  await page.getByRole('menuitem', { name: 'Browse' }).click();
+  await expect(page.getByRole('complementary', { name: 'Browse' })).toContainText('A customer looks around.');
+  await expect(page.locator('.svelte-flow__node[data-id="catalog"]')).toBeInViewport();
   await page.screenshot({ path: 'test-results/export-browse.png' });
-  // Zoomed in, the map grows about its middle: the cards there stay in view.
-  await page.getByRole('button', { name: 'Zoom in' }).click();
-  await expect(page.getByRole('img', { name: 'Catalog API, Service' })).toBeInViewport();
-  await expect(page.getByRole('img', { name: 'Web Shop, Service' })).toBeInViewport();
+
+  // The scheme is the reader's to pick, and this browser keeps it.
+  await header.getByRole('button', { name: 'Scheme' }).click();
+  await page.getByRole('menuitem', { name: 'Paper' }).click();
+  await expect(page.locator('html')).toHaveAttribute('data-scheme', 'paper');
+  await page.reload();
+  await expect(page.locator('html')).toHaveAttribute('data-scheme', 'paper');
 
   expect(asked).toEqual([]);
   expect(errors).toEqual([]);

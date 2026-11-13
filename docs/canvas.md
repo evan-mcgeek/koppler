@@ -203,12 +203,14 @@ On a team board the threads are kept in the stack, for the team; on yours, only 
 <img alt="A feature board, Checkout: its steps numbered in two phases on the map and in the panel, and one step the agent proposed, dashed, with Accept and Drop" src="images/feature-board.png">
 
 To show the flows to people who never run Koppler, such as a product team, share the feature boards with the team, then run `koppler export`.
-It writes one page that opens in any browser with nothing to install or load: pick a flow, move its cards about, and walk its steps.
-It holds each flow's request, steps and app names, with an app's description when it has one (its settings' Description, a few words on what it does), and nothing else of the stack: no addresses, settings or code.
+It writes one page that opens in any browser with nothing to install or load: Discover itself, to read, with the flow's steps on the left and its map, where a reader picks another flow from the bar, moves cards about, picks one to see its links, and walks the steps.
+It holds each flow's request, steps, app names and kinds, with an app's description when it has one (its settings' Description, a few words on what it does), and nothing else of the stack: no addresses, settings, files, repos or code.
+Nothing on it changes the flow: no Rename, Remove, Comment or Plan a run.
 Run in the stack repo's CI (`koppler export site/index.html --stack .`), it stays as current as the stack, behind your company's own sign-in.
 To send one feature board, your own or the team's, without sharing it first, pick **Export** in its **…** menu in the board menu: the page of that board alone is saved to your downloads (`koppler export --board "<name>"` writes the same).
 **Share** in Discover's bar does the same for the feature board on screen (it is off on Whole stack): pick the environment the page is about, then **Save the page**.
 The page is a snapshot of today, says **View only**, the environment and the date, and "Made with koppler" in plain words; a picked card shows its description and its steps in the flow, never a host, route or setting, and nothing a viewer does is saved.
+Shared from the canvas, it opens in the canvas's scheme; `koppler export` opens in Mono. The reader picks another in the bar's **Scheme** menu, kept in their browser.
 Share says when you last shared the board from this Mac; share again after changes.
 
 **Plan** shows every field of a card; **Live** shows what runs, with short cards.

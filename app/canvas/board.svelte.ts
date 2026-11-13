@@ -340,6 +340,8 @@ class Board {
   discover = $state.raw<DiscoverState>({ open: [], at: {} });
   /** A feature board's request, phases and steps; null on any other board. */
   feature = $state.raw<Feature | null>(null);
+  /** An exported page: Discover to read, with nothing to change and nowhere to save. */
+  viewOnly = $state(false);
   /** The area the board was put in by hand, by id; null when its apps say. */
   handArea = $state<string | null>(null);
   /** The feature board a run board was planned from in Discover: its Flow chip leads back to it. */

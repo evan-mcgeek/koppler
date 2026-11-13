@@ -50,7 +50,9 @@
   </p>
   <div class="request">
     <span class="label">The request</span>
-    {#if editing}
+    {#if board.viewOnly}
+      <p class="said">“{feature.request}”</p>
+    {:else if editing}
       <!-- svelte-ignore a11y_autofocus -->
       <textarea
         aria-label="The request"
@@ -79,9 +81,9 @@
     {/if}
   </div>
   <p class="uses">
-    Uses {recorded} of the stack's links{steps.length > recorded
-      ? `; ${String(steps.length - recorded)} not in it yet`
-      : ''}.
+    {#if !board.viewOnly}Uses {recorded} of the stack's links{steps.length > recorded
+        ? `; ${String(steps.length - recorded)} not in it yet`
+        : ''}.{/if}
     {#if steps.length}
       <button
         class="text walk"
@@ -92,15 +94,15 @@
         }}>Walk through the steps</button
       >
     {/if}
-    <button
-      class="text walk"
-      type="button"
-      aria-pressed={discovered.commenting}
-      title="Then a click on the card or the step it is about"
-      onclick={() => {
-        discovered.commenting = !discovered.commenting;
-      }}>Comment</button
-    >
+    {#if !board.viewOnly}<button
+        class="text walk"
+        type="button"
+        aria-pressed={discovered.commenting}
+        title="Then a click on the card or the step it is about"
+        onclick={() => {
+          discovered.commenting = !discovered.commenting;
+        }}>Comment</button
+      >{/if}
   </p>
 
   {#each feature.phases as one, at (one.name)}
@@ -133,26 +135,26 @@
                 ><Clock size={12} aria-hidden="true" />{discovered.startsOn(one)}</span
               >{/if}</button
           >
-          <button
-            class="text quiet"
-            type="button"
-            aria-label="Rename {one.name}"
-            onclick={() => {
-              renamed = one.name;
-              renaming = one.name;
-            }}>Rename</button
-          >
-          <button
-            class="text quiet"
-            type="button"
-            aria-label="Remove {one.name}"
-            title={one.steps.length
-              ? 'Take this phase and its steps off the feature'
-              : 'Take this phase off the feature'}
-            onclick={() => {
-              discovered.editFeature({ dropPhase: [one.name] });
-            }}>Remove</button
-          >
+          {#if !board.viewOnly}<button
+              class="text quiet"
+              type="button"
+              aria-label="Rename {one.name}"
+              onclick={() => {
+                renamed = one.name;
+                renaming = one.name;
+              }}>Rename</button
+            >
+            <button
+              class="text quiet"
+              type="button"
+              aria-label="Remove {one.name}"
+              title={one.steps.length
+                ? 'Take this phase and its steps off the feature'
+                : 'Take this phase off the feature'}
+              onclick={() => {
+                discovered.editFeature({ dropPhase: [one.name] });
+              }}>Remove</button
+            >{/if}
         {/if}
       </header>
       {#each steps.filter(step => step.phase === at) as { step, number } (number)}
@@ -170,7 +172,9 @@
             class="at"
             type="button"
             aria-label="Pick the apps of step {number}"
-            title="Pick its two cards, to plan a run with them (Shift adds them to the pick)"
+            title={board.viewOnly
+              ? 'Pick its two cards (Shift adds them to the pick)'
+              : 'Pick its two cards, to plan a run with them (Shift adds them to the pick)'}
             onclick={ev => {
               discovered.picked = [...new Set([...(ev.shiftKey ? discovered.picked : []), step.from, step.to])];
             }}>{number}</button
@@ -217,7 +221,7 @@
               }}>{talks.length}</button
             >
           {/if}
-          {#if !step.proposed}
+          {#if !step.proposed && !board.viewOnly}
             <button
               class="off"
               type="button"
@@ -237,7 +241,7 @@
     <p class="none">No steps yet. Pick a card and add its links as steps.</p>
   {/each}
 
-  {#if adding}
+  {#if board.viewOnly}{:else if adding}
     <form
       class="add"
       onsubmit={ev => {
@@ -438,6 +442,8 @@
     flex: 1;
     gap: 2px;
     min-width: 0;
+    /* A note can hold a path or a long name with no space: it breaks inside the column. */
+    overflow-wrap: anywhere;
   }
   .note {
     color: var(--ink-muted);

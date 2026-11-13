@@ -77,6 +77,7 @@ await buildPage({
 await buildPage({
   root: path.join(app, 'canvas', 'viewer'),
   configFile: path.join(app, 'canvas', 'vite.config.ts'),
+  resolve: { alias: [{ find: /^\.\/elk\.ts$/, replacement: path.join(app, 'canvas', 'viewer', 'elk.ts') }] },
   base: './',
   logLevel: 'warn',
   customLogger: logger,
@@ -85,6 +86,9 @@ await buildPage({
     emptyOutDir: true,
     assetsInlineLimit: () => true,
     modulePreload: false,
+    // Discover itself, in one file opened from disk.
+    chunkSizeWarningLimit: 4096,
+    rolldownOptions: { checks: { bundlerTimings: false } },
   },
 });
 if (warnings.length) {

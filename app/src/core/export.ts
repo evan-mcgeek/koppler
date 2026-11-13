@@ -1,26 +1,19 @@
-// An exported page's data: only the fields named here leave the stack.
+// An exported page's data: the stack cut down to what its Discover draws for the flows, and nothing else of it.
 import type { Point } from './arrange.ts';
-import type { Card } from './discover.ts';
-import { featureCards, featureOf } from './feature.ts';
+import { sourced, type Card } from './discover.ts';
+import { featureCards, featureOf, type Feature } from './feature.ts';
+import { STACK_FORMAT } from './migrations/stack/index.ts';
 import type { Stack } from './stack.ts';
 
-export interface FlowCard {
-  id: Card;
+/** A feature board as the page opens it: its accepted steps, and where its author left the cards. */
+export interface PageBoard extends Record<string, unknown> {
   name: string;
-  /** What it is, for someone who does not build it. */
-  kind: string;
-  /** What it does, when the stack says. */
-  description?: string;
-}
-export interface Flow {
-  name: string;
-  request: string;
-  phases: { name: string; steps: { from: Card; to: Card; number: string; note?: string }[] }[];
-  cards: FlowCard[];
-  /** Where the board's author left the cards that have a place. */
-  at: Record<Card, Point>;
-  /** Its open threads, when the sharer chose to include them: on a card, or on a step by its number. */
-  comments?: { on: { card: Card } | { step: string }; thread: { by: 'you' | 'agent'; text: string }[] }[];
+  version: 1;
+  nodes: Record<string, never>;
+  edges: never[];
+  feature: Feature;
+  /** Where its author left the cards, and the layout Arrange last chose. */
+  discover: { open: never[]; at: Record<Card, Point>; layout?: number };
 }
 export interface Exported {
   stack: string;
@@ -28,87 +21,128 @@ export interface Exported {
   exported: string;
   /** The environment the page was made for, when one board was shared from a canvas. */
   env?: string;
-  flows: Flow[];
+  /** The scheme the page opens in, when shared from a canvas; the reader can pick another. */
+  scheme?: string;
+  /** The stack as the page reads it: the flows' cards by name, kind and what each does, and the links between them. */
+  facts: Record<string, unknown>;
+  boards: PageBoard[];
 }
 
 /** A board as the stack or this Mac keeps it: only its name is sure. */
 type Board = { name: string } & Record<string, unknown>;
+const pick = <T>(from: Record<string, T> | undefined, keep: (id: string) => boolean): Record<string, T> =>
+  Object.fromEntries(Object.entries(from ?? {}).filter(([id]) => keep(id)));
+const map = <T, U>(from: Record<string, T>, to: (value: T, id: string) => U): Record<string, U> =>
+  Object.fromEntries(Object.entries(from).map(([id, value]) => [id, to(value, id)]));
+const some = <T extends object>(value: T) => (Object.keys(value).length ? value : undefined);
 
-/** A card's size on the page, as the layout sees it. */
-export const CARD = { w: 200, h: 60 };
-
-const KIND_WORDS: Record<string, string> = {
-  flutter: 'Mobile app',
-  web: 'Website',
-  lambda: 'Function',
-};
-
-const OUTSIDE = 'Outside service';
-
-/** What a card says under its name: what it does, else its kind; an outside service always says so. */
-export const lineOf = (card: FlowCard): string => (card.kind === OUTSIDE ? OUTSIDE : (card.description ?? card.kind));
-
-function cardOf(stack: Stack, id: Card): FlowCard {
-  if (id.startsWith('queue:')) return { id, name: stack.queues?.[id.slice(6)]?.name ?? id.slice(6), kind: 'Queue' };
-  if (id.startsWith('database:'))
-    return { id, name: stack.databases?.[id.slice(9)]?.name ?? id.slice(9), kind: 'Database' };
-  if (id.startsWith('resource:'))
-    return { id, name: stack.resources?.[id.slice(9)]?.name ?? id.slice(9), kind: 'Storage' };
-  const app = stack.apps[id];
-  return {
-    id,
-    name: app?.name ?? id,
-    kind: app?.outside ? OUTSIDE : (KIND_WORDS[app?.kind ?? ''] ?? 'Service'),
-    ...(app?.description && { description: app.description }),
-  };
-}
-
-/** Each feature board, the team's unless others are given, as a flow: its accepted steps in their phases, and the cards they name. */
-export function flowsOf(stack: Stack, boards: readonly Board[] = stack.presets ?? [], talk = false): Flow[] {
-  return boards.flatMap(preset => {
+/** Each feature board, the team's unless others are given, and the stack as the page needs it for them. */
+export function exportedOf(
+  stack: Stack & { found?: Record<string, Record<string, string>> },
+  given: readonly Board[] = stack.presets ?? [],
+  talk = false,
+): Pick<Exported, 'facts' | 'boards'> {
+  const boards = given.flatMap((preset): PageBoard[] => {
     const feature = featureOf(preset['feature']);
     if (!feature) return [];
-    const accepted = {
-      ...feature,
-      phases: feature.phases.map(phase => ({ ...phase, steps: phase.steps.filter(step => !step.proposed) })),
-    };
-    // Numbered once the phases left with no step are gone, as the page numbers them.
-    const phases = accepted.phases
-      .filter(phase => phase.steps.length)
-      .map((phase, at) => ({
-        name: phase.name,
-        steps: phase.steps.map((step, index) => ({
-          from: step.from,
-          to: step.to,
-          number: `${String(at + 1)}.${String(index + 1)}`,
-          ...(step.note && { note: step.note }),
-        })),
-      }));
-    const cards = featureCards(accepted).map(id => cardOf(stack, id));
-    const saved = (preset['discover'] as { at?: Record<Card, unknown> } | undefined)?.at;
-    const at = Object.fromEntries(
-      cards.flatMap(card => {
-        const point = saved?.[card.id] as Partial<Point> | undefined;
-        return typeof point?.x === 'number' && typeof point.y === 'number'
-          ? [[card.id, { x: point.x, y: point.y }] as const]
-          : [];
-      }),
-    );
-    // Only the words of open threads leave: no ids, no times, and a step's by its number on the page.
-    const numberOf = (ref: { from: Card; to: Card; phase?: string }) =>
-      phases
-        .filter(phase => !ref.phase || phase.name === ref.phase)
-        .flatMap(phase => phase.steps)
-        .find(step => step.from === ref.from && step.to === ref.to)?.number;
+    const phases = feature.phases
+      .map(phase => ({ ...phase, steps: phase.steps.filter(step => !step.proposed) }))
+      .filter(phase => phase.steps.length);
+    // Only the words of open threads leave: no times, and ids that say nothing.
     const comments = (talk ? (feature.comments ?? []) : [])
       .filter(one => !one.resolved)
-      .flatMap(one => {
-        const number = 'step' in one.on ? numberOf(one.on.step) : undefined;
-        const on = 'card' in one.on ? { card: one.on.card } : number ? { step: number } : null;
-        return on ? [{ on, thread: one.thread.map(({ by, text }) => ({ by, text })) }] : [];
-      });
-    return [{ name: preset.name, request: feature.request, phases, cards, at, ...(comments.length && { comments }) }];
+      .map((one, at) => ({
+        id: String(at + 1),
+        on: one.on,
+        thread: one.thread.map(({ by, text }) => ({ by, at: '', text })),
+      }));
+    const accepted: Feature = {
+      request: feature.request,
+      cards: feature.cards,
+      phases,
+      ...(comments.length && { comments }),
+    };
+    const kept = preset['discover'] as { at?: Record<Card, Partial<Point>>; layout?: unknown } | undefined;
+    const saved = kept?.at ?? {};
+    const layout = typeof kept?.layout === 'number' ? { layout: kept.layout } : {};
+    const at = Object.fromEntries(
+      featureCards(accepted).flatMap(card => {
+        const point = saved[card];
+        return typeof point?.x === 'number' && typeof point.y === 'number' ? [[card, { x: point.x, y: point.y }]] : [];
+      }),
+    );
+    return [
+      { name: preset.name, version: 1, nodes: {}, edges: [], feature: accepted, discover: { open: [], at, ...layout } },
+    ];
   });
+  const cards = new Set(boards.flatMap(one => featureCards(one.feature)));
+  const has = (prefix: string) => (id: string) => cards.has(`${prefix}${id}`);
+  const isApp = has('');
+  const apps = map(pick(stack.apps, isApp), app => {
+    const consumes = map(pick(app.consumes, isApp), call =>
+      sourced(call) ? { how: call.how && call.how !== 'unknown' ? call.how : 'env' } : {},
+    );
+    const publishes = map(pick(app.publishes, has('queue:')), () => ({}));
+    const reads = map(pick(app.reads, has('queue:')), () => ({}));
+    const uses = map(pick(app.uses, has('database:')), () => ({}));
+    const buckets = map(pick(app.buckets, has('resource:')), use => ({ access: use.access }));
+    return {
+      name: app.name,
+      kind: app.kind,
+      ...(app.description && { description: app.description }),
+      ...(app.outside && { outside: app.outside }),
+      ...(app.schedule && { schedule: app.schedule }),
+      ...(some(consumes) && { consumes }),
+      ...(some(publishes) && { publishes }),
+      ...(some(reads) && { reads }),
+      ...(some(uses) && { uses }),
+      ...(some(buckets) && { buckets }),
+    };
+  });
+  // Found in the code: that it was, not where.
+  const found = map(pick(stack.found, isApp), calls => map(pick(calls, isApp), () => ''));
+  const queues = map(pick(stack.queues, has('queue:')), queue => {
+    const feeds = map(pick(queue.feeds, has('queue:')), () => ({}));
+    return { name: queue.name, type: queue.type, ...(some(feeds) && { feeds }) };
+  });
+  const databases = map(pick(stack.databases, has('database:')), database => ({
+    ...(database.name && { name: database.name }),
+    ...(database.kind && { kind: database.kind }),
+  }));
+  const resources = map(pick(stack.resources, has('resource:')), resource => {
+    // A route's own words are its path: each is only counted.
+    const routes = Object.fromEntries(
+      Object.values(resource.routes ?? {})
+        .filter(to => cards.has(to))
+        .map((to, at) => [String(at + 1), to]),
+    );
+    const startedBy = (resource.startedBy ?? []).filter(isApp);
+    const steps = (resource.steps ?? []).map(step => ({
+      name: step.name,
+      ...(step.calls && isApp(step.calls) && { calls: step.calls }),
+    }));
+    return {
+      name: resource.name,
+      type: resource.type,
+      ...(some(routes) && { routes }),
+      ...(startedBy.length && { startedBy }),
+      ...(steps.length && { steps }),
+    };
+  });
+  return {
+    boards,
+    facts: {
+      koppler: STACK_FORMAT.version,
+      name: stack.name,
+      envs: stack.envs,
+      apps,
+      ...(some(found) && { found }),
+      ...(some(queues) && { queues }),
+      ...(some(databases) && { databases }),
+      ...(some(resources) && { resources }),
+      presets: boards,
+    },
+  };
 }
 
 /** A board to export by name: its exact name first, then ignoring case; your own before the team's either way. */
@@ -126,18 +160,6 @@ export function boardNamed<B extends Board>(
   if (!featureOf(board['feature']))
     return { error: `${board.name} is not a feature board: only a feature board has steps to put in the page` };
   return { board };
-}
-
-/** Cards with no place yet go in a row under the placed ones, so the author's arrangement stays as it is. */
-export function placeRest(flow: Flow): Record<Card, Point> {
-  const placed = Object.values(flow.at);
-  const left = Math.min(...placed.map(point => point.x));
-  const below = Math.max(...placed.map(point => point.y)) + CARD.h + 80;
-  const rest = flow.cards.filter(card => !flow.at[card.id]);
-  return {
-    ...flow.at,
-    ...Object.fromEntries(rest.map((card, index) => [card.id, { x: left + index * (CARD.w + 60), y: below }])),
-  };
 }
 
 /** The page's file name, from the stack's name. */

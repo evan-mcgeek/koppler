@@ -40,6 +40,11 @@ test.use({
 test('Share is off on the whole stack, and saves a feature board as a view-only page for the environment picked', async ({
   page,
 }, testInfo) => {
+  // The canvas is in a light scheme: the page opens in it.
+  await page.evaluate(() => {
+    localStorage.setItem('koppler-appearance', JSON.stringify({ scheme: 'blueprint' }));
+  });
+  await page.reload();
   await expect(card(page, 'web')).toBeVisible();
   await page.keyboard.press('ControlOrMeta+1');
   const share = page.getByRole('banner').getByRole('button', { name: 'Share', exact: true });
@@ -73,11 +78,13 @@ test('Share is off on the whole stack, and saves a feature board as a view-only 
   await expect(header).toContainText('View only');
   await expect(header).toContainText(/PROD · \w/);
   await expect(header).toContainText('Made with koppler');
+  await expect(page.locator('html')).toHaveAttribute('data-scheme', 'blueprint');
   // A picked card says what it is and its part in the flow, with no host.
-  await page.locator('.card[data-id="orders"]').click();
-  const about = page.getByRole('region', { name: 'Orders API' });
+  await page.locator('.svelte-flow__node[data-id="orders"]').click();
+  const about = page.getByRole('complementary', { name: 'Orders API' });
   await expect(about).toContainText('Takes the order and keeps it');
-  await expect(about.locator('li')).toHaveText(['Step 1.1: called by Web Shop', 'Step 1.2: calls Payments API']);
+  await expect(about).toContainText('Web Shop');
+  await expect(about).toContainText(/Step\s+1\.1/);
   await expect(page.locator('body')).not.toContainText('orders.prod.acme.example');
   await page.screenshot({ path: 'test-results/share-viewer.png' });
 });

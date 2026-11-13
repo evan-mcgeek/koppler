@@ -156,7 +156,10 @@ test('Share leaves comments out unless asked, and the page shows them to read on
   await (await saving).saveAs(file);
   await page.route('**/*', route => (route.request().url().startsWith('file:') ? route.continue() : route.abort()));
   await page.goto(`file://${file}`);
-  await page.locator('.card[data-id="orders"]').click();
-  await expect(page.getByRole('region', { name: 'Orders API' })).toContainText('Does it keep the basket?');
+  await page.getByRole('button', { name: '1 comment on Orders API' }).click();
+  const read = page.getByRole('complementary', { name: 'Comment on Orders API' });
+  await expect(read).toContainText('Does it keep the basket?');
+  // To read only: no reply, no Resolve.
   await expect(page.getByRole('textbox')).toHaveCount(0);
+  await expect(read.getByRole('button', { name: 'Resolve' })).toHaveCount(0);
 });

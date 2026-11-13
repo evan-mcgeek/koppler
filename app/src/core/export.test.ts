@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { boardNamed, fileNameOf, flowsOf, lineOf, placeRest } from './export.ts';
+import { boardNamed, exportedOf, fileNameOf } from './export.ts';
 import type { Stack } from './stack.ts';
 
 const app = (name: string, extra: object = {}) => ({ name, kind: 'node', slug: `acme/${name}`, ...extra });
@@ -61,54 +61,58 @@ const stack = {
   ],
 } as unknown as Stack;
 
-describe('flowsOf', () => {
-  it("gives each team feature board as a flow: its steps without the agent's proposals, its cards named in plain words", () => {
-    const [checkout] = flowsOf(stack);
-    expect(checkout).toEqual({
+describe('exportedOf', () => {
+  const { facts, boards } = exportedOf(stack);
+  const apps = facts['apps'] as Record<string, Record<string, unknown>>;
+
+  it("gives each feature board with its steps but the agent's proposals, and where its author left the cards", () => {
+    expect(boards.map(one => one.name)).toEqual(['Checkout', 'Refund']);
+    expect(boards[0]).toEqual({
       name: 'Checkout',
-      request: 'A customer pays for the order.',
-      phases: [
-        {
-          name: 'Pay',
-          steps: [
-            { from: 'shop', to: 'orders', number: '1.1', note: 'Sends the order' },
-            { from: 'orders', to: 'queue:events', number: '1.2' },
-          ],
-        },
-      ],
-      cards: [
-        { id: 'shop', name: 'Mobile App', kind: 'Mobile app' },
-        { id: 'orders', name: 'Orders API', kind: 'Service', description: 'Keeps every order' },
-        { id: 'queue:events', name: 'Order events', kind: 'Queue' },
-      ],
-      at: { shop: { x: 0, y: 0 }, orders: { x: 300, y: 0 }, 'queue:events': { x: 600, y: 0 } },
+      version: 1,
+      nodes: {},
+      edges: [],
+      feature: {
+        request: 'A customer pays for the order.',
+        cards: [],
+        phases: [
+          {
+            name: 'Pay',
+            steps: [
+              { from: 'shop', to: 'orders', kind: 'call', note: 'Sends the order' },
+              { from: 'orders', to: 'queue:events', kind: 'publish' },
+            ],
+          },
+        ],
+      },
+      discover: { open: [], at: { shop: { x: 0, y: 0 }, orders: { x: 300, y: 0 }, 'queue:events': { x: 600, y: 0 } } },
     });
+    // A phase left with no step goes.
+    expect(boards[1]?.feature.phases.map(phase => phase.name)).toEqual(['R']);
+    expect(boards[1]?.discover.at).toEqual({});
   });
 
-  it('leaves out boards that are no feature, phases with no step left, and places the board does not have', () => {
-    const flows = flowsOf(stack);
-    expect(flows.map(flow => flow.name)).toEqual(['Checkout', 'Refund']);
-    expect(flows[1]?.at).toEqual({});
-    // A phase left with no step goes, and the next is numbered as the page shows it.
-    expect(flows[1]?.phases.map(phase => [phase.name, phase.steps[0]?.number])).toEqual([['R', '1.1']]);
-    expect(flows[1]?.cards.find(card => card.id === 'psp')?.kind).toBe('Outside service');
+  it('keeps the layout Arrange last chose for a board', () => {
+    const laid = { name: 'Laid', feature: stack.presets?.[1]?.['feature'], discover: { open: [], at: {}, layout: 1 } };
+    expect(exportedOf(stack, [laid]).boards[0]?.discover).toEqual({ open: [], at: {}, layout: 1 });
   });
 
-  it('carries no address, secret, setting or path of the stack', () => {
-    const text = JSON.stringify(flowsOf(stack));
-    for (const kept of ['localhost', 'acme.example', 'ORDERS_DB', 'PSP_URL', 'acme/', 'flutter', 'dotnet'])
-      expect(text).not.toContain(kept);
-  });
-
-  it('keeps the places the author gave, and puts a card added since in a row below', () => {
-    const [checkout] = flowsOf(stack);
-    if (!checkout) throw new Error('no Checkout');
-    const { orders: _, ...partial } = checkout.at;
-    expect(placeRest({ ...checkout, at: partial })).toEqual({
-      shop: { x: 0, y: 0 },
-      'queue:events': { x: 600, y: 0 },
-      orders: { x: 0, y: 140 },
+  it("holds only the flows' cards, by name, kind and what each does, and the links between them", () => {
+    expect(Object.keys(apps)).toEqual(['shop', 'orders', 'psp']);
+    expect(apps['orders']).toEqual({
+      name: 'Orders API',
+      kind: 'dotnet',
+      description: 'Keeps every order',
+      consumes: { psp: { how: 'env' } },
     });
+    expect(apps['psp']).toEqual({ name: 'Payment provider', kind: 'node', outside: 'hosted' });
+    expect(facts['queues']).toEqual({ events: { name: 'Order events', type: 'sqs' } });
+    expect(facts).toMatchObject({ name: 'Acme Shop', envs: ['qa'], presets: boards });
+  });
+
+  it('carries no address, secret, setting, file or repo of the stack', () => {
+    const text = JSON.stringify(exportedOf(stack));
+    for (const kept of ['localhost', 'acme.example', 'ORDERS_DB', 'PSP_URL', 'acme/']) expect(text).not.toContain(kept);
   });
 });
 
@@ -137,9 +141,9 @@ describe('boardNamed', () => {
     });
   });
 
-  it("gives one flow for the board found, your own as well as the team's", () => {
+  it("gives the board found, your own as well as the team's, as the page's one board", () => {
     const found = boardNamed([mine], team, 'Refund');
-    expect('board' in found && flowsOf(stack, [found.board]).map(flow => flow.name)).toEqual(['Refund']);
+    expect('board' in found && exportedOf(stack, [found.board]).boards.map(one => one.name)).toEqual(['Refund']);
   });
 });
 
@@ -147,17 +151,5 @@ describe('fileNameOf', () => {
   it('names the page after the stack, in plain letters', () => {
     expect(fileNameOf('Acme Shop')).toBe('acme-shop-flows.html');
     expect(fileNameOf('  ** ')).toBe('stack-flows.html');
-  });
-});
-
-describe('lineOf', () => {
-  it('says what a card does in place of its kind, and an outside service stays one', () => {
-    expect(lineOf({ id: 'orders', name: 'Orders API', kind: 'Service', description: 'Keeps every order' })).toBe(
-      'Keeps every order',
-    );
-    expect(lineOf({ id: 'web', name: 'Web Shop', kind: 'Website' })).toBe('Website');
-    expect(lineOf({ id: 'psp', name: 'Payments', kind: 'Outside service', description: 'Takes card payments' })).toBe(
-      'Outside service',
-    );
   });
 });
