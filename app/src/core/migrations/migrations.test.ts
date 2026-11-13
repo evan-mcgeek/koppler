@@ -478,5 +478,5 @@ test('0.5.2: an app of kind other that is a GitHub Actions workflow becomes kind
     koppler: '0.5.2',
     apps: { ...old.apps, sync: { ...old.apps.sync, kind: 'workflow' } },
   });
-  expect(migrateStack(done.value).applied).toEqual([]);
+  expect(migrateStack({ ...done.value }).applied).toEqual([]);
 });
