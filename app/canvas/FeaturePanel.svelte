@@ -13,7 +13,7 @@
   const VERB: Record<string, string> = {
     call: 'calls',
     publish: 'publishes to',
-    read: 'reads',
+    read: 'is read by',
     uses: 'uses',
     feeds: 'feeds',
     bucket: 'uses',

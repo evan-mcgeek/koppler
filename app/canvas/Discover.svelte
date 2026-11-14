@@ -52,7 +52,7 @@
       untrack(
         () =>
           void flow.fitView({
-            nodes: [{ id: step.from }, { id: step.to }],
+            nodes: discovered.endsOf(step).map(id => ({ id })),
             duration: 200,
             maxZoom: flow.getZoom(),
             padding: 0.3,
@@ -92,12 +92,10 @@
   /** A phase picked: the cards of its steps; the rest dim. */
   const inPhase = $derived.by(() => {
     const phase = discovered.shownPhase === null ? undefined : board.feature?.phases[discovered.shownPhase];
-    return phase ? new Set(phase.steps.flatMap(step => [step.from, step.to])) : null;
+    return phase ? new Set(phase.steps.flatMap(step => discovered.endsOf(step))) : null;
   });
   /** Walking through the steps: the two cards of the step on screen; the rest dim. */
-  const walking = $derived(
-    discovered.current ? new Set([discovered.current.step.from, discovered.current.step.to]) : null,
-  );
+  const walking = $derived(discovered.current ? new Set(discovered.endsOf(discovered.current.step)) : null);
   // What the flow measured and where a card is while it is dragged: kept across redraws so fitting sees every card.
   let flowState = $state.raw<Record<Card, Node>>({});
   /** Where a card is: where it is being dragged, else where it was put. */
@@ -218,12 +216,13 @@
     const taken: Record<Card, number> = {};
     return (board.feature?.phases ?? []).flatMap((phase, at) => {
       const first = phase.steps[0];
-      const where = first && box(first.from);
-      if (!first || !where) return [];
+      const from = first && discovered.endsOf(first)[0];
+      const where = from && box(from);
+      if (!from || !where) return [];
       const when = discovered.startsOn(phase);
       const width = (nameWidths[at] ?? phase.name.length * 8.5 + (when ? when.length * 7.2 + 30 : 0)) + 34;
-      const x = where.x + (taken[first.from] ?? 0);
-      taken[first.from] = x - where.x + width + 8;
+      const x = where.x + (taken[from] ?? 0);
+      taken[from] = x - where.x + width + 8;
       return [{ at, name: phase.name, when, width, x, y: where.y - 30 }];
     });
   });
@@ -982,7 +981,7 @@ Schedule on {lastData.job.env.toUpperCase()}. Every environment in Settings"
                         >Step{numbers.length > 1 ? 's' : ''}
                         {numbers.join(', ')}{step.step.proposed ? ', proposed' : ''}</span
                       >{:else}<span>Not in this feature</span>
-                      {#if !board.viewOnly}<button
+                      {#if !board.viewOnly && !link.through}<button
                           class="text"
                           type="button"
                           onclick={() => {
@@ -993,7 +992,7 @@ Schedule on {lastData.job.env.toUpperCase()}. Every environment in Settings"
                 {/if}
                 {#if board.viewOnly}{#if link.sure === 'found'}<span class="detail"
                       ><span>Found in code, not confirmed</span></span
-                    >{/if}{:else if link.sure === 'found' && !discovered.stepOf(link)?.step.proposed}
+                    >{/if}{:else if link.sure === 'found' && !link.through && !discovered.stepOf(link)?.step.proposed}
                   <span class="detail">
                     <span>Found in code, not confirmed</span>
                     <button class="text" type="button" onclick={() => void discovered.confirm(link)}>Confirm</button>
