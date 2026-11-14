@@ -134,3 +134,80 @@ test("the exported page is Discover to read: the flows, their walk-through, card
   expect(errors).toEqual([]);
   fs.rmSync(dir, { recursive: true, force: true });
 });
+
+test('the Show menu hides the cards of a flow on the exported page, and its steps run on through them', async ({
+  page,
+}) => {
+  const queued = {
+    ...STACK,
+    queues: { 'order-events': { name: 'Order events', type: 'sqs', queue: 'order-events-qa' } },
+    apps: {
+      ...STACK.apps,
+      orders: { ...STACK.apps.orders, consumes: {}, publishes: { 'order-events': {} } },
+      payments: { ...STACK.apps.payments, reads: { 'order-events': {} } },
+    },
+    presets: [
+      {
+        name: 'Checkout',
+        version: 1,
+        nodes: {},
+        edges: [],
+        feature: {
+          request: 'A customer pays for the order.',
+          cards: [],
+          phases: [
+            {
+              name: 'Order',
+              steps: [
+                step('web', 'orders'),
+                { ...step('orders', 'queue:order-events', 'Says it is placed'), kind: 'publish' },
+                { ...step('queue:order-events', 'payments'), kind: 'read' },
+              ],
+            },
+          ],
+        },
+      },
+    ],
+  };
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-export-'));
+  fs.writeFileSync(path.join(dir, 'stack.json'), JSON.stringify(queued));
+  const file = path.join(dir, 'flows.html');
+  const made = spawnSync(process.execPath, [entry, 'export', file, '--stack', dir], { encoding: 'utf8' });
+  expect(made.status, made.stderr).toBe(0);
+  await page.goto(`file://${file}`);
+
+  const queue = page.locator('.svelte-flow__node[data-id="queue:order-events"]');
+  await expect(queue).toBeVisible();
+  await page.getByRole('button', { name: 'Show: All' }).click();
+  await page
+    .getByRole('dialog', { name: 'Kinds of card to see' })
+    .getByRole('checkbox', { name: /^Queues/ })
+    .uncheck();
+  await page.keyboard.press('Escape');
+  await expect(queue).toHaveCount(0);
+  const through = page.locator('.link.through[data-link="orders>payments>publish"]');
+  await expect(through).toHaveCount(1);
+
+  // The step into the hidden queue is walked on the dotted link, its two cards in view.
+  await page
+    .getByRole('complementary', { name: 'Checkout' })
+    .getByRole('button', { name: 'Walk through the steps' })
+    .click();
+  await page.keyboard.press('ArrowRight');
+  await expect(page.getByRole('status', { name: 'Step 1.2' })).toContainText('Says it is placed');
+  await expect(page.getByRole('complementary', { name: 'Checkout' })).toContainText(
+    /Order events\s*is read by Payments API/,
+  );
+  await expect(through).not.toHaveClass(/faded/);
+  for (const card of ['orders', 'payments'])
+    await expect(page.locator(`.svelte-flow__node[data-id="${card}"]`)).not.toHaveClass(/dimmed/);
+  await expect(page.locator('.svelte-flow__node[data-id="web"]')).toHaveClass(/dimmed/);
+  await page.screenshot({ path: 'test-results/export-hidden.png' });
+
+  // Kept in this browser for this stack's pages.
+  await page.reload();
+  await expect(page.locator('.svelte-flow__node[data-id="orders"]')).toBeVisible();
+  await expect(queue).toHaveCount(0);
+  expect(await page.evaluate(() => localStorage.getItem('koppler-hidden:export:Acme Shop'))).toBe('["queue"]');
+  fs.rmSync(dir, { recursive: true, force: true });
+});

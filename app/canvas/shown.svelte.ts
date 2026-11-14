@@ -2,13 +2,15 @@
 import { board } from './board.svelte.ts';
 
 const key = (dir: string) => `koppler-hidden:${dir}`;
+/** The stack's folder; an exported page has none, so its stack's name. */
+const stack = () => board.dir || `export:${board.facts?.name ?? ''}`;
 
 class Hidden {
   #by = $state<Record<string, string[]>>({});
 
   /** The filters hidden in this stack: a category such as `outside`, or a queue type such as `queue:kafka`. */
   get ids(): string[] {
-    const dir = board.dir;
+    const dir = stack();
     if (dir in this.#by) return this.#by[dir] ?? [];
     try {
       const raw: unknown = JSON.parse(localStorage.getItem(key(dir)) ?? '[]');
@@ -19,9 +21,10 @@ class Hidden {
     }
   }
   set(ids: string[]): void {
-    this.#by = { ...this.#by, [board.dir]: ids };
+    const dir = stack();
+    this.#by = { ...this.#by, [dir]: ids };
     try {
-      localStorage.setItem(key(board.dir), JSON.stringify(ids));
+      localStorage.setItem(key(dir), JSON.stringify(ids));
     } catch {
       // Not remembered where the browser keeps nothing.
     }

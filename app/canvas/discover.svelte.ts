@@ -66,6 +66,12 @@ const QUEUE_TAGS: Record<string, [string, string]> = {
 const RESOURCE_TAGS: Record<string, string> = { s3: 'S3', apigw: 'APIGW', sfn: 'SFN' };
 const counted = (n: number, one: string) => `${String(n)} ${one}${n === 1 ? '' : 's'}`;
 
+/** Whether a link on the map draws the step: it is the link, or one hop of it through hidden cards. */
+const carries = (link: Pick<Link, 'from' | 'to' | 'through'>, step: { from: Card; to: Card }) => {
+  const path = [link.from, ...(link.through ?? []), link.to];
+  return path.some((card, at) => card === step.from && path[at + 1] === step.to);
+};
+
 class Discovered {
   /** The board's own cards: its apps, and the outside systems put on it by hand. */
   #own = $derived([...board.nodes.map(node => node.id), ...board.pinned]);
@@ -79,12 +85,12 @@ class Discovered {
       this.#always,
     ),
   );
-  /** The map with the kinds of card hidden in the Show menu taken off, but the board's own. */
+  /** The map with the kinds of card hidden in the Show menu taken off. */
   map = $derived.by(() => {
     const facts = board.facts;
     const all = this.#all;
     if (!facts || !hidden.ids.length) return all;
-    return withoutHidden(all, card => !this.#always.includes(card) && hides(facts, hidden.ids, card));
+    return withoutHidden(all, card => hides(facts, hidden.ids, card));
   });
   /** The map: the whole stack, or a feature's cards and what was brought in from each opened card. */
   #all = $derived.by(() => {
@@ -107,12 +113,17 @@ class Discovered {
   });
   /** The feature's steps, numbered, in order. */
   steps = $derived(board.feature ? numbered(board.feature) : []);
-  /** A link's steps: one link can be a step in several phases. */
-  stepsOf(link: { from: Card; to: Card }): Numbered[] {
-    return this.steps.filter(one => one.step.from === link.from && one.step.to === link.to);
+  /** A link's steps: one link can be a step in several phases, and one through hidden cards carries each hop. */
+  stepsOf(link: Pick<Link, 'from' | 'to' | 'through'>): Numbered[] {
+    return this.steps.filter(one => carries(link, one.step));
+  }
+  /** The two cards on the map a step is drawn between: its own, or the ends of the link through its hidden ones. */
+  endsOf(step: { from: Card; to: Card }): [Card, Card] {
+    const link = this.map.links.find(one => carries(one, step));
+    return link ? [link.from, link.to] : [step.from, step.to];
   }
   /** The link's step to show: the picked one, else the one in the picked phase, else its first. */
-  stepOf(link: { from: Card; to: Card }): Numbered | undefined {
+  stepOf(link: Pick<Link, 'from' | 'to' | 'through'>): Numbered | undefined {
     const all = this.stepsOf(link);
     return (
       all.find(one => one.number === this.current?.number) ?? all.find(one => one.phase === this.shownPhase) ?? all[0]
