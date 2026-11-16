@@ -204,6 +204,28 @@ test('the Show menu hides the cards of a flow on the exported page, and its step
   await expect(page.locator('.svelte-flow__node[data-id="web"]')).toHaveClass(/dimmed/);
   await page.screenshot({ path: 'test-results/export-hidden.png' });
 
+  // Every kind hidden: still this flow, its steps and the Show menu, never a new board to plan.
+  await page.getByRole('button', { name: 'Show: 1 of 2' }).click();
+  await page
+    .getByRole('dialog', { name: 'Kinds of card to see' })
+    .getByRole('checkbox', { name: /^Services/ })
+    .uncheck();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.svelte-flow__node')).toHaveCount(0);
+  await expect(page.getByRole('status').filter({ hasText: 'Every card here is hidden' })).toBeVisible();
+  await expect(page.getByRole('complementary', { name: 'Checkout' })).toContainText('A customer pays for the order.');
+  await expect(page.getByText('New feature board')).toHaveCount(0);
+  await expect(page.getByText('Ask about Acme Shop')).toHaveCount(0);
+  await page.screenshot({ path: 'test-results/export-all-hidden.png' });
+  await page.getByRole('button', { name: 'Show everything' }).click();
+  await expect(page.locator('.svelte-flow__node[data-id="orders"]')).toBeVisible();
+  await page.getByRole('button', { name: 'Show: All' }).click();
+  await page
+    .getByRole('dialog', { name: 'Kinds of card to see' })
+    .getByRole('checkbox', { name: /^Queues/ })
+    .uncheck();
+  await page.keyboard.press('Escape');
+
   // Kept in this browser for this stack's pages.
   await page.reload();
   await expect(page.locator('.svelte-flow__node[data-id="orders"]')).toBeVisible();

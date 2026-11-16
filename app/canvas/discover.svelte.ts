@@ -92,6 +92,10 @@ class Discovered {
     if (!facts || !hidden.ids.length) return all;
     return withoutHidden(all, card => hides(facts, hidden.ids, card));
   });
+  /** Whether the map has cards before the Show menu hides any: with none, the board itself is empty. */
+  get hasCards(): boolean {
+    return this.#all.cards.length > 0;
+  }
   /** The map: the whole stack, or a feature's cards and what was brought in from each opened card. */
   #all = $derived.by(() => {
     const facts = board.facts;

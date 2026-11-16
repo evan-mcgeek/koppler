@@ -67,6 +67,19 @@ test('the Show menu hides whole kinds of card, a queue type on its own, and keep
   await expect(card(page, 'billing')).toHaveCount(0);
   await expect(card(page, 'queue:order-events')).toHaveCount(0);
 
+  // Every kind hidden: the stack is not empty, the map says so, and one click brings it all back.
+  await page.getByRole('button', { name: 'Show: 3 of 4' }).click();
+  const kinds = page.getByRole('dialog', { name: 'Kinds of card to see' });
+  for (const kind of [/^Services/, /^Jobs/, /^Queues/]) await kinds.getByRole('checkbox', { name: kind }).uncheck();
+  await page.keyboard.press('Escape');
+  await expect(page.getByText('No apps in this stack')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Show everything' }).click();
+  await expect(card(page, 'billing')).toBeVisible();
+  await page.getByRole('button', { name: 'Show: All' }).click();
+  for (const kind of [/^SQS/, /Outside systems/])
+    await page.getByRole('dialog', { name: 'Kinds of card to see' }).getByRole('checkbox', { name: kind }).uncheck();
+  await page.keyboard.press('Escape');
+
   // Everything back.
   await page.getByRole('button', { name: 'Show: 3 of 4' }).click();
   await page
