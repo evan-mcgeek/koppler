@@ -25,6 +25,7 @@ This folder keeps what came out of it, so the design travels with the code.
 | [Collapsible card](images/collapsible-card.png)               | An open card that fits the screen: sections that fold to one line ([#709](https://github.com/evan-mcgeek/koppler/issues/709))                                             |
 | [Board list](images/board-list.png)                           | The board menu as one list by area, with a Team tag on the team's boards                                                                                                  |
 | [Discover and Run](images/discover-and-run.png)               | Two front doors on one base: the doors, Discover's home, a feature board, crossing over, sharing and comments ([#715](https://github.com/evan-mcgeek/koppler/issues/715)) |
+| [Steps panel](images/steps-panel.png)                         | A flow you can read: a step's summary, values and the agent's note, phases that fold, the exported page ([#751](https://github.com/evan-mcgeek/koppler/issues/751))       |
 
 The mark is `sources/KopplerMark.dc.html`; the canvas draws it in `app/canvas/Mark.svelte` and `app/canvas/public/favicon.svg`.
 Names, hosts and apps in these files are examples (Acme Shop), not anyone's real stack.
