@@ -69,7 +69,7 @@
   };
   // The map refits when it gains cards, once each is placed, or the panel takes or gives back its room; a map not
   // shown never answers.
-  const shown = $derived(map.cards.length > 0);
+  const shown = $derived(discovered.hasCards);
   const placed = $derived(map.cards.every(({ card }) => discovered.positions[card]));
   // Read when the refit is due, after the wait, not as it was asked.
   const stillShown = () => shown;
@@ -487,7 +487,7 @@
 <div class="discover">
   <!-- On the left: a feature board's steps, else the home of the whole stack and the feature boards. -->
   {#if !board.present}
-    {#if board.feature && map.cards.length}<FeaturePanel feature={board.feature} />{:else}<DiscoverHome />{/if}
+    {#if board.feature && shown}<FeaturePanel feature={board.feature} />{:else}<DiscoverHome />{/if}
   {/if}
   <div
     class="map"
@@ -685,6 +685,20 @@
         <Panel position="top-right">
           <ShowFilter />
         </Panel>
+        {#if !map.cards.length}
+          <Panel position="top-center">
+            <p class="all-hidden" role="status">
+              Every card here is hidden.
+              <button
+                class="text"
+                type="button"
+                onclick={() => {
+                  hidden.set([]);
+                }}>Show everything</button
+              >
+            </p>
+          </Panel>
+        {/if}
         <Panel position="bottom-center">
           <BoardTools
             tool={tools.tool}
@@ -1154,6 +1168,17 @@ Schedule on {lastData.job.env.toUpperCase()}. Every environment in Settings"
   }
   .link.found .wire {
     stroke-dasharray: 5 4;
+  }
+  .all-hidden {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    margin: 0;
+    padding: 8px 12px;
+    border: 1px solid var(--line);
+    background: var(--panel);
+    color: var(--ink);
+    font: 400 13px var(--sans);
   }
   .link.through .wire,
   .legend .dots {
