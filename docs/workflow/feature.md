@@ -5,7 +5,7 @@ Each ends on its done-when line; reach it before moving on.
 
 ## 1. Start
 
-- The feature has an issue. If not, draft one (what the user wants and why, in a few lines), show it, and file it on a yes with the label `enhancement`, plus `roadmap` when it is planned work.
+- The feature has an issue. If not, draft one (what the user wants and why, in a few lines) and show it. File it on a yes with the label `enhancement`, plus `roadmap` when it is planned work.
 - Move its card to In Progress.
 - Branch off `origin/main` as `feat/<short-name>`. When an open PR touches the same files, build on top of it or wait for its merge.
 
@@ -20,12 +20,14 @@ Done when: you can name every file the change touches and every place the same b
 
 ## 3. Grill, when anything is open
 
-The feature is clear when the issue or the user already says what it does, where it shows, and how it behaves at its edges, and the code leaves one obvious way to build it.
+The feature is clear when the issue or the user already says what it does, where it shows, and how it behaves at its edges.
+Also, the code leaves one obvious way to build it.
 Then skip this step and say why in one line ("Clear: the issue settles X and Y").
 
 Otherwise, run the `grilling` and `domain-modeling` skills until every open decision is settled.
 Facts come from the code and the stack; only decisions go to the user, each with your recommended answer.
-Put each round on a `lavish` page when its answers have options to compare (layouts, flows, data shapes, a before and after); plain yes-or-no rounds stay in the chat.
+Put each round on a `lavish` page when its answers have options to compare (layouts, flows, data shapes, a before and after).
+Plain yes-or-no rounds stay in the chat.
 New terms go in `GLOSSARY.md`; a decision that is hard to reverse becomes an ADR.
 When in doubt whether it is clear, ask one short round: it costs less than building the wrong thing.
 
@@ -34,7 +36,7 @@ Done when: no decision is left open and the user confirms it, or the one-line re
 ## 4. Size
 
 - Fits one session: go to step 5.
-- Spans several sessions: write the spec into the issue and split it into tracer-bullet issues, each naming the issues that block it. Show the spec and the issues as one `lavish` page (the issues and what blocks what), file them on a yes, then build them one by one through this file.
+- Spans several sessions: write the spec into the issue and split it into tracer-bullet issues, each naming the issues that block it. Show the spec and the issues as one `lavish` page (the issues and what blocks what). File them on a yes, then build them one by one through this file.
 - Needs a new look (a new screen, a new control, a changed visual): brief Claude Design. Until the design comes back, build with the existing components and list the open design questions in the PR.
 
 ## 5. Build test-first
@@ -65,9 +67,12 @@ Fix each finding you can confirm in the code; say why you skipped the others.
 
 ## 8. Ship
 
-Commit, push, and open the PR with the `pr` skill: `Closes #<issue>`, what changed, how it was tested, and a line per step of this file with its result (or why it was skipped).
+Commit, push, and open the PR with the `pr` skill.
+The PR holds `Closes #<issue>`, what changed, and how it was tested.
+It also holds a line per step of this file with its result (or why it was skipped).
 Wait for the PR's CI (`gh pr checks <n> --watch`); merge, or give the user the merge command, only when every check passed and step 7 is done.
 A failed check, even a flake, is fixed first (`docs/workflow/bugs.md`).
 After the merge, move the card to Testing, and check the change in the user's running canvas (`koppler-merged-canvas-change-live-check`).
 
-When the user said to build several features, run this file for each in turn and report once at the end on a `lavish` page: one row per PR with a screenshot of the change, and what to try together.
+When the user said to build several features, run this file for each in turn.
+Report once at the end on a `lavish` page: one row per PR with a screenshot of the change, and what to try together.

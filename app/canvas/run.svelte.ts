@@ -535,7 +535,7 @@ class Runs {
       `BOARD ${board}`,
       `COMMENT ${id}, on ${about}`,
       `TEXT ${text}`,
-      `Look into it in the stack and its repos. Answer with koppler board edit "${board}" --reply ${id}="<your answer>". When the answer is a step the feature misses, add --phase "<phase>" --propose-step <from>:<to>="<note>" --summary <from>:<to>="<summary>" to the same command: it is drawn dashed until the user keeps or undoes it. Never change the stack yourself.`,
+      `Look into it in the stack and its repos. Answer with koppler board edit "${board}" --reply ${id}="<your answer>". When the answer is a step the feature misses, add --phase "<phase>" --propose-step <from>:<to>="<note>" --summary <from>:<to>="<summary>" to the same command. It is drawn dashed until the user keeps or undoes it. Never change the stack yourself.`,
     ].join('\n');
     return this.deliver(said, { tag: 'koppler-comment', data: { board, comment: id } }, 'Sent to the agent');
   }
@@ -733,7 +733,7 @@ class Runs {
           ]
         : [],
       ok: running ? 'Stop and revert' : 'Revert',
-      text: 'Stop and revert this stack using the koppler:plan skill: stop every process the agent started (apps, tunnels, background tasks; leave anything started from an IDE or by me) and revert every temporary code change (do-not-commit edits and added launch profiles). Report what was stopped and reverted.',
+      text: 'Stop and revert this stack using the koppler:plan skill. Stop every process the agent started: apps, tunnels and background tasks. Leave anything started from an IDE or by me. Revert every temporary code change: do-not-commit edits and added launch profiles. Report what was stopped and reverted.',
       sent: 'Stopping and reverting',
     });
   }

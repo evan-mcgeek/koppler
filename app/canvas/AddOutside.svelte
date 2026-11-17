@@ -51,7 +51,7 @@
   <button class="x" type="button" aria-label="Close" onclick={() => dialog?.close()}><Icon of={X} size={14} /></button>
   <h2 id="outside-title">Add an outside system</h2>
   <p class="sub">
-    A service that never runs on this Mac, such as a payment provider or a SaaS API: your apps call it, or it calls them
+    A service that never runs on this Mac, such as a payment provider or a SaaS API. Your apps call it, or it calls them
     (a webhook).
   </p>
   <form onsubmit={add}>

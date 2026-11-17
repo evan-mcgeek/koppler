@@ -9,7 +9,11 @@ npm install -g koppler
 Koppler needs macOS or Linux, git and Node 22 or newer.
 Until it is on npm, install it from a clone: `npm install -g ./koppler/app`.
 The [agent add-on](../README.md#the-agent-add-on) is optional.
-For Tab completion of every command and flag, add one line to your shell's startup file: `source <(koppler completion zsh)` in `~/.zshrc`, `source <(koppler completion bash)` in `~/.bashrc`, or `koppler completion fish | source` in `~/.config/fish/config.fish`.
+For Tab completion of every command and flag, add one line to your shell's startup file:
+
+- `source <(koppler completion zsh)` in `~/.zshrc`
+- `source <(koppler completion bash)` in `~/.bashrc`
+- `koppler completion fish | source` in `~/.config/fish/config.fish`
 
 ## 2. Find your repos and a stack
 

@@ -1,14 +1,21 @@
 # Preparing local nodes
 
 Facts come from `<state>/registry.json` (a copy of the shared `stack.json`; read its `notes`) and `<state>/local.json` (its `apps`, written by `koppler sync`: clone path, branch, dirty count).
-For an env other than the first, each field in `apps[id].envs.<env>` replaces the top-level one first (lists such as `prereqs` and `secrets` are replaced whole, never merged).
+For an env other than the first, each field in `apps[id].envs.<env>` replaces the top-level one first.
+Lists such as `prereqs` and `secrets` are replaced whole, never merged.
 Work in `LOCAL.apps[id].path`, the user's real clone, never a worktree.
 Every change below is proposed with the exact diff or command and applied only after the user confirms.
 
 ## Remembered changes
 
-Before working out any temporary edit, run `koppler recipes --apply <every local app>`: it applies the remembered changes (`koppler recipes`) that match the latest Send's environment and cables, logs them for Stop, and says which no longer fit because the code moved.
-For an edit you still have to make, log it first with `koppler actions add`; once the app runs with it, ask the user "Remember this for next time?" and on yes run `koppler recipes --remember <app> --why "<plain reason>" --when <always|calls:<app>|env:<env>>`. Add `--any-os` only when nothing in the edit depends on the operating system. It is shared through stack.json unless it names a path, alias or user only this machine has; then it stays private.
+Before working out any temporary edit, run `koppler recipes --apply <every local app>`.
+It applies the remembered changes (`koppler recipes`) that match the latest Send's environment and cables, and logs them for Stop.
+It also says which no longer fit because the code moved.
+For an edit you still have to make, log it first with `koppler actions add`.
+Once the app runs with it, ask the user "Remember this for next time?".
+On yes, run `koppler recipes --remember <app> --why "<plain reason>" --when <always|calls:<app>|env:<env>>`.
+Add `--any-os` only when nothing in the edit depends on the operating system.
+It is shared through stack.json unless it names a path, alias or user only this machine has; then it stays private.
 A recipe that moved: make the edit again by hand, then offer to remember the new one.
 
 ## Branches
@@ -21,19 +28,27 @@ If it says the changes clash with the branch, tell the user and leave the app on
 
 ## Wiring
 
-For each edge `from -> to`, run `koppler plan --wire <from> <to> [--device ios|android|phone|<id>]`: it prints the setting or the file and key, and the value to use, worked out for the device a mobile app runs on (simulator `localhost`, Android emulator `10.0.2.2`, a phone the Mac's network address and the callee's http port). Then:
+For each edge `from -> to`, run `koppler plan --wire <from> <to> [--device ios|android|phone|<id>]`.
+It prints the setting or the file and key, and the value to use.
+The value is worked out for the device a mobile app runs on.
+That is `localhost` for the simulator, `10.0.2.2` for the Android emulator, and for a phone the Mac's network address and the callee's http port.
+Then:
 
 - `how: env`: add a launch profile `<baseProfile>-LOCAL` (e.g. `QA-LOCAL`, `PROD-OPS-LOCAL`) to `from`'s `launchSettings`, copied from `baseProfile`, with each listed env var set to the printed value.
   Reuse the profile if it exists and only update its env vars. Keep a `note`'s path requirements (e.g. a callee URL that must keep a path suffix).
 - `how: edit`: make the minimal temporary edit at `file` / `key` with the printed value, marked with a `koppler: do not commit` comment.
   A mobile node's `platform` is the device (`ios`, `android` or `phone`); with `run: ide` there is no `platform`, so ask which device the user will pick.
-- `how: env-file`: add the printed lines to the printed file (`.env.local` by default: git-ignored and read on top of `.env` by Vite, Next.js and Create React App), creating it if needed; log it as `env-file`.
-  For a browser front end, also set the printed CORS setting in the callee's `-LOCAL` profile, and pass on any warning (no recorded CORS setting, an https page calling an http API).
+- `how: env-file`: add the printed lines to the printed file, creating it if needed, and log it as `env-file`.
+  The file is `.env.local` by default: git-ignored and read on top of `.env` by Vite, Next.js and Create React App.
+  For a browser front end, also set the printed CORS setting in the callee's `-LOCAL` profile.
+  Pass on any warning (no recorded CORS setting, an https page calling an http API).
 - `how: unknown`: find how the caller picks this address in its repo, apply it, and record the real `how` with `koppler stack set apps.<caller>.consumes.<callee>.how <how>`.
 - When it says the callee must listen on the network (a phone), start the callee with `koppler run <to> --lan`.
 
 Overrides named in a prerequisite `note` (e.g. an `AWS_PROFILE`) go into the same `-LOCAL` profile.
-Leave out of the `-LOCAL` profile any variable the app has as a stored secret (its `secrets[].env`): a launch profile's own value wins over the environment, so it would hide the secret, and `koppler run` refuses to start until it is removed.
+Leave out of the `-LOCAL` profile any variable the app has as a stored secret (its `secrets[].env`).
+A launch profile's own value wins over the environment, so it would hide the secret.
+`koppler run` refuses to start until the variable is removed.
 A node with no edges and no overrides runs its `baseProfile` unchanged.
 
 > This command modifies state.

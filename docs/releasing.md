@@ -8,7 +8,8 @@ From `app/`, with nothing uncommitted:
 npm run release -- patch   # or minor, major, or an exact version such as 0.1.0
 ```
 
-It bumps the version in `app/package.json` and its lock on a `release/<version>` branch from `main` as it is on GitHub, commits `Koppler <version>`, and opens its pull request.
+It bumps the version in `app/package.json` and its lock on a `release/<version>` branch from `main` as it is on GitHub.
+Then it commits `Koppler <version>` and opens its pull request.
 Plain `npm version` is not enough here: the package is in `app/`, not at the repo's root, so npm bumps it but makes no commit.
 
 Merging that pull request starts the Release workflow (`.github/workflows/release.yml`):
@@ -17,10 +18,14 @@ Merging that pull request starts the Release workflow (`.github/workflows/releas
    The `npm` environment deploys only from `v*` tags, so publishing runs on the tag, and waits for a reviewer's approval there.
 2. It publishes the package with `npm publish --provenance`, so npm shows the commit and the run that built it.
 3. It publishes the same package to GitHub Packages as `@evan-mcgeek/koppler`, which lists it on the repository's page.
-   GitHub Packages takes only scoped names, so npm stays the place to install from: installing from GitHub Packages needs a GitHub sign-in even for a public package.
-4. It makes the GitHub Release: the install command and links to the version on npm and on GitHub Packages, then notes from the pull requests merged since the last one.
+   GitHub Packages takes only scoped names, so npm stays the place to install from.
+   Installing from GitHub Packages needs a GitHub sign-in, even for a public package.
+4. It makes the GitHub Release, with the install command and links to the version on npm and on GitHub Packages.
+   Under them come notes from the pull requests merged since the last one.
 
-If a release stops part-way, run the workflow by hand (Actions, Release, Run workflow): on `main` it tags a version that has no tag yet, and on a `v*` tag it publishes that tag again.
+If a release stops part-way, run the workflow by hand (Actions, Release, Run workflow).
+On `main`, it tags a version that has no tag yet.
+On a `v*` tag, it publishes that tag again.
 
 ## How npm trusts the workflow
 
@@ -28,4 +33,5 @@ npm trusts this workflow directly (trusted publishing): no token is stored in th
 Set it up on npmjs.com, under the package's Settings, Trusted Publisher, GitHub Actions: owner `evan-mcgeek`, repository `koppler`, workflow `release.yml`, environment `npm`.
 
 npm allows that only for a package that already exists.
-The first version was published with a granular access token in the `NPM_TOKEN` secret of the `npm` environment; once trusted publishing is set up, delete the secret and revoke the token.
+The first version was published with a granular access token in the `NPM_TOKEN` secret of the `npm` environment.
+Once trusted publishing is set up, delete the secret and revoke the token.

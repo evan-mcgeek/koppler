@@ -10,8 +10,12 @@ npx -y koppler stack check stack.json
 ```
 
 It prints `stack.json: OK`, or each problem with where it is, and exits 1.
-It runs every check: the shape of each field, the apps a call names, the environments, the queues, the kinds, and settings that would make an app load other code.
-A field the format does not know is a problem too, named with what replaced it when it is an old one (`run` by `start`), and taken out with `koppler stack unset <path>`.
+It runs every check.
+It checks the shape of each field, the apps a call names, the environments, the queues and the kinds.
+It also checks for settings that would make an app load other code.
+A field the format does not know is a problem too.
+When it is an old one, the problem names what replaced it (`run` by `start`).
+Take it out with `koppler stack unset <path>`.
 
 ## On GitHub
 
@@ -52,5 +56,6 @@ koppler stack schema > stack.schema.json
 ## Proposing what was learned
 
 What an agent learns while running the apps (a port, a call, a tunnel) goes into the copy of `stack.json` on that Mac, with `koppler stack set`.
-`koppler stack propose` opens a pull request on the stack's repo with those changes, made on the file as the team has it on GitHub, so nobody else's change is undone.
+`koppler stack propose` opens a pull request on the stack's repo with those changes.
+It makes them on the file as the team has it on GitHub, so nobody else's change is undone.
 A stack linked from GitHub does the same with `koppler link --pr`.

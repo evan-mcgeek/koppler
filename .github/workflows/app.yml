@@ -4,7 +4,8 @@ name: App
 # when in doubt (Actions, App, Run workflow).
 on:
   pull_request:
-    paths: [app/**, .github/workflows/app.yml]
+    # The docs and the skills too: the format and plain-words checks read them.
+    paths: [app/**, docs/**, plugin/**, README.md, PRODUCT.md, AGENTS.md, GLOSSARY.md, .github/workflows/app.yml]
   workflow_dispatch:
 
 permissions:
