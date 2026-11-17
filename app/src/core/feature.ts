@@ -2,11 +2,20 @@
 // phases. A step the agent proposed waits, dashed, until the user accepts it.
 import { linksOf, type Card, type Facts, type Link } from './discover.ts';
 
+/** A fact a step names, such as Flag and its config path; a label can hold several items. */
+export interface StepValue {
+  label: string;
+  items: string[];
+}
 export interface Step {
   from: Card;
   to: Card;
   kind: Link['kind'];
-  /** What happens on it, in words. */
+  /** What happens on it, in one plain sentence. */
+  summary?: string;
+  /** The names it uses, by label. */
+  values?: StepValue[];
+  /** The agent's findings, in full. */
   note?: string;
   /** The agent's, not accepted yet. */
   proposed?: true;
@@ -65,6 +74,8 @@ export interface FeatureEdit {
   reply?: { id: string; by: Said['by']; text: string; at: string };
   /** A thread resolved, by its id. */
   resolve?: string;
+  /** What steps say: their summary and values, on a step added in the same edit or already there. */
+  about?: (StepRef & { summary?: string; values?: StepValue[] })[];
 }
 
 const MAX_REQUEST = 4000;
@@ -74,6 +85,22 @@ const isCard = (value: unknown): value is Card =>
 const isObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 const words = (value: unknown, max: number) => (typeof value === 'string' ? value.trim().slice(0, max) : '');
+export const MAX_NOTE = 4000;
+/** A step's values as kept: labelled, each with at least one item. */
+function valuesOf(given: unknown): StepValue[] {
+  if (!Array.isArray(given)) return [];
+  return given
+    .filter(isObject)
+    .slice(0, 12)
+    .flatMap(one => {
+      const label = words(one['label'], 40);
+      const items = (Array.isArray(one['items']) ? (one['items'] as unknown[]) : [])
+        .map(item => words(item, 300))
+        .filter(Boolean)
+        .slice(0, 20);
+      return label && items.length ? [{ label, items }] : [];
+    });
+}
 
 /** A feature as kept with a board, or null when there is none; whatever wrote it, only what makes sense is kept. */
 export function featureOf(given: unknown): Feature | null {
@@ -92,7 +119,9 @@ export function featureOf(given: unknown): Feature | null {
           from: step['from'] as Card,
           to: step['to'] as Card,
           kind: KINDS.includes(step['kind'] as Link['kind']) ? (step['kind'] as Link['kind']) : 'call',
-          ...(words(step['note'], 300) && { note: words(step['note'], 300) }),
+          ...(words(step['summary'], 300) && { summary: words(step['summary'], 300) }),
+          ...(valuesOf(step['values']).length && { values: valuesOf(step['values']) }),
+          ...(words(step['note'], MAX_NOTE) && { note: words(step['note'], MAX_NOTE) }),
           ...(step['proposed'] === true && { proposed: true as const }),
         })),
     }));
@@ -209,6 +238,14 @@ export function editFeature(given: Feature | null, edit: FeatureEdit): Feature {
       phases: feature.phases.map(one => (one.name === name ? { ...one, steps: [...one.steps, step] } : one)),
     };
   }
+  for (const { summary, values, ...ref } of edit.about ?? [])
+    steps(ref, all =>
+      all.map(step =>
+        same(ref)(step)
+          ? { ...step, ...(summary && { summary: words(summary, 300) }), ...(values?.length && { values }) }
+          : step,
+      ),
+    );
   for (const kept of edit.accept ?? [])
     steps(kept, all =>
       all.map(({ proposed, ...step }) => (same(kept)(step) || !proposed ? step : { ...step, proposed })),

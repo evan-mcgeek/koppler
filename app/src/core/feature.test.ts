@@ -141,6 +141,64 @@ describe('featureOf', () => {
     });
     expect(featureOf(null)).toBeNull();
   });
+
+  it("keeps a step's summary, its labelled values and the agent's note up to 4,000 characters", () => {
+    const note = 'x'.repeat(4100);
+    const [step] =
+      featureOf({
+        phases: [
+          {
+            name: 'Order',
+            steps: [
+              {
+                from: 'web',
+                to: 'orders',
+                summary: ' Sends the order. ',
+                values: [
+                  { label: 'Route', items: ['POST /orders', 7] },
+                  { label: '', items: ['x'] },
+                  { label: 'Flag' },
+                ],
+                note,
+              },
+            ],
+          },
+        ],
+      })?.phases[0]?.steps ?? [];
+    expect(step).toEqual({
+      from: 'web',
+      to: 'orders',
+      kind: 'call',
+      summary: 'Sends the order.',
+      values: [{ label: 'Route', items: ['POST /orders'] }],
+      note: note.slice(0, 4000),
+    });
+  });
+});
+
+describe('what steps say', () => {
+  it('gives a summary and values to a step added in the same edit, or already there, in one phase or every one', () => {
+    const made = editFeature(null, {
+      phase: ['Order', 'Pay'],
+      step: [
+        { from: 'web', to: 'orders', kind: 'call', note: 'POST /orders with the basket', phase: 'Order' },
+        { from: 'web', to: 'orders', kind: 'call', phase: 'Pay' },
+      ],
+      about: [{ from: 'web', to: 'orders', phase: 'Order', summary: 'Sends the order.' }],
+    });
+    expect(made.phases.map(one => one.steps[0]?.summary)).toEqual(['Sends the order.', undefined]);
+    const later = editFeature(made, {
+      about: [{ from: 'web', to: 'orders', values: [{ label: 'Route', items: ['POST /orders'] }] }],
+    });
+    expect(later.phases.map(one => one.steps[0]?.values)).toEqual([
+      [{ label: 'Route', items: ['POST /orders'] }],
+      [{ label: 'Route', items: ['POST /orders'] }],
+    ]);
+    expect(later.phases[0]?.steps[0]).toMatchObject({
+      summary: 'Sends the order.',
+      note: 'POST /orders with the basket',
+    });
+  });
 });
 
 describe('kindBetween and stackPath', () => {

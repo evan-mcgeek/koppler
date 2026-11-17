@@ -357,6 +357,10 @@ export function describeEdit(
       one => `${proposed ? 'take off' : 'took off'} the step ${cables([one])}${one.phase ? ` in ${one.phase}` : ''}`,
     ),
     ...kept.map(one => `${proposed ? 'keep' : 'kept'} ${cables([one])} in ${into(one)}: it is a step there already`),
+    ...(edit.feature?.about ?? []).map(
+      one =>
+        `${proposed ? 'give' : 'gave'} ${cables([one])} ${[one.summary && 'a summary', one.values?.length && `${String(one.values.length)} value${one.values.length > 1 ? 's' : ''}`].filter(Boolean).join(' and ')}`,
+    ),
     ...dropped.map(phase => `${proposed ? 'take off' : 'took off'} the phase ${phase}`),
     edit.feature?.comment &&
       `${proposed ? 'comment' : 'commented'} on ${'card' in edit.feature.comment.on ? name(edit.feature.comment.on.card) : cables([edit.feature.comment.on.step])} (${edit.feature.comment.id})`,

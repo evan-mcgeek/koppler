@@ -3,7 +3,8 @@
 // never saves its older copy over it.
 import path from 'node:path';
 import { flagValue } from '../cli/output.ts';
-import { featureOf, inStack, kindBetween, type FeatureEdit } from '../core/feature.ts';
+import { featureOf, inStack, kindBetween, MAX_NOTE, type FeatureEdit } from '../core/feature.ts';
+import { SUMMARY_WORDS, summaryProblems } from '../core/plain-words.ts';
 import { notRunHere } from '../core/stack.ts';
 import { upgradeBoardFile } from '../core/migrations/files.ts';
 import { withoutMissingApps } from '../core/missing-apps.ts';
@@ -55,7 +56,7 @@ export function editDone(id: unknown): void {
 }
 
 const CHANGES =
-  '[--propose] [--add <app,...>] [--remove <app,...>] [--cable <caller>:<callee>]... [--uncable <caller>:<callee>]... [--branch <app>=<branch>]... [--note <app>="<note>"]... [--arrange] [--request "<words>"] [--phase "<name>"] [--step|--propose-step <from>:<to>[="<note>"]]... [--unstep ["<phase>":]<from>:<to>]... [--drop-phase "<name>"]... [--rename-phase "<old>"="<new>"] [--comment <card>|"<phase>":<from>:<to>="<text>"] [--reply <comment id>="<text>"] [--resolve <comment id>] [--area <area>|auto]';
+  '[--propose] [--add <app,...>] [--remove <app,...>] [--cable <caller>:<callee>]... [--uncable <caller>:<callee>]... [--branch <app>=<branch>]... [--note <app>="<note>"]... [--arrange] [--request "<words>"] [--phase "<name>"] [--step|--propose-step <from>:<to>[="<note>"]]... [--summary <from>:<to>="<sentence>"]... [--value <from>:<to>="<Label>=<value>"]... [--unstep ["<phase>":]<from>:<to>]... [--drop-phase "<name>"]... [--rename-phase "<old>"="<new>"] [--comment <card>|"<phase>":<from>:<to>="<text>"] [--reply <comment id>="<text>"] [--resolve <comment id>] [--area <area>|auto]';
 const USAGE = `usage: koppler board new "<name>" ${CHANGES}\n       koppler board edit "<name>" ${CHANGES}\n       koppler board share "<name>"\n       koppler board open <file or link>\n       koppler board delete "<name>"\n       koppler board copy "<name>" --to|--from <stack> [--drop-missing]`;
 
 /** Queues a change for an open canvas of the stack in use, dropping ones a day old that no canvas took. */
@@ -271,6 +272,8 @@ function featureEdit(args: string[]): { feature: FeatureEdit } | null {
     '--phase',
     '--step',
     '--propose-step',
+    '--summary',
+    '--value',
     '--unstep',
     '--drop-phase',
     '--rename-phase',
@@ -309,6 +312,10 @@ function featureEdit(args: string[]): { feature: FeatureEdit } | null {
       edit.phase = [...(edit.phase ?? []), phase];
     } else if (arg === '--step' || arg === '--propose-step') {
       const step = pair(arg, value);
+      if ((step.note?.length ?? 0) > MAX_NOTE)
+        fail(
+          `the note on ${step.from} > ${step.to} has ${String(step.note?.length)} characters, over ${String(MAX_NOTE)}: shorten it`,
+        );
       edit.step = [
         ...(edit.step ?? []),
         {
@@ -318,6 +325,30 @@ function featureEdit(args: string[]): { feature: FeatureEdit } | null {
           ...(arg === '--propose-step' && { proposed: true as const }),
         },
       ];
+    } else if (arg === '--summary' || arg === '--value') {
+      const { from, to, note: said = '' } = pair(arg, value);
+      const ref = { from, to, ...(phase && { phase }) };
+      let about = edit.about?.find(one => one.from === from && one.to === to && one.phase === ref.phase);
+      if (!about) edit.about = [...(edit.about ?? []), (about = ref)];
+      if (arg === '--summary') {
+        const problems = summaryProblems(said);
+        if (!said) fail(`--summary ${value ?? ''}: expected <from>:<to>="<one sentence>"\n${USAGE}`);
+        if (problems.length)
+          fail(
+            `the summary of ${from} > ${to} has ${problems.join(' and ')}.\nWrite it as one sentence of at most ${String(SUMMARY_WORDS)} words, with no code names.\nPut the code names in --value or in the note.`,
+          );
+        about.summary = said;
+      } else {
+        const at = said.indexOf('=');
+        const label = said.slice(0, at).trim();
+        const item = said.slice(at + 1).trim();
+        if (at < 1 || !item || /\s/.test(label))
+          fail(`--value ${value ?? ''}: expected <from>:<to>="<Label>=<value>", the label one word\n${USAGE}`);
+        const values = (about.values ??= []);
+        const kept = values.find(one => one.label === label);
+        if (kept) kept.items.push(item);
+        else values.push({ label, items: [item] });
+      }
     } else if (arg === '--unstep') {
       const { from, to, phase: named } = pair(arg, value, true);
       edit.unstep = [...(edit.unstep ?? []), { from, to, ...(named && { phase: named }) }];
@@ -416,6 +447,18 @@ export function changeBoard(name: string, edit: BoardEdit, create: boolean, prop
     (create
       ? { name: name.trim(), version: VERSION, nodes: {}, edges: [] }
       : fail(`no board called ${name}; koppler board new makes one, koppler use --boards lists them`));
+  const kept = featureOf(board['feature'])?.phases.flatMap(one =>
+    one.steps.map(step => ({ ...step, phase: one.name })),
+  );
+  for (const ref of edit.feature?.about ?? [])
+    if (
+      ![...(kept ?? []), ...(edit.feature?.step ?? [])].some(
+        step => step.from === ref.from && step.to === ref.to && (!ref.phase || !step.phase || step.phase === ref.phase),
+      )
+    )
+      fail(
+        `${ref.from} > ${ref.to} is not a step of ${board.name}${ref.phase ? ` in ${ref.phase}` : ''}: add it with --step`,
+      );
   const app = (id: string) => stack.apps[id];
   const clones = readClones();
   for (const id of edit.add ?? []) {
