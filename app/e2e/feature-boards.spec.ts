@@ -48,7 +48,7 @@ const kept = (temp: string) =>
     JSON.parse(fs.readFileSync(path.join(temp, 'state.json'), 'utf8')) as {
       presets?: {
         name: string;
-        feature?: { request: string; phases: { steps: unknown[] }[] };
+        feature?: { request: string; phases: { steps: { from: string; to: string; values?: unknown }[] }[] };
         discover?: { at?: Record<string, { x: number; y: number }> };
       }[];
     }
@@ -303,6 +303,55 @@ test("a step's number on the map picks its row in the panel", async ({ page, can
   await expect(settle).toHaveAttribute('aria-expanded', 'true');
   await expect(row('2.1')).toHaveAttribute('aria-current', 'true');
   await page.locator('.links .number').filter({ hasText: '2.1' }).click();
+
+  // A step with a note and no summary: the panel asks the agent, whose proposal waits for Accept, Edit or Keep.
+  const review = panel.getByRole('status').filter({ hasText: 'note but no summary' });
+  await expect(review).toHaveText(/1\s+step has a note but no summary\./);
+  await review.getByRole('button', { name: 'Ask the agent for summaries' }).click();
+  await expect
+    .poll(() => sent(canvas.temp).find(one => one.tag === 'koppler-summaries')?.text ?? '')
+    .toMatch(/STEP "Settle" web:payments\nNOTE Pays the order with the saved card/);
+  koppler(
+    canvas,
+    'board',
+    'edit',
+    'New feature',
+    '--phase',
+    'Settle',
+    '--propose-summary',
+    'web:payments=Pays with the saved card.',
+    '--propose-value',
+    'web:payments=Route=POST /payments',
+  );
+  const proposal = panel.getByLabel('Proposed summary for step 2.2');
+  await expect(proposal).toContainText('Pays with the saved card.');
+  await expect(review).toHaveCount(0);
+  await page.screenshot({ path: 'test-results/feature-summary-proposed.png' });
+  await proposal.getByRole('button', { name: 'Edit' }).click();
+  await proposal.getByLabel('Summary of step 2.2').fill('Pays the order with the saved card.');
+  await proposal.getByRole('button', { name: 'Accept' }).click();
+  await expect(proposal).toHaveCount(0);
+  await expect(row('2.2').locator('.summary')).toHaveText('Pays the order with the saved card.');
+  await expect
+    .poll(
+      () =>
+        kept(canvas.temp)?.feature?.phases[1]?.steps.find(one => one.from === 'web' && one.to === 'payments')?.values,
+    )
+    .toEqual([{ label: 'Route', items: ['POST /payments'] }]);
+  // Turned down, the step keeps what it says.
+  koppler(
+    canvas,
+    'board',
+    'edit',
+    'New feature',
+    '--phase',
+    'Settle',
+    '--propose-summary',
+    'web:payments=Charges the card.',
+  );
+  await panel.getByLabel('Proposed summary for step 2.2').getByRole('button', { name: 'Keep' }).click();
+  await expect(panel.getByLabel('Proposed summary for step 2.2')).toHaveCount(0);
+  await expect(row('2.2').locator('.summary')).toHaveText('Pays the order with the saved card.');
 
   // The request, changed in the panel, stays as wide as the panel and grows with its words, not by a handle.
   await panel.getByTitle('Change the request').click();

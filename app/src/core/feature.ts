@@ -17,6 +17,8 @@ export interface Step {
   values?: StepValue[];
   /** The agent's findings, in full. */
   note?: string;
+  /** A summary and values the agent proposes for a step already written, until the user accepts, edits or keeps it. */
+  proposal?: { summary?: string; values?: StepValue[] };
   /** The agent's, not accepted yet. */
   proposed?: true;
 }
@@ -74,8 +76,10 @@ export interface FeatureEdit {
   reply?: { id: string; by: Said['by']; text: string; at: string };
   /** A thread resolved, by its id. */
   resolve?: string;
-  /** What steps say: their summary and values, on a step added in the same edit or already there. */
-  about?: (StepRef & { summary?: string; values?: StepValue[] })[];
+  /** What steps say: their summary and values, on a step added in the same edit or already there; proposed, they wait. */
+  about?: (StepRef & { summary?: string; values?: StepValue[]; proposed?: true })[];
+  /** Proposals turned down: each step keeps what it says. */
+  keep?: StepRef[];
 }
 
 const MAX_REQUEST = 4000;
@@ -86,6 +90,15 @@ const isObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 const words = (value: unknown, max: number) => (typeof value === 'string' ? value.trim().slice(0, max) : '');
 export const MAX_NOTE = 4000;
+/** A proposal as kept: only with a summary or values. */
+function proposalOf(given: unknown): { proposal?: NonNullable<Step['proposal']> } {
+  if (!isObject(given)) return {};
+  const summary = words(given['summary'], 300);
+  const values = valuesOf(given['values']);
+  return summary || values.length
+    ? { proposal: { ...(summary && { summary }), ...(values.length && { values }) } }
+    : {};
+}
 /** A step's values as kept: labelled, each with at least one item. */
 function valuesOf(given: unknown): StepValue[] {
   if (!Array.isArray(given)) return [];
@@ -122,6 +135,7 @@ export function featureOf(given: unknown): Feature | null {
           ...(words(step['summary'], 300) && { summary: words(step['summary'], 300) }),
           ...(valuesOf(step['values']).length && { values: valuesOf(step['values']) }),
           ...(words(step['note'], MAX_NOTE) && { note: words(step['note'], MAX_NOTE) }),
+          ...proposalOf(step['proposal']),
           ...(step['proposed'] === true && { proposed: true as const }),
         })),
     }));
@@ -238,13 +252,17 @@ export function editFeature(given: Feature | null, edit: FeatureEdit): Feature {
       phases: feature.phases.map(one => (one.name === name ? { ...one, steps: [...one.steps, step] } : one)),
     };
   }
-  for (const { summary, values, ...ref } of edit.about ?? [])
+  for (const { summary, values, proposed, ...ref } of edit.about ?? [])
     steps(ref, all =>
-      all.map(step =>
-        same(ref)(step)
-          ? { ...step, ...(summary && { summary: words(summary, 300) }), ...(values?.length && { values }) }
-          : step,
-      ),
+      all.map(({ proposal, ...step }) => {
+        if (!same(ref)(step)) return { ...step, ...(proposal && { proposal }) };
+        const said = { ...(summary && { summary: words(summary, 300) }), ...(values?.length && { values }) };
+        return proposed ? { ...step, proposal: said } : { ...step, ...said };
+      }),
+    );
+  for (const ref of edit.keep ?? [])
+    steps(ref, all =>
+      all.map(({ proposal, ...step }) => (same(ref)(step) ? step : { ...step, ...(proposal && { proposal }) })),
     );
   for (const kept of edit.accept ?? [])
     steps(kept, all =>

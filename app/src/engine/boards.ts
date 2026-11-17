@@ -56,7 +56,7 @@ export function editDone(id: unknown): void {
 }
 
 const CHANGES =
-  '[--propose] [--add <app,...>] [--remove <app,...>] [--cable <caller>:<callee>]... [--uncable <caller>:<callee>]... [--branch <app>=<branch>]... [--note <app>="<note>"]... [--arrange] [--request "<words>"] [--phase "<name>"] [--step|--propose-step <from>:<to>[="<note>"]]... [--summary <from>:<to>="<sentence>"]... [--value <from>:<to>="<Label>=<value>"]... [--unstep ["<phase>":]<from>:<to>]... [--drop-phase "<name>"]... [--rename-phase "<old>"="<new>"] [--comment <card>|"<phase>":<from>:<to>="<text>"] [--reply <comment id>="<text>"] [--resolve <comment id>] [--area <area>|auto]';
+  '[--propose] [--add <app,...>] [--remove <app,...>] [--cable <caller>:<callee>]... [--uncable <caller>:<callee>]... [--branch <app>=<branch>]... [--note <app>="<note>"]... [--arrange] [--request "<words>"] [--phase "<name>"] [--step|--propose-step <from>:<to>[="<note>"]]... [--summary|--propose-summary <from>:<to>="<sentence>"]... [--value|--propose-value <from>:<to>="<Label>=<value>"]... [--unstep ["<phase>":]<from>:<to>]... [--drop-phase "<name>"]... [--rename-phase "<old>"="<new>"] [--comment <card>|"<phase>":<from>:<to>="<text>"] [--reply <comment id>="<text>"] [--resolve <comment id>] [--area <area>|auto]';
 const USAGE = `usage: koppler board new "<name>" ${CHANGES}\n       koppler board edit "<name>" ${CHANGES}\n       koppler board share "<name>"\n       koppler board open <file or link>\n       koppler board delete "<name>"\n       koppler board copy "<name>" --to|--from <stack> [--drop-missing]`;
 
 /** Queues a change for an open canvas of the stack in use, dropping ones a day old that no canvas took. */
@@ -274,6 +274,8 @@ function featureEdit(args: string[]): { feature: FeatureEdit } | null {
     '--propose-step',
     '--summary',
     '--value',
+    '--propose-summary',
+    '--propose-value',
     '--unstep',
     '--drop-phase',
     '--rename-phase',
@@ -325,12 +327,15 @@ function featureEdit(args: string[]): { feature: FeatureEdit } | null {
           ...(arg === '--propose-step' && { proposed: true as const }),
         },
       ];
-    } else if (arg === '--summary' || arg === '--value') {
+    } else if (['--summary', '--value', '--propose-summary', '--propose-value'].includes(arg)) {
       const { from, to, note: said = '' } = pair(arg, value);
-      const ref = { from, to, ...(phase && { phase }) };
-      let about = edit.about?.find(one => one.from === from && one.to === to && one.phase === ref.phase);
+      const proposed = arg.startsWith('--propose-');
+      const ref = { from, to, ...(phase && { phase }), ...(proposed && { proposed: true as const }) };
+      let about = edit.about?.find(
+        one => one.from === from && one.to === to && one.phase === ref.phase && !!one.proposed === proposed,
+      );
       if (!about) edit.about = [...(edit.about ?? []), (about = ref)];
-      if (arg === '--summary') {
+      if (arg.endsWith('-summary')) {
         const problems = summaryProblems(said);
         if (!said) fail(`--summary ${value ?? ''}: expected <from>:<to>="<one sentence>"\n${USAGE}`);
         if (problems.length)

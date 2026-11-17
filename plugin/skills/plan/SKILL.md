@@ -124,7 +124,7 @@ When `koppler --version` names another version, tell the user both, and that the
 - **Never touch secrets.** The agent does not read, fetch, print or source secret values. See `references/secrets.md`.
 - **Real clones, not worktrees**, so the IDE sees the changes. Never commit or discard on the user's behalf; stash only through `koppler switch --set-aside`, when the user chose it on the card.
 - Questions about how the stack works ("how does checkout work", "what listens to Orders API") and feature boards belong to the **koppler:discover** skill.
-  So do the canvas's `koppler-feature` and `koppler-comment` prompts.
+  So do the canvas's `koppler-feature`, `koppler-comment` and `koppler-summaries` prompts.
   Load it and follow it.
 - Before a koppler command or flag you have not used this session, read its `--help` as the **koppler:help** skill says; never guess one.
 - A `koppler-facts` prompt with `data.app` comes from "Ask the agent to fill in" in an app's settings.
