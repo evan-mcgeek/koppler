@@ -196,9 +196,13 @@ A **feature board** (**Ask the agent for a new one…** in Discover's board menu
 One link can be a step in several phases, each with its own number and note.
 Describe the feature and **Hand it to the agent**: its proposals show dashed, each with Accept and Drop, until you accept them; accepting a link the stack does not have yet records it there.
 Or start from an app, and add a picked card's links with **Add as a step**.
-The panel on the left holds the request and the steps, each in words ("Web Shop calls Orders API"): pick a phase to dim the others, rename or remove it, or take a step off; a picked card's panel opens on the right.
-Each phase's title sits on the map over the card it starts from, above the cards; a click on it picks the phase too, dimming the other phases' cards and links.
-**Walk through the steps**, or click a step's number on the map, to follow the feature one step at a time ("Step 2 of 7"): → and ← move on and back, each step brought into view with its note, its link and two cards in ink and the rest at 45%, and its phase marked in the panel and on the map; **End** or Esc stops.
+The panel on the left holds the request and the steps in phases.
+Each step reads as one sentence ("Web Shop calls Orders API") with its summary under it.
+A click on a step opens it to its values and the agent's note, and picks its two cards; one step is open at a time.
+A click on a phase folds it to its name and its count of steps, kept per board; rename or remove a phase, or take a step off, from the panel.
+A picked card's panel opens on the right.
+Each phase's title sits on the map over the card it starts from, above the cards; a click on it picks the phase, dimming the other phases' cards and links.
+**Walk through the steps**, or click a step's number on the map, to follow the feature one step at a time ("Step 2 of 7"): → and ← move on and back, each step brought into view with its summary and values, its link and two cards in ink and the rest at 45%, and its phase marked in the panel and on the map; **End** or Esc stops.
 **Comment**, then a click on a card or a step's **Here**, opens a thread beside the map; the agent is asked to answer it and does so in the thread, and while it works a warn dot shows on the card's marker.
 An answer that adds a step the feature misses draws it dashed until **Keep step N** makes it solid; **Undo** takes it off and leaves the thread.
 A card with open threads carries an ink marker with their number, a step carries it at its end, and the home and the board menu count each board's; **Resolve** hides a thread and its marker.

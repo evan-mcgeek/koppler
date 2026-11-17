@@ -99,7 +99,7 @@ test("the exported page is Discover to read: the flows, their walk-through, card
   await expect(page.getByRole('status', { name: 'Step 1.1' })).toContainText('Web Shop → Orders API');
   await page.keyboard.press('ArrowRight');
   await expect(page.getByRole('status', { name: 'Step 2.1' })).toContainText('Takes the money');
-  await expect(steps.locator('button.phase[aria-pressed="true"]')).toHaveText(/Pay/);
+  await expect(steps.locator('section.marked button.phase')).toHaveText(/Pay/);
   await page.keyboard.press('Escape');
   await expect(page.getByRole('status', { name: /^Step / })).toHaveCount(0);
 

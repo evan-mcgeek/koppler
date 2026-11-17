@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { atRest, breakable, isCode, noteWords, valueWords } from './step-text.ts';
+import { atRest, breakable, isCode, noteWords, phaseName, valueWords } from './step-text.ts';
 
 describe('atRest', () => {
   it('shows the summary, else the note up to its first "; " or " (", and opens only when there is more', () => {
@@ -56,5 +56,15 @@ describe('valueWords', () => {
       { text: '2026-12-03', date: true },
       { text: ', UTC' },
     ]);
+  });
+});
+
+describe('phaseName', () => {
+  it("takes off a leading number only when it is the phase's own", () => {
+    expect(phaseName('1. Campaign switch', 1)).toBe('Campaign switch');
+    expect(phaseName('3) Checkout', 3)).toBe('Checkout');
+    expect(phaseName('1. Campaign switch', 2)).toBe('1. Campaign switch');
+    expect(phaseName('2b. Reminders', 2)).toBe('2b. Reminders');
+    expect(phaseName('Pay', 1)).toBe('Pay');
   });
 });
