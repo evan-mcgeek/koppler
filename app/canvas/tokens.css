@@ -39,6 +39,8 @@
   /* Hairlines, no shadows: a floating layer is set apart by its edge. */
   --lift: none;
   --lift-high: none;
+  /* A picked row: the ink a shade over the panel, in every scheme. */
+  --tint: color-mix(in oklab, var(--ink) 7%, var(--panel));
   --sans: 'Barlow', system-ui, sans-serif;
   --display: 'Barlow Semi Condensed', 'Barlow', system-ui, sans-serif;
   --mono: 'Sometype Mono', ui-monospace, monospace;

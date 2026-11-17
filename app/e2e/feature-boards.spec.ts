@@ -255,6 +255,40 @@ test("a step's number on the map picks its row in the panel", async ({ page, can
   await expect(marked).toHaveCount(0);
   await expect(panel.locator('section.dim')).toHaveCount(0);
 
+  // A row with more to show opens on a click to its summary, values and the agent's note, one row at a time.
+  koppler(
+    canvas,
+    'board',
+    'edit',
+    'New feature',
+    '--summary',
+    'web:orders=Starts the order from the basket.',
+    '--value',
+    'web:orders=Route=POST /orders',
+    '--summary',
+    'orders:queue:events=Says the order is placed.',
+    '--phase',
+    'Settle',
+    '--value',
+    'queue:events:payments=Queue=order-events-qa',
+  );
+  const head = (number: string) => row(number).locator('button.head');
+  await expect(row('1.1').locator('.summary')).toHaveText('Starts the order from the basket.');
+  await expect(head('1.1')).toHaveAttribute('aria-expanded', 'false');
+  // Nothing more than its line: no caret, and it does not open.
+  await expect(head('1.2')).not.toHaveAttribute('aria-expanded');
+  await expect(head('2.2')).not.toHaveAttribute('aria-expanded');
+  await head('1.1').click();
+  await expect(head('1.1')).toHaveAttribute('aria-expanded', 'true');
+  await expect(row('1.1').locator('.opened')).toContainText('Starts the order from the basket.');
+  await expect(row('1.1').locator('.values')).toContainText(/Route\s*POST \/orders/);
+  await page.screenshot({ path: 'test-results/feature-step-opened.png' });
+  await head('2.1').click();
+  await expect(head('2.1')).toHaveAttribute('aria-expanded', 'true');
+  await expect(head('1.1')).toHaveAttribute('aria-expanded', 'false');
+  await head('2.1').click();
+  await expect(panel.locator('.opened')).toHaveCount(0);
+
   // The request, changed in the panel, stays as wide as the panel and grows with its words, not by a handle.
   await panel.getByTitle('Change the request').click();
   const request = panel.getByLabel('The request');

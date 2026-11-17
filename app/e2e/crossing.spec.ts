@@ -44,7 +44,7 @@ const toFlow = async (page: Page) => {
   await page.getByRole('complementary', { name: 'Discover' }).locator('.row').filter({ hasText: 'Paying' }).click();
   await expect(bar(page).getByRole('button', { name: 'Board: Paying' })).toBeVisible();
   // A step's apps, picked from the panel.
-  await page.getByRole('button', { name: 'Pick the apps of step 1.1' }).click();
+  await page.getByRole('button', { name: /^Step 1.1: / }).click();
   await expect(page.locator('.pickbar')).toContainText('2 picked: Web Shop, Orders API');
   await page.getByRole('button', { name: 'Plan a run with these' }).click();
   return page.getByRole('dialog', { name: 'Plan a run with 2 apps' });

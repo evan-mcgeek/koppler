@@ -60,8 +60,8 @@ test('the home lists the whole stack first, then the feature boards, and opens e
   const steps = page.getByRole('complementary', { name: 'Checkout flow' });
   await expect(steps.locator('.kind')).toHaveText('Feature board · 2 steps');
   await expect(steps.locator('.step')).toHaveText([
-    /^1\.1\s*Web Shop\s*calls Orders API/,
-    /^1\.2\s*Orders API\s*calls Payments API/,
+    /^\s*1\.1\s*Web Shop\s*calls Orders API/,
+    /^\s*1\.2\s*Orders API\s*calls Payments API/,
   ]);
   await page.screenshot({ path: 'test-results/discover-feature.png' });
   await page.getByRole('button', { name: /^Board:/ }).click();
