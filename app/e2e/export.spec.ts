@@ -160,7 +160,12 @@ test('the Show menu hides the cards of a flow on the exported page, and its step
               name: 'Order',
               steps: [
                 step('web', 'orders'),
-                { ...step('orders', 'queue:order-events', 'Says it is placed'), kind: 'publish' },
+                {
+                  ...step('orders', 'queue:order-events', 'OrderService.Publish sends OrderPlaced to order-events-qa'),
+                  kind: 'publish',
+                  summary: 'Says the order is placed.',
+                  values: [{ label: 'Queue', items: ['order-events-qa'] }],
+                },
                 { ...step('queue:order-events', 'payments'), kind: 'read' },
               ],
             },
@@ -194,7 +199,10 @@ test('the Show menu hides the cards of a flow on the exported page, and its step
     .getByRole('button', { name: 'Walk through the steps' })
     .click();
   await page.keyboard.press('ArrowRight');
-  await expect(page.getByRole('status', { name: 'Step 1.2' })).toContainText('Says it is placed');
+  // The summary shows where the note did; the agent's note is kept on the page.
+  await expect(page.getByRole('status', { name: 'Step 1.2' })).toContainText('Says the order is placed.');
+  await expect(page.getByRole('complementary', { name: 'Checkout' })).toContainText('Says the order is placed.');
+  await expect(page.getByRole('complementary', { name: 'Checkout' })).not.toContainText('OrderService.Publish');
   await expect(page.getByRole('complementary', { name: 'Checkout' })).toContainText(
     /Order events\s*is read by Payments API/,
   );

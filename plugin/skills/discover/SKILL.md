@@ -18,7 +18,10 @@ Before a koppler command or flag you have not used this session, read its `--hel
 1. Read what the stack knows: `koppler stack get apps` (calls, queues, databases, outside systems), `koppler guide` for the whole picture, `koppler discover --find "<name>"` for a name the user used that is not an app's.
 2. Read the repos of the apps on the way for what the stack does not record: the call, the route, the event, the handler. A fact is what the code shows, never a guess from a name.
 3. Make the board, named after the question: `koppler board new "<question, shortened>" --request "<the question in the user's words>"`.
-4. Propose its steps, in order, in phases: `koppler board edit "<board>" --phase "<phase>" --propose-step <from>:<to>="<what happens on it, where in the code>"`. A card is an app's id, `queue:<id>` or `database:<id>`; a link used again in a later phase is a step there too, with its own note.
+4. Propose its steps, in order, in phases: `koppler board edit "<board>" --phase "<phase>" --propose-step <from>:<to>="<note>" --summary <from>:<to>="<summary>" --value <from>:<to>="<Label>=<value>"`. A card is an app's id, `queue:<id>` or `database:<id>`; a link used again in a later phase is a step there too, with its own.
+   - The summary is what the panel shows: one sentence of at most 20 words, in plain words, with no class, field or config names. "Gets the discount campaign with the feature flags."
+   - Each value is a name the step uses, under a one-word label: `Route=POST /orders`, `Flag=/OrdersApi/Flags/BlackFriday`, `Dates=2026-11-09 to 2026-12-03`, `Fields=CodeId__c`. Give `--value` again with the same label for more items.
+   - The note keeps what you found, in full: the classes, the handlers, the reasoning.
 5. Reply in a few lines: the flow in words, the board's name, and what you could not find. The user accepts each step on the board (Discover, the board menu, or Ask about on its home).
 
 Never use `--step` for your own findings, and never change the stack: accepting a step on the board is what records a new link.

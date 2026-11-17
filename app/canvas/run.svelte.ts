@@ -518,7 +518,7 @@ class Runs {
       'Propose the steps of this feature board from its request, using the koppler:discover skill.',
       `BOARD ${name}`,
       `REQUEST ${request}`,
-      `Find which apps, queues and databases it goes through, in order and in phases, from the stack and its repos. Propose each with koppler board edit "${name}" --phase "<phase>" --propose-step <from>:<to>="<why>"; the user accepts each on the board. Never change the stack yourself.`,
+      `Find the apps, queues and databases it goes through, in order and in phases, from the stack and its repos. Propose each step with koppler board edit "${name}" --phase "<phase>" --propose-step <from>:<to>="<note>" --summary <from>:<to>="<summary>" --value <from>:<to>="<Label>=<value>", as the skill says. The user accepts each on the board. Never change the stack yourself.`,
     ].join('\n');
     const waiting = (live.status?.agent?.state ?? 'none') === 'none';
     return this.deliver(
@@ -535,7 +535,7 @@ class Runs {
       `BOARD ${board}`,
       `COMMENT ${id}, on ${about}`,
       `TEXT ${text}`,
-      `Look into it in the stack and its repos. Answer with koppler board edit "${board}" --reply ${id}="<your answer>". When the answer is a step the feature misses, add --phase "<phase>" --propose-step <from>:<to>="<why>" to the same command: it is drawn dashed until the user keeps or undoes it. Never change the stack yourself.`,
+      `Look into it in the stack and its repos. Answer with koppler board edit "${board}" --reply ${id}="<your answer>". When the answer is a step the feature misses, add --phase "<phase>" --propose-step <from>:<to>="<note>" --summary <from>:<to>="<summary>" to the same command: it is drawn dashed until the user keeps or undoes it. Never change the stack yourself.`,
     ].join('\n');
     return this.deliver(said, { tag: 'koppler-comment', data: { board, comment: id } }, 'Sent to the agent');
   }

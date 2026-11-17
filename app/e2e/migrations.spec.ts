@@ -4,6 +4,7 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { BOARD_FORMAT } from '../src/core/migrations/board/index.ts';
 import { STACK_FORMAT } from '../src/core/migrations/stack/index.ts';
 import { at, expect, STACK, test } from './canvas.ts';
 
@@ -68,7 +69,10 @@ test('an older stack is read in this format and written back with its version, w
     env: { ...process.env, KOPPLER_CONFIG_DIR: path.join(canvas.dir, 'config'), KOPPLER_TEMP: canvas.temp },
   });
   expect(read(file)).toMatchObject({ koppler: STACK_FORMAT.version, databases: named });
-  expect((read(file)['presets'] as { koppler?: string }[]).map(one => one.koppler)).toEqual(['0.1.0', '0.1.0']);
+  expect((read(file)['presets'] as { koppler?: string }[]).map(one => one.koppler)).toEqual([
+    BOARD_FORMAT.version,
+    BOARD_FORMAT.version,
+  ]);
 });
 
 test('the board file says the format it is written in', async ({ page, canvas }) => {

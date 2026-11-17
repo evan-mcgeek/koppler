@@ -587,6 +587,26 @@ test('A feature board from the terminal: its request, phases and steps; the agen
   ]);
   assert.match(koppler('board', 'edit', 'Pay', '--step', 'web:ghost').out, /ghost is not in the stack/);
   assert.match(koppler('board', 'edit', 'Pay', '--step', 'web').out, /expected <from>:<to>/);
+
+  // What a step says: one plain sentence and labelled values, on a step already there; the same label again adds an item.
+  const said = koppler('board', 'edit', 'Pay', '--phase', 'Settle', '--summary', 'queue:events:web=Shows the order as paid.', '--value', 'queue:events:web=Queue=order-events-qa', '--value', 'queue:events:web=Queue=order-events-prod');
+  assert.equal(said.code, 0, said.out);
+  assert.match(said.out, /CHANGED Pay: gave Events to Web a summary and 1 value$/m);
+  assert.deepEqual(pay().feature.phases[1].steps[0], {
+    from: 'queue:events',
+    to: 'web',
+    kind: 'read',
+    summary: 'Shows the order as paid.',
+    values: [{ label: 'Queue', items: ['order-events-qa', 'order-events-prod'] }],
+    note: 'Reads it',
+    proposed: true,
+  });
+  const wordy = koppler('board', 'edit', 'Pay', '--summary', 'orders:queue:events=OrderService.Publish sends OrderPaid; the queue fans it out.');
+  assert.notEqual(wordy.code, 0);
+  assert.match(wordy.out, /the summary of orders > queue:events has 2 sentences and code names \(OrderService\.Publish\)\.\nWrite it as one sentence of at most 20 words, with no code names\./);
+  assert.match(koppler('board', 'edit', 'Pay', '--summary', 'web:orders=Sends the order.').out, /web > orders is not a step of Pay: add it with --step/);
+  assert.match(koppler('board', 'edit', 'Pay', '--value', 'orders:queue:events=Two words=x').out, /the label one word/);
+  assert.match(koppler('board', 'edit', 'Pay', '--step', `web:orders=${'x'.repeat(4001)}`).out, /the note on web > orders has 4001 characters, over 4000: shorten it/);
   fs.rmSync(dir, { recursive: true });
 });
 

@@ -1,5 +1,6 @@
 import { expect, test } from 'vitest';
 import { check, foldCopies, migrate, VERSION, withHidden, type StackFacts, type StoredPreset } from './presets.ts';
+import { BOARD_FORMAT } from './migrations/board/index.ts';
 
 const stack: StackFacts = {
   known: id => ['app', 'api', 'db-api', 'far'].includes(id),
@@ -30,15 +31,21 @@ test('an older preset is brought to the current format; a current one is left al
       nodes: { api: { run: 'cli' }, app: { run: 'ide' } },
       edges: [],
       version: VERSION,
-      koppler: '0.1.0',
+      koppler: BOARD_FORMAT.version,
     },
     migratedFrom: '0.0.0',
   });
-  const current = { name: 'Now', version: VERSION, koppler: '0.1.0', nodes: { api: { run: 'cli' } }, edges: [] };
+  const current = {
+    name: 'Now',
+    version: VERSION,
+    koppler: BOARD_FORMAT.version,
+    nodes: { api: { run: 'cli' } },
+    edges: [],
+  };
   expect(migrate(current)).toEqual({ preset: current, migratedFrom: null });
   // No Koppler version yet: read as the oldest, run through every migration, and stamped.
   const numbered = { name: 'Then', version: VERSION, nodes: { api: { run: 'ide' } }, edges: [] };
-  expect(migrate(numbered)).toEqual({ preset: { ...numbered, koppler: '0.1.0' }, migratedFrom: '0.0.0' });
+  expect(migrate(numbered)).toEqual({ preset: { ...numbered, koppler: BOARD_FORMAT.version }, migratedFrom: '0.0.0' });
   expect(migrate({ ...current, koppler: '9.0.0' }).error).toMatch(/newer Koppler/);
 });
 
@@ -68,7 +75,7 @@ test('only what this stack can run opens, and every change is noted', () => {
   expect(result.preset).toEqual({
     name: 'PR 12',
     version: VERSION,
-    koppler: '0.1.0',
+    koppler: BOARD_FORMAT.version,
     source: 'pr.json',
     nodes: {
       app: { run: 'cli', platform: 'ios' },
@@ -96,7 +103,7 @@ test('a clean preset opens with nothing to say', () => {
     nodes: { app: { run: 'ide' }, api: { run: 'cli', branch: 'main' } },
     edges: [{ from: 'app', to: 'api' }],
   };
-  expect(check(clean, stack)).toEqual({ preset: { ...clean, koppler: '0.1.0' }, notes: [] });
+  expect(check(clean, stack)).toEqual({ preset: { ...clean, koppler: BOARD_FORMAT.version }, notes: [] });
 });
 
 test('a clone with uncommitted work on another branch keeps its branch, and the note says why', () => {

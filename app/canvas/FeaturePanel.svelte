@@ -182,7 +182,9 @@
           <span class="what">
             <span class="from">{name(step.from)}</span>
             <span class="verb">{VERB[step.kind] ?? 'calls'} {name(step.to)}</span>
-            {#if step.note}<span class="note">{step.note}</span>{/if}
+            {#if step.summary ?? step.note}<span class="note" title={step.summary ? step.note : undefined}
+                >{step.summary ?? step.note}</span
+              >{/if}
             {#if step.proposed}
               <span class="ask"
                 ><strong>Proposed</strong>

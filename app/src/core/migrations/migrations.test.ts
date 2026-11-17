@@ -480,3 +480,23 @@ test('0.5.2: an app of kind other that is a GitHub Actions workflow becomes kind
   });
   expect(migrateStack({ ...done.value }).applied).toEqual([]);
 });
+
+test('0.6.0: a board keeps its steps as they are, and says it is in the format with summaries and values', () => {
+  const old = {
+    name: 'Checkout',
+    version: 1,
+    koppler: '0.1.0',
+    nodes: { web: { run: 'cli' } },
+    edges: [],
+    feature: {
+      request: 'Pay.',
+      cards: [],
+      phases: [{ name: 'Order', steps: [{ from: 'web', to: 'orders', note: 'x' }] }],
+    },
+  };
+  const done = migrate(old, BOARD_FORMAT);
+  expect(done.applied?.map(one => [one.migration.version, one.changes])).toEqual([['0.6.0', []]]);
+  expect(done.value).toEqual({ ...old, koppler: '0.6.0' });
+  expect(migrate({ ...done.value }, BOARD_FORMAT).applied).toEqual([]);
+  expect(migrate({ ...old, koppler: '0.7.0' }, BOARD_FORMAT).error).toMatch(/update Koppler/);
+});

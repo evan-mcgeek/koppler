@@ -907,6 +907,10 @@ const COMMANDS: Command[] = [
         "make it a feature board: the request it came from, and the stack's links it uses as numbered steps, each in the phase named before it",
       ],
       [
+        'edit "<name>" [--summary <from>:<to>="<sentence>"]... [--value <from>:<to>="<Label>=<value>"]...',
+        'say what a step does in one plain sentence, and the names it uses under one-word labels, beside its note; for a step added in the same command, or one already there',
+      ],
+      [
         'edit "<name>" [--propose-step <from>:<to>[="<why>"]]... [--unstep <from>:<to>]...',
         'propose a step, dashed on the map until the user accepts it there, or take one off; a card is an app, queue:<id> or database:<id>',
       ],

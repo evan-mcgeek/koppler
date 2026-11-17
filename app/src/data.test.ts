@@ -1,3 +1,4 @@
+import { BOARD_FORMAT } from './core/migrations/board/index.ts';
 import { STACK_FORMAT } from './core/migrations/stack/index.ts';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -51,7 +52,10 @@ test('a board saved in the old script form is still read, and the JSON file wins
 test('a run file from before its version is read in this format and written back with it', () => {
   writeData('state', { env: 'qa', presets: [{ name: 'Old', nodes: { web: {} }, edges: [] }] });
   const read = readData('state');
-  expect(read).toMatchObject({ koppler: '0.2.0', presets: [{ koppler: '0.1.0', nodes: { web: { run: 'cli' } } }] });
+  expect(read).toMatchObject({
+    koppler: '0.2.0',
+    presets: [{ koppler: BOARD_FORMAT.version, nodes: { web: { run: 'cli' } } }],
+  });
   expect(JSON.parse(fs.readFileSync(dataFile('state'), 'utf8'))).toEqual(read);
 });
 

@@ -806,7 +806,7 @@
               >Step {discovered.steps.findIndex(one => one.number === number) + 1} of {discovered.steps.length}</span
             >
             <span class="what"><strong>{number}</strong> {name(step.from)} → {name(step.to)}</span>
-            <span class="note">{step.note ?? ''}</span>
+            <span class="note">{step.summary ?? step.note ?? ''}</span>
           </span>
           <button
             class="icon"
