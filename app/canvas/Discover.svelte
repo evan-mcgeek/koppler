@@ -38,6 +38,7 @@
   import BoardTools from './BoardTools.svelte';
   import ShowFilter from './ShowFilter.svelte';
   import { hidden } from './shown.svelte.ts';
+  import { atRest } from '../src/core/step-text.ts';
   import Overview from './Overview.svelte';
   import { dragging, FIT, present, toolState, type Tool } from './tools.svelte.ts';
   import { undo } from './undo.svelte.ts';
@@ -800,13 +801,24 @@
         </div>
       {:else if discovered.current}
         {@const { step, number } = discovered.current}
+        {@const shown = atRest(step)}
         <div class="pickbar stepbar" role="status" aria-label="Step {number}">
-          <span class="said" title="{number} {name(step.from)} → {name(step.to)}{step.note ? `: ${step.note}` : ''}">
+          <span class="said" title={step.note ? `Agent’s note: ${step.note}` : undefined}>
             <span class="of"
               >Step {discovered.steps.findIndex(one => one.number === number) + 1} of {discovered.steps.length}</span
             >
             <span class="what"><strong>{number}</strong> {name(step.from)} → {name(step.to)}</span>
-            <span class="note">{step.summary ?? step.note ?? ''}</span>
+            <span class="note">{shown.line ?? ''}</span>
+            {#if step.values?.length}
+              <dl class="values">
+                {#each step.values.slice(0, 4) as value (value.label)}
+                  <dt>{value.label}</dt>
+                  <dd>{value.items.join(', ')}</dd>
+                {/each}
+              </dl>
+              {#if step.values.length > 4}<span class="more">+{step.values.length - 4} more in the steps panel</span
+                >{/if}
+            {/if}
           </span>
           <button
             class="icon"
@@ -1444,7 +1456,9 @@ Schedule on {lastData.job.env.toUpperCase()}. Every environment in Settings"
     margin-top: 4px;
   }
   /* One size for every step, so its arrows stay under the pointer: two lines, each cut short, the whole in its title. */
+  /* Values make it taller upward; its buttons keep to the foot, under the pointer. */
   .stepbar {
+    align-items: end;
     gap: 4px;
     width: min(560px, calc(100% - 32px));
   }
@@ -1465,6 +1479,27 @@ Schedule on {lastData.job.env.toUpperCase()}. Every environment in Settings"
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+  .stepbar .values {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 2px 10px;
+    margin: 4px 0 0;
+  }
+  .stepbar dt {
+    color: var(--muted);
+    font: 400 12px var(--sans);
+  }
+  .stepbar dd {
+    overflow: hidden;
+    margin: 0;
+    font: 500 12px var(--mono);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .stepbar .more {
+    color: var(--muted);
+    font-size: 12px;
   }
   .stepbar strong {
     font: 600 12px var(--mono);

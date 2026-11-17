@@ -183,6 +183,16 @@ test('the Show menu hides the cards of a flow on the exported page, and its step
 
   const queue = page.locator('.svelte-flow__node[data-id="queue:order-events"]');
   await expect(queue).toBeVisible();
+
+  // A step with more says Details; opened, its summary, values and the agent's note, the code names in mono.
+  const details = page.getByRole('complementary', { name: 'Checkout' });
+  await expect(details.getByRole('button', { name: 'Details' })).toHaveCount(1);
+  await details.getByRole('button', { name: 'Details' }).click();
+  await expect(details.locator('.values')).toContainText(/Queue\s*order-events-qa/);
+  await expect(details.locator('.agent code').first()).toHaveText('OrderService.Publish');
+  await page.screenshot({ path: 'test-results/export-details.png' });
+  await details.getByRole('button', { name: 'Hide details' }).click();
+  await expect(details.locator('.opened')).toHaveCount(0);
   await page.getByRole('button', { name: 'Show: All' }).click();
   await page
     .getByRole('dialog', { name: 'Kinds of card to see' })
@@ -201,6 +211,7 @@ test('the Show menu hides the cards of a flow on the exported page, and its step
   await page.keyboard.press('ArrowRight');
   // The summary shows where the note did; the agent's note is kept on the page.
   await expect(page.getByRole('status', { name: 'Step 1.2' })).toContainText('Says the order is placed.');
+  await expect(page.getByRole('status', { name: 'Step 1.2' })).toContainText(/Queue\s*order-events-qa/);
   await expect(page.getByRole('complementary', { name: 'Checkout' })).toContainText('Says the order is placed.');
   await expect(page.getByRole('complementary', { name: 'Checkout' })).not.toContainText('OrderService.Publish');
   await expect(page.getByRole('complementary', { name: 'Checkout' })).toContainText(

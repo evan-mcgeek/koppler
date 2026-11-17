@@ -1,9 +1,13 @@
 <script lang="ts">
+  import { untrack } from 'svelte';
   import Clock from '@lucide/svelte/icons/clock';
   // A feature board's panel: its request, and its steps in phases. Picking a phase dims the others on the map.
+  import ChevronDown from '@lucide/svelte/icons/chevron-down';
+  import ChevronRight from '@lucide/svelte/icons/chevron-right';
   import X from '@lucide/svelte/icons/x';
   import { linksOf } from '../src/core/discover.ts';
   import { numbered, type Feature } from '../src/core/feature.ts';
+  import { atRest, breakable, noteWords, valueWords } from '../src/core/step-text.ts';
   import { board } from './board.svelte.ts';
   import { stacks } from './stacks.svelte.ts';
   import { discovered } from './discover.svelte.ts';
@@ -28,6 +32,11 @@
     return steps.filter(({ step }) =>
       known.some(link => link.from === step.from && link.to === step.to && link.sure === 'confirmed'),
     ).length;
+  });
+  /** The one step opened, by its number; a new board opens none. */
+  let opened = $state<string | null>(null);
+  $effect(() => {
+    if (board.name) untrack(() => (opened = null));
   });
   let editing = $state(false);
   let request = $state('');
@@ -160,78 +169,132 @@
       {#each steps.filter(step => step.phase === at) as { step, number } (number)}
         {@const ref = { from: step.from, to: step.to, phase: one.name }}
         {@const talks = discovered.openOn({ step: ref })}
+        {@const shown = atRest(step)}
+        {@const open = opened === number}
         <div
           class="step"
           class:proposed={step.proposed}
+          class:open
           aria-current={discovered.step === number || undefined}
           {@attach (row: HTMLElement) => {
             if (discovered.step === number) row.scrollIntoView({ block: 'nearest' });
           }}
         >
           <button
-            class="at"
+            class="head"
             type="button"
-            aria-label="Pick the apps of step {number}"
+            aria-label="Step {number}: {name(step.from)} {VERB[step.kind] ?? 'calls'} {name(step.to)}"
+            aria-expanded={shown.opens ? open : undefined}
             title={board.viewOnly
               ? 'Pick its two cards (Shift adds them to the pick)'
               : 'Pick its two cards, to plan a run with them (Shift adds them to the pick)'}
             onclick={ev => {
+              if (shown.opens) opened = open ? null : number;
               discovered.picked = [...new Set([...(ev.shiftKey ? discovered.picked : []), step.from, step.to])];
-            }}>{number}</button
+            }}
           >
-          <span class="what">
-            <span class="from">{name(step.from)}</span>
-            <span class="verb">{VERB[step.kind] ?? 'calls'} {name(step.to)}</span>
-            {#if step.summary ?? step.note}<span class="note" title={step.summary ? step.note : undefined}
-                >{step.summary ?? step.note}</span
-              >{/if}
-            {#if step.proposed}
-              <span class="ask"
-                ><strong>Proposed</strong>
-                <button
-                  class="text"
-                  type="button"
-                  onclick={() => void discovered.accept([{ ...step, phase: one.name }])}>Accept</button
-                >
-                <button
-                  class="text"
-                  type="button"
-                  onclick={() => {
-                    discovered.drop([{ ...step, phase: one.name }]);
-                  }}>Drop</button
-                ></span
+            <span class="caret" aria-hidden="true"
+              >{#if shown.opens && !board.viewOnly}{#if open}<ChevronDown size={12} />{:else}<ChevronRight
+                    size={12}
+                  />{/if}{/if}</span
+            >
+            <span class="at">{number}</span>
+            <span class="what">
+              <span class="route"
+                ><b>{name(step.from)}</b> <span class="verb">{VERB[step.kind] ?? 'calls'}</span>
+                <b>{name(step.to)}</b></span
+              >
+              {#if shown.line && !open}<span class="summary">{shown.line}</span>{/if}
+            </span>
+          </button>
+          <span class="end">
+            {#if discovered.commenting}
+              <button
+                class="text here"
+                type="button"
+                aria-label="Comment on step {number}"
+                onclick={() => {
+                  discovered.commenting = false;
+                  discovered.thread = { on: { step: ref } };
+                }}>Here</button
+              >
+            {:else if talks.length && !board.viewOnly}
+              <button
+                class="talk"
+                type="button"
+                aria-label="{talks.length} {talks.length === 1 ? 'comment' : 'comments'} on step {number}"
+                onclick={() => {
+                  discovered.thread = { id: talks[0]?.id ?? '' };
+                }}>{talks.length}</button
+              >
+            {/if}
+            {#if !step.proposed && !board.viewOnly}
+              <button
+                class="off"
+                type="button"
+                aria-label="Take step {number} off"
+                title="Take this step off the feature"
+                onclick={() => {
+                  discovered.editFeature({ unstep: [{ ...step, phase: one.name }] });
+                }}><X size={14} /></button
               >
             {/if}
           </span>
-          {#if discovered.commenting}
+          {#if open}
+            <div class="opened">
+              {#if step.summary}<p class="said">{step.summary}</p>{/if}
+              {#if step.values?.length}
+                <dl class="values">
+                  {#each step.values as value (value.label)}
+                    <div>
+                      <dt>{value.label}</dt>
+                      {#each value.items as item, at (at)}
+                        <dd>
+                          {#each valueWords(item) as words, part (part)}{#if words.date}<span class="nowrap"
+                                >{words.text}</span
+                              >{:else}{#each breakable(words.text) as bit, cut (cut)}{#if cut}<wbr
+                                  />{/if}{bit}{/each}{/if}{/each}
+                        </dd>
+                      {/each}
+                    </div>
+                  {/each}
+                </dl>
+              {/if}
+              {#if step.note && step.note !== shown.line}
+                <div class="agent">
+                  <span class="label">Agent’s note</span>
+                  <p>
+                    {#each noteWords(step.note) as words, part (part)}{#if words.code}<code class:nowrap={words.date}
+                          >{#each breakable(words.text) as bit, cut (cut)}{#if cut}<wbr />{/if}{bit}{/each}</code
+                        >{:else}{words.text}{/if}{/each}
+                  </p>
+                </div>
+              {/if}
+            </div>
+          {/if}
+          {#if board.viewOnly && shown.opens}
             <button
-              class="text here"
+              class="text details"
               type="button"
-              aria-label="Comment on step {number}"
+              aria-expanded={open}
               onclick={() => {
-                discovered.commenting = false;
-                discovered.thread = { on: { step: ref } };
-              }}>Here</button
-            >
-          {:else if talks.length}
-            <button
-              class="talk"
-              type="button"
-              aria-label="{talks.length} {talks.length === 1 ? 'comment' : 'comments'} on step {number}"
-              onclick={() => {
-                discovered.thread = { id: talks[0]?.id ?? '' };
-              }}>{talks.length}</button
+                opened = open ? null : number;
+              }}>{open ? 'Hide details' : 'Details'}</button
             >
           {/if}
-          {#if !step.proposed && !board.viewOnly}
-            <button
-              class="off"
-              type="button"
-              aria-label="Take step {number} off"
-              title="Take this step off the feature"
-              onclick={() => {
-                discovered.editFeature({ unstep: [{ ...step, phase: one.name }] });
-              }}><X size={14} /></button
+          {#if step.proposed}
+            <span class="ask"
+              ><strong>Proposed</strong>
+              <button class="text" type="button" onclick={() => void discovered.accept([{ ...step, phase: one.name }])}
+                >Accept</button
+              >
+              <button
+                class="text"
+                type="button"
+                onclick={() => {
+                  discovered.drop([{ ...step, phase: one.name }]);
+                }}>Drop</button
+              ></span
             >
           {/if}
         </div>
@@ -312,13 +375,6 @@
   }
   .here {
     align-self: start;
-  }
-  .from {
-    font: 500 14px var(--sans);
-  }
-  .verb {
-    color: var(--muted);
-    font: 400 13px var(--sans);
   }
   .request {
     display: grid;
@@ -408,51 +464,161 @@
     outline: 2px solid var(--ink);
     outline-offset: 2px;
   }
+  /* A step: caret, number, the route and its summary, and the end slot; opened, its detail spans from the number on. */
   .step {
-    display: flex;
-    gap: 12px;
-    padding: 9px 0;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    margin: 0 -10px 0 -6px;
+    padding: 0 10px 0 0;
     border-bottom: 1px solid var(--line);
-    font: 400 14px var(--sans);
   }
-  /* Picked by its number on the map: tinted past the column on both sides, so its words stay where they were. */
   .step[aria-current='true'] {
-    margin-inline: -8px;
-    padding-inline: 8px;
-    background: color-mix(in oklab, var(--cable) 12%, transparent);
+    background: var(--tint);
   }
-  .at {
-    flex: none;
-    align-self: start;
-    width: 30px;
-    padding: 0;
+  .head {
+    display: grid;
+    grid-template-columns: 14px 30px minmax(0, 1fr);
+    column-gap: 4px;
+    padding: 8px 0 8px 6px;
     border: 0;
     background: none;
-    color: var(--ink-muted);
-    font: 400 11px/20px var(--mono);
+    color: var(--ink);
     text-align: left;
     cursor: pointer;
   }
-  .at:hover,
-  .at:focus-visible {
+  .head:focus-visible {
+    outline: 2px solid var(--ink);
+    outline-offset: -2px;
+  }
+  .caret {
+    display: flex;
+    align-items: center;
+    height: 19px;
+    color: var(--muted);
+  }
+  .at {
+    color: var(--muted);
+    font: 500 12px/19px var(--mono);
+  }
+  .step[aria-current='true'] .at {
     color: var(--ink);
-    text-decoration: underline;
-    outline: none;
+    font-weight: 600;
   }
   .what {
-    display: grid;
-    flex: 1;
-    gap: 2px;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
     min-width: 0;
-    /* A note can hold a path or a long name with no space: it breaks inside the column. */
+  }
+  .route {
+    font: 400 14px/19px var(--sans);
+    overflow-wrap: anywhere;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .route b {
+    font-weight: 600;
+  }
+  .verb {
+    color: var(--muted);
+  }
+  .summary {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    color: var(--muted);
+    font: 400 13px/18px var(--sans);
+    text-wrap: pretty;
+  }
+  .end {
+    display: flex;
+    gap: 4px;
+    align-items: start;
+    padding-top: 6px;
+  }
+  .opened {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-width: 0;
+    padding: 6px 0 10px 24px;
+  }
+  .opened .said {
+    margin: 0;
+    color: var(--ink);
+    font: 500 13px/1.5 var(--sans);
+    text-wrap: pretty;
+    cursor: auto;
+  }
+  .values {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin: 0;
+  }
+  .values div {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .values dt {
+    color: var(--muted);
+    font: 400 12px/16px var(--sans);
+  }
+  .values dd {
+    margin: 0;
+    color: var(--ink);
+    font: 500 12px/17px var(--mono);
+    overflow-wrap: break-word;
+  }
+  .nowrap {
+    white-space: nowrap;
+  }
+  .agent {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding-top: 8px;
+    border-top: 1px solid var(--line);
+  }
+  .agent .label {
+    color: var(--muted);
+    font: 600 12px var(--sans);
+  }
+  .agent p {
+    margin: 0;
+    color: var(--muted);
+    font: 400 12px/1.5 var(--sans);
     overflow-wrap: anywhere;
   }
-  .note {
-    color: var(--ink-muted);
+  .agent code {
+    font: 400 11.5px var(--mono);
+  }
+  button.details {
+    grid-column: 1 / -1;
+    justify-self: start;
+    margin: -4px 0 8px 58px;
+    color: var(--muted);
     font-size: 12px;
   }
-  .proposed .what > span:first-child {
-    color: var(--ink-muted);
+  .open button.details {
+    margin-left: 24px;
+  }
+  .proposed {
+    border-bottom-style: dashed;
+  }
+  .proposed .route {
+    color: var(--muted);
+  }
+  .step > .ask {
+    grid-column: 1 / -1;
+    padding: 0 0 8px 50px;
   }
   .ask {
     display: flex;
