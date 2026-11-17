@@ -214,7 +214,7 @@ test("a step's number on the map picks its row in the panel", async ({ page, can
   await page.keyboard.press('ArrowLeft');
   await expect(bar).toHaveAccessibleName('Step 1.1');
   // The phase of the step in view is the one marked, and the other phase steps back.
-  const marked = panel.locator('button.phase[aria-pressed="true"]');
+  const marked = panel.locator('section.marked button.phase');
   await expect(marked).toHaveText(/Pay/);
   for (const number of ['1.2', '2.1', '2.2', '2.2']) {
     await page.keyboard.press('ArrowRight');
@@ -288,6 +288,21 @@ test("a step's number on the map picks its row in the panel", async ({ page, can
   await expect(head('1.1')).toHaveAttribute('aria-expanded', 'false');
   await head('2.1').click();
   await expect(panel.locator('.opened')).toHaveCount(0);
+
+  // A phase folds to its name and its count of steps; a step picked in it from the map opens it again.
+  const settle = panel.locator('button.phase').filter({ hasText: 'Settle' });
+  await settle.click();
+  await expect(settle).toHaveAttribute('aria-expanded', 'false');
+  await expect(panel.locator('.folded')).toHaveText('2 steps');
+  await expect(row('2.1')).toHaveCount(0);
+  expect(
+    await page.evaluate(() => Object.keys(localStorage).filter(key => key.startsWith('koppler-phase-folds:'))),
+  ).toHaveLength(1);
+  await page.screenshot({ path: 'test-results/feature-phase-folded.png' });
+  await page.locator('.links .number').filter({ hasText: '2.1' }).click();
+  await expect(settle).toHaveAttribute('aria-expanded', 'true');
+  await expect(row('2.1')).toHaveAttribute('aria-current', 'true');
+  await page.locator('.links .number').filter({ hasText: '2.1' }).click();
 
   // The request, changed in the panel, stays as wide as the panel and grows with its words, not by a handle.
   await panel.getByTitle('Change the request').click();
@@ -370,7 +385,7 @@ test('one link is a step in two phases: both are walked, one is taken off, and a
   await expect.poll(() => kept(canvas.temp)?.feature?.phases.length).toBe(1);
 });
 
-test('every phase title shows whole on the map; one picked there or in the panel dims the other phases', async ({
+test('every phase title shows whole on the map; one picked there dims the other phases and is marked in the panel', async ({
   page,
   canvas,
 }) => {
@@ -419,17 +434,14 @@ test('every phase title shows whole on the map; one picked there or in the panel
   }
   await page.screenshot({ path: 'test-results/feature-phase-titles.png' });
 
-  // A title picks its phase, as the panel does: the cards of the other phases dim, and a second click lets go.
+  // A title picks its phase: the cards of the other phases dim, the panel marks it, and a second click lets go.
   await titles.filter({ hasText: 'Settle' }).click();
   const panel = page.getByRole('complementary', { name: 'New feature' });
-  await expect(panel.getByRole('button', { name: /Settle/ }).first()).toHaveAttribute('aria-pressed', 'true');
+  await expect(panel.locator('section.marked button.phase')).toHaveText(/Settle/);
   await expect(card(page, 'web')).toHaveClass(/dimmed/);
   for (const id of ['orders', 'payments']) await expect(card(page, id)).not.toHaveClass(/dimmed/);
   await page.screenshot({ path: 'test-results/feature-phase-picked.png' });
   await titles.filter({ hasText: 'Settle' }).click();
   await expect(page.locator('.svelte-flow__node.dimmed')).toHaveCount(0);
-  // From the panel too.
-  await panel.getByRole('button', { name: /Pay/ }).first().click();
-  await expect(card(page, 'web')).not.toHaveClass(/dimmed/);
-  await expect(page.locator('.svelte-flow__node.dimmed').first()).toBeVisible();
+  await expect(panel.locator('section.marked')).toHaveCount(0);
 });

@@ -51,3 +51,9 @@ export const valueWords = (item: string): Words[] =>
     .split(/(\d{4}-\d{2}-\d{2})/)
     .filter(Boolean)
     .map(text => (DATE.test(text) ? { text, date: true as const } : { text }));
+
+/** A phase's name with its own leading number taken off, only when it is the phase's: "2b. Reminders" stays. */
+export const phaseName = (name: string, number: number): string => {
+  const own = /^(\d+)[.)]\s+(.+)$/.exec(name);
+  return own && Number(own[1]) === number ? (own[2] ?? name) : name;
+};

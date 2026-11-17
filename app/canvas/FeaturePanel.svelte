@@ -7,7 +7,8 @@
   import X from '@lucide/svelte/icons/x';
   import { linksOf } from '../src/core/discover.ts';
   import { numbered, type Feature } from '../src/core/feature.ts';
-  import { atRest, breakable, noteWords, valueWords } from '../src/core/step-text.ts';
+  import { atRest, breakable, noteWords, phaseName, valueWords } from '../src/core/step-text.ts';
+  import { phaseFolds } from './phase-folds.svelte.ts';
   import { board } from './board.svelte.ts';
   import { stacks } from './stacks.svelte.ts';
   import { discovered } from './discover.svelte.ts';
@@ -38,6 +39,14 @@
   $effect(() => {
     if (board.name) untrack(() => (opened = null));
   });
+  // A step picked or walked to in a folded phase opens its phase.
+  $effect(() => {
+    const phase = discovered.current && feature.phases[discovered.current.phase];
+    if (phase && phaseFolds.names.includes(phase.name))
+      untrack(() => {
+        phaseFolds.set(phaseFolds.names.filter(name => name !== phase.name));
+      });
+  });
   let editing = $state(false);
   let request = $state('');
   let renaming = $state<string | null>(null);
@@ -54,13 +63,13 @@
 <aside class="panel" aria-labelledby="feature-title">
   <h2 id="feature-title">{board.name}</h2>
   <p class="kind">
-    {team && stacks.shared ? 'Team feature board' : 'Feature board'} · {steps.length}
+    {team && stacks.shared ? 'Team feature board' : 'Feature board'} · {feature.phases.length}
+    {feature.phases.length === 1 ? 'phase' : 'phases'} · {steps.length}
     {steps.length === 1 ? 'step' : 'steps'}
   </p>
   <div class="request">
-    <span class="label">The request</span>
     {#if board.viewOnly}
-      <p class="said">“{feature.request}”</p>
+      <p class="said">{feature.request}</p>
     {:else if editing}
       <!-- svelte-ignore a11y_autofocus -->
       <textarea
@@ -85,7 +94,7 @@
         onclick={() => {
           request = feature.request;
           editing = true;
-        }}>{feature.request ? `“${feature.request}”` : 'Add the request it came from'}</button
+        }}>{feature.request || 'Add the request it came from'}</button
       >
     {/if}
   </div>
@@ -115,7 +124,11 @@
   </p>
 
   {#each feature.phases as one, at (one.name)}
-    <section class:dim={discovered.shownPhase !== null && discovered.shownPhase !== at}>
+    {@const folded = phaseFolds.names.includes(one.name)}
+    <section
+      class:dim={discovered.shownPhase !== null && discovered.shownPhase !== at}
+      class:marked={discovered.shownPhase === at}
+    >
       <header>
         {#if renaming === one.name}
           <form
@@ -133,16 +146,20 @@
           <button
             class="phase"
             type="button"
-            aria-pressed={discovered.shownPhase === at}
-            title="Show only this phase on the map"
+            aria-expanded={!folded}
+            title={folded ? 'Show its steps' : 'Fold it to its name'}
             onclick={() => {
-              discovered.phase = discovered.phase === at ? null : at;
+              phaseFolds.toggle(one.name);
             }}
-            ><span class="number" aria-hidden="true">{at + 1}</span>{one.name}{#if discovered.startsOn(one)}<span
+            ><span class="number" aria-hidden="true">{at + 1}</span><span class="name"
+              >{phaseName(one.name, at + 1)}</span
+            >{#if discovered.startsOn(one)}<span
                 class="when"
                 title="This phase starts on a schedule: its first step is a scheduled job"
                 ><Clock size={12} aria-hidden="true" />{discovered.startsOn(one)}</span
-              >{/if}</button
+              >{/if}<span class="fold" aria-hidden="true"
+              >{#if folded}<ChevronRight size={14} />{:else}<ChevronDown size={14} />{/if}</span
+            ></button
           >
           {#if !board.viewOnly}<button
               class="text quiet"
@@ -166,141 +183,148 @@
             >{/if}
         {/if}
       </header>
-      {#each steps.filter(step => step.phase === at) as { step, number } (number)}
-        {@const ref = { from: step.from, to: step.to, phase: one.name }}
-        {@const talks = discovered.openOn({ step: ref })}
-        {@const shown = atRest(step)}
-        {@const open = opened === number}
-        <div
-          class="step"
-          class:proposed={step.proposed}
-          class:open
-          aria-current={discovered.step === number || undefined}
-          {@attach (row: HTMLElement) => {
-            if (discovered.step === number) row.scrollIntoView({ block: 'nearest' });
-          }}
-        >
-          <button
-            class="head"
-            type="button"
-            aria-label="Step {number}: {name(step.from)} {VERB[step.kind] ?? 'calls'} {name(step.to)}"
-            aria-expanded={shown.opens ? open : undefined}
-            title={board.viewOnly
-              ? 'Pick its two cards (Shift adds them to the pick)'
-              : 'Pick its two cards, to plan a run with them (Shift adds them to the pick)'}
-            onclick={ev => {
-              if (shown.opens) opened = open ? null : number;
-              discovered.picked = [...new Set([...(ev.shiftKey ? discovered.picked : []), step.from, step.to])];
+      {#if folded}
+        {@const count = steps.filter(step => step.phase === at).length}
+        <p class="folded">{count} {count === 1 ? 'step' : 'steps'}</p>
+      {:else}
+        {#each steps.filter(step => step.phase === at) as { step, number } (number)}
+          {@const ref = { from: step.from, to: step.to, phase: one.name }}
+          {@const talks = discovered.openOn({ step: ref })}
+          {@const shown = atRest(step)}
+          {@const open = opened === number}
+          <div
+            class="step"
+            class:proposed={step.proposed}
+            class:open
+            aria-current={discovered.step === number || undefined}
+            {@attach (row: HTMLElement) => {
+              if (discovered.step === number) row.scrollIntoView({ block: 'nearest' });
             }}
           >
-            <span class="caret" aria-hidden="true"
-              >{#if shown.opens && !board.viewOnly}{#if open}<ChevronDown size={12} />{:else}<ChevronRight
-                    size={12}
-                  />{/if}{/if}</span
-            >
-            <span class="at">{number}</span>
-            <span class="what">
-              <span class="route"
-                ><b>{name(step.from)}</b> <span class="verb">{VERB[step.kind] ?? 'calls'}</span>
-                <b>{name(step.to)}</b></span
-              >
-              {#if shown.line && !open}<span class="summary">{shown.line}</span>{/if}
-            </span>
-          </button>
-          <span class="end">
-            {#if discovered.commenting}
-              <button
-                class="text here"
-                type="button"
-                aria-label="Comment on step {number}"
-                onclick={() => {
-                  discovered.commenting = false;
-                  discovered.thread = { on: { step: ref } };
-                }}>Here</button
-              >
-            {:else if talks.length && !board.viewOnly}
-              <button
-                class="talk"
-                type="button"
-                aria-label="{talks.length} {talks.length === 1 ? 'comment' : 'comments'} on step {number}"
-                onclick={() => {
-                  discovered.thread = { id: talks[0]?.id ?? '' };
-                }}>{talks.length}</button
-              >
-            {/if}
-            {#if !step.proposed && !board.viewOnly}
-              <button
-                class="off"
-                type="button"
-                aria-label="Take step {number} off"
-                title="Take this step off the feature"
-                onclick={() => {
-                  discovered.editFeature({ unstep: [{ ...step, phase: one.name }] });
-                }}><X size={14} /></button
-              >
-            {/if}
-          </span>
-          {#if open}
-            <div class="opened">
-              {#if step.summary}<p class="said">{step.summary}</p>{/if}
-              {#if step.values?.length}
-                <dl class="values">
-                  {#each step.values as value (value.label)}
-                    <div>
-                      <dt>{value.label}</dt>
-                      {#each value.items as item, at (at)}
-                        <dd>
-                          {#each valueWords(item) as words, part (part)}{#if words.date}<span class="nowrap"
-                                >{words.text}</span
-                              >{:else}{#each breakable(words.text) as bit, cut (cut)}{#if cut}<wbr
-                                  />{/if}{bit}{/each}{/if}{/each}
-                        </dd>
-                      {/each}
-                    </div>
-                  {/each}
-                </dl>
-              {/if}
-              {#if step.note && step.note !== shown.line}
-                <div class="agent">
-                  <span class="label">Agent’s note</span>
-                  <p>
-                    {#each noteWords(step.note) as words, part (part)}{#if words.code}<code class:nowrap={words.date}
-                          >{#each breakable(words.text) as bit, cut (cut)}{#if cut}<wbr />{/if}{bit}{/each}</code
-                        >{:else}{words.text}{/if}{/each}
-                  </p>
-                </div>
-              {/if}
-            </div>
-          {/if}
-          {#if board.viewOnly && shown.opens}
             <button
-              class="text details"
+              class="head"
               type="button"
-              aria-expanded={open}
-              onclick={() => {
-                opened = open ? null : number;
-              }}>{open ? 'Hide details' : 'Details'}</button
+              aria-label="Step {number}: {name(step.from)} {VERB[step.kind] ?? 'calls'} {name(step.to)}"
+              aria-expanded={shown.opens ? open : undefined}
+              title={board.viewOnly
+                ? 'Pick its two cards (Shift adds them to the pick)'
+                : 'Pick its two cards, to plan a run with them (Shift adds them to the pick)'}
+              onclick={ev => {
+                if (shown.opens) opened = open ? null : number;
+                discovered.picked = [...new Set([...(ev.shiftKey ? discovered.picked : []), step.from, step.to])];
+              }}
             >
-          {/if}
-          {#if step.proposed}
-            <span class="ask"
-              ><strong>Proposed</strong>
-              <button class="text" type="button" onclick={() => void discovered.accept([{ ...step, phase: one.name }])}
-                >Accept</button
+              <span class="caret" aria-hidden="true"
+                >{#if shown.opens && !board.viewOnly}{#if open}<ChevronDown size={12} />{:else}<ChevronRight
+                      size={12}
+                    />{/if}{/if}</span
               >
+              <span class="at">{number}</span>
+              <span class="what">
+                <span class="route"
+                  ><b>{name(step.from)}</b> <span class="verb">{VERB[step.kind] ?? 'calls'}</span>
+                  <b>{name(step.to)}</b></span
+                >
+                {#if shown.line && !open}<span class="summary">{shown.line}</span>{/if}
+              </span>
+            </button>
+            <span class="end">
+              {#if discovered.commenting}
+                <button
+                  class="text here"
+                  type="button"
+                  aria-label="Comment on step {number}"
+                  onclick={() => {
+                    discovered.commenting = false;
+                    discovered.thread = { on: { step: ref } };
+                  }}>Here</button
+                >
+              {:else if talks.length && !board.viewOnly}
+                <button
+                  class="talk"
+                  type="button"
+                  aria-label="{talks.length} {talks.length === 1 ? 'comment' : 'comments'} on step {number}"
+                  onclick={() => {
+                    discovered.thread = { id: talks[0]?.id ?? '' };
+                  }}>{talks.length}</button
+                >
+              {/if}
+              {#if !step.proposed && !board.viewOnly}
+                <button
+                  class="off"
+                  type="button"
+                  aria-label="Take step {number} off"
+                  title="Take this step off the feature"
+                  onclick={() => {
+                    discovered.editFeature({ unstep: [{ ...step, phase: one.name }] });
+                  }}><X size={14} /></button
+                >
+              {/if}
+            </span>
+            {#if open}
+              <div class="opened">
+                {#if step.summary}<p class="said">{step.summary}</p>{/if}
+                {#if step.values?.length}
+                  <dl class="values">
+                    {#each step.values as value (value.label)}
+                      <div>
+                        <dt>{value.label}</dt>
+                        {#each value.items as item, at (at)}
+                          <dd>
+                            {#each valueWords(item) as words, part (part)}{#if words.date}<span class="nowrap"
+                                  >{words.text}</span
+                                >{:else}{#each breakable(words.text) as bit, cut (cut)}{#if cut}<wbr
+                                    />{/if}{bit}{/each}{/if}{/each}
+                          </dd>
+                        {/each}
+                      </div>
+                    {/each}
+                  </dl>
+                {/if}
+                {#if step.note && step.note !== shown.line}
+                  <div class="agent">
+                    <span class="label">Agent’s note</span>
+                    <p>
+                      {#each noteWords(step.note) as words, part (part)}{#if words.code}<code class:nowrap={words.date}
+                            >{#each breakable(words.text) as bit, cut (cut)}{#if cut}<wbr />{/if}{bit}{/each}</code
+                          >{:else}{words.text}{/if}{/each}
+                    </p>
+                  </div>
+                {/if}
+              </div>
+            {/if}
+            {#if board.viewOnly && shown.opens}
               <button
-                class="text"
+                class="text details"
                 type="button"
+                aria-expanded={open}
                 onclick={() => {
-                  discovered.drop([{ ...step, phase: one.name }]);
-                }}>Drop</button
-              ></span
-            >
-          {/if}
-        </div>
-      {:else}
-        <p class="none">No steps yet. Pick a card and add its links as steps.</p>
-      {/each}
+                  opened = open ? null : number;
+                }}>{open ? 'Hide details' : 'Details'}</button
+              >
+            {/if}
+            {#if step.proposed}
+              <span class="ask"
+                ><strong>Proposed</strong>
+                <button
+                  class="text"
+                  type="button"
+                  onclick={() => void discovered.accept([{ ...step, phase: one.name }])}>Accept</button
+                >
+                <button
+                  class="text"
+                  type="button"
+                  onclick={() => {
+                    discovered.drop([{ ...step, phase: one.name }]);
+                  }}>Drop</button
+                ></span
+              >
+            {/if}
+          </div>
+        {:else}
+          <p class="none">No steps yet. Pick a card and add its links as steps.</p>
+        {/each}
+      {/if}
     </section>
   {:else}
     <p class="none">No steps yet. Pick a card and add its links as steps.</p>
@@ -376,26 +400,28 @@
   .here {
     align-self: start;
   }
+  /* The request in two lines at most, muted, with no box; changed in place. */
   .request {
-    display: grid;
-    gap: 6px;
-    margin-top: 14px;
-    padding: 12px 14px;
-    border: 1px solid var(--line);
-    background: var(--desk);
+    margin-top: 10px;
+  }
+  .request .said {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--muted);
+    font: 400 13px/1.45 var(--sans);
+    text-align: left;
+    cursor: text;
   }
   .label {
     color: var(--ink-muted);
     font: 400 12px var(--sans);
-  }
-  .said {
-    padding: 0;
-    border: 0;
-    background: none;
-    color: var(--ink);
-    font: 400 14px/1.5 var(--sans);
-    text-align: left;
-    cursor: text;
   }
   textarea,
   input {
@@ -436,12 +462,14 @@
     display: flex;
     align-items: center;
     gap: 10px;
+    padding: 0 0 6px;
   }
   .phase {
     display: flex;
     flex: 1;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
+    min-width: 0;
     padding: 0;
     border: 0;
     background: none;
@@ -454,13 +482,28 @@
     display: grid;
     flex: none;
     place-items: center;
-    width: 18px;
-    height: 18px;
+    width: 20px;
+    height: 20px;
     background: var(--ink);
-    color: var(--desk);
-    font: 600 11px var(--mono);
+    color: var(--panel);
+    font: 600 12px var(--mono);
   }
-  .phase[aria-pressed='true'] .number {
+  .phase .name {
+    flex: 1;
+    min-width: 0;
+  }
+  .fold {
+    display: flex;
+    color: var(--muted);
+  }
+  .folded {
+    margin: 0;
+    padding: 0 0 10px 28px;
+    border-bottom: 1px solid var(--line);
+    color: var(--muted);
+    font: 400 12px var(--sans);
+  }
+  .marked .number {
     outline: 2px solid var(--ink);
     outline-offset: 2px;
   }

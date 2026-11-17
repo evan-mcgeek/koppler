@@ -58,7 +58,7 @@ test('the home lists the whole stack first, then the feature boards, and opens e
   await expect(page.getByRole('button', { name: 'Board: Checkout flow' })).toBeVisible();
   // A feature board's steps take the left; the board menu leads back to the whole stack.
   const steps = page.getByRole('complementary', { name: 'Checkout flow' });
-  await expect(steps.locator('.kind')).toHaveText('Feature board · 2 steps');
+  await expect(steps.locator('.kind')).toHaveText('Feature board · 1 phase · 2 steps');
   await expect(steps.locator('.step')).toHaveText([
     /^\s*1\.1\s*Web Shop\s*calls Orders API/,
     /^\s*1\.2\s*Orders API\s*calls Payments API/,
