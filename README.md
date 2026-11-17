@@ -10,19 +10,20 @@ Koppler does the wiring, the tunnels, the local queues and the start order, and 
 Everything you leave unplugged keeps calling the deployed environment you chose.
 
 Koppler is for local development.
-It helps most when you work on one app (a mobile app, a front end, one API) and need a few of its neighbours running next to it.
+It helps most when you work on one app and need a few of its neighbours running next to it.
+That app can be a mobile app, a front end or one API.
 
 <img alt="One feature, Checkout, worked on across four apps: the mobile app and web shop cabled to a local Orders API, which calls a local Payments API; each runs its feature/checkout branch, Orders API has its deployed QA database and a local SQS queue, two apps carry a note for the agent, and everything runs" src="docs/images/board.png">
 
 ## How it works
 
-- **A shared stack.** The team describes its apps once in a `stack.json` in a repo they share: what each app is, how it runs, what it calls, which queues it uses, which secrets it needs.
+- **A shared stack.** The team describes its apps once in a `stack.json` in a repo they share. The file says what each app is, how it runs, what it calls, which queues it uses and which secrets it needs.
 - **A board per person.** On the canvas each app is a card. A cable from one card to another means "this caller uses my local copy of that app". Team boards load a usual setup in one click.
-- **Run.** Koppler switches branches, points callers at the local apps, opens tunnels, starts local queues and starts the apps callees first, checking that each one answers. Before anything starts, a review lists what will start, what keeps calling the deployed environment and which tunnels open.
+- **Run.** Koppler switches branches, points callers at the local apps, opens tunnels and starts local queues. It starts the apps callees first and checks that each one answers. Before anything starts, a review lists what will start, what keeps calling the deployed environment and which tunnels open.
 - **Live cards.** Each card shows its steps, whether its port answers, and its log.
-- **Settings, not JSON.** Every fact of the stack is edited in the canvas's settings or with `koppler stack set`, checked before it is kept; a lock keeps a field as it is. Nobody edits `stack.json` by hand.
+- **Settings, not JSON.** Every fact of the stack is edited in the canvas's settings or with `koppler stack set`, and checked before it is kept. A lock keeps a field as it is. Nobody edits `stack.json` by hand.
 - **Stop and revert.** One click stops what Koppler started and undoes every temporary change. Apps you started yourself are left alone.
-- **Secrets stay yours.** You store them in the macOS Keychain (on Linux, in files only you can read); Koppler starts an app with them and never shows them.
+- **Secrets stay yours.** You store them in the macOS Keychain (on Linux, in files only you can read). Koppler starts an app with them and never shows them.
 
 <img alt="The review before a Run on QA: the four apps that start on feature/checkout with their notes for the agent, what keeps calling deployed QA, and the tunnel that opens" src="docs/images/review.png" width="520">
 
@@ -34,13 +35,17 @@ koppler init
 koppler
 ```
 
-`koppler init` finds your repos and your team's stack (or starts a new one), and `koppler` on its own starts the canvas and opens it in your browser.
+`koppler init` finds your repos and your team's stack (or starts a new one).
+`koppler` on its own starts the canvas and opens it in your browser.
 [Getting started](docs/getting-started.md) walks through the first run.
 
 ## The agent add-on
 
 Koppler works on its own.
-With an AI agent it does more: you describe a setup in chat ("run the Orders API against my local Payments API"), the agent fills in what the stack is missing from the repos, takes notes like "use the test account" into a run, and explains and fixes what fails.
+With an AI agent it does more.
+You describe a setup in chat ("run the Orders API against my local Payments API").
+The agent fills in what the stack is missing from the repos and takes notes like "use the test account" into a run.
+It also explains and fixes what fails.
 
 In Claude Code, add the plugin:
 
@@ -82,7 +87,9 @@ Everything else depends on your stack (the .NET SDK, Flutter, Docker, the AWS CL
 Koppler runs from `app/dist/`, which `npm run build` makes from `app/src/` (`npm install` first).
 While working on Koppler itself, link `app/scripts/koppler-dev.mjs` as `koppler`: it rebuilds when the source is newer, then runs the build.
 Run the tests with `npm test` in `app/`; unit tests sit next to their module as `<name>.test.ts`.
-The documentation's screenshots come from `npm run screenshots` in `app/`: it drives the canvas on a demo stack and writes `docs/images/`, with the hero and the social card drawn from `app/screenshots/brand.html`.
+The documentation's screenshots come from `npm run screenshots` in `app/`.
+It drives the canvas on a demo stack and writes `docs/images/`.
+The hero and the social card are drawn from `app/screenshots/brand.html`.
 The canvas has tests of its own that drive it in a browser: `npm install`, `npx playwright install chromium` once, then `npm run test:canvas`.
 `npm run lint`, `npm run types` and `npm run format:check` are what CI checks besides the tests; `npm run format` formats.
 `npm run check` runs all of it as CI does, side by side where it can, in about two minutes.
@@ -91,7 +98,8 @@ The canvas has tests of its own that drive it in a browser: `npm install`, `npx 
 
 Open an [issue](https://github.com/evan-mcgeek/koppler/issues/new?template=bug_report.md) with the steps to reproduce, the logs and, if you have one, an idea for the fix.
 `koppler status --debug [app...]` gives versions and recent logs with secrets and company names taken out, ready to paste.
-With the add-on, the agent does the same on its own: when it finds a bug in Koppler, it drafts the issue and files it once you agree.
+With the add-on, the agent does the same on its own.
+When it finds a bug in Koppler, it drafts the issue and files it once you agree.
 
 ## Status
 

@@ -38,7 +38,8 @@ Local addresses reach a back end as environment variables, named per cable in `s
 
 A `web` app is started with `npm run` like a Node app and opened in the browser.
 A local address is passed with the prefix the framework needs for browser code (`VITE_`, `NEXT_PUBLIC_`, `REACT_APP_`), or written to the git-ignored `.env.local`.
-Koppler also checks what a browser needs on the other side: the API must allow the front end's origin (CORS), and an https page cannot call an http API.
+Koppler also checks what a browser needs on the other side.
+The API must allow the front end's origin (CORS), and an https page cannot call an http API.
 Other front-end dev servers (Nuxt, Remix, Astro, ...) run as `node` apps through their npm script.
 
 ## Mobile
@@ -49,17 +50,20 @@ Other front-end dev servers (Nuxt, Remix, Astro, ...) run as `node` apps through
 | React Native and Expo                   | `reactnative` | iOS simulator or Android emulator (`npx expo start`, `npx react-native run-ios`) | Recognised   |
 | Native iOS (Swift) and Android (Kotlin) | none yet      | started by you from Xcode or Android Studio                                      | Not covered  |
 
-A simulator reaches your Mac's local apps at `localhost`, the Android emulator at `10.0.2.2`, and a phone at your Mac's address on the network, with the apps it calls opened to the network (`koppler run <app> --lan`).
+A simulator reaches your Mac's local apps at `localhost`, and the Android emulator at `10.0.2.2`.
+A phone reaches them at your Mac's address on the network, with the apps it calls opened to the network (`koppler run <app> --lan`).
 Koppler works out that address per device for Flutter and React Native; for a native app, set it in your project the same way.
 
 ## Serverless and cloud
 
-| Stack                       | Kind     | Started with                                                                                                                                                                            | Needs               |                     |
-| --------------------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------- | ------------------- |
-| AWS Lambda, queue-triggered | `lambda` | the function in its real runtime image, in the local AWS emulator that holds the board's local queues: triggered by the one it reads, or, with none, by a local address callers post to | Docker, the AWS CLI | Run for real (.NET) |
-| AWS SAM                     | `sam`    | `sam build`, then `sam local start-api`, with the environment's deploy parameters from `samconfig.toml`                                                                                 | Docker, the SAM CLI | Run for real        |
+| Stack                       | Kind     | Started with                                                                                                                                                                                   | Needs               |                     |
+| --------------------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------- | ------------------- |
+| AWS Lambda, queue-triggered | `lambda` | the function in its real runtime image, in the local AWS emulator that holds the board's local queues. It is triggered by the queue it reads or, with none, by a local address callers post to | Docker, the AWS CLI | Run for real (.NET) |
+| AWS SAM                     | `sam`    | `sam build`, then `sam local start-api`, with the environment's deploy parameters from `samconfig.toml`                                                                                        | Docker, the SAM CLI | Run for real        |
 
-A Lambda gets the settings its stack entry names (`lambda.env`), from a cable to a local app or a stored secret, and Parameter Store values from stored secrets (`lambda.parameters`); it can live in another app's repo, with that app's `slug` and its folder as `lambda.project`.
+A Lambda gets the settings its stack entry names (`lambda.env`), from a cable to a local app or a stored secret.
+It gets Parameter Store values from stored secrets (`lambda.parameters`).
+It can live in another app's repo, with that app's `slug` and its folder as `lambda.project`.
 
 A SAM app serves its API functions; functions triggered by queues, schedules or streams are listed in its log, not run.
 
@@ -74,7 +78,7 @@ Compose is checked last: many repos have a compose file only for their database.
 ## Anything else
 
 - **`other`:** any app, started by the command in its `start` field.
-- **Your own kinds:** a stack can define kinds for a technology Koppler has no recipe for: the files that recognise it, its start command and its port. See `kinds` in the [stack format](../plugin/skills/plan/references/stack.md).
+- **Your own kinds:** a stack can define kinds for a technology Koppler has no recipe for. Each kind gives the files that recognise it, its start command and its port. See `kinds` in the [stack format](../plugin/skills/plan/references/stack.md).
 - **Outside systems** (`outside`): things the apps call that never run locally, such as Salesforce or a SaaS API. They show in Discover, not on a board, and always use the deployed environment.
   An outside system's own links can come from its repos, read by the agent on request; for Salesforce, see [reading a Salesforce org](../plugin/skills/plan/references/salesforce.md).
 

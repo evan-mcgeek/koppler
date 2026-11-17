@@ -19,7 +19,8 @@ koppler stack locks
 In Claude Code that is a `permissions.allow` list in `.claude/settings.json`, one `Bash(koppler <command>:*)` entry per line above.
 Other agents have their own allow lists; use the same commands.
 
-Leave these asking every time, because they start or stop things, change code, branches or the stack, may touch production, show its data, or touch secrets: `koppler run`, `koppler up`, `koppler down`, `koppler stop`, `koppler switch`, `koppler recipes`, `koppler stack set`, `koppler stack unset`, `koppler query`, `koppler secret`.
+Leave these asking every time: `koppler run`, `koppler up`, `koppler down`, `koppler stop`, `koppler switch`, `koppler recipes`, `koppler stack set`, `koppler stack unset`, `koppler query`, `koppler secret`.
+They start or stop things, change code, branches or the stack, may touch production, show its data, or touch secrets.
 `koppler stack unlock` asks the person at the terminal, like approval.
 `koppler doctor --approve` cannot be allowed at all: it asks the person at the terminal, and refuses anywhere else.
 On PROD the user's Run on PROD on the canvas is the confirmation; `koppler query` stays in the user's own terminal.
@@ -34,5 +35,6 @@ To let the agent start PROD runs, allow the command in `permissions.allow`, in `
 { "permissions": { "allow": ["Bash(koppler up:*)"] } }
 ```
 
-An allowed command skips the auto mode check, on every environment, so only add it if the Run on PROD you confirm on the canvas is the check you want.
+An allowed command skips the auto mode check, on every environment.
+So only add it if the Run on PROD you confirm on the canvas is the check you want.
 Without the rule, start the run yourself: press Run on the canvas again, or run the `koppler up --run <id>` the agent gives you in your own terminal.

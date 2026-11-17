@@ -680,7 +680,7 @@ const COMMANDS: Command[] = [
     who: 'you',
     args: '<name> [-f] [-n <lines>] [--run <id>] | --all [-f] [--since run|1h|all] [--lines <n>] [--except <app,app>]',
     about:
-      'show or follow a log, secrets masked; --run shows the one a past run kept; --all shows every app on the board in one stream, in the order its lines came',
+      'show or follow a log, secrets masked. --run shows the one a past run kept. --all shows every app on the board in one stream, in the order its lines came',
     run: logs,
     example: 'koppler logs orders-api -f',
   },
@@ -908,7 +908,7 @@ const COMMANDS: Command[] = [
       ],
       [
         'edit "<name>" [--summary <from>:<to>="<sentence>"]... [--value <from>:<to>="<Label>=<value>"]...',
-        'say what a step does in one plain sentence, and the names it uses under one-word labels, beside its note; for a step added in the same command, or one already there',
+        'say what a step does in one plain sentence, and the names it uses under one-word labels, beside its note. It works for a step added in the same command, or one already there',
       ],
       [
         'edit "<name>" [--propose-step <from>:<to>[="<why>"]]... [--unstep <from>:<to>]...',
@@ -1018,7 +1018,7 @@ function help(command?: Command): void {
       '\n',
     );
   const lines = [
-    'Koppler plugs your local code into the real stack: the apps you change run on this Mac, wired together; the rest keeps calling a deployed environment.',
+    'Koppler plugs your local code into the real stack. The apps you change run on this Mac, wired together; the rest keeps calling a deployed environment.',
     '',
     'usage: koppler <command> [options]',
     '       koppler alone starts the canvas and its server, and opens it',

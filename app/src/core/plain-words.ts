@@ -19,3 +19,26 @@ export function summaryProblems(text: string): string[] {
     ...(names.length ? [`code names (${names.slice(0, 3).join(', ')})`] : []),
   ];
 }
+
+/** The most words a sentence of Koppler's own text may have. */
+export const SENTENCE_WORDS = 25;
+
+/** A sentence's words: an inline code span counts as one, punctuation alone as none. */
+export const wordsIn = (sentence: string): number =>
+  sentence
+    .replace(/`[^`]*`/g, 'x')
+    .split(/\s+/)
+    .filter(word => /[\p{L}\p{N}]/u.test(word)).length;
+
+/** A text's sentences: each line on its own, split after ".", "!" or "?" where a new sentence starts. */
+export const sentencesOf = (text: string): string[] =>
+  text
+    .split(/\n+|(?<=[.!?])\s+(?=[\p{Lu}"“(*`[-])/u)
+    .map(one => one.trim())
+    .filter(Boolean);
+
+/** The sentences over the limit, with their word counts. */
+export const tooLong = (text: string, most = SENTENCE_WORDS): { sentence: string; words: number }[] =>
+  sentencesOf(text)
+    .map(sentence => ({ sentence, words: wordsIn(sentence) }))
+    .filter(one => one.words > most);

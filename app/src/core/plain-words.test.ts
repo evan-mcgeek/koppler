@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isIdentifier, summaryProblems } from './plain-words.ts';
+import { isIdentifier, sentencesOf, summaryProblems, tooLong, wordsIn } from './plain-words.ts';
 
 describe('summaryProblems', () => {
   it('passes one plain sentence', () => {
@@ -24,5 +24,18 @@ describe('isIdentifier', () => {
     const plain = ['GraphQL', 'iOS', 'JavaScript', 'CRM', 'UTC', 'read/'];
     expect(named.filter(isIdentifier)).toEqual(named);
     expect(plain.filter(isIdentifier)).toEqual([]);
+  });
+});
+
+describe('sentences and words', () => {
+  it('counts a code span as one word and punctuation as none, and splits where a sentence starts', () => {
+    expect(wordsIn('Run `koppler canvas start --no-open` - then reload.')).toBe(4);
+    expect(sentencesOf('Stop the run. Then start again.\n--all shows every app. e.g. this stays')).toEqual([
+      'Stop the run.',
+      'Then start again.',
+      '--all shows every app. e.g. this stays',
+    ]);
+    const long = ['Word', ...Array.from({ length: 25 }, () => 'word')].join(' ');
+    expect(tooLong(`Short one. ${long}.`)).toEqual([{ sentence: `${long}.`, words: 26 }]);
   });
 });

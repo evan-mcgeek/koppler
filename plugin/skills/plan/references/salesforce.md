@@ -1,7 +1,8 @@
 # Reading a Salesforce org's links
 
 Salesforce is one outside card in the stack.
-Koppler has no Salesforce parser: you read the org's repos when the user asks, and record what you find on that card with the usual commands.
+Koppler has no Salesforce parser.
+You read the org's repos when the user asks, and record what you find on that card with the usual commands.
 
 ## When
 
@@ -26,7 +27,8 @@ A credential often comes in pairs, one per environment (for example `OrdersApi` 
 Match each address to an app's deployed address (`koppler stack get apps.<id>.deployedUrl`, and each `envs.<env>.deployedUrl`) to know which app it is and on which environment.
 An address no app owns is an outside system of its own: propose it, do not guess.
 
-Calls into Salesforce come from the other apps' repos (a `*.my.salesforce.com` address, an SDK, a Pub/Sub API subscriber): `koppler sync` finds them by address once the Salesforce card has its `url`.
+Calls into Salesforce come from the other apps' repos (a `*.my.salesforce.com` address, an SDK, a Pub/Sub API subscriber).
+`koppler sync` finds them by address once the Salesforce card has its `url`.
 
 ## Recording it
 

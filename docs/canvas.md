@@ -8,10 +8,16 @@ It is served on your machine only, and its address stays the same across restart
 The board holds the apps you want running locally.
 Every board you build is saved as you change it, per stack.
 Team boards are boards the stack shares with everyone who uses it; one click opens one.
-Each board is one board: changing a team board changes it in the stack's file, for the team too once the stack is shared (a linked stack sends it with `koppler stack propose`, a stack in a repo with a commit).
+Each board is one board: changing a team board changes it in the stack's file.
+It changes for the team too once the stack is shared.
+A linked stack sends it with `koppler stack propose`, a stack in a repo with a commit.
 A team board copied by an older Koppler, as `<name> (local)`, becomes the one team board again, with your copy's changes.
-**Share with team** proposes your board as a team board of the stack: a pull request on the stack's repo on GitHub, made from the team's `stack.json` as it is there, so nothing else on your Mac goes with it; the notes on its cards go with the board. Your team gets it once the pull request is merged.
-A stack that is not on GitHub keeps the board among its team boards in its file here, for you to commit; it is then one board, no longer yours too.
+**Share with team** proposes your board as a team board of the stack, in a pull request on the stack's repo on GitHub.
+The pull request is made from the team's `stack.json` as it is there, so nothing else on your Mac goes with it.
+The notes on its cards go with the board.
+Your team gets it once the pull request is merged.
+A stack that is not on GitHub keeps the board among its team boards in its file here, for you to commit.
+It is then one board, no longer yours too.
 The same is `koppler board share "<name>"` in the terminal.
 A board file can also be opened, dropped on the page or linked from GitHub.
 `koppler board new "<name>"` makes a board from the terminal, and `koppler board edit "<name>"` changes one, even one open on the canvas.
@@ -19,25 +25,45 @@ A board file can also be opened, dropped on the page or linked from GitHub.
 ### Areas
 
 A big stack can name its parts as areas, such as Payments or Shipping, and each app the areas it is in (`koppler stack set apps.<id>.areas '["payments"]'`).
-The stack's settings have an **Areas** tab to add, rename and remove areas, with how many apps and team boards each has; an area's id is made from its first name and stays when it is renamed, and dragging an area sets the order the board menu groups in.
-Removing an area that apps or team boards use asks first and names them; on Save it is taken out of every app and team board at once.
-An app's areas are under its name in its settings: each one can be taken out, and **Add** opens the stack's areas to tick; with none, the app shows in every area.
-**Areas**, above the Apps list and under **Find a board** in the board menu, picks the areas you want to see; your choice is kept on this Mac, per stack, and both places show the same one.
-With some areas picked, the Apps list groups its apps under them, then the apps in no area, which always show; the apps on the board always show too, under **On this board** when they are outside your areas.
-An app in two areas lists once, with "also" and the other one under its name, and a dashed line says how many apps your areas hide, with **Show all**.
-The board menu is one list: the team's boards and your own together under each area, the one most of their apps are in unless it was set by hand, with **No area** last and each heading's count beside it.
-Inside an area boards go by name; in a stack shared with a team (in a repo, or linked) a team board carries a small **Team** tag, your own none, and a feature board says so under its name.
-When your areas hide boards, a dashed line counts them by kind ("4 boards in Payments and Accounts: 3 team, 1 yours"); with no areas the menu is one list by name.
-**Find a board** looks through every board: one your areas hide shows under **Hidden by your areas**, and opening it leaves your choice as it is, with its area beside its name in the bar.
+The stack's settings have an **Areas** tab to add, rename and remove areas, with how many apps and team boards each has.
+An area's id is made from its first name and stays when it is renamed.
+Dragging an area sets the order the board menu groups in.
+Removing an area that apps or team boards use asks first and names them.
+On Save, it is taken out of every app and team board at once.
+An app's areas are under its name in its settings.
+Each one can be taken out, and **Add** opens the stack's areas to tick.
+With none, the app shows in every area.
+**Areas**, above the Apps list and under **Find a board** in the board menu, picks the areas you want to see.
+Your choice is kept on this Mac, per stack, and both places show the same one.
+With some areas picked, the Apps list groups its apps under them, then the apps in no area, which always show.
+The apps on the board always show too, under **On this board** when they are outside your areas.
+An app in two areas lists once, with "also" and the other one under its name.
+A dashed line says how many apps your areas hide, with **Show all**.
+The board menu is one list: the team's boards and your own together under each area.
+A board goes under the area most of its apps are in, unless it was set by hand.
+**No area** comes last, and each heading's count is beside it.
+Inside an area, boards go by name.
+In a stack shared with a team (in a repo, or linked), a team board carries a small **Team** tag, your own none.
+A feature board says so under its name.
+When your areas hide boards, a dashed line counts them by kind ("4 boards in Payments and Accounts: 3 team, 1 yours").
+With no areas, the menu is one list by name.
+**Find a board** looks through every board.
+One your areas hide shows under **Hidden by your areas**.
+Opening it leaves your choice as it is, with its area beside its name in the bar.
 In Plan and Live a card says its areas after its kind, only while your areas hide some.
 Discover leaves the apps outside your areas off the map, with their links, but never the board's own.
 A card that links to one keeps a dashed **+N hidden**, which names them and their areas and opens the Areas checklist.
-A dashed line under the map says which areas it shows and how many apps it hides, with **Areas** and **Show all**, and a picked card's panel still lists its hidden links, muted, each with its area.
-**Find a card** (`/`) marks an app your areas hide as **Hidden by your areas**, with its areas; picking it adds those areas to your choice and brings it onto the map.
+A dashed line under the map says which areas it shows and how many apps it hides, with **Areas** and **Show all**.
+A picked card's panel still lists its hidden links, muted, each with its area.
+**Find a card** (`/`) marks an app your areas hide as **Hidden by your areas**, with its areas.
+Picking it adds those areas to your choice and brings it onto the map.
 When a board's apps tie between areas, its tooltip in the board menu says which area it went to and why.
-Right-click a board in the menu, or point at it and click **…**, for **Set area…**: pick an area, or **Worked out from its apps** to take it from its apps again.
+Right-click a board in the menu, or point at it and click **…**, for **Set area…**.
+Pick an area, or **Worked out from its apps** to take it from its apps again.
 That menu also holds **Delete…**, and on your own boards **Share with the team…**; deleting a team board takes it out of the stack's file.
-Your own boards keep their area on this Mac; a team board's area is in the stack, so changing it changes it for the team, and its settings under **Team boards** set it too.
+Your own boards keep their area on this Mac.
+A team board's area is in the stack, so changing it changes it for the team.
+Its settings under **Team boards** set it too.
 Areas are a view only: what runs, the environments and the secrets stay the same.
 
 ## Cards
@@ -52,27 +78,38 @@ Each app is a card with:
 - **Note:** an instruction for the agent about this app, such as a feature flag or a test account (needs the [agent add-on](../README.md#the-agent-add-on)).
 - **Local libraries:** when another of your clones publishes a package the app depends on, the app can use your local copy instead.
 - **Status, steps and log** once it runs.
-  After a run starts an app, Koppler reads its log for its first 30 seconds: the **First 30 s** step says it found no errors, or shows the lines that tell of one and hands them to the agent.
+  After a run starts an app, Koppler reads its log for its first 30 seconds.
+  The **First 30 s** step says it found no errors, or shows the lines that tell of one and hands them to the agent.
 
 Apps you have not cloned yet show greyed out, with the command to clone them.
 
-Under its name, a card's sections fold to one line each, saying what they hold: Setup (branch, who starts it, tunnels, queues, libraries, cables), Databases, Note for the agent, and Calls, the deployed apps it still calls (in Plan only).
-A click on a line opens or folds it, ⌥-click does every section, and **Fold all** / **Open all** are among its actions; a new card starts with Setup open, and each card keeps how it was left on this Mac.
+Under its name, a card's sections fold to one line each, saying what they hold.
+The sections are Setup (branch, who starts it, tunnels, queues, libraries, cables), Databases, Note for the agent, and Calls.
+Calls lists the deployed apps it still calls (in Plan only).
+A click on a line opens or folds it, and ⌥-click does every section.
+**Fold all** / **Open all** are among its actions.
+A new card starts with Setup open, and each card keeps how it was left on this Mac.
 The failure and **Ask the agent to fix** never fold.
 
-Pointing at a card shows its actions above it: run it alone, stop or restart it while it runs, its log, its settings, and taking it off the board.
+Pointing at a card shows its actions above it.
+They are: run it alone, stop or restart it while it runs, its log, its settings, and taking it off the board.
 
 <img alt="A running card: its actions above it, its branch, all its steps done, and the deployed app it still calls" src="images/card.png" width="320">
 
 ## Settings
 
-**Settings** in a card's tools, the gear on a queue or outside system, and **Stack settings** in the top bar's Settings menu open settings: every fact the stack holds about that thing, in tabs.
+**Settings** in a card's tools, the gear on a queue or outside system, and **Stack settings** in the top bar's Settings menu open settings.
+They show every fact the stack holds about that thing, in tabs.
 
 <img alt="An app's settings: its name, kind and slug, then tabs; Runs here shows its start command, local address, readiness check and more, each with a lock" src="images/settings.png" width="480">
 
 - Changes are a draft until **Save**, which checks the whole stack and says where anything is wrong. **Discard** drops them, and closing with changes asks first.
-- **Needs first** lists what an app needs before it runs, one row each: a tunnel, an AWS sign-in, a hosts entry, a sign-in of the stack's own, the local HTTPS certificate, a private package feed. **Add a need** asks which, then shows only that kind's fields.
-- What Koppler knows is picked, not typed: the kind, the AWS profile (names from your AWS config), the project, launch settings, launch profile or script from the app's clone, the apps it calls, the queues it uses.
+- **Needs first** lists what an app needs before it runs, one row each.
+  A row can be a tunnel, an AWS sign-in, a hosts entry or a sign-in of the stack's own.
+  It can also be the local HTTPS certificate or a private package feed.
+  **Add a need** asks which, then shows only that kind's fields.
+- What Koppler knows is picked, not typed: the kind and the AWS profile (names from your AWS config).
+  So are the project, launch settings, launch profile or script from the app's clone, the apps it calls and the queues it uses.
 - **Environments** shows what each environment after the first uses: its own value, or the first one's.
 - The lock beside a field keeps it as it is, for you, for commands and for the agent. Unlocking from the terminal (`koppler stack unlock`) asks you.
 - **Ask the agent to fill in** has the agent read the repo and propose the empty fields; locked fields stay.
@@ -81,8 +118,12 @@ The same fields can be read and changed with `koppler stack get`, `set` and `uns
 
 ## Appearance
 
-The canvas is dark, with square corners and hairlines, and colour only as a signal: one colour for what runs on your machine, one for what still calls the deployed environment, amber when something needs you, and red for PROD and failures.
-**Appearance**, in the top bar's Settings menu or behind the gear at the bottom of the side pane, has eight schemes, five dark (Mono, the default, then Patch bay, Signal, Scope and Sodium) and three light (Paper, Blueprint and Workshop), and the local and deployed colours picked by hand over the scheme.
+The canvas is dark, with square corners and hairlines, and colour only as a signal.
+One colour is for what runs on your machine, and one for what still calls the deployed environment.
+Amber shows when something needs you, and red is for PROD and failures.
+**Appearance** is in the top bar's Settings menu or behind the gear at the bottom of the side pane.
+It has eight schemes: five dark (Mono, the default, then Patch bay, Signal, Scope and Sodium) and three light (Paper, Blueprint and Workshop).
+It also has the local and deployed colours, picked by hand over the scheme.
 Warning and PROD colours are never among the picks, so a custom colour can never be mistaken for either.
 PROD stays red and striped in every scheme.
 Your choice is kept in this browser.
@@ -110,20 +151,43 @@ These appear next to the app that uses them, and show or hide with it.
 
 <img alt="Orders API and Payments API, their databases Orders and Payments behind one tunnel to the Aurora cluster: the tunnel card has a row for each database, open for both, and each database card is deployed on QA and reachable" src="images/databases.png">
 
-- **Databases** the stack names under `databases` each have a card, with a switch between **Deployed** (dashed: the environment's database, through its tunnel) and **Local** (solid: your own database on this Mac).
-  The first time a database goes Local, its card asks where it runs (host, port, database name), with **Test connection**; the address is kept on this Mac only, never in the stack, and can be changed from the card or the database's settings.
+- **Databases** the stack names under `databases` each have a card.
+  The card has a switch between **Deployed** (dashed: the environment's database, through its tunnel) and **Local** (solid: your own database on this Mac).
+  The first time a database goes Local, its card asks where it runs (host, port, database name), with **Test connection**.
+  The address is kept on this Mac only, never in the stack.
+  It can be changed from the card or the database's settings.
   A run points each app at its local database through its setting, or the one line the stack says to change, undone on Stop. Deployed on PROD asks first.
-- The tunnel card has a row per database behind it, and the line to each database leaves from its row. **Show tunnel** on an app's card draws its line through the tunnel card, or straight to the database; by default the tunnel shows when two or more apps on the board share it. A right click on a line does the same.
+- The tunnel card has a row per database behind it, and the line to each database leaves from its row.
+  **Show tunnel** on an app's card draws its line through the tunnel card, or straight to the database.
+  By default the tunnel shows when two or more apps on the board share it.
+  A right click on a line does the same.
 
 - **Tunnels** carry an app to a deployed database or service. Koppler opens one per host and port, shared by the apps that need it, and moves a clashing one to a free port. Each can be left out of a run, and one that runs can be restarted from its card when calls through it hang.
-- **Queues** an app on the board publishes to or reads from show which apps do: SQS queues and Kafka topics, the ones Koppler can run here. A switch on the card picks **Deployed** (local apps use the environment's queue) or **Local** (Koppler starts an SQS emulator or a Kafka broker in Docker and points every app on that queue at it). A queue can be hidden and shown again from its app.
-- A scheduled job (an app with a `schedule`) is always the deployed one: Discover draws it beside the app whose repo it ships from, joined by a dashed "same repo" line; its panel gives its schedule in words for the environment read (the expression on hover) and "deployed only". A phase that starts from a job carries its schedule.
-  Plan and Live draw no job card: an app on the board that uses a deployed database or queue a job uses says so in one line ("2 jobs use Orders DB: …"), which opens them in Discover. The Apps list keeps jobs folded under **Scheduled jobs** at its foot, not counted; search "job" lists only them. In a job's settings, **Runs as** is **On a schedule**, with a schedule for each environment read back in words.
-- Everything that never runs here is in Discover, not on the board: outside systems (a payment provider, a CRM), SNS topics and event buses, and what feeds a queue from further up. Click an outside system in the Apps list to open it there; add one with **Add outside system…** under the list.
-- Every link with a direction leaves its sender as a small dot and lands in the receiver's ring, with a chevron pointing in: into a queue publishes, into an app from a queue reads, into another app calls. Database and tunnel links go both ways: a dot at each end.
+- **Queues** an app on the board publishes to or reads from show which apps do.
+  They are SQS queues and Kafka topics, the ones Koppler can run here.
+  A switch on the card picks **Deployed** (local apps use the environment's queue) or **Local**.
+  With **Local**, Koppler starts an SQS emulator or a Kafka broker in Docker and points every app on that queue at it.
+  A queue can be hidden and shown again from its app.
+- A scheduled job (an app with a `schedule`) is always the deployed one.
+  Discover draws it beside the app whose repo it ships from, joined by a dashed "same repo" line.
+  Its panel gives its schedule in words for the environment read (the expression on hover) and "deployed only".
+  A phase that starts from a job carries its schedule.
+  Plan and Live draw no job card.
+  An app on the board that uses a deployed database or queue a job uses says so in one line.
+  The line reads "2 jobs use Orders DB: …" and opens them in Discover.
+  The Apps list keeps jobs folded under **Scheduled jobs** at its foot, not counted; search "job" lists only them.
+  In a job's settings, **Runs as** is **On a schedule**, with a schedule for each environment read back in words.
+- Everything that never runs here is in Discover, not on the board.
+  This covers outside systems (a payment provider, a CRM), SNS topics and event buses, and what feeds a queue from further up.
+  Click an outside system in the Apps list to open it there; add one with **Add outside system…** under the list.
+- Every link with a direction leaves its sender as a small dot and lands in the receiver's ring, with a chevron pointing in.
+  A chevron into a queue publishes, into an app from a queue reads, and into another app calls.
+  Database and tunnel links go both ways: a dot at each end.
 - Pick a card, or Shift-click several, to trace them: their links stay lit and say what they do, everything else fades back. Point at a link and it says who does what.
 - What a board hides stays hidden with that board: a board for one flow can leave out the queues of the others.
-- Every card, not only an app's, takes a note for the agent, kept with the board and handed to the agent with the run. On a queue, a database or a tunnel, pick the card and choose **Add note** in its foot; a written note reads as text, and a click opens it to edit.
+- Every card, not only an app's, takes a note for the agent, kept with the board and handed to the agent with the run.
+  On a queue, a database or a tunnel, pick the card and choose **Add note** in its foot.
+  A written note reads as text, and a click opens it to edit.
 
 ## Environment
 
@@ -131,7 +195,8 @@ The environment switch in the header lists the stack's environments.
 Unplugged calls, tunnels and deployed queues follow it.
 On PROD the whole page is framed in red, with a striped band under the header.
 
-On a production environment the review shows anything that blocks the run first, keeps the plan's header and footer in view, and pressing Run there is the confirmation.
+On a production environment, the review shows anything that blocks the run first, and keeps the plan's header and footer in view.
+Pressing Run there is the confirmation.
 Queries against production stay in your own terminal.
 
 ## Run and Stop
@@ -141,7 +206,9 @@ Nothing starts, stops or restarts until you confirm it there; then Koppler runs 
 
 <img alt="The review before a Run on QA: the four apps that start on feature/checkout with their notes for the agent, what keeps calling deployed QA, and the tunnel that opens" src="images/review.png" width="480">
 
-With the agent add-on, Run's menu has two more ways: **Run with a note for the agent…** passes an instruction for the whole run, and **Get a checklist instead** asks the agent for a per-app checklist instead of changing anything.
+With the agent add-on, Run's menu has two more ways.
+**Run with a note for the agent…** passes an instruction for the whole run.
+**Get a checklist instead** asks the agent for a per-app checklist instead of changing anything.
 The agent answers on the canvas, with buttons for its questions.
 The agent chip in the toolbar says where the agent is:
 
@@ -160,64 +227,122 @@ The chip opens the agent's messages; with no agent listening, or one gone quiet,
 ## Views and shortcuts
 
 Koppler has two front doors, **Discover | Run**, the first control in the bar.
-**Discover** is for understanding and sharing a flow: the whole stack, or a feature board, with nothing to run, so its bar has no status, Activity, Stop or Run.
+**Discover** is for understanding and sharing a flow: the whole stack, or a feature board.
+It has nothing to run, so its bar has no status, Activity, Stop or Run.
 **Run** is for running a slice on this Mac: run boards, with **Plan** and **Live**.
-Each door keeps its own boards and comes back to the one it was on: Discover's board menu lists **Whole stack** and the feature boards, with **Ask the agent for a new one…**; Run's lists the run boards.
+Each door keeps its own boards and comes back to the one it was on.
+Discover's board menu lists **Whole stack** and the feature boards, with **Ask the agent for a new one…**.
+Run's lists the run boards.
 Opening a feature board in Discover stops nothing that runs.
 Discover's home, on its left, lists **Whole stack** first, then the team's feature boards and yours, each with its phases and steps.
-**Ask about** the stack at its foot hands a question to the agent: it becomes a feature board of your own named after the question, and the agent's finds show on the map, dashed, until you accept them; while it works, the board says **Agent drafting** and how many it has found.
+**Ask about** the stack at its foot hands a question to the agent.
+It becomes a feature board of your own, named after the question.
+The agent's finds show on the map, dashed, until you accept them.
+While it works, the board says **Agent drafting** and how many it has found.
 
 **Discover** on **Whole stack** shows how the stack fits together: every app, queue, database, resource and outside system, read from the stack.
 On a big stack, pick your areas to narrow it.
-**Show** at the map's top right hides whole kinds of card: services and clients, jobs and functions (a schedule, a Lambda or a workflow), outside systems, queues and topics (each queue type on its own too), databases and cloud resources.
-A link that ran through hidden cards is drawn dotted, straight between the cards still shown, and a flow's step through a hidden card is walked on it.
+**Show** at the map's top right hides whole kinds of card:
+
+- services and clients
+- jobs and functions (a schedule, a Lambda or a workflow)
+- outside systems
+- queues and topics (each queue type on its own too)
+- databases and cloud resources
+
+A link that ran through hidden cards is drawn dotted, straight between the cards still shown.
+A flow's step through a hidden card is walked on it.
 It works the same on a feature board and on an exported page; the choice is kept in this browser, per stack.
 Discover's home counts the whole stack by kind: "26 services · 8 jobs · 32 outside systems".
-A card on the map shows only its name and kind; what it is, its branch, its repo, where the deployed one answers, its schedule and a dead end are in its panel when it is picked.
+A card on the map shows only its name and kind.
+Once picked, its panel shows what it is, its branch, its repo, where the deployed one answers, its schedule and a dead end.
 Nothing on it runs or changes the board.
-Its tools are the board's: Select and Hand, Undo, Arrange (each press the next layout), Fit, zoom and Present, with the same keys; dragging over the map picks the cards in it, and the overview sits in the corner.
+Its tools are the board's, with the same keys: Select and Hand, Undo, Arrange (each press the next layout), Fit, zoom and Present.
+Dragging over the map picks the cards in it, and the overview sits in the corner.
 A dashed link was found in the code and is not in the stack yet, and **Confirm** in the panel keeps it there.
-A card added or changed in your stack and not in the shared one yet (not committed in the stack's repo, or for a stack linked from GitHub, not merged there) is tagged **New** or **Changed**; its panel says which fields changed.
-An app whose clone is on another branch than its repo's main one, or has files changed, says so in its panel (`feat/refunds, 3 changed`), with the apps that call it, which would meet those changes.
-An app's panel opens with its description, when its settings have one: a line on what it does, which `koppler guide` and the exported page also show.
-A call whose place in the code is known (where it was found, or the settings file the stack names) has **Open in editor**, which opens that file in the caller's clone, at its line, in VS Code or any editor that takes `vscode://` links.
-A **?** on a link means the stack records the call without saying where it comes from (no setting, file or place in the code): **No source yet**.
-Resources are what the stack's `resources` name: an S3 bucket's link says whether the app **reads**, **writes** or **both**; an API Gateway's panel lists its routes and what each hands to; a Step Functions panel lists what starts it and its steps in order.
-**Read again** reads the code once more: your clones, and, with your `gh` login, the repos not cloned here, from a copy Koppler keeps for reading only (`koppler sync --github`).
+A card added or changed in your stack and not in the shared one yet is tagged **New** or **Changed**.
+That is, it is not committed in the stack's repo, or for a stack linked from GitHub, not merged there.
+Its panel says which fields changed.
+An app whose clone is on another branch than its repo's main one, or has files changed, says so in its panel (`feat/refunds, 3 changed`).
+It shows the apps that call it too, which would meet those changes.
+An app's panel opens with its description, when its settings have one.
+The description is a line on what it does, which `koppler guide` and the exported page also show.
+A call whose place in the code is known (where it was found, or the settings file the stack names) has **Open in editor**.
+It opens that file in the caller's clone, at its line, in VS Code or any editor that takes `vscode://` links.
+A **?** on a link means **No source yet**.
+The stack records the call without saying where it comes from (no setting, file or place in the code).
+Resources are what the stack's `resources` name.
+An S3 bucket's link says whether the app **reads**, **writes** or **both**.
+An API Gateway's panel lists its routes and what each hands to.
+A Step Functions panel lists what starts it and its steps in order.
+**Read again** reads the code once more, in your clones.
+With your `gh` login, it also reads the repos not cloned here, from a copy Koppler keeps for reading only (`koppler sync --github`).
 An app whose repo holds other apps of the stack too (a Lambda in an API's repo) names that repo in its panel.
 A queue or topic something sends to that nothing reads or passes on is flagged **Dead end · no readers**: its links stop at a bar.
-Pick several cards (Shift-click, or a step's number in a feature board's panel for its two apps) and **Plan a run with these** asks where they go: a **New run board**, named after the flow and laid out, or **Add to a run board**; then Run opens on it.
-Only the cloned apps cross; the rest stay deployed and are listed in **Left out**, with a clone command for each app, and the flow's steps and descriptions stay in Discover.
-A run board planned from a feature board keeps it: a **Flow** chip on the board leads back with **Open in Discover**, the board menu says "from <flow>" under its name, and a card's **Show in Discover** opens that flow with the card picked.
+Pick several cards (Shift-click, or a step's number in a feature board's panel for its two apps).
+**Plan a run with these** then asks where they go.
+The choices are a **New run board**, named after the flow and laid out, or **Add to a run board**.
+Then Run opens on it.
+Only the cloned apps cross.
+The rest stay deployed and are listed in **Left out**, with a clone command for each app.
+The flow's steps and descriptions stay in Discover.
+A run board planned from a feature board keeps it.
+A **Flow** chip on the board leads back with **Open in Discover**, and the board menu says "from <flow>" under its name.
+A card's **Show in Discover** opens that flow with the card picked.
 
 <img alt="Discover on QA: the whole stack with the board's apps drawn solid, Orders API picked and its links listed in the panel" src="images/discover.png">
 
-A **feature board** (**Ask the agent for a new one…** in Discover's board menu, or **Ask about** on its home) is for one feature: the request it came from, and which of the stack's links it uses, as numbered steps in phases.
+A **feature board** (**Ask the agent for a new one…** in Discover's board menu, or **Ask about** on its home) is for one feature.
+It holds the request it came from, and which of the stack's links it uses, as numbered steps in phases.
 One link can be a step in several phases, each with its own number and note.
-Describe the feature and **Hand it to the agent**: its proposals show dashed, each with Accept and Drop, until you accept them; accepting a link the stack does not have yet records it there.
+Describe the feature and **Hand it to the agent**.
+Its proposals show dashed, each with Accept and Drop, until you accept them.
+Accepting a link the stack does not have yet records it there.
 Or start from an app, and add a picked card's links with **Add as a step**.
 The panel on the left holds the request and the steps in phases.
 Each step reads as one sentence ("Web Shop calls Orders API") with its summary under it.
-A click on a step opens it to its values and the agent's note, and picks its two cards; one step is open at a time.
-A click on a phase folds it to its name and its count of steps, kept per board; rename or remove a phase, or take a step off, from the panel.
+A click on a step opens it to its values and the agent's note, and picks its two cards.
+One step is open at a time.
+A click on a phase folds it to its name and its count of steps, kept per board.
+Rename or remove a phase, or take a step off, from the panel.
 A picked card's panel opens on the right.
-Each phase's title sits on the map over the card it starts from, above the cards; a click on it picks the phase, dimming the other phases' cards and links.
-**Walk through the steps**, or click a step's number on the map, to follow the feature one step at a time ("Step 2 of 7"): → and ← move on and back, each step brought into view with its summary and values, its link and two cards in ink and the rest at 45%, and its phase marked in the panel and on the map; **End** or Esc stops.
-**Comment**, then a click on a card or a step's **Here**, opens a thread beside the map; the agent is asked to answer it and does so in the thread, and while it works a warn dot shows on the card's marker.
-An answer that adds a step the feature misses draws it dashed until **Keep step N** makes it solid; **Undo** takes it off and leaves the thread.
-A card with open threads carries an ink marker with their number, a step carries it at its end, and the home and the board menu count each board's; **Resolve** hides a thread and its marker.
+Each phase's title sits on the map over the card it starts from, above the cards.
+A click on it picks the phase, dimming the other phases' cards and links.
+**Walk through the steps**, or click a step's number on the map, to follow the feature one step at a time ("Step 2 of 7").
+The → and ← keys move on and back.
+Each step is brought into view with its summary and values, its link and two cards in ink and the rest at 45%.
+Its phase is marked in the panel and on the map.
+**End** or Esc stops.
+**Comment**, then a click on a card or a step's **Here**, opens a thread beside the map.
+The agent is asked to answer it, and does so in the thread.
+While it works, a warn dot shows on the card's marker.
+An answer that adds a step the feature misses draws it dashed until **Keep step N** makes it solid.
+**Undo** takes it off and leaves the thread.
+A card with open threads carries an ink marker with their number, and a step carries it at its end.
+The home and the board menu count each board's threads.
+**Resolve** hides a thread and its marker.
 On a team board the threads are kept in the stack, for the team; on yours, only you see them. Share leaves them out unless you include them, and the page shows them to read only.
 
 <img alt="A feature board, Checkout: its steps numbered in two phases on the map and in the panel, and one step the agent proposed, dashed, with Accept and Drop" src="images/feature-board.png">
 
 To show the flows to people who never run Koppler, such as a product team, share the feature boards with the team, then run `koppler export`.
-It writes one page that opens in any browser with nothing to install or load: Discover itself, to read, with the flow's steps on the left and its map, where a reader picks another flow from the bar, moves cards about, picks one to see its links, and walks the steps.
-It holds each flow's request, steps, app names and kinds, with an app's description when it has one (its settings' Description, a few words on what it does), and nothing else of the stack: no addresses, settings, files, repos or code.
+It writes one page that opens in any browser with nothing to install or load.
+The page is Discover itself, to read, with the flow's steps on the left and its map.
+On it, a reader picks another flow from the bar, moves cards about, picks one to see its links, and walks the steps.
+It holds each flow's request, steps, app names and kinds, with an app's description when it has one.
+The description is its settings' Description, a few words on what it does.
+It holds nothing else of the stack: no addresses, settings, files, repos or code.
 Nothing on it changes the flow: no Rename, Remove, Comment or Plan a run.
 Run in the stack repo's CI (`koppler export site/index.html --stack .`), it stays as current as the stack, behind your company's own sign-in.
-To send one feature board, your own or the team's, without sharing it first, pick **Export** in its **…** menu in the board menu: the page of that board alone is saved to your downloads (`koppler export --board "<name>"` writes the same).
-**Share** in Discover's bar does the same for the feature board on screen (it is off on Whole stack): pick the environment the page is about, then **Save the page**.
-The page is a snapshot of today, says **View only**, the environment and the date, and "Made with koppler" in plain words; a picked card shows its description and its steps in the flow, never a host, route or setting, and nothing a viewer does is saved.
+To send one feature board, your own or the team's, without sharing it first, pick **Export** in its **…** menu in the board menu.
+The page of that board alone is saved to your downloads.
+`koppler export --board "<name>"` writes the same.
+**Share** in Discover's bar does the same for the feature board on screen (it is off on Whole stack).
+Pick the environment the page is about, then **Save the page**.
+The page is a snapshot of today.
+It says **View only**, the environment and the date, and "Made with koppler" in plain words.
+A picked card shows its description and its steps in the flow, never a host, route or setting.
+Nothing a viewer does is saved.
 Shared from the canvas, it opens in the canvas's scheme; `koppler export` opens in Mono. The reader picks another in the bar's **Scheme** menu, kept in their browser.
 Share says when you last shared the board from this Mac; share again after changes.
 
@@ -226,7 +351,9 @@ Live is there only while something runs; once the last app stops, the board goes
 
 <img alt="The Live view: short cards with their state, every app running" src="images/live.png">
 
-Zoomed out below 60%, cards are short in Plan too: pick one and its fields open in a panel on the right of the board, where they change the card as they would on it. The × or a click on the empty board closes it.
+Zoomed out below 60%, cards are short in Plan too.
+Pick one and its fields open in a panel on the right of the board, where they change the card as they would on it.
+The × or a click on the empty board closes it.
 
 <img alt="Zoomed out: short cards, and the picked Orders API's branch, who starts it and its cables in the panel on the right" src="images/zoomed-out.png">
 
@@ -249,14 +376,27 @@ Zoomed out below 60%, cards are short in Plan too: pick one and its fields open 
 ## The top bar
 
 It keeps its words at 1280 pixels and wider.
-As the window narrows it gives them up one step at a time: Settings drops its word, then the wordmark, then the two chips join into one, then Activity drops its word, then the stack's name is cut short, then the stack leaves the bar and is the first row of the board menu, and last the board's name is cut short, keeping "(local)".
+As the window narrows, it gives them up one step at a time:
+
+1. Settings drops its word.
+2. The wordmark goes.
+3. The two chips join into one.
+4. Activity drops its word.
+5. The stack's name is cut short.
+6. The stack leaves the bar and is the first row of the board menu.
+7. Last, the board's name is cut short, keeping "(local)".
+
 Run, Stop, the view switch and the environment keep their words at every width.
 The mark opens the shortcuts and legend, as `?` does.
-The stack and the board read as one path after the mark, `Acme Shop / Checkout`, in every view; the board's name opens the board menu, with **Find a board** at its top.
+The stack and the board read as one path after the mark, `Acme Shop / Checkout`, in every view.
+The board's name opens the board menu, with **Find a board** at its top.
 Discover runs nothing, so its bar has no status, Activity, Stop or Run.
-The side pane lists the stack's apps, those on the board first, each with its kind and its light; hovering a row shows **Run alone**, add or remove, and **More** (settings, and removing it from the stack).
-Its width is changed by dragging its right edge, from 280 to 560 pixels, or with the arrow keys once the edge has focus; a double-click or Enter puts it back to 300, and the width is kept on this Mac.
-Once a newer Koppler is installed (`npm i -g koppler`), a line under the bar names both versions, and **Restart canvas** starts the canvas again on the new one; apps and tunnels keep running.
+The side pane lists the stack's apps, those on the board first, each with its kind and its light.
+Hovering a row shows **Run alone**, add or remove, and **More** (settings, and removing it from the stack).
+Its width is changed by dragging its right edge, from 280 to 560 pixels, or with the arrow keys once the edge has focus.
+A double-click or Enter puts it back to 300, and the width is kept on this Mac.
+Once a newer Koppler is installed (`npm i -g koppler`), a line under the bar names both versions.
+**Restart canvas** starts the canvas again on the new one; apps and tunnels keep running.
 
 ## Side panels
 
@@ -266,6 +406,8 @@ Once a newer Koppler is installed (`npm i -g koppler`), a line under the bar nam
 - **Flow check:** tests every connection of the running board; with the agent add-on, it can hand failures to the agent to explain.
 - **History:** recent runs and Stops and how each ended.
 - **Logs:** each app's log opens as a tab under the board.
-  The All apps tab shows every app on the board in one stream, in the order the lines came, each with the app's name in its colour.
-  The apps are tags above it: click one to leave it out or bring it back, and the pencil gives it a short name of your own in this log, kept with the board.
+  The All apps tab shows every app on the board in one stream, in the order the lines came.
+  Each line carries the app's name in its colour.
+  The apps are tags above it: click one to leave it out or bring it back.
+  The pencil gives it a short name of your own in this log, kept with the board.
   Times are to the millisecond; one marked `~` is when Koppler first read the line, for a log Koppler did not write.
