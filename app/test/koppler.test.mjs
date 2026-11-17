@@ -606,6 +606,17 @@ test('A feature board from the terminal: its request, phases and steps; the agen
   assert.match(wordy.out, /the summary of orders > queue:events has 2 sentences and code names \(OrderService\.Publish\)\.\nWrite it as one sentence of at most 20 words, with no code names\./);
   assert.match(koppler('board', 'edit', 'Pay', '--summary', 'web:orders=Sends the order.').out, /web > orders is not a step of Pay: add it with --step/);
   assert.match(koppler('board', 'edit', 'Pay', '--value', 'orders:queue:events=Two words=x').out, /the label one word/);
+  // Proposed for a step already written: it waits beside the step, which keeps what it says.
+  const offered = koppler('board', 'edit', 'Pay', '--propose-summary', 'orders:queue:events=Says the order is paid.', '--propose-value', 'orders:queue:events=Queue=order-events');
+  assert.equal(offered.code, 0, offered.out);
+  assert.match(offered.out, /CHANGED Pay: proposed for Orders to Events a summary and 1 value$/m);
+  assert.deepEqual(pay().feature.phases[0].steps[0], {
+    from: 'orders',
+    to: 'queue:events',
+    kind: 'publish',
+    proposal: { summary: 'Says the order is paid.', values: [{ label: 'Queue', items: ['order-events'] }] },
+  });
+  assert.match(koppler('board', 'edit', 'Pay', '--propose-summary', 'orders:queue:events=Calls OrderService.Publish.').out, /code names \(OrderService\.Publish\)\./);
   assert.match(koppler('board', 'edit', 'Pay', '--step', `web:orders=${'x'.repeat(4001)}`).out, /the note on web > orders has 4001 characters, over 4000: shorten it/);
   fs.rmSync(dir, { recursive: true });
 });

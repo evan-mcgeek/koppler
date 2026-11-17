@@ -36,7 +36,7 @@ const stack = {
             name: 'Pay',
             steps: [
               { from: 'shop', to: 'orders', kind: 'call', note: 'Sends the order' },
-              { from: 'orders', to: 'queue:events', kind: 'publish' },
+              { from: 'orders', to: 'queue:events', kind: 'publish', proposal: { summary: 'Says it is placed.' } },
               { from: 'orders', to: 'psp', kind: 'call', proposed: true },
             ],
           },
@@ -65,7 +65,7 @@ describe('exportedOf', () => {
   const { facts, boards } = exportedOf(stack);
   const apps = facts['apps'] as Record<string, Record<string, unknown>>;
 
-  it("gives each feature board with its steps but the agent's proposals, and where its author left the cards", () => {
+  it("gives each feature board with its steps but the agent's proposals, steps or summaries, and where its author left the cards", () => {
     expect(boards.map(one => one.name)).toEqual(['Checkout', 'Refund']);
     expect(boards[0]).toEqual({
       name: 'Checkout',

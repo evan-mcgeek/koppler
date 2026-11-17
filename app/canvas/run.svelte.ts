@@ -540,6 +540,18 @@ class Runs {
     return this.deliver(said, { tag: 'koppler-comment', data: { board, comment: id } }, 'Sent to the agent');
   }
 
+  /** Steps written before summaries existed go to the agent, which proposes a summary and values for each from its note. */
+  askSummaries(board: string, steps: { phase: string; from: string; to: string; note: string }[]): Promise<boolean> {
+    const text = [
+      'Write a summary and values for these steps of a feature board, using the koppler:discover skill.',
+      `BOARD ${board}`,
+      ...steps.map(step => `STEP "${step.phase}" ${step.from}:${step.to}\nNOTE ${step.note}`),
+      `Propose each with koppler board edit "${board}" --phase "<phase>" --propose-summary <from>:<to>="<summary>" --propose-value <from>:<to>="<Label>=<value>".`,
+      'The user accepts, edits or keeps each on the board. Leave the notes as they are.',
+    ].join('\n');
+    return this.deliver(text, { tag: 'koppler-summaries', data: { board } }, 'Sent to the agent');
+  }
+
   /** Asks the agent to fill in an app's settings from its repo: it proposes, waits for a yes, and leaves locked ones alone. */
   askFill(id: string, empty: string[], locked: string[]): Promise<boolean> {
     const text = [

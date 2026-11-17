@@ -273,3 +273,47 @@ describe('comments on a feature board', () => {
     expect(withoutComments(talked)).toEqual(withoutComments(base));
   });
 });
+
+describe('a proposed summary', () => {
+  const base = editFeature(null, {
+    phase: ['Order'],
+    step: [{ from: 'web', to: 'orders', kind: 'call', note: 'POST /orders with the basket', phase: 'Order' }],
+  });
+  const proposed = editFeature(base, {
+    about: [
+      {
+        from: 'web',
+        to: 'orders',
+        proposed: true,
+        summary: 'Sends the order.',
+        values: [{ label: 'Route', items: ['POST /orders'] }],
+      },
+    ],
+  });
+  const step = (feature: ReturnType<typeof editFeature>) => feature.phases[0]?.steps[0];
+
+  it('waits beside the step, which keeps what it says, and is read back as written', () => {
+    expect(step(proposed)).toEqual({
+      from: 'web',
+      to: 'orders',
+      kind: 'call',
+      note: 'POST /orders with the basket',
+      proposal: { summary: 'Sends the order.', values: [{ label: 'Route', items: ['POST /orders'] }] },
+    });
+    expect(featureOf(proposed)?.phases[0]?.steps[0]).toEqual(step(proposed));
+  });
+
+  it('is accepted as it is or as edited, or turned down, and then is gone', () => {
+    const accepted = editFeature(proposed, {
+      about: [{ from: 'web', to: 'orders', summary: 'Sends the basket as an order.' }],
+    });
+    expect(step(accepted)).toEqual({
+      from: 'web',
+      to: 'orders',
+      kind: 'call',
+      note: 'POST /orders with the basket',
+      summary: 'Sends the basket as an order.',
+    });
+    expect(step(editFeature(proposed, { keep: [{ from: 'web', to: 'orders' }] }))).toEqual(step(base));
+  });
+});

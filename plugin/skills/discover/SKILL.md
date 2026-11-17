@@ -1,6 +1,6 @@
 ---
 name: discover
-description: Use when the user wants to understand how part of their stack works without running it. Examples are "how does checkout work", "what listens to Orders API", "what calls X", "find me how this feature works" and "map this flow". Also use it when the user wants a stack or board made from a description or a diagram. Also use it when the Koppler canvas sends a koppler-feature or koppler-comment prompt from Discover. It reads the stack and its repos and makes a feature board whose steps it proposes in phases. It also answers comments on the board and shares it as a page. Not for running apps on this Mac: that is koppler:plan.
+description: Use when the user wants to understand how part of their stack works without running it. Examples are "how does checkout work", "what listens to Orders API", "what calls X", "find me how this feature works" and "map this flow". Also use it when the user wants a stack or board made from a description or a diagram. Also use it when the Koppler canvas sends a koppler-feature, koppler-comment or koppler-summaries prompt from Discover. It reads the stack and its repos and makes a feature board whose steps it proposes in phases. It also answers comments on the board and shares it as a page. Not for running apps on this Mac: that is koppler:plan.
 ---
 
 # Koppler Discover
@@ -33,6 +33,7 @@ Never use `--step` for your own findings, and never change the stack: accepting 
 
 - A `koppler-feature` prompt comes from **Ask about** or a new feature board in Discover. `data.board` names the board and `data.request` is the feature or question in the user's words. Do steps 1, 2 and 4 above on that board; do not make another.
 - A `koppler-comment` prompt is a comment the user left on a feature board, on a card or a step. `data.board` names the board and `data.comment` the thread. Look into what it asks in the stack and the repos, then answer in the thread with `koppler board edit "<board>" --reply <comment id>="<your answer>"`. When the answer is a step the feature misses, put `--phase "<phase>" --propose-step <from>:<to>="<why>"` in the same command. It is drawn dashed in the thread and on the map until the user keeps or undoes it. The user resolves the thread; on a team board the thread is the team's, so answer for the team.
+- A `koppler-summaries` prompt lists steps of a board that have a note but no summary, each with its note. For each step, propose a summary and values from the note and the code: `koppler board edit "<board>" --phase "<phase>" --propose-summary <from>:<to>="<summary>" --propose-value <from>:<to>="<Label>=<value>"`. The user accepts, edits or keeps each one on the steps panel. Leave the notes as they are.
 
 ## A stack or a board from a description
 

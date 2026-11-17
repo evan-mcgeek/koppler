@@ -46,7 +46,11 @@ export function exportedOf(
     const feature = featureOf(preset['feature']);
     if (!feature) return [];
     const phases = feature.phases
-      .map(phase => ({ ...phase, steps: phase.steps.filter(step => !step.proposed) }))
+      .map(phase => ({
+        ...phase,
+        // What the agent only proposed stays off the page: steps, and summaries waiting for a yes.
+        steps: phase.steps.filter(step => !step.proposed).map(({ proposal: _, ...step }) => step),
+      }))
       .filter(phase => phase.steps.length);
     // Only the words of open threads leave: no times, and ids that say nothing.
     const comments = (talk ? (feature.comments ?? []) : [])

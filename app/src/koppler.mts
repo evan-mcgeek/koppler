@@ -911,6 +911,10 @@ const COMMANDS: Command[] = [
         'say what a step does in one plain sentence, and the names it uses under one-word labels, beside its note. It works for a step added in the same command, or one already there',
       ],
       [
+        'edit "<name>" [--propose-summary <from>:<to>="<sentence>"]... [--propose-value <from>:<to>="<Label>=<value>"]...',
+        'propose a summary and values for a step already written; the user accepts, edits or keeps it on the steps panel',
+      ],
+      [
         'edit "<name>" [--propose-step <from>:<to>[="<why>"]]... [--unstep <from>:<to>]...',
         'propose a step, dashed on the map until the user accepts it there, or take one off; a card is an app, queue:<id> or database:<id>',
       ],

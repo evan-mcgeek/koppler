@@ -9,6 +9,7 @@
   import { numbered, type Feature } from '../src/core/feature.ts';
   import { atRest, breakable, noteWords, phaseName, valueWords } from '../src/core/step-text.ts';
   import { phaseFolds } from './phase-folds.svelte.ts';
+  import { runs } from './run.svelte.ts';
   import { board } from './board.svelte.ts';
   import { stacks } from './stacks.svelte.ts';
   import { discovered } from './discover.svelte.ts';
@@ -47,6 +48,17 @@
         phaseFolds.set(phaseFolds.names.filter(name => name !== phase.name));
       });
   });
+  /** Steps written before summaries: a note, no summary, nothing proposed yet. */
+  const unsummed = $derived(
+    feature.phases.flatMap(one =>
+      one.steps
+        .filter(step => step.note && !step.summary && !step.proposal && !step.proposed)
+        .map(step => ({ phase: one.name, from: step.from, to: step.to, note: step.note ?? '' })),
+    ),
+  );
+  let asked = $state(false);
+  /** The proposal being changed before it is accepted, by step number, with the words so far. */
+  let rewording = $state<{ number: string; summary: string } | null>(null);
   let editing = $state(false);
   let request = $state('');
   let renaming = $state<string | null>(null);
@@ -122,6 +134,23 @@
         }}>Comment</button
       >{/if}
   </p>
+
+  {#if !board.viewOnly && unsummed.length}
+    <div class="review" role="status">
+      <span
+        >{unsummed.length}
+        {unsummed.length === 1 ? 'step has a note but no summary.' : 'steps have a note but no summary.'}</span
+      >
+      <button
+        class="primary"
+        type="button"
+        disabled={asked}
+        onclick={async () => {
+          asked = await runs.askSummaries(board.name ?? '', unsummed);
+        }}>{asked ? 'Asked the agent' : 'Ask the agent for summaries'}</button
+      >
+    </div>
+  {/if}
 
   {#each feature.phases as one, at (one.name)}
     {@const folded = phaseFolds.names.includes(one.name)}
@@ -302,6 +331,66 @@
                   opened = open ? null : number;
                 }}>{open ? 'Hide details' : 'Details'}</button
               >
+            {/if}
+            {#if step.proposal && !board.viewOnly}
+              {@const proposal = step.proposal}
+              <div class="proposal" aria-label="Proposed summary for step {number}">
+                <span class="label">Proposed summary</span>
+                {#if rewording?.number === number}
+                  <!-- svelte-ignore a11y_autofocus -->
+                  <textarea
+                    aria-label="Summary of step {number}"
+                    rows="2"
+                    maxlength="300"
+                    autofocus
+                    bind:value={rewording.summary}
+                  ></textarea>
+                {:else if proposal.summary}<p class="said">{proposal.summary}</p>{/if}
+                {#if proposal.values?.length}
+                  <dl class="values">
+                    {#each proposal.values as value (value.label)}
+                      <div>
+                        <dt>{value.label}</dt>
+                        {#each value.items as item, at (at)}<dd>{item}</dd>{/each}
+                      </div>
+                    {/each}
+                  </dl>
+                {/if}
+                <span class="ask">
+                  <button
+                    class="text"
+                    type="button"
+                    onclick={() => {
+                      const summary = rewording?.number === number ? rewording.summary.trim() : proposal.summary;
+                      rewording = null;
+                      discovered.editFeature({
+                        about: [
+                          {
+                            ...ref,
+                            ...(summary && { summary }),
+                            ...(proposal.values?.length && { values: proposal.values }),
+                          },
+                        ],
+                      });
+                    }}>Accept</button
+                  >
+                  {#if rewording?.number !== number}<button
+                      class="text"
+                      type="button"
+                      onclick={() => {
+                        rewording = { number, summary: proposal.summary ?? '' };
+                      }}>Edit</button
+                    >{/if}
+                  <button
+                    class="text"
+                    type="button"
+                    onclick={() => {
+                      rewording = null;
+                      discovered.editFeature({ keep: [ref] });
+                    }}>Keep</button
+                  >
+                </span>
+              </div>
             {/if}
             {#if step.proposed}
               <span class="ask"
@@ -658,6 +747,43 @@
   }
   .proposed .route {
     color: var(--muted);
+  }
+  .review {
+    display: grid;
+    gap: 8px;
+    margin-top: 12px;
+    padding: 10px 12px;
+    border: 1px solid var(--line);
+    color: var(--ink);
+    font: 400 13px/1.45 var(--sans);
+  }
+  .primary {
+    justify-self: start;
+    height: 30px;
+    padding: 0 12px;
+    border: 0;
+    background: var(--ink);
+    color: var(--desk);
+    font: 600 13px var(--sans);
+    cursor: pointer;
+  }
+  .primary:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+  .proposal {
+    grid-column: 1 / -1;
+    display: grid;
+    gap: 6px;
+    margin: 0 0 10px 24px;
+    padding: 8px 10px;
+    border: 1px dashed var(--line-strong);
+  }
+  .proposal .said {
+    margin: 0;
+    color: var(--ink);
+    font: 500 13px/1.5 var(--sans);
+    cursor: auto;
   }
   .step > .ask {
     grid-column: 1 / -1;

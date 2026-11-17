@@ -55,6 +55,8 @@ function describe(tag: string, data: Loose): string {
       return `Propose the steps of ${text(data['board']) || 'a feature board'}`;
     case 'koppler-comment':
       return `Answer a comment on ${text(data['board']) || 'a feature board'}`;
+    case 'koppler-summaries':
+      return `Propose summaries for ${text(data['board']) || 'a feature board'}`;
     case 'koppler-reply':
       return 'Your answer to a question';
     case 'koppler-review':

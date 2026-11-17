@@ -12,7 +12,7 @@ export function summaryProblems(text: string): string[] {
   const said = text.trim();
   const words = said.split(/\s+/).filter(Boolean);
   const sentences = said.replace(/[.!?]+$/, '').split(/[.!?;]+\s+/).length;
-  const names = words.filter(isIdentifier);
+  const names = words.filter(isIdentifier).map(word => word.replace(/[.,;:!?)]+$/, ''));
   return [
     ...(sentences > 1 ? [`${String(sentences)} sentences`] : []),
     ...(words.length > SUMMARY_WORDS ? [`${String(words.length)} words`] : []),
