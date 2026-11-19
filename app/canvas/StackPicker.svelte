@@ -85,6 +85,7 @@
     if (open) place();
   }}
 >
+  {#if switcher.waitingStop}<p class="wait">{switcher.waitingStop}</p>{/if}
   {#each stacks as stack (stack.dir)}
     {@const current = stack.dir === board.dir}
     {@const apps = current ? board.apps.length : stack.apps}
@@ -92,7 +93,7 @@
       type="button"
       role="menuitemradio"
       aria-checked={current}
-      disabled={current}
+      disabled={current || !!switcher.waitingStop}
       title={stack.path}
       onclick={() => {
         list?.hidePopover();
@@ -201,6 +202,16 @@
   }
   .menu button:disabled {
     cursor: default;
+  }
+  .menu button:disabled[aria-checked='false'] {
+    color: var(--muted);
+  }
+  .wait {
+    margin: 0 0 4px;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--line);
+    color: var(--muted);
+    font: 12px/1.4 var(--sans);
   }
   .check {
     width: 9px;

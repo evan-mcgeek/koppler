@@ -101,6 +101,8 @@ export interface Run {
   /** The apps whose logs the run kept, and whether they are kept for good. */
   logs?: string[];
   pinned?: boolean;
+  /** The stack a Stop switches to once it is done. */
+  switchTo?: string;
 }
 interface Status {
   /** When the server put it together. */

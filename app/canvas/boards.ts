@@ -23,6 +23,11 @@ function leave(to: string, open: () => void): void {
     open();
     return;
   }
+  // A Stop already on its way stops this too: a second one would only wait behind it.
+  if (runs.stopping) {
+    toasts.show(`A Stop is on its way. Open ${to} once it is done.`);
+    return;
+  }
   runs.stopReview({
     title: `Open ${to}`,
     sub: `Something is still running. It is stopped and reverted first, then ${to} opens.`,
