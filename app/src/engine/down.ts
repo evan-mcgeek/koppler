@@ -57,18 +57,36 @@ function jsonTextLike(file: string, raw: string, json: unknown): string {
   return (raw.startsWith(BOM) ? BOM : '') + body + (raw.endsWith('\n') ? eol : '');
 }
 
+/** Where Koppler's text is in the file, once and only once: exactly as written, or with its spaces and line breaks
+ * changed by a formatter. The text to put back loses the edge whitespace the match left out. */
+function editAt(body: string, action: EditAction): { at: number; length: number; before: string } | null {
+  const times = body.split(action.after).length - 1;
+  if (times === 1) return { at: body.indexOf(action.after), length: action.after.length, before: action.before };
+  const words = action.after.trim().split(/\s+/).filter(Boolean);
+  if (times > 1 || !words.length) return null;
+  const escape = (word: string) => word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const found = [...body.matchAll(new RegExp(words.map(escape).join('\\s+'), 'g'))];
+  const [one] = found;
+  if (found.length !== 1 || !one) return null;
+  const lead = /^\s*/.exec(action.after)?.[0] ?? '';
+  const trail = /\s*$/.exec(action.after)?.[0] ?? '';
+  const { before } = action;
+  const bare =
+    before.startsWith(lead) && before.endsWith(trail) && before.length >= lead.length + trail.length
+      ? before.slice(lead.length, before.length - trail.length)
+      : before.trim();
+  return { at: one.index, length: one[0].length, before: bare };
+}
+
 function undoEdit(action: EditAction): Undone {
   const body = fs.readFileSync(action.file, 'utf8');
-  const times = body.split(action.after).length - 1;
   const name = path.basename(action.file);
-  if (times === 1) {
-    // As a function, so `$&` and the like in the text are put back as they are.
-    fs.writeFileSync(
-      action.file,
-      body.replace(action.after, () => action.before),
-    );
+  const found = editAt(body, action);
+  if (found) {
+    fs.writeFileSync(action.file, body.slice(0, found.at) + found.before + body.slice(found.at + found.length));
     return { state: 'gone', said: `reverted ${name}` };
   }
+  const times = body.split(action.after).length - 1;
   if (times === 0 && body.includes(action.before)) return { state: 'gone', said: `${name} already as before` };
   const before = JSON.stringify(action.before).slice(0, 200);
   return { state: 'left', why: `${action.file} changed since Koppler edited it; put back by hand: ${before}` };

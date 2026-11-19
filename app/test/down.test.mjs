@@ -70,6 +70,24 @@ test('Reverting text that holds $& or $\' (regexes, shell, templates) puts it ba
   assert.equal(fs.readFileSync(file, 'utf8'), `// top\n${before}\n// bottom\n`);
 });
 
+test('Two chained edits revert to the first line after a formatter reflowed the newest one onto two lines.', async () => {
+  const d = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-down-reflow-')), file = path.join(d, 'config.dart');
+  const e = { ...process.env, KOPPLER_STATE: d, KOPPLER_TEMP: d, KOPPLER_CONFIG_DIR: d };
+  const original = "        Config.apiUrl: 'https://api.qa.acme.example/',";
+  const emulator = "        Config.apiUrl: 'http://10.0.2.2:5000/', // koppler: do not commit";
+  const simulator = "        Config.apiUrl: 'http://localhost:5000/', // koppler: do not commit";
+  // dart format splits Koppler's long line in two.
+  fs.writeFileSync(file, "final c = {\n        Config.apiUrl:\n            'http://localhost:5000/', // koppler: do not commit\n};\n");
+  fs.writeFileSync(path.join(d, 'registry.json'), JSON.stringify({ envs: ['qa'], apps: { api: { name: 'API' } } }));
+  fs.writeFileSync(path.join(d, 'actions.json'), JSON.stringify([
+    { kind: 'edit', app: 'api', file, before: original, after: emulator },
+    { kind: 'edit', app: 'api', file, before: emulator, after: simulator },
+  ]));
+  const out = spawnSync('node', [path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'dist', 'koppler.mjs'), 'down'], { encoding: 'utf8', env: e });
+  assert.equal(out.status, 0, out.stdout + out.stderr);
+  assert.equal(fs.readFileSync(file, 'utf8'), `final c = {\n${original}\n};\n`);
+});
+
 test('Stop leaves the user\'s own work as it was: formatting, lines of their own, files they edited since, and the right branch.', async () => {
   const d = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-down-own-')), app = path.join(d, 'app'), bin = path.join(d, 'bin');
   const e = { ...process.env, KOPPLER_STATE: d, KOPPLER_TEMP: d, KOPPLER_CONFIG_DIR: d, PATH: `${bin}:${process.env.PATH}` };
