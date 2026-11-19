@@ -55,7 +55,7 @@ In Claude Code, add the plugin:
 ```
 
 For any other agent (GitHub Copilot CLI, VS Code, OpenCode), or Claude Code without the plugin, run `koppler agent init`.
-It links the [plan](plugin/skills/plan), [discover](plugin/skills/discover) and [help](plugin/skills/help) skills into each agent it finds and registers `koppler mcp`, its MCP server.
+It links the [plan](plugin/skills/plan), [discover](plugin/skills/discover), [help](plugin/skills/help) and [run](plugin/skills/run) skills into each agent it finds and registers `koppler mcp`, its MCP server.
 Either way, the agent drives the `koppler` command, so install the app first.
 
 ## Requirements
@@ -78,11 +78,11 @@ Everything else depends on your stack (the .NET SDK, Flutter, Docker, the AWS CL
 
 ## Repository
 
-| Folder              | What                                                                                                                                         |
-| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| [`app/`](app)       | The `koppler` package: the command, the engine, the canvas and its local server                                                              |
-| [`plugin/`](plugin) | The agent add-on: a Claude Code plugin with the `plan`, `discover` and `help` skills (`/koppler:plan`, `/koppler:discover`, `/koppler:help`) |
-| [`docs/`](docs)     | User documentation                                                                                                                           |
+| Folder              | What                                                                                                                                                                |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`app/`](app)       | The `koppler` package: the command, the engine, the canvas and its local server                                                                                     |
+| [`plugin/`](plugin) | The agent add-on: a Claude Code plugin with the `plan`, `discover`, `help` and `run` skills (`/koppler:plan`, `/koppler:discover`, `/koppler:help`, `/koppler:run`) |
+| [`docs/`](docs)     | User documentation                                                                                                                                                  |
 
 Koppler runs from `app/dist/`, which `npm run build` makes from `app/src/` (`npm install` first).
 While working on Koppler itself, link `app/scripts/koppler-dev.mjs` as `koppler`: it rebuilds when the source is newer, then runs the build.
