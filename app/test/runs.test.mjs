@@ -114,3 +114,29 @@ test('A queue with several Stops and Sends: only the newest board action goes ou
   const out = pickPrompts([...q, 'junk'], Date.parse(at(30)));
   assert.deepEqual(out.map(p => [p.tag, p.waited]), [['koppler-reply', 24], ['koppler-stop', 2]]);
 });
+
+test('A Stop sent on a stack switched away from is marked done by its id there, and nothing of the stack in use changes.', async () => {
+  const d = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-runs-shelf-'));
+  const e = { ...process.env, KOPPLER_STATE: d, KOPPLER_TEMP: d, KOPPLER_CONFIG_DIR: d };
+  delete e.CLAUDE_CODE_SESSION_ID;
+  const run = (...args) => { const r = spawnSync('node', [path.join(here, '..', 'dist', 'koppler.mjs'), ...args], { encoding: 'utf8', env: e }); return { out: (r.stdout + r.stderr).trim(), code: r.status }; };
+  const jsonl = list => list.map(one => JSON.stringify(one)).join('\n') + '\n';
+  try {
+    // Stack A's history, put aside by the switch to stack B; the Stop was picked up after the switch.
+    const shelf = path.join(d, 'stacks', 'a1b2c3d4e5f6');
+    fs.mkdirSync(shelf, { recursive: true });
+    fs.writeFileSync(path.join(shelf, 'history.jsonl'), jsonl([runRecord({ tag: 'koppler-stop', at: 't', data: { id: 'stop0007' } })]));
+    fs.writeFileSync(path.join(d, 'history.jsonl'), jsonl([runRecord(send('run0008', [{ id: 'api', run: 'cli' }]))]));
+    const liveB = { id: 'run0008', at: 't', env: 'qa', nodes: { api: { run: 'cli' } }, edges: [] };
+    fs.writeFileSync(path.join(d, 'live.json'), JSON.stringify(liveB));
+    const done = run('history', 'done', 'stop0007');
+    assert.equal(done.code, 0, done.out);
+    assert.match(done.out, /Stop stop0007: done; it was sent on a stack no longer in use, so nothing here changed/);
+    assert.equal(readRuns(fs.readFileSync(path.join(shelf, 'history.jsonl'), 'utf8')).find(one => one.id === 'stop0007')?.state, 'done');
+    assert.deepEqual(JSON.parse(fs.readFileSync(path.join(d, 'live.json'), 'utf8')), liveB);
+    assert.equal(readRuns(fs.readFileSync(path.join(d, 'history.jsonl'), 'utf8')).at(-1)?.state, 'waiting');
+    assert.match(run('history', 'done', 'gone0009').out, /no run gone0009 in the history/);
+  } finally {
+    fs.rmSync(d, { recursive: true, force: true });
+  }
+});

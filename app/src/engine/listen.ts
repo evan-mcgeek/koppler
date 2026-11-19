@@ -10,7 +10,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { tempDir } from '../paths.ts';
 import { Failure } from '../failure.ts';
-import type { Prompt } from './history.ts';
+import { appendEvent, type Prompt } from './history.ts';
 import { locked as lockedFile, writeJson } from '../json-files.ts';
 import { claudeTitle } from './claude-title.ts';
 
@@ -209,8 +209,7 @@ export async function listen(argv: string[]): Promise<void> {
       for (const prompt of picked) {
         const id = prompt.data?.['id'];
         if (typeof id !== 'string' || !/^[a-z0-9]{6,40}$/.test(id)) continue;
-        const event = JSON.stringify({ id, event: 'picked', at: stamp() });
-        fs.appendFileSync(path.join(temp, 'history.jsonl'), event + '\n', { mode: 0o600 });
+        appendEvent(id, 'picked');
       }
       process.stdout.write(picked.map(prompt => JSON.stringify(prompt) + '\n').join(''));
       fs.unlinkSync(taking);

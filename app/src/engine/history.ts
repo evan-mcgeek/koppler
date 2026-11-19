@@ -188,8 +188,31 @@ export const NOTE_WORDS = {
 export const appendRun = (record: RunRecord): void => {
   append(record);
 };
+/** The runs one history file holds. */
+export const runsIn = (file: string): Run[] => {
+  try {
+    return readRuns(fs.readFileSync(file, 'utf8'));
+  } catch {
+    return [];
+  }
+};
+/** The history that holds a run: the stack in use, or a stack switched away from since the run was sent. */
+export function historyOf(id: string): string {
+  const here = historyFile();
+  if (runsIn(here).some(run => run.id === id)) return here;
+  const shelves = path.join(tempDir(), 'stacks');
+  let kept: string[] = [];
+  try {
+    kept = fs.readdirSync(shelves).map(dir => path.join(shelves, dir, 'history.jsonl'));
+  } catch {
+    // No stack was ever switched away from.
+  }
+  return kept.find(file => runsIn(file).some(run => run.id === id)) ?? here;
+}
+/** Something that happened to a run, kept with the run, whichever stack is in use now. */
 export const appendEvent = (id: string, event: string, reason?: string): void => {
-  append({ id, event, at: stamp(), ...(reason && { reason: text(reason, 500) }) });
+  const line = { id, event, at: stamp(), ...(reason && { reason: text(reason, 500) }) };
+  fs.appendFileSync(historyOf(id), JSON.stringify(line) + '\n', { mode: 0o600 });
 };
 
 const CODE_KINDS = ['edit', 'file', 'profile', 'env-file', 'checkout'];
@@ -271,13 +294,7 @@ export function readRuns(raw: string | null | undefined): Run[] {
   });
   return list.slice(-MAX_RUNS);
 }
-export const runs = (): Run[] => {
-  try {
-    return readRuns(fs.readFileSync(historyFile(), 'utf8'));
-  } catch {
-    return [];
-  }
-};
+export const runs = (): Run[] => runsIn(historyFile());
 export const live = (): LiveBoard | null => {
   try {
     return JSON.parse(fs.readFileSync(liveFile(), 'utf8')) as LiveBoard | null;
