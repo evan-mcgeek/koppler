@@ -16,12 +16,15 @@ import { writeJson } from '../json-files.ts';
 import {
   actionsFile,
   append,
+  appendEvent,
   codeChanges,
+  historyOf,
   live,
   liveFile,
   NOTE_WORDS,
   notes,
   runs,
+  runsIn,
   type CodeChange,
   type LiveBoard,
   type Run,
@@ -186,8 +189,20 @@ export async function appliedCommand(args: string[]): Promise<void> {
     );
     return;
   }
-  if (!run) fail(given ? `no run ${given} in the history` : 'no run is waiting to be applied');
   if (failed && !reason) fail('say why: koppler history done --failed "<what went wrong>"');
+  // A run of a stack switched away from since it was sent ends there: nothing of the stack in use changes.
+  if (!run && given) {
+    const theirs = runsIn(historyOf(given)).find(one => one.id === given);
+    if (theirs) {
+      appendEvent(theirs.id, failed ? 'failed' : 'done', reason);
+      const what = theirs.kind === 'stop' ? 'Stop' : 'Run';
+      console.log(
+        `${what} ${theirs.id}: ${failed ? 'failed' : 'done'}; it was sent on a stack no longer in use, so nothing here changed`,
+      );
+      return;
+    }
+  }
+  if (!run) fail(given ? `no run ${given} in the history` : 'no run is waiting to be applied');
   const changes = changesAfter(run, all);
   // How each remembered change did on this Mac, and when; private, never in the shared stack.
   try {
