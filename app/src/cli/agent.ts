@@ -17,6 +17,7 @@ const SKILLS = [
   { dir: 'plan', as: 'koppler-plan' },
   { dir: 'discover', as: 'koppler-discover' },
   { dir: 'help', as: 'koppler-help' },
+  { dir: 'run', as: 'koppler-run' },
 ];
 const USAGE = 'usage: koppler agent init [--agent claude,copilot,vscode,opencode] [--dry-run]';
 interface Server {
@@ -145,14 +146,6 @@ function linkSkill(dir: string, name: string, source: string, dry: boolean): str
   return `skill linked at ${at}`;
 }
 
-/** Removes the link an older Koppler made for its one skill, once it points nowhere. */
-function dropOldLink(dir: string, dry: boolean): string {
-  const at = path.join(dir, 'koppler-run');
-  if (!fs.lstatSync(at, { throwIfNoEntry: false })?.isSymbolicLink() || exists(at)) return '';
-  if (!dry) fs.unlinkSync(at);
-  return `${dry ? 'would remove' : 'removed'} the old skill link at ${at}`;
-}
-
 /** `koppler agent init`: every agent found here, or the ones named, gets the skill and the MCP server. */
 export function agentCommand(args: string[]): void {
   if (args[0] !== 'init') fail(USAGE);
@@ -171,9 +164,7 @@ export function agentCommand(args: string[]): void {
     const skill = agent.plugin?.()
       ? 'skill comes with the koppler plugin'
       : skills
-        ? [...sources.map(({ as, source }) => linkSkill(skills, as, source, dry)), dropOldLink(skills, dry)]
-            .filter(Boolean)
-            .join(', ')
+        ? sources.map(({ as, source }) => linkSkill(skills, as, source, dry)).join(', ')
         : 'skill shared with GitHub Copilot CLI';
     console.log(`${agent.name}: ${skill}; ${agent.mcp(server, dry)}`);
   }

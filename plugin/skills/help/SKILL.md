@@ -17,6 +17,7 @@ Read it instead of guessing a command or a flag, even when the user did not ask 
 
 ## Which skill next
 
+- Only starting Koppler and opening the canvas, nothing else: **koppler:run**.
 - Running apps on this Mac, wired to each other, and stopping them; connecting this session to the canvas: **koppler:plan**.
 - How a flow works, feature boards, comments, sharing a flow: **koppler:discover**.
 

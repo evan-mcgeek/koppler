@@ -37,13 +37,13 @@ test('agent init links the skill into each agent found and registers koppler mcp
   // Both skills, each under a name of its own: without the plugin there is no koppler: in front.
   assert.match(
     done.stdout,
-    /Claude Code: skill linked at .*\.claude\/skills\/koppler-plan, skill linked at .*\.claude\/skills\/koppler-discover, skill linked at .*\.claude\/skills\/koppler-help; MCP added/,
+    /Claude Code: skill linked at .*\.claude\/skills\/koppler-plan, skill linked at .*\.claude\/skills\/koppler-discover, skill linked at .*\.claude\/skills\/koppler-help, skill linked at .*\.claude\/skills\/koppler-run; MCP added/,
   );
   assert.match(done.stdout, /GitHub Copilot CLI: skill linked/);
   assert.match(done.stdout, /OpenCode: skill linked/);
   assert.doesNotMatch(done.stdout, /VS Code/);
   for (const dir of ['.claude/skills', '.copilot/skills', '.config/opencode/skills'])
-    for (const skill of ['koppler-plan', 'koppler-discover', 'koppler-help'])
+    for (const skill of ['koppler-plan', 'koppler-discover', 'koppler-help', 'koppler-run'])
       assert.ok(fs.existsSync(path.join(home, dir, skill, 'SKILL.md')), `${dir}/${skill}`);
   assert.match(fs.readFileSync(added, 'utf8'), /^mcp add --scope user koppler -- .+ mcp$/m);
   const copilot = JSON.parse(fs.readFileSync(path.join(home, '.copilot', 'mcp-config.json'), 'utf8'));
@@ -74,20 +74,14 @@ test("agent init leaves the user's own skill folder and a config that is not pla
   assert.match(koppler('agent', 'init', '--agent', 'cursor').stderr, /no agent called cursor/);
 });
 
-test('agent init removes the koppler-run link an older Koppler left once it points nowhere, and keeps one that still works', () => {
+test('agent init puts the run skill where an older Koppler left a koppler-run link that points nowhere', () => {
   const { home, koppler } = sandbox();
   const claude = path.join(home, '.claude', 'skills');
   fs.mkdirSync(claude, { recursive: true });
   fs.symlinkSync(path.join(home, 'gone'), path.join(claude, 'koppler-run'));
   const done = koppler('agent', 'init', '--agent', 'claude');
   assert.equal(done.status, 0, done.stderr);
-  assert.match(done.stdout, /removed the old skill link at .*koppler-run/);
-  assert.equal(fs.lstatSync(path.join(claude, 'koppler-run'), { throwIfNoEntry: false }), undefined);
-
-  const copilot = path.join(home, '.copilot', 'skills');
-  fs.mkdirSync(path.join(home, 'mine'));
-  fs.mkdirSync(copilot, { recursive: true });
-  fs.symlinkSync(path.join(home, 'mine'), path.join(copilot, 'koppler-run'));
-  assert.doesNotMatch(koppler('agent', 'init', '--agent', 'copilot').stdout, /old skill link/);
-  assert.ok(fs.lstatSync(path.join(copilot, 'koppler-run')).isSymbolicLink());
+  assert.match(done.stdout, /skill linked at .*koppler-run/);
+  assert.ok(fs.existsSync(path.join(claude, 'koppler-run', 'SKILL.md')));
+  assert.match(fs.readFileSync(path.join(claude, 'koppler-run', 'SKILL.md'), 'utf8'), /^name: run$/m);
 });
