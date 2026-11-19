@@ -1,11 +1,11 @@
 // Discover's home: the whole stack, the feature boards, the team's and yours, and a question to the agent.
 import type { Page } from '@playwright/test';
-import { at, card, expect, sent, STACK, test } from './canvas.ts';
+import { at, card, expect, saved, sent, STACK, test } from './canvas.ts';
 
-const flow = (name: string, steps: [string, string][]) => ({
+const flow = (name: string, steps: [string, string][], nodes: Record<string, { run: string }> = {}) => ({
   name,
   version: 1,
-  nodes: {},
+  nodes,
   edges: [],
   feature: {
     request: `How does ${name} work`,
@@ -23,6 +23,7 @@ test.use({
         ['web', 'orders'],
         ['orders', 'payments'],
       ]),
+      flow('Refund flow', [['web', 'orders']], { web: { run: 'cli' }, orders: { run: 'cli' } }),
     ],
   },
   board: {
@@ -46,6 +47,7 @@ test('the home lists the whole stack first, then the feature boards, and opens e
     /^Whole stack\s*4 services$/,
     /^Browse flow\s*1 phase · 1 step$/,
     /^Checkout flow\s*1 phase · 2 steps$/,
+    /^Refund flow\s*1 phase · 1 step$/,
   ]);
   // One list, the team's and yours, by name.
   await expect(home(page).locator('.head')).toHaveText(['Feature boards']);
@@ -71,6 +73,21 @@ test('the home lists the whole stack first, then the feature boards, and opens e
     .click();
   await expect(page.getByRole('button', { name: 'Board: Whole stack' })).toBeVisible();
   await expect(rows.first()).toHaveAttribute('aria-current', 'true');
+});
+
+test('a team feature board with app cards opens without being kept again', async ({ page }) => {
+  const kept: string[] = [];
+  page.on('request', r => {
+    if (r.method() === 'POST' && r.url().includes('/board-team')) kept.push(r.url());
+  });
+  await expect(card(page, 'web')).toBeVisible();
+  await page.keyboard.press('ControlOrMeta+1');
+  const opened = saved(page);
+  await home(page).locator('.row').filter({ hasText: 'Refund flow' }).click();
+  await expect(page.getByRole('complementary', { name: 'Refund flow' }).locator('.step')).toHaveCount(1);
+  // The board opened is saved as the one on screen; the team's board itself did not change, so it is not sent.
+  await opened;
+  expect(kept).toEqual([]);
 });
 
 test('a question to the agent becomes a feature board of your own, named after it', async ({ page, canvas }) => {

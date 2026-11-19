@@ -1567,10 +1567,9 @@ class Board {
           ],
           (key, value: unknown) => (key === 'followsClone' ? undefined : value),
         );
-      // A feature board with no app cards opens as it is kept.
-      const asOpened = Object.keys(team.nodes).length
-        ? check(team, this.#facts()).preset
-        : { nodes: {}, edges: [], feature: team['feature'] };
+      // A feature board with no app cards opens as it is kept; checking a board's apps leaves its feature as it is.
+      const checked = Object.keys(team.nodes).length ? check(team, this.#facts()).preset : { nodes: {}, edges: [] };
+      const asOpened = checked && { ...checked, feature: team['feature'] };
       if (!asOpened || told(this.#onScreen(team.name) as never) !== told(asOpened))
         this.#putTeam(team.name, kept(team.name, team));
       return;
@@ -1589,7 +1588,8 @@ class Board {
   #putTeam(name: string, preset: StoredPreset | null): void {
     const stack = this.#resolved;
     const at = this.team.findIndex(one => one.name === name);
-    if (!stack || at < 0) return;
+    // The board as it is already kept is not kept again: a save that changes nothing ends here.
+    if (!stack || at < 0 || JSON.stringify(preset) === JSON.stringify(this.team[at])) return;
     const presets = preset
       ? this.team.map((one, n) => (n === at ? preset : one))
       : this.team.filter((_, n) => n !== at);
