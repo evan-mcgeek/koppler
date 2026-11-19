@@ -14,8 +14,10 @@ export async function freePorts(count, { roomAfter = 0 } = {}) {
   const ports = [];
   while (ports.length < count) {
     const port = await free(0);
+    // A port near the top has no room after it: probing past 65535 throws, so it is skipped before.
+    if (!port || ports.includes(port) || port + roomAfter > 65535) continue;
     const room = await Promise.all(Array.from({ length: roomAfter }, (_, i) => free(port + i + 1)));
-    if (port && !ports.includes(port) && room.every(Boolean) && port + roomAfter < 65536) ports.push(port);
+    if (room.every(Boolean)) ports.push(port);
   }
   return ports;
 }

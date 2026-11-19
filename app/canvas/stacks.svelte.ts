@@ -13,9 +13,22 @@ class Stacks {
   }
   /** The stack being switched to from this page, until the page reloads with it. */
   switching = $state<string | null>(null);
+  /** What a Stop on its way says to a second switch: the switch it makes once done, or that it is not done yet. */
+  get waitingStop(): string | null {
+    const stop = runs.stopping;
+    if (!stop) return null;
+    const to = stop.switchTo && (live.status?.stacks?.find(one => one.dir === stop.switchTo)?.name ?? stop.switchTo);
+    return to
+      ? `Switching to ${to} once the agent finishes the Stop.`
+      : 'A Stop is on its way. Switch once it is done.';
+  }
 
   /** Another stack: at once when nothing runs here, else after the Stop and revert its review shows. */
   useStack(to: { dir: string; name: string }): void {
+    if (this.waitingStop) {
+      toasts.show(this.waitingStop);
+      return;
+    }
     if (runs.idle) {
       void this.#switch(to.dir);
       return;

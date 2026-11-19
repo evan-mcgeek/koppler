@@ -140,3 +140,9 @@ test('A Stop sent on a stack switched away from is marked done by its id there, 
     fs.rmSync(d, { recursive: true, force: true });
   }
 });
+
+test('A Stop that switches stacks keeps where it switches to, so the canvas can say a switch is on its way.', async () => {
+  assert.equal(runRecord({ tag: 'koppler-stop', at: 't', data: { id: 'stop0010', switchTo: '/stacks/other' } }).switchTo, '/stacks/other');
+  assert.equal(runRecord({ tag: 'koppler-stop', at: 't', data: { id: 'stop0011' } }).switchTo, undefined);
+  assert.equal(runRecord(send('run0012', [{ id: 'api', run: 'cli' }], [], { switchTo: '/x' })).switchTo, undefined);
+});

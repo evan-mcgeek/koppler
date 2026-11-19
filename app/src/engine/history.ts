@@ -24,6 +24,8 @@ export interface RunRecord {
   databases?: Record<string, 'local'>;
   /** The plan the user confirmed. */
   plan: Steps;
+  /** The stack a Stop switches to once it is done. */
+  switchTo?: string;
 }
 /** One code change of a run, as removed and added lines, for the History's diffs. */
 export interface CodeChange {
@@ -139,6 +141,7 @@ export function runRecord(prompt: Prompt | null | undefined): RunRecord | null {
     edges: board.edges.filter(edge => nodes[edge.from] && nodes[edge.to]),
     ...(Object.keys(queues).length && { queues }),
     ...(Object.keys(databases).length && { databases }),
+    ...(stop && typeof data['switchTo'] === 'string' && { switchTo: text(data['switchTo'], 1000) }),
     plan: {
       starts: steps(plan['starts']),
       restarts: steps(plan['restarts']),

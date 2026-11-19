@@ -3,7 +3,7 @@
 import { describe, plan, type Plan, type RunIn } from '../src/core/plan.ts';
 import { board } from './board.svelte.ts';
 import { post, save, send } from './data.ts';
-import { live } from './live.svelte.ts';
+import { live, type Run } from './live.svelte.ts';
 import { dialogs } from './dialogs.svelte.ts';
 import { toasts } from './toast.svelte.ts';
 import { addressText, localDatabases as local } from './local-databases.svelte.ts';
@@ -785,6 +785,14 @@ class Runs {
         );
       },
     };
+  }
+  /** A Stop sent and not finished yet: another Stop, a switch or a board that needs one waits for it. */
+  get stopping(): Run | null {
+    return (
+      live.status?.runs?.findLast(
+        one => one.kind === 'stop' && (one.state === 'waiting' || one.state === 'applying'),
+      ) ?? null
+    );
   }
   /** Whether anything Koppler would stop runs: nothing to stop and revert before leaving this stack. */
   get idle(): boolean {

@@ -114,3 +114,27 @@ test('with something running, switching first shows what it stops', async ({ pag
   await expect(review.getByRole('button', { name: 'Stop, revert and switch' })).toBeVisible();
   await expect(notice(page)).toHaveCount(0);
 });
+
+test('while a Stop and switch is on its way, the switcher says so and offers no second switch', async ({
+  page,
+  canvas,
+}) => {
+  const { acme, other } = twoStacks(canvas);
+  const stacks = [
+    { dir: acme, name: 'Acme Shop', path: acme, apps: 4, shared: false },
+    { dir: other, name: 'Other Stack', path: other, apps: 1, shared: false },
+  ];
+  const live = { env: 'qa', nodes: { web: { run: 'cli' } }, edges: [] };
+  // The Stop was taken by the agent, who has not finished it yet.
+  const runs = [{ id: 'stop0001', at: '2026-01-01T00:00:00Z', kind: 'stop', state: 'applying', switchTo: other }];
+  await page.route('**/data/status.json', route =>
+    route.fulfill({ json: { apps: {}, running: ['web'], live, stacks, stack: acme, runs } }),
+  );
+  await page.reload();
+  await picker(page, 'Acme Shop').click();
+  const menu = page.getByRole('menu', { name: 'Stacks' });
+  await expect(menu).toContainText('Switching to Other Stack once the agent finishes the Stop.');
+  await expect(menu.getByRole('menuitemradio', { name: /Other Stack/ })).toBeDisabled();
+  await menu.screenshot({ path: 'test-results/stack-switch-waiting.png' });
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+});
