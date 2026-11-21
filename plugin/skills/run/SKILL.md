@@ -8,8 +8,11 @@ description: Use when the user only wants Koppler open, such as "/koppler:run", 
 Start Koppler and stop there.
 
 1. Run `koppler` with no command. It starts the canvas and its server, and opens the canvas in the browser.
-2. Tell the user the canvas address it printed, in one line.
-3. When the canvas already runs, say so, with its address.
+2. Tell the user, in one line, that the canvas is open, with its address as a link.
+   The address is the one line of `<state>/canvas-url`; `koppler` prints only the port, since the address carries an access token.
+3. When the canvas already runs, say so, with the same link.
+
+`<state>` is Koppler's state folder, `~/.local/state/koppler/run`, or the folder `KOPPLER_TEMP` names when it is set.
 
 ## Leave the rest alone
 
