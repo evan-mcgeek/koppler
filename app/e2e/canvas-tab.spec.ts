@@ -24,7 +24,9 @@ test('koppler canvas with a tab open shows it there instead of opening another',
       KOPPLER_CONFIG_DIR: path.join(canvas.dir, 'config'),
     },
   });
-  expect(said).toContain('The canvas is already open in your browser.');
+  // It says where the canvas is by its port, never by its address, which carries the access token.
+  expect(said).toContain(`The canvas is already open in your browser, on port ${new URL(canvas.url).port}.`);
+  expect(said).not.toContain(new URL(canvas.url).pathname);
   await expect(page.getByRole('dialog', { name: 'Add repos to Acme Shop' })).toBeVisible();
   expect(fs.existsSync(opened)).toBe(false);
 });

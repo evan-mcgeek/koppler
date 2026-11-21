@@ -112,8 +112,14 @@ export async function canvas(args: string[]): Promise<void> {
   if (board && !boards.some(one => one.name.toLowerCase() === board.toLowerCase()))
     fail(`no board called ${board}; koppler use --boards lists them`);
   const hash = args.includes('--pick') ? '#pick' : board ? `#board=${encodeURIComponent(board)}` : '';
+  // The address carries the page's access token, so only its port is said.
+  const port = () => new URL(fs.readFileSync(urlFile, 'utf8').trim()).port;
   if (!args.includes('--no-open') && (await shownInOpenPage(urlFile, hash))) {
-    console.log(board ? `Switched the open canvas to ${board}.` : 'The canvas is already open in your browser.');
+    console.log(
+      board
+        ? `Switched the open canvas to ${board}.`
+        : `The canvas is already open in your browser, on port ${port()}.`,
+    );
     return;
   }
   if (!record || !alive(record)) {
@@ -122,14 +128,13 @@ export async function canvas(args: string[]): Promise<void> {
   }
   for (let tries = 0; tries < 40 && !fs.existsSync(urlFile); tries++) await sleep(250);
   if (!fs.existsSync(urlFile)) fail('the canvas did not start; see koppler logs canvas');
-  // The address carries the page's access token, so it goes to the browser and is not printed.
   const url = fs.readFileSync(urlFile, 'utf8').trim() + hash;
   if (args.includes('--no-open') || process.platform !== 'darwin') {
-    console.log(`The canvas runs on port ${new URL(url).port}; its address is in ${urlFile}`);
+    console.log(`The canvas runs on port ${port()}; its address is in ${urlFile}`);
     return;
   }
   sh('open', [url]);
-  console.log('The canvas is open in your browser.');
+  console.log(`The canvas is open in your browser, on port ${port()}.`);
 }
 
 /** The log of every app on the board in one stream, as the canvas's All apps tab shows it; `-f` follows it. */
