@@ -69,7 +69,7 @@ export const KINDS: Record<string, Kind> = {
   },
   node: { label: 'Node', runIn: RUN_IN, serves: true, needs: [NPM] },
   web: { label: 'Web', runIn: RUN_IN, serves: false, browser: true, needs: [NPM] },
-  // A queue-triggered AWS Lambda, run in an emulator in Docker; callers post to its local address.
+  // An AWS Lambda triggered by a queue or an API Gateway, run in an emulator in Docker.
   lambda: {
     label: 'Lambda',
     runIn: RUN_IN,
