@@ -136,3 +136,31 @@ resource "aws_lambda_event_source_mapping" "reader" {
   assert.deepEqual(at('catalog-kafka')?.sends, []);
   fs.rmSync(repo, { recursive: true, force: true });
 });
+
+test('queues a for_each makes are linked one by one, and a name set when deployed is noted with its pattern', () => {
+  const tf = `
+resource "aws_sqs_queue" "orders" {
+  for_each = toset(["created", "paid"])
+  name     = "acme-orders-\${each.key}"
+}
+resource "aws_sqs_queue" "jobs" {
+  name = "acme-jobs-\${random_id.suffix.hex}"
+}
+resource "aws_lambda_event_source_mapping" "orders" {
+  event_source_arn = aws_sqs_queue.orders["created"].arn
+}
+resource "aws_lambda_event_source_mapping" "jobs" {
+  event_source_arn = aws_sqs_queue.jobs.arn
+}`;
+  const drafts = { shop: draftApp('shop', readModule(files({ 'q.tf': tf }), ['qa']), stack, new Map()) };
+  const linked = linkQueues(drafts, stack);
+  assert.deepEqual(
+    linked.map(queue => queue.id),
+    ['acme-orders-created', 'acme-orders-paid', 'shop-jobs'],
+  );
+  const draft = queueDraft(linked, {});
+  assert.equal(
+    (draft.queues['shop-jobs'] as { note?: string }).note,
+    'Its name is set when deployed: acme-jobs-${random_id.suffix.hex}',
+  );
+});

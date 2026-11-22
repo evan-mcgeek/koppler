@@ -40,9 +40,13 @@ export interface QueueUse {
   via?: string;
   /** Its name is a list or map of names, one queue each (Kafka topics a pipe reads): its keys, or its values. */
   list?: 'key' | 'value';
+  /** Its `for_each` or `count`, as written: one queue per instance. */
+  forEach?: string;
+  count?: string;
 }
 
-export type NamedQueue = QueueUse & { name: string | null };
+/** A queue in one environment; `pattern` is its name as written when only a deploy can tell it. */
+export type NamedQueue = Omit<QueueUse, 'forEach' | 'count'> & { name: string | null; pattern?: string };
 
 export interface Domain {
   host: string;
@@ -328,9 +332,22 @@ export function queueUses(tf: string): QueueUse[] {
     fedBy: Set<string>;
   }
   const found = new Map<string, Found>();
-  const add = (address: string, type: QueueType, raw: string | null) => {
+  const add = (address: string, type: QueueType, raw: string | null, body = '') => {
     if (DEAD_LETTER.test(address)) return;
-    found.set(address, { address, type, raw, reads: false, sends: false, env: new Set(), fedBy: new Set(), feeds: [] });
+    const forEach = assigned(body, 'for_each');
+    const count = assigned(body, 'count');
+    found.set(address, {
+      address,
+      type,
+      raw,
+      reads: false,
+      sends: false,
+      env: new Set(),
+      fedBy: new Set(),
+      feeds: [],
+      ...(forEach && { forEach }),
+      ...(count && { count }),
+    });
   };
   const TYPES: Record<string, QueueType> = {
     aws_sqs_queue: 'sqs',
@@ -345,6 +362,7 @@ export function queueUses(tf: string): QueueUse[] {
       `${match[1] === 'data' ? 'data.' : ''}${match[2] ?? ''}.${match[3] ?? ''}`,
       TYPES[match[2] ?? ''] ?? 'sqs',
       assigned(body, 'name') ?? null,
+      body,
     );
   for (const { match, body } of blocks(tf, /module\s+"([\w-]+)"\s*\{/g)) {
     const source = assigned(body, 'source') ?? '';
@@ -587,13 +605,13 @@ function busNamed(raw: string | undefined, tf: string): string | null {
 }
 
 /**
- * The names a list or map variable holds, a field of one too (`var.kafka.topics`): a list's items, a map's keys or
- * values. Written in a .tfvars file or a .tfvars.json one; commented-out items are left out.
+ * The names a list or map holds, written as it is or in a variable or local, a field of one too (`var.kafka.topics`): a
+ * list's items, a map's keys or values. Read from .tfvars, .tfvars.json or the code; commented-out items are left out.
  */
 const namesIn = (raw: string | null | undefined, context: Context, pick: 'key' | 'value'): string[] => {
-  const [, name = '', path = ''] = /^var\.([\w-]+)((?:\.[\w-]+)*)$/.exec(raw?.trim() ?? '') ?? [];
+  const [, from = '', name = '', path = ''] = /^(var|local)\.([\w-]+)((?:\.[\w-]+)*)$/.exec(raw?.trim() ?? '') ?? [];
   const fields = path.split('.').filter(Boolean);
-  const written = name ? context.vars[name] : raw;
+  const written = name ? (from === 'var' ? context.vars : context.locals)[name] : raw;
   try {
     const value = fields.reduce<unknown>(
       (at, field) => (at && typeof at === 'object' ? (at as Record<string, unknown>)[field] : undefined),
@@ -620,6 +638,44 @@ const namesIn = (raw: string | null | undefined, context: Context, pick: 'key' |
       .filter(Boolean);
   return [...text.matchAll(/"([^"\n]+)"/g)].map(match => match[1] ?? '');
 };
+
+/** The instances a `for_each` or `count` makes in an environment, by index; null when it cannot be told. */
+function instancesOf(queue: QueueUse, context: Context): { index: string; key: string; value?: string }[] | null {
+  if (queue.count) {
+    const reference = /^(var|local)\.([\w-]+)$/.exec(queue.count.trim());
+    const written = reference
+      ? (reference[1] === 'var' ? context.vars : context.locals)[reference[2] ?? '']
+      : queue.count;
+    const count = Number((written ?? '').replace(/"/g, '').trim());
+    if (!Number.isInteger(count) || count < 1 || count > 100) return null;
+    return Array.from({ length: count }, (_, at) => ({ index: String(at), key: String(at) }));
+  }
+  if (!queue.forEach) return null;
+  const raw = /^toset\(\s*([\s\S]+?)\s*\)$/.exec(queue.forEach.trim())?.[1] ?? queue.forEach;
+  const keys = namesIn(raw, context, 'key');
+  const values = namesIn(raw, context, 'value');
+  if (!keys.length) return null;
+  // A map whose values are not plain names gives keys only.
+  return keys.map((key, at) => ({
+    index: JSON.stringify(key),
+    key,
+    ...(values.length === keys.length && { value: values[at] }),
+  }));
+}
+
+/** A name as written for one instance: `each.key`, `each.value` and `count.index` become that instance's. */
+const forInstance = (raw: string, { key, value }: { key: string; value?: string | undefined }) =>
+  raw
+    .replace(/\beach\.key\b/g, JSON.stringify(key))
+    .replace(/\bcount\.index\b/g, JSON.stringify(key))
+    .replace(/\beach\.value\b(?!\.)/g, value === undefined ? 'each.value' : JSON.stringify(value));
+
+/** A queue's name in one environment, or the pattern it is written with when only a deploy can tell it. */
+function nameIn(raw: string | null, context: Context): { name: string | null; pattern?: string } {
+  const name = named(raw, context);
+  const written = raw?.trim() ?? '';
+  return name === null && /^"[\s\S]*"$/.test(written) ? { name, pattern: written.slice(1, -1) } : { name };
+}
 
 export const hostOf = (address: string) => {
   try {
@@ -716,15 +772,22 @@ export function readModule(files: { name: string; text: string }[], workspaces: 
   return contexts.map(context => ({
     token: context.token,
     queues: queues
-      .flatMap(queue =>
-        queue.list
-          ? namesIn(queue.raw, context, queue.list).map(name => ({
-              ...queue,
-              address: `${queue.address}["${name}"]`,
-              name,
-            }))
-          : [{ ...queue, name: named(queue.raw, context) }],
-      )
+      .flatMap((use): NamedQueue[] => {
+        const { forEach: _forEach, count: _count, ...queue } = use;
+        if (queue.list)
+          return namesIn(queue.raw, context, queue.list).map(name => ({
+            ...queue,
+            address: `${queue.address}["${name}"]`,
+            name,
+          }));
+        const instances = instancesOf(use, context);
+        if (!instances) return [{ ...queue, ...nameIn(queue.raw, context) }];
+        return instances.map(instance => ({
+          ...queue,
+          address: `${queue.address}[${instance.index}]`,
+          ...nameIn(queue.raw && forInstance(queue.raw, instance), context),
+        }));
+      })
       .filter(queue => !DEAD_LETTER.test(queue.name ?? '')),
     buckets: [
       ...resources.buckets.map(({ raw, ...bucket }) => ({ ...bucket, name: named(raw, context) })),
