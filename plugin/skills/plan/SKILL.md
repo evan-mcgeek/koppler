@@ -248,6 +248,9 @@ The confirmed plan comes with the prompt (`data.plan`, `PLAN` lines in the text)
 - Check before you explain.
   When a result looks wrong (an empty query, an unexpected value), verify the cause (the data, the currency, the filters).
   Do that before blaming the tunnel, the environment or the user's setup.
+- A tunnel `koppler status` shows as `needs login` was stopped: Cloudflare Access kept asking for a login.
+  Give the user the login command from its last log line.
+  Once they have logged in, run `koppler up` again.
 - When done: `koppler history done` (or `koppler history done --failed "<what went wrong, in plain words>"`). After a Stop and revert: `koppler history done <id>` with the prompt's `data.id`. That board becomes the live state the next plan is compared with, and the run shows as Done or Failed in the canvas History.
 - A Stop whose `data.switchTo` is set comes from switching stacks on the canvas: stop and revert as usual, `koppler history done <id>`, then `koppler use "<switchTo>"`. The canvas then loads that stack by itself. `koppler use` refuses while anything is still running.
 - A newer run replaces one you have not started; if one arrives while you work, finish the step in progress, then run `koppler plan` again.
