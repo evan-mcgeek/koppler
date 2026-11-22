@@ -253,6 +253,8 @@ Tests, docs, lock files and migration tools are not searched.
   A queue read through a pipe or rule to a Lambda or an API destination is drafted as `reads` with `via`, such as `"rule to Lambda"`.
   Feeds of queues the stack already has are under `queueSuggestions.feeds`.
   Topic names in a map (`for_each = var.kafka.topics`, `each.value`), in a `.tfvars.json`, or in the variables of the folder above a module are read too.
+  A queue or topic made with `for_each` or `count` is one per instance, named with `each.key`, `each.value` or `count.index`.
+  A name only a deploy can tell, such as one with a `random_id` suffix, comes with a note giving its pattern.
 - buckets, API Gateways and Step Functions (`resourceSuggestions`), for `resources` and each app's `buckets`.
   An S3 bucket an app's own policies read or write (`s3:Get*`/`s3:List*`, `s3:Put*`/`s3:Delete*`), declared in its clone or named by its ARN.
   It comes with the environments' bucket names.
