@@ -35,6 +35,8 @@ export interface StartContext {
   device?: (Device & { id: string }) | null | undefined;
   /** Where a run keeps what a Lambda's secret holds for this start: local addresses of the apps it calls. */
   lambdaOverrides?: string;
+  /** Where an iOS app is built. */
+  derivedData?: string;
   /** Where a Flutter app's `flutter run` writes its process id, for hot reload. */
   flutterPid?: string;
   /** The stack, for the kinds it adds. */
@@ -153,6 +155,45 @@ function startFlutter(app: App, ctx: StartContext): Start {
   return { cwd: ctx.repo, command: ['sh', '-c', script], onStop };
 }
 
+function startIos(app: App, ctx: StartContext): Start {
+  const { device } = ctx;
+  if (!device) return { error: 'needs a device: --device ios, or a simulator id (xcrun simctl list devices booted)' };
+  if (device.platform !== 'ios') return { error: 'runs on an iOS simulator' };
+  if (device.physical) return { error: 'runs on a simulator only for now' };
+  const udid = quote(device.id);
+  const scheme = app.ios?.scheme;
+  const derived = quote(ctx.derivedData ?? 'build');
+  // The only scheme the project has, else the user names one.
+  const findScheme = [
+    'schemes=$(xcodebuild -list -json -$kind "$c")',
+    'n=$(printf %s "$schemes" | plutil -extract $kind.schemes raw -o - -)',
+    '[ "$n" = 1 ] || { echo "koppler: $c has $n schemes; pick one: koppler stack set apps.<app>.ios.scheme <name>" >&2; exit 1; }',
+    'scheme=$(printf %s "$schemes" | plutil -extract $kind.schemes.0 raw -o - -)',
+  ];
+  const findApp = `app=$(ls -d ${derived}/Build/Products/*-iphonesimulator/*.app | head -n 1)`;
+  const plist = `/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$app/Info.plist"`;
+  const bundle = app.mobile?.iosBundleId;
+  // A setting given for this start (a cable's local address) reaches the app through the simulator's launch.
+  const settings = (ctx.override ?? []).filter(name => /^\w+$/.test(name));
+  const script = [
+    'set -e',
+    'c=$(ls -d *.xcworkspace 2>/dev/null | head -n 1); kind=workspace',
+    '[ -n "$c" ] || { c=$(ls -d *.xcodeproj | head -n 1); kind=project; }',
+    ...(scheme ? [`scheme=${quote(scheme)}`] : findScheme),
+    `xcodebuild -$kind "$c" -scheme "$scheme" -destination id=${udid} -derivedDataPath ${derived} -quiet build`,
+    findApp,
+    `xcrun simctl install ${udid} "$app"`,
+    `bundle=${bundle ? quote(bundle) : `$(${plist})`}`,
+    ...settings.map(name => `export SIMCTL_CHILD_${name}="$${name}"`),
+    `exec xcrun simctl launch --console-pty --terminate-running-process ${udid} "$bundle"`,
+  ].join('\n');
+  // Ending the launch closes the app; this closes it too when the launch was killed before it could.
+  const onStop = bundle
+    ? [['xcrun', 'simctl', 'terminate', device.id, bundle]]
+    : [['sh', '-c', `${findApp}; xcrun simctl terminate ${udid} "$(${plist})"`]];
+  return { cwd: ctx.repo, command: ['sh', '-c', script], onStop };
+}
+
 function startNode(app: App, ctx: StartContext): Start {
   const scripts = ctx.scripts ?? {};
   const script = app.script ?? ['dev', 'start'].find(name => Object.hasOwn(scripts, name));
@@ -243,6 +284,7 @@ function startFromRecipe(app: App, ctx: StartContext): Start {
 const BY_KIND: Record<string, (app: App, ctx: StartContext) => Start> = {
   dotnet: startDotnet,
   flutter: startFlutter,
+  ios: startIos,
   node: startNode,
   web: startNode,
   lambda: startLambda,

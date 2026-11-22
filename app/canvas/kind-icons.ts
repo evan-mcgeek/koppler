@@ -15,6 +15,7 @@ import {
   siReact,
   siRuby,
   siRust,
+  siSwift,
 } from 'simple-icons';
 import type { Component } from 'svelte';
 
@@ -29,6 +30,7 @@ const LAMBDA =
 const ICONS: Record<string, KindIcon> = {
   dotnet: { logo: siDotnet.path },
   flutter: { logo: siFlutter.path },
+  ios: { logo: siSwift.path },
   node: { logo: siNodedotjs.path },
   lambda: { logo: LAMBDA },
   sam: { logo: LAMBDA },

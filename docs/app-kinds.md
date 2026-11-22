@@ -44,15 +44,22 @@ Other front-end dev servers (Nuxt, Remix, Astro, ...) run as `node` apps through
 
 ## Mobile
 
-| Stack                                   | Kind          | Runs on                                                                          |              |
-| --------------------------------------- | ------------- | -------------------------------------------------------------------------------- | ------------ |
-| Flutter                                 | `flutter`     | iOS simulator, Android emulator, or a phone on the same Wi-Fi (through `fvm`)    | Run for real |
-| React Native and Expo                   | `reactnative` | iOS simulator or Android emulator (`npx expo start`, `npx react-native run-ios`) | Recognised   |
-| Native iOS (Swift) and Android (Kotlin) | none yet      | started by you from Xcode or Android Studio                                      | Not covered  |
+| Stack                   | Kind          | Runs on                                                                          |              |
+| ----------------------- | ------------- | -------------------------------------------------------------------------------- | ------------ |
+| Flutter                 | `flutter`     | iOS simulator, Android emulator, or a phone on the same Wi-Fi (through `fvm`)    | Run for real |
+| React Native and Expo   | `reactnative` | iOS simulator or Android emulator (`npx expo start`, `npx react-native run-ios`) | Recognised   |
+| Native iOS (Swift)      | `ios`         | iOS simulator: built with `xcodebuild`, installed and launched with `simctl`     | Recognised   |
+| Native Android (Kotlin) | none yet      | started by you from Android Studio                                               | Not covered  |
 
 A simulator reaches your Mac's local apps at `localhost`, and the Android emulator at `10.0.2.2`.
 A phone reaches them at your Mac's address on the network, with the apps it calls opened to the network (`koppler run <app> --lan`).
-Koppler works out that address per device for Flutter and React Native; for a native app, set it in your project the same way.
+Koppler works out that address per device for Flutter, React Native and native iOS apps.
+An `ios` app is a repo with an Xcode project or workspace at its root.
+Koppler builds its scheme: the only one it has, or `ios.scheme` in `stack.json`.
+Its output is its log on the card, and Stop closes it on the simulator.
+A local address reaches it as a launch setting, read with `ProcessInfo.processInfo.environment`.
+A line in a file it reads, such as an `.xcconfig`, can be changed instead, and is undone on Stop.
+It runs on a simulator only for now, not on a phone.
 
 ## Serverless and cloud
 

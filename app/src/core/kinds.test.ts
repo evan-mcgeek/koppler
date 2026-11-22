@@ -21,6 +21,10 @@ test('a clone is recognised by its files', () => {
   expect(detect(repoOf({ 'README.md': '' }))).toBeNull();
   // A .NET repo that only keeps a database in a compose file is still .NET.
   expect(detect(repoOf({ 'Api.csproj': '', 'docker-compose.yml': '' }))).toBe('dotnet');
+  // A Flutter app keeps its Xcode project in ios/: it is still Flutter.
+  expect(detect(repoOf({ 'pubspec.yaml': '', 'ios/Runner.xcodeproj/project.pbxproj': '' }))).toBe('flutter');
+  expect(detect(repoOf({ 'AcmeShop.xcworkspace/contents.xcworkspacedata': '' }))).toBe('ios');
+  expect(detect(repoOf({ 'Package.swift': '' }))).toBeNull();
 });
 
 test('a SAM app is one unless it has a dev server of its own', () => {

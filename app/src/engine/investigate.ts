@@ -251,7 +251,7 @@ export function investigate({ afterSync = false } = {}): void {
 
   const rows = apps.map(app => {
     const listens =
-      app.kind === 'flutter'
+      app.kind === 'flutter' || app.kind === 'ios'
         ? '(app, calls out only)'
         : portsOf(app).join(', ') || (app.repo ? 'none found' : 'not cloned');
     const counted = [
@@ -284,7 +284,7 @@ export function investigate({ afterSync = false } = {}): void {
     for (const line of describePlan(plan)) console.log(`  RESOLVE ${line}`);
   }
   for (const app of apps) {
-    if (!app.repo || app.kind === 'flutter') continue;
+    if (!app.repo || app.kind === 'flutter' || app.kind === 'ios') continue;
     const ports = portsOf(app);
     const [first] = app.ports;
     if (!app.stackUrl && first) {

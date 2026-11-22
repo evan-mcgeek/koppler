@@ -48,6 +48,14 @@ export const KINDS: Record<string, Kind> = {
     ],
     needs: [{ tool: 'fvm', fix: 'brew tap leoafarias/fvm && brew install fvm' }],
   },
+  // A native iOS app (an Xcode project or workspace), built and run on a simulator.
+  ios: {
+    label: 'iOS (Swift)',
+    runIn: RUN_IN,
+    serves: false,
+    platforms: [['ios', 'iOS simulator']],
+    needs: [{ tool: 'xcodebuild', fix: 'Install Xcode from the App Store' }],
+  },
   node: { label: 'Node', runIn: RUN_IN, serves: true, needs: [NPM] },
   web: { label: 'Web', runIn: RUN_IN, serves: false, browser: true, needs: [NPM] },
   // A queue-triggered AWS Lambda, run in an emulator in Docker; callers post to its local address.
@@ -274,6 +282,7 @@ export function detect(repo: RepoView, stack?: WithKinds): string | null {
   // A SAM app, unless it has its own dev server (then it runs as the Node app it also is).
   if (isSam(repo) && !pkg?.scripts?.['dev'] && !pkg?.scripts?.['start']) return 'sam';
   if (repo.has('package.json')) return frameworkOf(pkg) ? 'web' : 'node';
+  if (repo.list('').some(name => /\.(xcodeproj|xcworkspace)$/.test(name))) return 'ios';
   return Object.keys(BUILT_IN_RECIPES).find(id => BUILT_IN_RECIPES[id]?.detect(repo)) ?? null;
 }
 

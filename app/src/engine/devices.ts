@@ -76,11 +76,11 @@ const NONE: Record<string, string> = {
  * The device to run a mobile app on: `ios` (a simulator), `android` (an emulator), `phone` (a connected phone), or a
  * device's id or name. With nothing asked for, a simulator or emulator that is already up.
  */
-export function resolveDevice(spec: string | undefined, app: Pick<App, 'mobile'>): RunDevice {
+export function resolveDevice(spec: string | undefined, app: Pick<App, 'mobile' | 'kind'>): RunDevice {
   const all = devices();
   const simulator = all.find(device => device.platform === 'ios' && !device.physical);
   const emulator = all.find(device => device.platform === 'android' && !device.physical);
-  const want = spec ?? ((app.mobile?.iosBundleId && simulator) || !emulator ? 'ios' : 'android');
+  const want = spec ?? ((app.mobile?.iosBundleId && simulator) || !emulator || app.kind === 'ios' ? 'ios' : 'android');
   const found =
     want === 'ios'
       ? simulator
