@@ -11,7 +11,7 @@ import { writeData, type Clone } from '../data.ts';
 import { tempDir } from '../paths.ts';
 import { checkStack as checkLoadedStack } from './checks.ts';
 import { readStackFile } from './stack-file.ts';
-import { librariesFor, packageOf, type Library } from './libraries.ts';
+import { librariesFor, nugetPackagesOf, packageOf, type Library } from './libraries.ts';
 import { grepClone, hostOwners, hostsByApp, lines, missingCalls } from './calls.ts';
 import { githubCopy } from './github-copies.ts';
 import { CONFIG, expand, fail, type Index, loadConfig, readIndex, type Save, tilde } from './config.ts';
@@ -77,10 +77,11 @@ function syncStack(stackDir: string, index: Index, github = false): void {
 
   const local: Record<string, Clone | null> = {};
   const here = index.repos.filter(repo => fs.existsSync(repo.path));
-  // Every clone that publishes a package (Dart or npm), so an app can use the local copy of a library it depends on.
+  // Every clone that publishes a package (Dart, npm or NuGet), so an app can use the local copy of a library it uses.
   const packages = here.flatMap((repo): Library[] => {
     const published = packageOf(repo.path);
-    return published ? [{ path: repo.path, ...published }] : [];
+    const nuget = nugetPackagesOf(repo.path).map(one => ({ path: repo.path, ...one }));
+    return [...(published ? [{ path: repo.path, ...published }] : []), ...nuget];
   });
   for (const [id, app] of Object.entries(stack.apps)) {
     local[id] = null;

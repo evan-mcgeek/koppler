@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { packageOf, dependenciesOf, librariesFor, link, unlink } from './libraries.ts';
+import { packageOf, dependenciesOf, librariesFor, libraryTargets, link, nugetPackagesOf, unlink } from './libraries.ts';
 import { readActions } from './actions.ts';
 import { test } from 'vitest';
 
@@ -144,6 +144,48 @@ test.each([
     assert.ok(entry?.kind === 'file');
     unlink(entry);
     assert.equal(fs.readFileSync(file, 'utf8'), before);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('a .NET app uses the clone of a NuGet library through a targets file outside its repo', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-nuget-'));
+  const app = path.join(dir, 'shop-api');
+  const lib = path.join(dir, 'acme-common');
+  const write = (file: string, text: string) => {
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, text);
+  };
+  write(
+    path.join(app, 'src/Shop.Api/Shop.Api.csproj'),
+    '<Project Sdk="Microsoft.NET.Sdk.Web"><ItemGroup><PackageReference Include="acme.common" Version="1.0.0" /><PackageReference Include="Serilog" /></ItemGroup></Project>',
+  );
+  const project = path.join(lib, 'src/Acme.Common/Acme.Common.csproj');
+  write(
+    project,
+    '<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><PackageId>Acme.Common</PackageId></PropertyGroup></Project>',
+  );
+  write(
+    path.join(lib, 'tests/Acme.Common.Tests/Acme.Common.Tests.csproj'),
+    '<Project Sdk="Microsoft.NET.Sdk"><ItemGroup><PackageReference Include="Microsoft.NET.Test.Sdk" /></ItemGroup></Project>',
+  );
+  try {
+    // A test project publishes nothing.
+    assert.deepEqual(nugetPackagesOf(lib), [{ name: 'Acme.Common', ecosystem: 'nuget', project }]);
+    const libs = librariesFor(app, [{ path: lib, ...nugetPackagesOf(lib)[0]! }]);
+    // Named as the app references it, which is what MSBuild removes.
+    assert.deepEqual(libs, [{ name: 'acme.common', path: lib, ecosystem: 'nuget', project }]);
+    const before = fs.readdirSync(app, { recursive: true }).sort();
+    const done = link('shop-api', app, libs, path.join(dir, 'actions.json'));
+    const targets = libraryTargets('shop-api');
+    const text = fs.readFileSync(targets, 'utf8');
+    assert.match(text, /<PackageReference Remove="acme\.common" \/>/);
+    assert.ok(text.includes(`<ProjectReference Include="${project}" />`));
+    // Nothing in the app's repo changes.
+    assert.deepEqual(fs.readdirSync(app, { recursive: true }).sort(), before);
+    assert.equal(unlink(done[0] as any), 'shop-api.targets removed');
+    assert.equal(fs.existsSync(targets), false);
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }

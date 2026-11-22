@@ -2,18 +2,22 @@
 // any tracked file, and back again on Stop.
 //   Dart / Flutter: a pubspec_overrides.yaml in the app with a path override (Dart reads it on top of pubspec.yaml).
 //   npm: `npm install --no-save <path>` (package.json and the lockfile stay as they are; Stop reinstalls from them).
+//   NuGet: a targets file in Koppler's own folder, given to `dotnet run`, swaps the package for the clone's project.
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { readJson } from '../json-files.ts';
+import { tempDir } from '../paths.ts';
 import { readActions, updateActions, type Action, type FileAction, type NpmLocalAction } from './actions.ts';
 
-export type Ecosystem = 'dart' | 'npm';
+export type Ecosystem = 'dart' | 'npm' | 'nuget';
 /** A clone that publishes a package. */
 export interface Library {
   name: string;
   path: string;
   ecosystem: Ecosystem;
+  /** NuGet: the project inside the clone that makes the package. */
+  project?: string;
 }
 
 const read = (file: string) => {
@@ -53,13 +57,74 @@ export function dependenciesOf(dir: string): { ecosystem: Ecosystem; names: stri
   return pkg ? { ecosystem: 'npm', names: Object.keys({ ...pkg.dependencies, ...pkg.devDependencies }) } : null;
 }
 
+const SKIP = new Set(['bin', 'obj', 'node_modules', '.git']);
+/** The .NET projects in a folder, a few levels down. */
+function projectsIn(dir: string, depth = 3): string[] {
+  let entries: fs.Dirent[];
+  try {
+    entries = fs.readdirSync(dir, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+  return entries.flatMap(entry => {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) return depth > 0 && !SKIP.has(entry.name) ? projectsIn(full, depth - 1) : [];
+    return entry.name.endsWith('.csproj') ? [full] : [];
+  });
+}
+const references = (text: string) =>
+  [...text.matchAll(/<PackageReference\s[^>]*?\bInclude\s*=\s*"([^"]+)"/gi)].map(match => match[1] ?? '');
+
+/** The NuGet packages a clone makes: each project but its tests and the ones marked not packable. */
+export function nugetPackagesOf(dir: string): (Omit<Library, 'path'> & { project: string })[] {
+  return projectsIn(dir).flatMap(project => {
+    const text = read(project) ?? '';
+    if (/<IsPackable>\s*false\s*</i.test(text) || references(text).includes('Microsoft.NET.Test.Sdk')) return [];
+    const name = /<PackageId>\s*([^<\s]+)\s*<\/PackageId>/.exec(text)?.[1] ?? path.basename(project, '.csproj');
+    return [{ name, ecosystem: 'nuget' as const, project }];
+  });
+}
+
 /** The libraries an app can use locally: clones that publish a package it depends on (other than itself). */
 export function librariesFor(appDir: string, clones: Library[]): Library[] {
   const deps = dependenciesOf(appDir);
-  if (!deps) return [];
-  return clones
-    .filter(clone => clone.path !== appDir && clone.ecosystem === deps.ecosystem && deps.names.includes(clone.name))
-    .map(({ name, path: clonePath, ecosystem }) => ({ name, path: clonePath, ecosystem }));
+  const picked: Library[] = deps
+    ? clones
+        .filter(clone => clone.path !== appDir && clone.ecosystem === deps.ecosystem && deps.names.includes(clone.name))
+        .map(({ name, path: clonePath, ecosystem }) => ({ name, path: clonePath, ecosystem }))
+    : [];
+  // NuGet names ignore case; the app's own spelling is the one MSBuild removes.
+  const nuget = projectsIn(appDir).flatMap(project => references(read(project) ?? ''));
+  for (const clone of clones) {
+    const used = nuget.find(name => name.toLowerCase() === clone.name.toLowerCase());
+    if (clone.ecosystem === 'nuget' && clone.path !== appDir && used && clone.project)
+      picked.push({ name: used, path: clone.path, ecosystem: 'nuget', project: clone.project });
+  }
+  return picked;
+}
+
+/** Where the targets file that swaps an app's NuGet packages for local projects is kept. */
+export const libraryTargets = (appId: string): string => path.join(tempDir(), 'libraries', `${appId}.targets`);
+
+const xml = (text: string) =>
+  text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+/** The targets file: in each project that references the package, the package goes and the clone's project comes. */
+export function nugetTargets(libraries: Library[]): string {
+  const swaps = libraries.map((library, at) => {
+    const all = `_KopplerAll${String(at)}`;
+    const others = `_KopplerOthers${String(at)}`;
+    return [
+      '  <ItemGroup>',
+      `    <${all} Include="@(PackageReference)" />`,
+      `    <${others} Include="@(PackageReference)" Exclude="${xml(library.name)}" />`,
+      '  </ItemGroup>',
+      `  <ItemGroup Condition="'@(${all})' != '@(${others})'">`,
+      `    <PackageReference Remove="${xml(library.name)}" />`,
+      `    <ProjectReference Include="${xml(library.project ?? '')}" />`,
+      '  </ItemGroup>',
+    ].join('\n');
+  });
+  return `<!-- Written by Koppler for a local run; Stop removes it. -->\n<Project>\n${swaps.join('\n')}\n</Project>\n`;
 }
 
 const OVERRIDES = 'pubspec_overrides.yaml';
@@ -95,6 +160,20 @@ export function link(appId: string, appDir: string, libraries: Library[], logFil
   };
   const dart = libraries.filter(library => library.ecosystem === 'dart');
   const npm = libraries.filter(library => library.ecosystem === 'npm');
+  const nuget = libraries.filter(library => library.ecosystem === 'nuget');
+  if (nuget.length > 0) {
+    const file = libraryTargets(appId);
+    const text = nugetTargets(nuget);
+    const logged = log.find((action): action is FileAction => action.kind === 'file' && action.file === file);
+    if (!logged) record({ kind: 'file', app: appId, file, before: null, after: text });
+    else
+      updateActions(logFile, list => {
+        const entry = list.find(action => action.kind === 'file' && action.file === file);
+        if (entry?.kind === 'file') entry.after = text;
+      });
+    fs.mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 });
+    fs.writeFileSync(file, text, { mode: 0o600 });
+  }
   if (dart.length > 0) {
     const file = path.join(appDir, OVERRIDES);
     const logged = (action: Action): action is FileAction => action.kind === 'file' && action.file === file;
