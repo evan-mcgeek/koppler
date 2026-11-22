@@ -34,6 +34,7 @@ import { recipesCommand } from './engine/recipes.ts';
 import { dbCommand } from './engine/local-databases.ts';
 import { findCommand } from './engine/research.ts';
 import { run } from './engine/run.ts';
+import { invoke } from './cli/invoke.ts';
 import { appliedCommand, historyCommand, planCommand, runningNames, sessionCommand } from './engine/runs.ts';
 import { updateClones } from './engine/clones.ts';
 import { readIndex, tilde } from './engine/config.ts';
@@ -853,6 +854,14 @@ const COMMANDS: Command[] = [
     about: 'start one stack app, or any command, detached and logged',
     run: args => run(args),
     example: 'koppler run orders-api --env qa',
+  },
+  {
+    name: 'invoke',
+    who: 'agent',
+    args: '<app> <function> [--event <file>] [--env <env>]',
+    about: 'run one SAM function once, such as one a queue or a schedule triggers, with a sample event by default',
+    run: invoke,
+    example: 'koppler invoke shop-jobs OrdersQueueFunction',
   },
   {
     name: 'switch',

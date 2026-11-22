@@ -347,6 +347,7 @@ A tunnel on a loopback alias needs the user to run the printed `sudo` commands f
 
 - `auto`: start tunnels and apps with `koppler`. Its processes are detached: they outlive agent background-job limits and Claude Code restarts, log where the canvas reads, and stop by name.
   - Stack apps of any kind: `koppler run <app> [--env <env>] [--device ios|android|phone|<id>]`.
+  - A SAM function its API does not run (a queue, a schedule): `koppler invoke <app> <function> [--event <file>]`.
     Each kind has its own rules.
     .NET runs its `-LOCAL` profile.
     Flutter builds and launches on the device, keeps its log on the card and closes the app on stop.
