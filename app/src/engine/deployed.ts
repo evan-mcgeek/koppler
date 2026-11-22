@@ -71,6 +71,8 @@ export interface LinkedQueue {
   feeds: Record<string, FeedVia>;
   /** Per app that reads it not by itself, how: a pipe or rule to a Lambda or an API destination. */
   via: Record<string, string>;
+  /** Its name as written, when only a deploy can tell it. */
+  pattern?: string;
 }
 
 type AppsStack = EnvStack & {
@@ -213,6 +215,7 @@ export function draftApp(
           }),
         ],
         ...(via ? { via } : {}),
+        ...(queue.pattern && { pattern: queue.pattern }),
       });
     }
   }
@@ -283,6 +286,7 @@ export function linkQueues(drafts: Drafts, stack: EnvStack): LinkedQueue[] {
     /** Feeds by the key of what it feeds; that key is resolved to an entry once all are read. */
     feeds: Map<string, FeedVia>;
     via: Map<string, string>;
+    pattern?: string;
   }
   const [first = ''] = stack.envs;
   const byName = new Map<string, Entry>();
@@ -301,6 +305,7 @@ export function linkQueues(drafts: Drafts, stack: EnvStack): LinkedQueue[] {
       envs: {},
       feeds: new Map(),
       via: new Map(),
+      ...(queue.pattern && { pattern: queue.pattern }),
     };
     const user = entry.users.get(app) ?? { reads: false, sends: false, env: new Set<string>() };
     entry.users.set(app, {
@@ -353,7 +358,8 @@ export function linkQueues(drafts: Drafts, stack: EnvStack): LinkedQueue[] {
   const used = (user: User) => user.reads || user.sends || user.env.size > 0;
   const idOf = (entry: Entry) => {
     const owner = [...entry.users.keys()][0] ?? '';
-    const resourceName = (entry.address.split('.').pop() ?? '').replace(/_/g, '-');
+    // One instance of a for_each or count keeps its key: `orders["paid"]` reads as orders-paid.
+    const resourceName = (entry.address.split('.').pop() ?? '').replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-|-$/g, '');
     return entry.queue ? queueId(entry.queue) : `${owner}-${resourceName}`;
   };
   return [...byName.values()]
@@ -384,6 +390,7 @@ export function linkQueues(drafts: Drafts, stack: EnvStack): LinkedQueue[] {
         inside: internal ? owner : null,
         address: entry.address,
         owner,
+        ...(entry.pattern && { pattern: entry.pattern }),
       };
     });
 }
@@ -508,6 +515,13 @@ export function queueDraft(queues: LinkedQueue[], stack: QueueStack) {
     /** What queues the stack has already feed, for `queues.<id>.feeds`. */
     feeds: Record<string, Record<string, { via: FeedVia }>>;
   } = { queues: {}, apps: {}, feeds: {} };
+  const note = (queue: LinkedQueue) =>
+    [
+      queue.fedBy.length ? `Fed by ${queue.fedBy.join(' and ')}` : '',
+      queue.pattern ? `Its name is set when deployed: ${queue.pattern}` : '',
+    ]
+      .filter(Boolean)
+      .join('. ');
   const feedsOf = (queue: LinkedQueue) =>
     Object.fromEntries(Object.entries(queue.feeds).map(([to, via]) => [to, { via }]));
   for (const queue of queues) {
@@ -522,7 +536,7 @@ export function queueDraft(queues: LinkedQueue[], stack: QueueStack) {
       type: queue.type,
       ...(queue.queue && { queue: queue.queue }),
       ...(perEnv.length && { envs: Object.fromEntries(perEnv) as object }),
-      ...(queue.fedBy.length && { note: `Fed by ${queue.fedBy.join(' and ')}` }),
+      ...(note(queue) && { note: note(queue) }),
       ...(Object.keys(queue.feeds).length && { feeds: feedsOf(queue) }),
     };
     for (const [key, apps] of [
