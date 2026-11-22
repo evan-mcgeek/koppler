@@ -67,7 +67,9 @@ When `koppler --version` fails, tell the user how to install it and stop.
 A released skill has a `VERSION` file beside this one.
 When `koppler --version` names another version, tell the user both, and that the older one needs updating (`npm i -g koppler`, and the plugin).
 `<app>` below means the Koppler app's folder, `"$(dirname "$(realpath "$(command -v koppler)")")/.."` (with `dist/` and `bin/`).
-`<state>` means Koppler's state folder, `~/.local/state/koppler/run` (the canvas, the agent and `koppler` share it).
+`<state>` means Koppler's state folder, which the canvas, the agent and `koppler` share.
+It is the folder `KOPPLER_TEMP` names, else `run` in the folder `KOPPLER_STATE` names, else `~/.local/state/koppler/run`.
+Check both with `printenv KOPPLER_TEMP KOPPLER_STATE` before reading a file there.
 
 ## Operating principles
 

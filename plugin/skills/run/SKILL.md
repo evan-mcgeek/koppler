@@ -12,7 +12,8 @@ Start Koppler and stop there.
    The address is the one line of `<state>/canvas-url`; `koppler` prints only the port, since the address carries an access token.
 3. When the canvas already runs, say so, with the same link.
 
-`<state>` is Koppler's state folder, `~/.local/state/koppler/run`, or the folder `KOPPLER_TEMP` names when it is set.
+`<state>` is Koppler's state folder: the folder `KOPPLER_TEMP` names, else `run` in the folder `KOPPLER_STATE` names, else `~/.local/state/koppler/run`.
+Check both with `printenv KOPPLER_TEMP KOPPLER_STATE` before reading `canvas-url`.
 
 ## Leave the rest alone
 
