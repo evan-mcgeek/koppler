@@ -51,6 +51,8 @@ export type NamedQueue = Omit<QueueUse, 'forEach' | 'count'> & { name: string | 
 export interface Domain {
   host: string;
   from: 'api' | 'cdn' | 'dns';
+  /** The base path the app is served under on that host. */
+  path?: string;
 }
 
 export interface Setting {
@@ -104,6 +106,8 @@ export interface Module {
   settings: Setting[];
   secrets: SecretName[];
   dir?: string;
+  /** A domain only known when deployed, as written. */
+  unread?: string;
 }
 
 export interface Call {

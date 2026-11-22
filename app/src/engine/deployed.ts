@@ -11,6 +11,7 @@ import { findFiles } from './investigate.ts';
 import { hostsByApp } from './calls.ts';
 import { writeJson } from '../json-files.ts';
 import { appOn } from '../core/stack.ts';
+import { serverlessDomains } from '../core/serverless.ts';
 import {
   type BucketUse,
   type Call,
@@ -133,7 +134,28 @@ export function readRepo(repo: string, workspaces: string[] = []): Module[] {
   } catch {
     // Not a SAM app.
   }
-  return [...terraform, ...sam];
+  return [...terraform, ...sam, ...serverless(repo, workspaces)];
+}
+
+/** A Serverless Framework app's custom domain per stage; one only known when deployed is said, not guessed. */
+function serverless(repo: string, stages: string[]): Module[] {
+  const file = ['serverless.yml', 'serverless.yaml'].find(name => fs.existsSync(path.join(repo, name)));
+  if (!file) return [];
+  const { found, unread } = serverlessDomains(fs.readFileSync(path.join(repo, file), 'utf8'), stages);
+  const empty = {
+    account: null,
+    settings: [],
+    secrets: [],
+    queues: [],
+    buckets: [],
+    routes: [],
+    machines: [],
+    dir: file,
+  };
+  return [
+    ...found.map(({ token, domains }) => ({ ...empty, token, domains })),
+    ...(unread ? [{ ...empty, token: null, domains: [], unread }] : []),
+  ];
 }
 
 const RANK = { api: 0, cdn: 1, dns: 2 };
@@ -236,7 +258,7 @@ export function draftApp(
       return [
         env,
         {
-          deployedUrl: first ? `https://${first.host}/` : null,
+          deployedUrl: first ? `https://${first.host}/${first.path ? `${first.path}/` : ''}` : null,
           otherAddresses: others.map(domain => domain.host),
           accounts: [...found.accounts],
           settingsWithAddress: settings.flatMap(({ name, address, secret }) =>
@@ -663,7 +685,10 @@ export function deployed(args: string[] = []): void {
       console.log('  no Terraform in its clone');
       continue;
     }
+    for (const module of modules)
+      if (module.unread) console.log(`  ${module.dir ?? ''}: its domain ${module.unread} is only known when deployed`);
     if (isEmpty(envs)) {
+      if (modules.every(module => module.unread)) continue;
       const theirs = [...new Set(modules.map(module => module.token ?? 'unnamed'))].join(', ');
       console.log(
         `  Terraform found, but none of its environments (${theirs}) matches the stack's (${stack.envs.join(', ')}); list them in envAliases`,

@@ -30,6 +30,7 @@ koppler init
 
 Once the stack has apps, `init` ends with `koppler discover`, which reads every app's repo and reports local ports, tunnels, calls and gaps in the stack.
 `koppler discover --deployed` drafts deployed addresses, settings, secret names, queues and calls from each repo's infrastructure code.
+That code is Terraform, a SAM app's `samconfig.toml`, or a Serverless Framework app's `serverless.yml`.
 The agent checks those drafts in the repos before adding them to `stack.json`.
 The stack lives in your team's repo, so changes to it are yours to review and commit.
 
