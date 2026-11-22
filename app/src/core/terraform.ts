@@ -108,6 +108,8 @@ export interface Module {
   settings: Setting[];
   secrets: SecretName[];
   dir?: string;
+  /** A domain only known when deployed, as written. */
+  unread?: string;
 }
 
 export interface Call {

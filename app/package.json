@@ -76,6 +76,7 @@
   "type": "module",
   "dependencies": {
     "elkjs": "0.9.3",
+    "yaml": "2.9.1",
     "zod": "^4.6.5"
   }
 }
