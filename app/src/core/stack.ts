@@ -264,7 +264,7 @@ const App = z.looseObject(
       .regex(/^(?=.*\S)[^\r\n]*$/, 'one line of words')
       .optional()
       .describe('What it does, in a few words, for someone who does not build it'),
-    kind: required.describe('What it is built with: dotnet, node, web, flutter, ios, lambda, workflow, other'),
+    kind: required.describe('What it is built with: dotnet, node, web, flutter, ios, android, lambda, workflow, other'),
     areas: z
       .array(z.string(), { error: 'a list of area ids' })
       .optional()
@@ -394,6 +394,10 @@ const App = z.looseObject(
       .looseObject({ scheme: z.string().optional() })
       .optional()
       .describe('iOS: the Xcode scheme to build, when the project has several'),
+    android: z
+      .looseObject({ variant: z.string().optional() })
+      .optional()
+      .describe('Android: the build variant to install, such as freeDebug (debug when not set)'),
     mobile: z
       .looseObject({
         iosBundleId: z.string().optional(),

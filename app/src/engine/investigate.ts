@@ -6,7 +6,7 @@ import path from 'node:path';
 import { table } from '../cli/output.ts';
 import { fail } from '../failure.ts';
 import { frameworkOf, type PackageJson } from '../core/frameworks.ts';
-import { defaultPort, detect, of as kindOf, type RepoView } from '../core/kinds.ts';
+import { defaultPort, detect, of as kindOf, ON_DEVICE, type RepoView } from '../core/kinds.ts';
 import { describePlan, planTunnels } from '../core/ports.ts';
 import { readClones, readStack } from '../data.ts';
 import { tempDir } from '../paths.ts';
@@ -250,10 +250,9 @@ export function investigate({ afterSync = false } = {}): void {
   const portsOf = (app: (typeof apps)[number]) => [...new Set(app.ports.map(found => found.port))];
 
   const rows = apps.map(app => {
-    const listens =
-      app.kind === 'flutter' || app.kind === 'ios'
-        ? '(app, calls out only)'
-        : portsOf(app).join(', ') || (app.repo ? 'none found' : 'not cloned');
+    const listens = ON_DEVICE.includes(app.kind ?? '')
+      ? '(app, calls out only)'
+      : portsOf(app).join(', ') || (app.repo ? 'none found' : 'not cloned');
     const counted = [
       app.calls.length && `${String(app.calls.length)} recorded`,
       app.found.length && `${String(app.found.length)} found`,
@@ -284,7 +283,7 @@ export function investigate({ afterSync = false } = {}): void {
     for (const line of describePlan(plan)) console.log(`  RESOLVE ${line}`);
   }
   for (const app of apps) {
-    if (!app.repo || app.kind === 'flutter' || app.kind === 'ios') continue;
+    if (!app.repo || ON_DEVICE.includes(app.kind ?? '')) continue;
     const ports = portsOf(app);
     const [first] = app.ports;
     if (!app.stackUrl && first) {

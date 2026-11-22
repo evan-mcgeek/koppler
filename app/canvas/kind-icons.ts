@@ -16,6 +16,7 @@ import {
   siRuby,
   siRust,
   siSwift,
+  siAndroid,
 } from 'simple-icons';
 import type { Component } from 'svelte';
 
@@ -31,6 +32,7 @@ const ICONS: Record<string, KindIcon> = {
   dotnet: { logo: siDotnet.path },
   flutter: { logo: siFlutter.path },
   ios: { logo: siSwift.path },
+  android: { logo: siAndroid.path },
   node: { logo: siNodedotjs.path },
   lambda: { logo: LAMBDA },
   sam: { logo: LAMBDA },

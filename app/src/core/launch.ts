@@ -194,6 +194,41 @@ function startIos(app: App, ctx: StartContext): Start {
   return { cwd: ctx.repo, command: ['sh', '-c', script], onStop };
 }
 
+/** The applicationId its Gradle files give, in double or single quotes. */
+const FIND_PACKAGE = String.raw`pkg=$(grep -hoE "applicationId[ =]*[\"'][^\"']+" app/build.gradle.kts app/build.gradle build.gradle.kts build.gradle 2>/dev/null | head -n 1 | sed -E "s/.*[\"']//")`;
+
+function startAndroid(app: App, ctx: StartContext): Start {
+  const { device } = ctx;
+  if (!device) return { error: 'needs a device: --device android, or an emulator id (adb devices)' };
+  if (device.platform !== 'android') return { error: 'runs on an Android emulator' };
+  if (device.physical) return { error: 'runs on an emulator only for now' };
+  const adb = `adb -s ${quote(device.id)}`;
+  const variant = app.android?.variant ?? 'debug';
+  const install = `install${variant.charAt(0).toUpperCase()}${variant.slice(1)}`;
+  const pkg = app.mobile?.androidPackage;
+  // A setting given for this start (a cable's local address) reaches the app as a launch extra.
+  const extras = (ctx.override ?? []).filter(name => /^\w+$/.test(name)).map(name => `--es ${name} "$(q "$${name}")"`);
+  const script = [
+    'set -e',
+    'g=./gradlew; [ -x "$g" ] || g=gradle',
+    `"$g" ${install}`,
+    pkg ? `pkg=${quote(pkg)}` : FIND_PACKAGE,
+    '[ -n "$pkg" ] || { echo "koppler: no applicationId found; set it: koppler stack set apps.<app>.mobile.androidPackage <id>" >&2; exit 1; }',
+    // The device's shell reads each extra again, so each is quoted for it.
+    String.raw`q() { printf "'%s'" "$(printf %s "$1" | sed "s/'/'\\\\''/g")"; }`,
+    `act=$(${adb} shell cmd package resolve-activity --brief -c android.intent.category.LAUNCHER "$pkg" | tail -n 1 | tr -d '\\r')`,
+    `${adb} shell am force-stop "$pkg"`,
+    [`${adb} shell am start -W -n "$act"`, ...extras].join(' '),
+    `pid=$(${adb} shell pidof -s "$pkg" | tr -d '\\r')`,
+    // ponytail: the log follows the launched process only; an app that restarts itself is followed from the next start.
+    `exec ${adb} logcat --pid="$pid"`,
+  ].join('\n');
+  const onStop = pkg
+    ? [['adb', '-s', device.id, 'shell', 'am', 'force-stop', pkg]]
+    : [['sh', '-c', `cd ${quote(ctx.repo ?? '.')} && ${FIND_PACKAGE} && ${adb} shell am force-stop "$pkg"`]];
+  return { cwd: ctx.repo, command: ['sh', '-c', script], onStop };
+}
+
 function startNode(app: App, ctx: StartContext): Start {
   const scripts = ctx.scripts ?? {};
   const script = app.script ?? ['dev', 'start'].find(name => Object.hasOwn(scripts, name));
@@ -285,6 +320,7 @@ const BY_KIND: Record<string, (app: App, ctx: StartContext) => Start> = {
   dotnet: startDotnet,
   flutter: startFlutter,
   ios: startIos,
+  android: startAndroid,
   node: startNode,
   web: startNode,
   lambda: startLambda,

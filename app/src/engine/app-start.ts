@@ -5,6 +5,7 @@ import { execFileSync } from 'node:child_process';
 import { APPROVE, approved, startsFromStack } from './checks.ts';
 import { fail } from '../failure.ts';
 import { launchProfile, mockCommand, startCommand, type LaunchProfiles, type StartContext } from '../core/launch.ts';
+import { ON_DEVICE } from '../core/kinds.ts';
 import { isProtected } from '../core/plan.ts';
 import type { App, Secret } from '../core/stack.ts';
 import { readClones, readStack } from '../data.ts';
@@ -156,7 +157,7 @@ export function appStart(id: string, options: RunOptions): AppStart | null {
       `${base.name} is started by a command from the stack that you have not allowed yet, or that changed since. Review it in your own terminal: ${APPROVE}`,
     );
   const repo = readClones()[id]?.path ?? fail(`${id} is not cloned (koppler sync --rescan after cloning)`);
-  const device = app.kind === 'flutter' || app.kind === 'ios' ? resolveDevice(options.device, app) : undefined;
+  const device = ON_DEVICE.includes(app.kind) ? resolveDevice(options.device, app) : undefined;
   const ctx = { ...contextFor(id, app, repo, env, options, stack.envAliases?.[env] ?? [], device), stack };
   const start = startCommand(app, ctx);
   if (start.error !== undefined) fail(`${id}: ${start.error}; or run any command: koppler run ${id} -- <command>`);

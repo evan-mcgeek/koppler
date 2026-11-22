@@ -29,6 +29,9 @@ export interface Kind {
   /** Added by the stack in use. */
   custom?: true;
 }
+/** The kinds Koppler starts on a device, by id: apps that call out and are never called. */
+export const ON_DEVICE = ['flutter', 'ios', 'android'];
+
 /** Koppler's own kinds. */
 export const KINDS: Record<string, Kind> = {
   dotnet: {
@@ -55,6 +58,14 @@ export const KINDS: Record<string, Kind> = {
     serves: false,
     platforms: [['ios', 'iOS simulator']],
     needs: [{ tool: 'xcodebuild', fix: 'Install Xcode from the App Store' }],
+  },
+  // A native Android app (Gradle with the Android application plugin), built and run on an emulator.
+  android: {
+    label: 'Android (Kotlin)',
+    runIn: RUN_IN,
+    serves: false,
+    platforms: [['android', 'Android emulator']],
+    needs: [{ tool: 'adb', fix: 'Install Android Studio, then put its platform-tools on your PATH' }],
   },
   node: { label: 'Node', runIn: RUN_IN, serves: true, needs: [NPM] },
   web: { label: 'Web', runIn: RUN_IN, serves: false, browser: true, needs: [NPM] },
@@ -268,6 +279,10 @@ const packageJson = (repo: RepoView): PackageJson | null => {
     return null;
   }
 };
+const isAndroidApp = (repo: RepoView) =>
+  /com\.android\.application|plugins\.android\.application/.test(
+    textOf(repo, ['build.gradle', 'build.gradle.kts', 'app/build.gradle', 'app/build.gradle.kts']),
+  );
 const isSam = (repo: RepoView) =>
   ['template.yaml', 'template.yml'].some(file => repo.has(file) && read(repo, file).includes('AWS::Serverless'));
 
@@ -283,6 +298,7 @@ export function detect(repo: RepoView, stack?: WithKinds): string | null {
   if (isSam(repo) && !pkg?.scripts?.['dev'] && !pkg?.scripts?.['start']) return 'sam';
   if (repo.has('package.json')) return frameworkOf(pkg) ? 'web' : 'node';
   if (repo.list('').some(name => /\.(xcodeproj|xcworkspace)$/.test(name))) return 'ios';
+  if (isAndroidApp(repo)) return 'android';
   return Object.keys(BUILT_IN_RECIPES).find(id => BUILT_IN_RECIPES[id]?.detect(repo)) ?? null;
 }
 
