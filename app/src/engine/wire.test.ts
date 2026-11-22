@@ -44,12 +44,12 @@ test('a call whose setting holds a route keeps it when the call goes local', () 
 
 test('a setting goes into a launch profile only for an app that has launch profiles', () => {
   // A Node app has none: the run sets the variable in its environment when it starts it.
-  expect(wireInfo(stack, {}, 'web', 'api', 'qa').profile).toBeUndefined();
+  expect(wireInfo(stack, {}, 'web', 'api', 'qa')).toMatchObject({ profile: undefined });
   const dotnet = structuredClone(stack);
   Object.assign(dotnet.apps['web'] ?? {}, {
     kind: 'dotnet',
     launchSettings: 'Properties/launchSettings.json',
     baseProfile: 'QA',
   });
-  expect(wireInfo(dotnet, {}, 'web', 'api', 'qa').profile).toBe('QA-LOCAL');
+  expect(wireInfo(dotnet, {}, 'web', 'api', 'qa')).toMatchObject({ profile: 'QA-LOCAL' });
 });
