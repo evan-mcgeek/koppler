@@ -548,7 +548,7 @@ async function created(queue: localQueue.LocalQueue, left: string[]): Promise<st
     try {
       return queue.type === 'kafka'
         ? `${localQueue.KAFKA}/${localQueue.createTopic(queue.queue)}`
-        : localQueue.createQueue(queue.queue);
+        : localQueue.createLocal(queue.type, queue.queue);
     } catch (error) {
       if (attempt === 30) left.push(`${queue.name}: the local queue could not be created (${lastLine(error)})`);
       else await sleep(1000);
@@ -584,6 +584,18 @@ async function startQueues(up: Up, chosen: Record<string, string>): Promise<void
     urls[queue.id] = url;
     console.log(`queues: ${queue.name} is local at ${url}`);
   }
+  const feeds = localQueue.localFeeds(
+    stack,
+    local.queues.filter(queue => urls[queue.id]),
+  );
+  left.push(...feeds.left);
+  for (const { from, to } of feeds.feeds)
+    try {
+      localQueue.feedLocal({ type: from.type, address: urls[from.id] ?? '' }, urls[to.id] ?? '');
+      console.log(`queues: ${from.name} feeds the local ${to.name}`);
+    } catch (error) {
+      left.push(`${from.name}: it could not be made to feed the local ${to.name} (${lastLine(error)})`);
+    }
   const settings = localQueue.queueEnv(
     stack,
     local.queues.filter(queue => urls[queue.id]),

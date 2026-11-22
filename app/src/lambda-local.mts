@@ -15,7 +15,7 @@ import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { ENDPOINT, FUNCTIONS, LAMBDA_QUEUES, REGION } from './engine/queues.ts';
+import { ENDPOINT, FUNCTIONS, LAMBDA_QUEUES, LAMBDA_SETTINGS, REGION } from './engine/queues.ts';
 import { takeSecrets } from './safe-env.ts';
 
 /** The app's `lambda` in stack.json. */
@@ -199,10 +199,11 @@ function putParameters(parameters: NonNullable<Config['parameters']>): void {
   }
 }
 
-/** The settings the function reads: fixed ones, then what Koppler set (a cable's address, a stored secret). */
+/** The settings the function reads: fixed ones, then what Koppler set (a cable's address, a stored secret, a queue). */
 function environment(): Record<string, string> {
   const variables: Record<string, string> = { ...config?.environment };
-  for (const name of config?.env ?? []) {
+  const queues = (process.env[LAMBDA_SETTINGS] ?? '').split(',').filter(Boolean);
+  for (const name of new Set([...(config?.env ?? []), ...queues])) {
     const value = stored[name] ?? process.env[name];
     if (value !== undefined) variables[name] = fromDocker(value);
     else if (!(name in variables)) say(`${name} is not set: the function starts without it`);
