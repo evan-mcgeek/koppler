@@ -1,5 +1,4 @@
-// A Cloudflare Access tunnel that is logged out asks for a login on every connection, each in a new browser page.
-// After a few in a minute it is stopped, and its log ends on a line that says how to log in.
+// A logged-out Cloudflare Access tunnel opens a login page per connection; after a few in a minute it is stopped.
 
 /** What cloudflared prints each time it opens a login page. */
 export const LOGIN_PROMPT = 'A browser window should have opened';
@@ -7,9 +6,9 @@ const NEEDS_LOGIN = 'koppler: needs login.';
 const LIMIT = 3;
 const WINDOW = 60_000;
 
-/** Whether the prompts seen so far (their times) are too many: an app keeps reconnecting while logged out. */
-export const tooManyPrompts = (times: number[], now: number): boolean =>
-  times.filter(time => now - time < WINDOW).length >= LIMIT;
+/** The prompt times still inside the window. */
+export const recentPrompts = (times: number[], now: number): number[] => times.filter(time => now - time < WINDOW);
+export const tooManyPrompts = (times: number[], now: number): boolean => recentPrompts(times, now).length >= LIMIT;
 
 /** The login command for the host a tunnel's command names. */
 function loginFor(command: string[]): string {
