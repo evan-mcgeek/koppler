@@ -1,5 +1,10 @@
 // A logged-out Cloudflare Access tunnel opens a login page per connection; after a few in a minute it is stopped.
 
+/** What `cloudflared access token` says on stderr when there is no session, or only an expired one. */
+export const noSession = (stderr: string): boolean => stderr.includes('Unable to find token');
+/** A login that never prints the token, and closes its page once done. */
+export const loginArgs = (host: string): string[] => ['access', 'login', '--quiet', '--auto-close', `https://${host}`];
+
 /** What cloudflared prints each time it opens a login page. */
 export const LOGIN_PROMPT = 'A browser window should have opened';
 const NEEDS_LOGIN = 'koppler: needs login.';
