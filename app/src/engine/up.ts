@@ -4,6 +4,7 @@
 // changes, each cable's local address passed to its caller, then starts. What it cannot do alone is listed for the
 // agent (exit 3).
 import { keepRunLogs } from './run-logs.ts';
+import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { envOf, flagValue, positional } from '../cli/output.ts';
@@ -11,6 +12,7 @@ import { fail, Failure } from '../failure.ts';
 import { of as kindOf } from '../core/kinds.ts';
 import type { BoardNode, Edge } from '../core/plan.ts';
 import { aliasReady, planSteps, planTunnels, type TunnelNeed } from '../core/ports.ts';
+import { loginArgs, noSession } from '../core/access-login.ts';
 import { signInOf, type SignIn } from '../core/sign-in.ts';
 import { notRunHere, type App, type Prereq } from '../core/stack.ts';
 import { readClones, readData, readStack, type Clone, type Registry } from '../data.ts';
@@ -487,12 +489,42 @@ async function openTunnels(up: Up): Promise<void> {
       fail(
         `${steps.name} needs its own local address first; in your terminal:\n  ${steps.sudo.join('\n  ')}\nthen run koppler up again`,
       );
+    await logInFirst(
+      up,
+      tunnel.host,
+      needs.filter(need => need.tunnel === tunnel.host).map(need => need.app),
+    );
     await run([steps.name, '--port', port, '--bind', tunnel.bind, '--keep-alive', '--', ...steps.tunnelArgs]);
   }
   for (const id of new Set(needs.map(need => need.app))) {
     const mine = needs.filter(need => need.app === id).map(need => need.what ?? need.tunnel);
     up.step(id, 'Tunnels', 'done', `${mine.join(', ')} open`);
   }
+}
+/**
+ * Logs in to Cloudflare Access once when the host has no session, so the app's first connections do not each open a
+ * login page. Only cloudflared's own "no token" answer counts; stdout, where the token is, is never read.
+ */
+async function logInFirst(up: Up, host: string, apps: string[]): Promise<void> {
+  const check = spawnSync('cloudflared', ['access', 'token', `-app=https://${host}`], {
+    encoding: 'utf8',
+    stdio: ['ignore', 'ignore', 'pipe'],
+    timeout: 20000,
+  });
+  if (check.error || !noSession(check.stderr)) return;
+  for (const app of new Set(apps)) up.step(app, 'Tunnels', 'user', `Log in to Cloudflare Access for ${host}.`);
+  console.log(`${host}: no Cloudflare Access session; log in on the page that opens`);
+  const code = await new Promise<number | null>(resolve => {
+    const child = spawn('cloudflared', loginArgs(host), { stdio: 'ignore' });
+    child.once('exit', resolve);
+    child.once('error', () => {
+      resolve(null);
+    });
+  });
+  if (code !== 0)
+    fail(
+      `${host} needs a Cloudflare Access login: run cloudflared access login https://${host}, then koppler up again`,
+    );
 }
 const hostsFile = () => {
   try {

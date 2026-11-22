@@ -58,3 +58,62 @@ test('a tunnel that keeps asking for an Access login stops, and status says to l
   const message = said.find(one => one.title === `${name} needs a Cloudflare Access login`);
   assert.deepEqual(message?.sections?.[0]?.commands, ['cloudflared access login https://db.acme.test']);
 });
+
+test('koppler up logs in once before it opens a tunnel with no Access session, without ever printing the token', async () => {
+  const { allowStack } = await import('./allow.mjs');
+  const { freePorts } = await import('./helpers.mjs');
+  const [appPort, dbPort] = await freePorts(2);
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-tunnel-precheck-'));
+  const tools = path.join(home, 'bin');
+  fs.mkdirSync(tools);
+  // No session until `access login` runs; the login prints its token unless told to be quiet.
+  fs.writeFileSync(
+    path.join(tools, 'cloudflared'),
+    `#!/bin/sh
+case "$2" in
+  token) [ -f "${home}/session" ] && { echo the-token; exit 0; }
+         echo "Unable to find token for provided application. Please run login command to generate token." >&2; exit 0 ;;
+  login) echo "$*" >> "${home}/logins"; touch "${home}/session"
+         case " $* " in *" --quiet "*) ;; *) echo the-token ;; esac; exit 0 ;;
+esac
+for last; do :; done
+exec python3 -m http.server "\${last##*:}" --bind 127.0.0.1
+`,
+    { mode: 0o755 },
+  );
+  const upEnv = { ...env, PATH: `${tools}:${process.env.PATH}`, KOPPLER_STATE: home, KOPPLER_TEMP: home, KOPPLER_CONFIG_DIR: home, KOPPLER_EARLY_LOG: '1' };
+  const run = (...args) => {
+    const r = spawnSync('node', [entry, ...args], { encoding: 'utf8', env: upEnv });
+    return { out: (r.stdout + r.stderr).trim(), code: r.status };
+  };
+  const stack = {
+    envs: ['qa'],
+    apps: {
+      api: {
+        name: 'API',
+        kind: 'other',
+        start: `exec python3 -m http.server ${appPort} --bind 127.0.0.1`,
+        url: `http://localhost:${appPort}`,
+        prereqs: [{ tunnel: 'db.acme.test', port: dbPort }],
+      },
+    },
+  };
+  fs.writeFileSync(path.join(home, 'registry.json'), JSON.stringify(stack));
+  allowStack(home, stack);
+  fs.writeFileSync(path.join(home, 'local.json'), JSON.stringify({ apps: { api: { path: home } } }));
+  try {
+    const first = run('up', 'api');
+    assert.equal(first.code, 0, first.out);
+    assert.match(first.out, new RegExp(`started tunnel-db-acme-test-${dbPort}\\b`));
+    assert.equal(fs.readFileSync(path.join(home, 'logins'), 'utf8').trim(), 'access login --quiet --auto-close https://db.acme.test');
+    assert.doesNotMatch(first.out, /the-token/);
+    run('stop', '--all', '--yes');
+    // With a session, no login.
+    const second = run('up', 'api');
+    assert.equal(second.code, 0, second.out);
+    assert.equal(fs.readFileSync(path.join(home, 'logins'), 'utf8').trim().split('\n').length, 1);
+  } finally {
+    run('stop', '--all', '--yes');
+    fs.rmSync(home, { recursive: true, force: true });
+  }
+});

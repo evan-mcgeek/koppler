@@ -163,6 +163,7 @@ These appear next to the app that uses them, and show or hide with it.
   A right click on a line does the same.
 
 - **Tunnels** carry an app to a deployed database or service. Koppler opens one per host and port, shared by the apps that need it, and moves a clashing one to a free port. Each can be left out of a run, and one that runs can be restarted from its card when calls through it hang.
+  Before a tunnel opens, Koppler checks its Cloudflare Access session, and logs in once when there is none.
   A tunnel whose Cloudflare Access login keeps asking (3 times in a minute) is stopped, so it does not open a browser page per connection.
   `koppler status` shows it as `needs login`, and the inbox gives the login command to run before the next run.
 - **Queues** an app on the board publishes to or reads from show which apps do.
