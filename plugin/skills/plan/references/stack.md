@@ -116,11 +116,11 @@ It holds facts about the apps, never secret values.
 | `pending`                                | The app is listed but its run facts are not collected yet.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 
 Local libraries need nothing in `stack.json`.
-`koppler sync` matches each app's dependencies (`pubspec.yaml`, `package.json`) with the packages your clones publish.
+`koppler sync` matches each app's dependencies (`pubspec.yaml`, `package.json`, a `.csproj`'s PackageReference) with the packages your clones publish.
 The card offers a Libraries switch for each.
 Switched on, `koppler up` points the app at your clone (a `pubspec_overrides.yaml` for Dart, `npm install --no-save` for npm).
+For .NET it writes a targets file in Koppler's own folder, and `dotnet run` swaps the package for the clone's project.
 Stop reverts it.
-.NET libraries are not covered yet.
 
 Top-level `presets` are the team boards: `[{ "name": "Mobile App + Mobile API", "version": 1, "nodes": { "<app>": { "run": "cli", "platform"?, "branch"?, "note"? } }, "edges": [{ "from", "to" }] }]`. The canvas lays them out by who calls whom; `koppler sync` checks every app and cable exists. Every board a user builds is kept as their own, saved as they change it; Share copies it as JSON to add here.
 A single preset in its own `.json` file, a list of them, or a whole `stack.json` can be opened from the canvas's board selector.

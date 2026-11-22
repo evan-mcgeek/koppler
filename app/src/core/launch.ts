@@ -37,6 +37,8 @@ export interface StartContext {
   lambdaOverrides?: string;
   /** Where an iOS app is built. */
   derivedData?: string;
+  /** .NET: the targets file that swaps packages for local libraries, when some are picked. */
+  libraryTargets?: string;
   /** Where a Flutter app's `flutter run` writes its process id, for hot reload. */
   flutterPid?: string;
   /** The stack, for the kinds it adds. */
@@ -106,7 +108,8 @@ function startDotnet(app: App, ctx: StartContext): Start {
   if (ctx.lan && !ctx.httpPort) return { error: 'no http address in its launch profile to open to the network' };
   const lan = ctx.lan ? ['--urls', `http://0.0.0.0:${String(ctx.httpPort)}`] : [];
   const port = ctx.lan ? ctx.httpPort : portOf(app.url);
-  const run = ['dotnet', 'run', '--project', app.project];
+  const libraries = ctx.libraryTargets ? [`--property:CustomAfterMicrosoftCommonTargets=${ctx.libraryTargets}`] : [];
+  const run = ['dotnet', 'run', '--project', app.project, ...libraries];
   // The repo's AWS_PROFILE names a profile on someone else's machine: the environment's own sign-in replaces it.
   // A -LOCAL profile is the user's own, and kept as it is.
   const sso = (app.prereqs ?? []).find(prereq => prereq.sso)?.sso;

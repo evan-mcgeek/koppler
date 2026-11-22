@@ -28,6 +28,17 @@ test('.NET: the -LOCAL profile wins when there is one, and stored secrets apply'
   expect(startCommand({ kind: 'dotnet' }).error).toMatch(/needs project/);
 });
 
+test('.NET: local libraries come in through their targets file, with or without the launch profile', () => {
+  const libraryTargets = '/k/libraries/api.targets';
+  const swap = '--property:CustomAfterMicrosoftCommonTargets=/k/libraries/api.targets';
+  expect(command(startCommand(api, { repo: '/r', profiles: { QA: {} }, libraryTargets }))).toEqual([
+    ...['dotnet', 'run', '--project', 'src/Api', swap, '--launch-profile', 'QA'],
+  ]);
+  const wired = command(startCommand(api, { repo: '/r', profiles: { QA: {} }, override: ['A'], libraryTargets }));
+  expect(wired).toContain(swap);
+  expect(command(startCommand(api, { repo: '/r', profiles: { QA: {} } }))).not.toContain(swap);
+});
+
 test('.NET: one rule for which profile, used for starting, wiring and checking', () => {
   const profiles = { DEV: {}, PROD: {}, 'PROD-LOCAL': {} };
   expect(launchProfile({ baseProfile: 'DEV' }, profiles, 'prod')).toEqual({

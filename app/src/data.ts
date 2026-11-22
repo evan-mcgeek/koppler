@@ -61,7 +61,7 @@ export interface Clone {
   dirty?: number;
   branches?: string[];
   /** Clones of libraries the app depends on, which it can use in place of the published ones. */
-  libraries?: { name: string; path: string; ecosystem: 'dart' | 'npm' }[];
+  libraries?: { name: string; path: string; ecosystem: 'dart' | 'npm' | 'nuget'; project?: string }[];
 }
 /**
  * The stack in use as this Koppler reads it: brought up to its format, its expressions filled in, and its databases
