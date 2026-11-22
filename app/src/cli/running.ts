@@ -35,10 +35,14 @@ export async function stop(args: string[]): Promise<void> {
   const names = args.filter(arg => !arg.startsWith('-'));
   if (!all && !names.length) fail('usage: koppler stop <name...> | --all [--yes]');
   for (const name of names) if (!NAME.test(name)) fail(notAName(name));
+  // Every name that runs is stopped, even when another does not: that one is an error once the rest are stopped.
+  const missing = all ? [] : names.filter(name => !readRecord(name));
+  const notStarted = () => fail(`${missing.join(', ')} ${missing.length === 1 ? 'is' : 'are'} not started by koppler`);
   const targets = all
     ? records().filter(record => record.name !== 'canvas')
-    : names.map(name => readRecord(name) ?? fail(`${name} is not started by koppler`));
+    : names.flatMap(name => readRecord(name) ?? []);
   if (!targets.length) {
+    if (missing.length) notStarted();
     console.log('nothing to stop');
     return;
   }
@@ -48,6 +52,7 @@ export async function stop(args: string[]): Promise<void> {
   // Stopping in bulk is not a run, so the history gets a note of it: later it says why nothing runs any more.
   const stopped = targets.map(record => record.name);
   if (all) appendNote('stop-apps', stopped);
+  if (missing.length) notStarted();
 }
 
 export async function restart(args: string[]): Promise<void> {
