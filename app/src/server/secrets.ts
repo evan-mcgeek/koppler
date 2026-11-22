@@ -6,11 +6,14 @@ import { isProtected } from '../core/plan.ts';
 import { readStack, type Registry } from '../data.ts';
 import { APP, BIN } from '../paths.ts';
 import { storeOf } from '../core/stack.ts';
+import { testArgs } from '../core/secret-types.ts';
 
 /** A secret an app declares for an environment, as the Credentials panel shows it. */
 export interface DeclaredSecret {
   name: string;
   type?: string;
+  /** For a key: where it is tried, and the header that carries it. */
+  probe?: { url: string; header?: string };
   when?: string;
   /** How to get the value from a terminal. */
   fetchCli?: string;
@@ -35,6 +38,10 @@ export interface Answer {
   body: { ok?: boolean; message?: string; error?: string };
 }
 
+const probeOf = (probe: unknown): DeclaredSecret['probe'] | undefined => {
+  const { url, header } = (probe ?? {}) as Record<string, unknown>;
+  return typeof url === 'string' ? { url, ...(typeof header === 'string' && { header }) } : undefined;
+};
 const said = (value: unknown) => (typeof value === 'string' ? value : JSON.stringify(value));
 // The panel stores the value itself, so the closing "then run secret-set" step is left out.
 const CLOSING_STEP = /[,;.]?\s*(and\s+|then\s+)*run:?\s+(<skill>\/bin\/secret-set|koppler secret set)\b.*$/is;
@@ -55,10 +62,12 @@ export function declaredSecrets(stack: SecretStack | null | undefined): Declared
       const own = env === first || !!overlay?.secrets;
       (out[id] ??= {})[env] = list.map(secret => {
         const { type, when } = secret;
+        const probe = probeOf(secret['probe']);
         const fetch = (secret['fetch'] ?? {}) as { cli?: unknown; ui?: unknown };
         return {
           name: secret['env'] as string,
           ...(typeof type === 'string' && /^[a-z]{1,20}$/.test(type) && { type }),
+          ...(probe && { probe }),
           ...(own && !!when && { when: said(when) }),
           ...(own && !!fetch.cli && { fetchCli: said(fetch.cli).replaceAll('<skill>', APP) }),
           ...(own &&
@@ -137,7 +146,6 @@ export async function secretRequest(action: 'set' | 'remove' | 'test' | undefine
     await refreshStored(true);
     return { status: 200, body: { ok: true } };
   }
-  const type = declared.type ? ['--type', declared.type] : [];
-  const { code, out } = await runScript('secret-test', [store, declared.name, ...type]);
+  const { code, out } = await runScript('secret-test', testArgs(store, declared.name, declared));
   return { status: 200, body: { ok: code === 0, message: out || 'failed: the check did not finish' } };
 }

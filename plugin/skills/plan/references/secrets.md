@@ -39,12 +39,18 @@ So a PROD value never replaces or leaks into QA.
 `koppler doctor --secrets <app> [--env <env>]` tries each stored secret the app declares and prints only the outcome (`connected`, or a plain reason).
 It tests Postgres (needs `psql`), MySQL (needs the `mysql` client) and Redis or Valkey (no client needed).
 The value can be in .NET `Key=Value;` form, a URL, or `host:port,password=...` for Redis.
-A secret's optional `type` in `stack.json` (`postgres`, `mysql`, `redis`) says which one it is.
+A secret's optional `type` in `stack.json` (`postgres`, `mysql`, `redis`, `key`) says which one it is.
 Without it, the value's shape decides, and an ambiguous `Server=...;User Id=...` string asks for the type.
 `koppler run <app>` runs the same test before it starts the app and refuses to start on a failure (`--no-test` starts anyway). A protected environment's store is only tested when asked (`--test`), because each read of it shows a Keychain prompt.
-A value is only ever sent to the host named inside it.
-API keys and tokens are not tested.
-Testing them would mean sending them to an address taken from `stack.json`, which anyone editing that file could point elsewhere.
+A connection is only ever sent to the host named inside it.
+An API key or token (`type: key`) names no host, so the stack says where to try it: `probe.url`, an https address.
+It goes as a bearer token, or in the header `probe.header` names.
+The test sends one request and reads only the status: `accepted`, rejected (401 or 403), or the status it got.
+It never follows a redirect, and never shows the value or the answer.
+A key goes only to a host the user approved for that secret on this Mac: `koppler secret approve <app>[@<env>] <NAME> <host>`.
+Anyone editing `stack.json` could point `probe.url` elsewhere, so the approval lives in `~/.config/koppler/approvals.json`, never in the stack.
+A new host asks again, and `koppler secret revoke <app>[@<env>] <NAME>` takes every approval back.
+Without one, the test says so and prints the approve command; the agent hands that command to the user and never runs it.
 `koppler secret psql <app or app@env> <NAME>` opens `psql` with a stored connection string.
 `... --pgpass` adds its line to `~/.pgpass` (for `localhost` and `127.0.0.1`), so other database tools find the password.
 Both are for the user's own terminal.

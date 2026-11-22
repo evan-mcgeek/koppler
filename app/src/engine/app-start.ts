@@ -8,6 +8,7 @@ import { fail } from '../failure.ts';
 import { launchProfile, mockCommand, startCommand, type LaunchProfiles, type StartContext } from '../core/launch.ts';
 import { ON_DEVICE } from '../core/kinds.ts';
 import { isProtected } from '../core/plan.ts';
+import { testArgs } from '../core/secret-types.ts';
 import type { App, Secret } from '../core/stack.ts';
 import { readClones, readStack } from '../data.ts';
 import { repoFiles } from './investigate.ts';
@@ -53,7 +54,7 @@ export function httpUrlOf(app: Partial<App>, repo: string | undefined, env: stri
 
 /** Tries one stored secret against the address inside it; the outcome only, never the value. */
 export function secretTest(store: string, secret: Secret): { code: number; message: string } {
-  const args = [store, secret.env ?? '', ...(secret.type ? ['--type', secret.type] : [])];
+  const args = testArgs(store, secret.env ?? '', secret);
   try {
     const said = execFileSync(path.join(BIN, 'secret-test'), args, {
       encoding: 'utf8',

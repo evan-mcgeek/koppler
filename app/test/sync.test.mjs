@@ -65,7 +65,7 @@ test('Queues: named and typed, and apps only publish to or read queues the stack
   assert.deepEqual(Object.keys(found), ['pay']);
   assert.deepEqual(Object.keys(found.pay), ['orders']);
   assert.deepEqual(validateStack({ envs: ['qa'], apps: { orders: app }, presets: [{ name: 'Just orders', version: 1, nodes: { orders: {} } }] }), []);
-  assert.deepEqual(validateStack({ envs: ['qa', 'prod'], apps: { orders: { ...app, secrets: [{ env: 'DB', type: 'postgres' }], envs: { prod: { secrets: [{ env: 'DB', type: 'oracle' }] } } } } }), ['apps.orders.envs.prod.secrets: type "oracle" is not one Koppler tests (postgres, mysql, redis)']);
+  assert.deepEqual(validateStack({ envs: ['qa', 'prod'], apps: { orders: { ...app, secrets: [{ env: 'DB', type: 'postgres' }], envs: { prod: { secrets: [{ env: 'DB', type: 'oracle' }] } } } } }), ['apps.orders.envs.prod.secrets: type "oracle" is not one Koppler tests (postgres, mysql, redis, key)']);
   assert.deepEqual(validateStack({ envs: ['qa'], apps: { orders: app }, presets: [{ name: 'No version', nodes: { orders: {} } }] }), ['presets[0].version: required (the current preset format is 1)']);
   assert.match(validateStack({ envs: ['qa'], apps: { orders: app }, presets: [{ name: 'Future', version: 99, nodes: { orders: {} } }] })[0], /newer than this Koppler reads/);
   assert.ok(validateStack({ envs: ['qa'], apps: { orders: app }, presets: [{ name: 'Bad', version: 1, nodes: { ghost: {} }, edges: [{ from: 'orders', to: 'ghost' }] }] }).length === 2);

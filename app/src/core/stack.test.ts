@@ -39,7 +39,10 @@ test('a stack that can be used has nothing wrong with it, and is typed', () => {
         ...app,
         url: 'https://localhost:7001',
         prereqs: [{ sso: 'acme-qa' }, { tunnel: 'db.qa.acme.example', port: 5432, env: 'ConnectionStrings__Db' }],
-        secrets: [{ env: 'ConnectionStrings__Db', type: 'postgres' }],
+        secrets: [
+          { env: 'ConnectionStrings__Db', type: 'postgres' },
+          { env: 'PAYMENTS_KEY', type: 'key', probe: { url: 'https://api.acme-pay.test/me', header: 'X-Api-Key' } },
+        ],
         publishes: { thumbs: {} },
         buckets: { receipts: { access: 'write' } },
         envs: { prod: { prereqs: [{ tunnel: 'db.acme.example', port: 5432 }], start: 'dotnet run' } },
@@ -84,6 +87,18 @@ test('each part is named where it is wrong', () => {
     [
       web({ secrets: [{ env: 'DB', type: 'oracle' }] }),
       `apps.web.secrets: type "oracle" is not one Koppler tests (${SECRET_TYPES.join(', ')})`,
+    ],
+    [
+      web({ secrets: [{ env: 'KEY', type: 'key' }] }),
+      'apps.web.secrets: a key needs probe.url, the address it is tried at',
+    ],
+    [
+      web({ secrets: [{ env: 'KEY', type: 'key', probe: { url: 'http://api.acme-pay.test/me' } }] }),
+      'apps.web.secrets[0].probe.url: an https address, or http on this Mac',
+    ],
+    [
+      web({ secrets: [{ env: 'KEY', type: 'key', probe: { url: 'https://api.acme-pay.test', header: 'X Key' } }] }),
+      'apps.web.secrets[0].probe.header: a header name',
     ],
     [
       web({ secrets: [{ env: 'NODE_OPTIONS' }] }),

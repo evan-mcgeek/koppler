@@ -1,10 +1,12 @@
 // Checks that a stored credential really works, by connecting to the address inside the value itself.
 // Says only the outcome: never the value, and never the server's own message (it can echo names from the value).
-// A value is only ever sent to the host it names; nothing in stack.json can point a test somewhere else.
+// A connection is only ever sent to the host it names. A key names none, so it goes only to a host the user approved
+// for it on this Mac; nothing in stack.json can send it anywhere else.
 import { execFile, execFileSync } from 'node:child_process';
 import net from 'node:net';
 import tls from 'node:tls';
-import { SECRET_TYPES } from './core/secret-types.ts';
+import { isApproved } from './approvals.ts';
+import { probeUrlOk, SECRET_TYPES, type Probe } from './core/secret-types.ts';
 import { clientEnv, findClient } from './safe-env.ts';
 
 export const TYPES = SECRET_TYPES;
@@ -226,13 +228,31 @@ function redis(to: Connection): Promise<Outcome> {
 }
 const TESTS: Record<string, ((to: Connection) => Promise<Outcome>) | undefined> = { postgres, mysql, redis };
 
-/** Tries the connection a value holds. */
-export async function check(value: string, type?: string): Promise<Outcome> {
+/** One request with the key; only its status is read, and a redirect is never followed. */
+async function key(value: string, probe: Probe | undefined): Promise<Outcome> {
+  if (!probe?.url) return { code: 2, message: 'cannot test: say where to try it with probe.url on this secret' };
+  if (!probeUrlOk(probe.url)) return { code: 2, message: 'cannot test: its probe address must start with https://' };
+  const text = value.trim();
+  if (/[\r\n]/.test(text)) return { code: 2, message: 'cannot test: the value is more than one line' };
+  const headers = probe.header ? { [probe.header]: text } : { authorization: `Bearer ${text}` };
+  try {
+    const { status } = await fetch(probe.url, { headers, redirect: 'manual', signal: AbortSignal.timeout(10000) });
+    if (status >= 200 && status < 300) return { code: 0, message: 'accepted' };
+    if (status === 401 || status === 403) return { code: 1, message: 'failed: it rejected the key' };
+    return { code: 1, message: `failed: it answered ${String(status)}` };
+  } catch {
+    return { code: 1, message: reason('timeout') };
+  }
+}
+
+/** Tries the connection a value holds, or a key at its probe address. */
+export async function check(value: string, type?: string, probe?: Probe): Promise<Outcome> {
   if (type && !(TYPES as readonly string[]).includes(type))
     return {
       code: 2,
       message: `cannot test: Koppler has no test for type "${type}" (it tests ${TYPES.join(', ')})`,
     };
+  if (type === 'key') return key(value, probe);
   const found = parse(value, type);
   if (!found) return { code: 2, message: 'cannot test: not a database or cache connection Koppler reads' };
   if (found.type === null)
@@ -246,17 +266,29 @@ export async function check(value: string, type?: string): Promise<Outcome> {
   return test(found);
 }
 
-/** secret-test <app or app@env> <NAME> [--type <type>] */
+/** secret-test <app or app@env> <NAME> [--type <type>] [--url <probe address>] [--header <name>] */
 export async function main(args: string[], here: string): Promise<never> {
   const [store = '', name = ''] = args;
-  const typeAt = args.indexOf('--type');
-  const type = typeAt >= 0 ? args[typeAt + 1] : undefined;
+  const option = (flag: string) => {
+    const at = args.indexOf(flag);
+    return at >= 0 ? args[at + 1] : undefined;
+  };
+  const type = option('--type');
+  const probe = { url: option('--url'), header: option('--header') };
   const fail = (message: string): never => {
     console.error(message);
     process.exit(2);
   };
   if (!/^[a-z0-9-]+(@[a-z0-9-]+)?$/.test(store)) fail(`invalid app id: ${store}`);
   if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) fail(`invalid env name: ${name}`);
+  // Asked before the value is read: an unapproved key never leaves its store.
+  if (type === 'key' && probe.url && probeUrlOk(probe.url)) {
+    const host = new URL(probe.url).hostname;
+    if (!isApproved(store, name, host)) {
+      console.log(`cannot test: approve sending it to ${host} first: koppler secret approve ${store} ${name} ${host}`);
+      process.exit(2);
+    }
+  }
   let value = '';
   try {
     value = execFileSync(`${here}/secret-store`, ['value', store, name], {
@@ -270,7 +302,7 @@ export async function main(args: string[], here: string): Promise<never> {
     console.log('not stored');
     process.exit(2);
   }
-  const { code, message } = await check(value, type);
+  const { code, message } = await check(value, type, probe);
   console.log(message);
   process.exit(code);
 }
