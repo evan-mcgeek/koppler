@@ -11,7 +11,7 @@ const stack = {
   queues: {
     'order-events': { name: 'Order events', type: 'sqs', queue: 'order-events-qa' },
     receipts: { name: 'Receipts', type: 'kafka', queue: 'receipts-qa' },
-    alerts: { name: 'Alerts', type: 'sns', queue: 'alerts-qa' },
+    alerts: { name: 'Alerts', type: 'other', queue: 'alerts-qa' },
   },
   apps: {
     ...STACK.apps,
@@ -51,7 +51,7 @@ test('a queue between two apps shows as a card linked to both', async ({ page })
   await page.screenshot({ path: 'test-results/next-queues.png' });
 });
 
-test('what cannot run here stays off Plan, and Discover shows it: an SNS topic and an outside system on the whole stack', async ({
+test('what cannot run here stays off Plan, and Discover shows it: an other queue and an outside system on the whole stack', async ({
   page,
 }) => {
   await expect(queue(page)).toHaveCount(2);
@@ -116,6 +116,29 @@ test("a queue is hidden from its card; an app's Queues switch takes only that ap
   await ofOrders.check();
   await expect(queue(page)).toHaveCount(2);
   await expect(page.locator('.links .flow.msg')).toHaveCount(2);
+});
+
+test.describe('an SNS topic and an event bus', () => {
+  test.use({
+    stack: {
+      ...stack,
+      queues: {
+        alerts: { name: 'Alerts', type: 'sns', queue: 'alerts-qa' },
+        shop: { name: 'Shop events', type: 'eventbridge', queue: 'shop-qa' },
+      },
+      apps: { ...stack.apps, orders: { ...orders, publishes: { alerts: {}, shop: {} } } },
+    },
+  });
+
+  test('run here too: each is a card with its Local switch', async ({ page }) => {
+    await expect(queue(page)).toHaveCount(2);
+    await expect(queue(page).filter({ hasText: 'Alerts' })).toContainText('SNS');
+    const bus = queue(page).filter({ hasText: 'Shop events' });
+    await expect(bus).toContainText('BUS');
+    await bus.getByRole('radio', { name: 'Local' }).check();
+    await expect(bus.getByRole('radio', { name: 'Local' })).toBeChecked();
+    await page.screenshot({ path: 'test-results/next-queues-topic-bus.png' });
+  });
 });
 
 test.describe('a card nobody switched', () => {
