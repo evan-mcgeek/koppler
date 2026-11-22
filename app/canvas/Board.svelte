@@ -437,6 +437,14 @@
 <svelte:window
   onkeydown={(ev: KeyboardEvent) => {
     if (ev.key === 'Escape') lineMenu = null;
+    // Escape lets go of what is picked. Svelte Flow's own Escape picks a focused card that was not picked, so the pick
+    // is cleared here, after it; a field's Escape and a cable being drawn keep theirs.
+    if (
+      ev.key === 'Escape' &&
+      !ev.defaultPrevented &&
+      !(ev.target instanceof HTMLElement && ev.target.closest('input, textarea, select, [contenteditable]'))
+    )
+      board.pickNone();
     hold(ev);
     tools.key(ev);
     shortcut(ev);

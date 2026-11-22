@@ -2232,6 +2232,12 @@ class Board {
     this.infra = this.infra.map(all);
     this.edges = this.edges.map(unselected);
   }
+  /** Nothing picked: no card, tunnel or cable. */
+  pickNone(): void {
+    this.nodes = this.nodes.map(unselected);
+    this.infra = this.infra.map(unselected);
+    this.edges = this.edges.map(unselected);
+  }
   /** Selects this card alone, app or tunnel, so a drag moves only it. */
   pick(id: string): void {
     const only = <T extends { id: string; selected?: boolean }>(one: T): T =>
