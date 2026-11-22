@@ -146,6 +146,10 @@ test('The test on a cable follows the whole path, and only ever tries this Mac\'
     assert.equal(await t({ node: 'bare' }), 'Cannot test?');
     assert.equal(await t({ node: 'fn' }, { answers: async () => ({ status: 200, ms: 3, body: '{"koppler":"lambda","ok":true,"function":"Active","trigger":"Enabled"}' }) }), 'Function ready');
     assert.equal(await t({ node: 'fn' }, { answers: async () => ({ status: 503, ms: 3, body: '{"koppler":"lambda","ok":false,"function":"Failed","trigger":"Enabled"}' }) }), 'Function not ready');
+    // Called only through its API, it has no queue trigger to report.
+    const api = await cableTest(reg, { node: 'fn' }, probe({ answers: async () => ({ status: 200, ms: 3, body: '{"koppler":"lambda","ok":true,"function":"Active"}' }) }));
+    assert.equal(api.text, 'Function ready');
+    assert.match(api.detail, /the function is deployed and answers through its API\.$/);
     assert.equal(await t({ node: 'fn' }, { answers: async () => ({ status: 404, ms: 3, body: '' }) }), 'Answers');
     // By itself the canvas never reads a production credential.
     let read = 0;
