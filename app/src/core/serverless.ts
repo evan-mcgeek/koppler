@@ -1,30 +1,23 @@
 // A Serverless Framework app's custom domain (serverless-domain-manager), per stage, from its serverless.yml.
+import { parse } from 'yaml';
 import type { Domain } from './terraform.ts';
 
-type Tree = { [key: string]: Tree | string };
+type Tree = Record<string, unknown>;
 
-/** The block mappings of a YAML file as nested objects; lists and flow values are skipped. */
-function readMappings(text: string): Tree {
-  const root: Tree = {};
-  const open: { indent: number; tree: Tree }[] = [{ indent: -1, tree: root }];
-  for (const line of text.split('\n')) {
-    // ponytail: block mappings with plain or quoted values only; anchors, lists and multi-line values are not read.
-    const match = /^( *)([\w.-]+|"[^"]*"|'[^']*'):(?:\s+(.*?))?\s*$/.exec(line.replace(/\s+#.*$/, ''));
-    if (!match) continue;
-    const [, spaces = '', rawKey = '', value = ''] = match;
-    while ((open.at(-1)?.indent ?? -1) >= spaces.length) open.pop();
-    const parent = open.at(-1)?.tree ?? root;
-    const key = rawKey.replace(/^["']|["']$/g, '');
-    if (value) parent[key] = value.replace(/^"(.*)"$|^'(.*)'$/, '$1$2');
-    else open.push({ indent: spaces.length, tree: (parent[key] = {}) });
+/** The file as data; CloudFormation tags (`!Ref`, `!Sub`) are read as plain values, and a file that is not YAML as empty. */
+function readTree(text: string): Tree {
+  try {
+    const tree: unknown = parse(text, { strict: false, logLevel: 'silent', merge: true });
+    return tree && typeof tree === 'object' ? (tree as Tree) : {};
+  } catch {
+    return {};
   }
-  return root;
 }
 
-const at = (tree: Tree, dotted: string): Tree | string | undefined =>
+const at = (tree: Tree, dotted: string): unknown =>
   dotted
     .split('.')
-    .reduce<Tree | string | undefined>((node, key) => (typeof node === 'object' ? node[key] : undefined), tree);
+    .reduce<unknown>((node, key) => (node && typeof node === 'object' ? (node as Tree)[key] : undefined), tree);
 
 const STAGE = /^(sls:stage|self:provider\.stage|opt:stage(\s*,.*)?)$/;
 
@@ -51,7 +44,7 @@ export function serverlessDomains(
   text: string,
   stages: string[],
 ): { found: { token: string | null; domains: Domain[] }[]; unread: string | null } {
-  const tree = readMappings(text);
+  const tree = readTree(text);
   const raw = at(tree, 'custom.customDomain.domainName');
   if (typeof raw !== 'string') return { found: [], unread: null };
   const basePath = at(tree, 'custom.customDomain.basePath');
@@ -61,7 +54,7 @@ export function serverlessDomains(
   const fixed = resolve(raw, tree, null);
   if (isHost(fixed)) return { found: [{ token: null, domains: domain(fixed) }], unread: null };
   const maps = [...raw.matchAll(/\$\{self:([\w.-]+)\.\$\{[^}]*\}\}/g)].map(match => at(tree, match[1] ?? ''));
-  const keys = maps.flatMap(map => (typeof map === 'object' ? Object.keys(map) : []));
+  const keys = maps.flatMap(map => (map && typeof map === 'object' && !Array.isArray(map) ? Object.keys(map) : []));
   const found = [...new Set([...stages, ...keys])].flatMap(stage => {
     const host = resolve(raw, tree, stage);
     return isHost(host) ? [{ token: stage, domains: domain(host) }] : [];

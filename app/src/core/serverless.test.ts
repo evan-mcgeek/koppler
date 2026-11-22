@@ -48,3 +48,30 @@ test('a value read when deployed is not guessed, and is said', () => {
     serverlessDomains('custom:\n  customDomain:\n    domainName: ${self:custom.customDomain.domainName}\n', []).unread,
   ).toBe('${self:custom.customDomain.domainName}');
 });
+
+test('a real file reads: anchors, lists and CloudFormation tags elsewhere do not get in the way', () => {
+  const yml = `service: orders-api
+defaults: &domain
+  domainName: api.\${sls:stage}.acme.dev
+  basePath: orders
+functions:
+  list:
+    handler: handler.list
+    events:
+      - http: { path: orders, method: get }
+custom:
+  customDomain:
+    <<: *domain
+resources:
+  Resources:
+    Queue:
+      Type: AWS::SQS::Queue
+      Properties:
+        QueueName: !Ref QueueName
+        Tags:
+          - Key: app
+            Value: !Sub "\${AWS::StackName}"
+`;
+  expect(hosts(yml, ['qa'])).toEqual(['qa: api.qa.acme.dev/orders']);
+  expect(serverlessDomains('custom: [unclosed\n', ['qa'])).toEqual({ found: [], unread: null });
+});
