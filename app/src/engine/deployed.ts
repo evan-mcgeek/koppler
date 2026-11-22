@@ -136,7 +136,7 @@ export function readRepo(repo: string, workspaces: string[] = []): Module[] {
   return [...terraform, ...sam];
 }
 
-const RANK = { api: 0, cdn: 1, dns: 2 };
+const RANK = { api: 0, cdn: 1, lb: 2, dns: 3 };
 
 const deployedUrlOf = (stack: AppsStack, id: string, env: string) => appOn(stack, id, env)?.deployedUrl;
 
@@ -222,7 +222,8 @@ export function draftApp(
   return Object.fromEntries(
     Object.entries(gathered).map(([env, found]): [string, Draft] => {
       const ranked = found.domains.sort((a, b) => RANK[a.from] - RANK[b.from]);
-      const domains = [...new Map(ranked.map(domain => [domain.host, domain])).values()];
+      // The same host twice is one: the better ranked, which may know its path and scheme.
+      const domains = ranked.filter((domain, at) => ranked.findIndex(other => other.host === domain.host) === at);
       const settings = [...found.settings.values()];
       const calls = settings.flatMap(({ name, address }): Call[] => {
         const callee = address && owners.get(hostOf(address));
@@ -236,7 +237,9 @@ export function draftApp(
       return [
         env,
         {
-          deployedUrl: first ? `https://${first.host}/` : null,
+          deployedUrl: first
+            ? `${first.http ? 'http' : 'https'}://${first.host}/${first.path ? `${first.path}/` : ''}`
+            : null,
           otherAddresses: others.map(domain => domain.host),
           accounts: [...found.accounts],
           settingsWithAddress: settings.flatMap(({ name, address, secret }) =>

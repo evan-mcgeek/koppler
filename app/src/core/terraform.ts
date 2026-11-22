@@ -50,7 +50,11 @@ export type NamedQueue = Omit<QueueUse, 'forEach' | 'count'> & { name: string | 
 
 export interface Domain {
   host: string;
-  from: 'api' | 'cdn' | 'dns';
+  from: 'api' | 'cdn' | 'lb' | 'dns';
+  /** The base path the app is served under on that host. */
+  path?: string;
+  /** Served over plain HTTP: a load balancer listener on port 80. */
+  http?: true;
 }
 
 export interface Setting {
@@ -281,6 +285,81 @@ export function addressOf(value: unknown): string | null {
     return null;
   }
 }
+
+/** The items of a list as written, or the one value. */
+const listed = (raw: string) =>
+  raw.trim().startsWith('[')
+    ? raw
+        .replace(/^\[|\]$/g, '')
+        .split(',')
+        .map(item => item.trim())
+        .filter(Boolean)
+    : [raw];
+
+const nameOf = (match: RegExpExecArray) => /"([\w-]+)"\s*\{$/.exec(match[0])?.[1] ?? '';
+const refTo = (raw: string | undefined, type: string) => new RegExp(`\\b${type}\\.([\\w-]+)`).exec(raw ?? '')?.[1];
+/** The target group an action block forwards to, in either of the ways Terraform writes it. */
+const forwardsTo = (body: string, head: RegExp) =>
+  blocks(body, head).map(action => refTo(action.body, 'aws_lb_target_group'));
+
+/**
+ * The hosts an ECS service behind a load balancer answers on, as written: the host of the listener rule that forwards
+ * to it, else the Route 53 alias of its load balancer. Its own DNS name is only known when deployed, so it is not used.
+ */
+function loadBalancerHosts(tf: string): { raw: string; path?: string; http: boolean }[] {
+  const served = new Set(
+    blocks(tf, resource('aws_ecs_service'))
+      .flatMap(({ body }) => blocks(body, /load_balancer\s*\{/g))
+      .map(({ body }) => refTo(assigned(body, 'target_group_arn'), 'aws_lb_target_group')),
+  );
+  served.delete(undefined);
+  if (!served.size) return [];
+  const aliases = new Map<string | undefined, string>(
+    blocks(tf, resource('aws_route53_record')).flatMap(({ body }) => {
+      const name = assigned(body, 'name');
+      const lb = blocks(body, /alias\s*\{/g).map(alias => refTo(assigned(alias.body, 'name'), 'aws_lb'))[0];
+      return name && lb ? [[lb, name] as const] : [];
+    }),
+  );
+  const listeners = new Map(
+    blocks(tf, resource('aws_lb_listener')).map(({ match, body }) => [
+      nameOf(match),
+      {
+        lb: refTo(assigned(body, 'load_balancer_arn'), 'aws_lb'),
+        http: !/^"?443"?$/.test(assigned(body, 'port') ?? '') && !/HTTPS/.test(assigned(body, 'protocol') ?? ''),
+        forwards: forwardsTo(body, /default_action\s*\{/g),
+      },
+    ]),
+  );
+  const firstValue = (body: string, head: RegExp) =>
+    blocks(body, head).flatMap(block => listed(assigned(block.body, 'values') ?? ''));
+  const fromRules = blocks(tf, resource('aws_lb_listener_rule')).flatMap(({ body }) => {
+    if (!forwardsTo(body, /action\s*\{/g).some(group => served.has(group))) return [];
+    const listener = listeners.get(refTo(assigned(body, 'listener_arn'), 'aws_lb_listener') ?? '');
+    const path = firstValue(body, /path_pattern\s*\{/g)[0];
+    const hosts = firstValue(body, /host_header\s*\{/g);
+    const alias = aliases.get(listener?.lb);
+    return (hosts.length ? hosts : alias ? [alias] : []).map(raw => ({
+      raw,
+      ...(path && { path }),
+      http: listener?.http ?? false,
+    }));
+  });
+  const fromListeners = [...listeners.values()].flatMap(listener => {
+    const alias = aliases.get(listener.lb);
+    return alias && listener.forwards.some(group => served.has(group)) ? [{ raw: alias, http: listener.http }] : [];
+  });
+  return [...fromRules, ...fromListeners];
+}
+
+/** A domain as written, before it is worked out for an environment. */
+type DeclaredDomain = { raw: string; from: Domain['from']; path?: string; http?: boolean };
+
+/** A path pattern as a plain base path (`/api/*` reads as api), or nothing. */
+const basePath = (value: unknown) => {
+  const path = typeof value === 'string' ? value.replace(/\/?\*$/, '').replace(/^\/|\/$/g, '') : '';
+  return /^[\w-]+(\/[\w-]+)*$/.test(path) ? path : undefined;
+};
 
 /** The smallest {...} around position `at` in `text`. */
 function around(text: string, at: number): string {
@@ -728,21 +807,14 @@ export function readModule(files: { name: string; text: string }[], workspaces: 
         .filter(([name]) => name === key)
         .map(([, raw]) => raw),
     );
-  const listed = (raw: string) =>
-    raw.trim().startsWith('[')
-      ? raw
-          .replace(/^\[|\]$/g, '')
-          .split(',')
-          .map(item => item.trim())
-          .filter(Boolean)
-      : [raw];
   const from = (source: Domain['from']) => (raw: string) => ({ raw, from: source });
   const declared = {
     domains: [
       ...pick('aws_api_gateway_domain_name|aws_apigatewayv2_domain_name', 'domain_name').map(from('api')),
       ...pick('aws_cloudfront_distribution', 'aliases').flatMap(listed).map(from('cdn')),
+      ...loadBalancerHosts(tf).map(host => ({ ...host, from: 'lb' as const })),
       ...pick('aws_route53_record', 'name').map(from('dns')),
-    ],
+    ] as DeclaredDomain[],
     settings: [
       ...blocks(tf, resource('aws_lambda_function'))
         .flatMap(block => blocks(block.body, /environment\s*\{/g))
@@ -801,9 +873,12 @@ export function readModule(files: { name: string; text: string }[], workspaces: 
     routes: resources.routes.map(({ apiRaw, ...route }) => ({ ...route, apiName: named(apiRaw, context) })),
     machines: resources.machines.map(({ raw, ...machine }) => ({ ...machine, name: named(raw, context) })),
     account: accountOf(context),
-    domains: declared.domains.flatMap(({ raw, from: source }): Domain[] => {
-      const host = addressOf(resolve(raw, context) ?? '');
-      return host && !host.includes('/') ? [{ host, from: source }] : [];
+    domains: declared.domains.flatMap((domain): Domain[] => {
+      const host = addressOf(resolve(domain.raw, context) ?? '');
+      const path = basePath(resolve(domain.path, context));
+      return host && !host.includes('/')
+        ? [{ host, from: domain.from, ...(path && { path }), ...(domain.http ? { http: true as const } : {}) }]
+        : [];
     }),
     settings: declared.settings
       .filter(([name]) => !TOOLING.test(name))

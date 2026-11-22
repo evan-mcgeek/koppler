@@ -330,3 +330,38 @@ resource "aws_lambda_function" "f" {
     assert.deepEqual([q!.sends, q!.reads], [true, true]);
   }
 });
+
+test('an ECS service behind a load balancer: its address is the host and path of its rule, over HTTPS', () => {
+  const tf = `
+resource "aws_ecs_service" "orders" {
+  load_balancer {
+    target_group_arn = aws_lb_target_group.orders.arn
+  }
+}
+resource "aws_lb_target_group" "orders" {
+  port = 8080
+}
+resource "aws_lb_listener" "https" {
+  port     = 443
+  protocol = "HTTPS"
+}
+resource "aws_lb_listener_rule" "orders" {
+  listener_arn = aws_lb_listener.https.arn
+  action {
+    target_group_arn = aws_lb_target_group.orders.arn
+  }
+  condition {
+    host_header {
+      values = ["orders.acme.example"]
+    }
+  }
+  condition {
+    path_pattern {
+      values = ["/api/*"]
+    }
+  }
+}`;
+  const stack = { envs: ['qa'], apps: { orders: {} } };
+  const draft = draftApp('orders', readModule([{ name: 'main.tf', text: tf }]), stack, new Map());
+  assert.equal(draft.qa!.deployedUrl, 'https://orders.acme.example/api/');
+});
