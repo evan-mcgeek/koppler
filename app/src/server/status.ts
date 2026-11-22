@@ -49,6 +49,15 @@ interface AppStatus extends Loose {
 }
 type Status = Loose & { apps: Record<string, AppStatus> };
 
+/** The port of an app's local address, or 0 when it has none. */
+const portOf = (url: unknown): number => {
+  try {
+    return Number(new URL(String(url)).port) || 0;
+  } catch {
+    return 0;
+  }
+};
+
 export const SOURCE = path.join(tempDir(), 'status.json');
 const OUT = path.join(tempDir(), 'status.js');
 const STEP_STATES = ['done', 'failed', 'user', 'todo'];
@@ -262,6 +271,11 @@ async function snapshot(serving: boolean): Promise<Status> {
   const stack = stackNow();
   for (const id of Object.keys(live()?.nodes ?? {}))
     if (!status.apps[id] && stack?.apps[id] && kindOf(stack.apps[id]).platforms) status.apps[id] = {};
+  // Any other app of the last run is looked for on its own port: stopped since, it reads as down, not as running.
+  for (const id of Object.keys(live()?.nodes ?? {})) {
+    const port = status.apps[id] ? 0 : portOf(stack?.apps[id]?.url);
+    if (port) status.apps[id] = { port };
+  }
   await refreshMobile(Object.keys(status.apps));
   for (const [id, app] of Object.entries(status.apps)) {
     if (app.port) app.listening = await portOpen(app.port);

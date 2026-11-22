@@ -162,24 +162,35 @@ export const test = base.extend<{
       // Never the profiles of whoever runs the tests.
       AWS_CONFIG_FILE: path.join(dir, 'aws-config'),
     };
-    const server = spawn(process.execPath, [path.join(here, '..', 'dist', 'status-watch.mjs')], {
-      env,
-      stdio: ['ignore', 'pipe', 'pipe'],
-    });
+    const urlFile = path.join(temp, 'canvas-url');
     // Kept to say why, when it does not start.
     let said = '';
     const keep = (chunk: Buffer) => {
       said = (said + chunk.toString()).slice(-4000);
     };
-    server.stdout.on('data', keep);
-    server.stderr.on('data', keep);
-    const urlFile = path.join(temp, 'canvas-url');
+    const start = () => {
+      const started = spawn(process.execPath, [path.join(here, '..', 'dist', 'status-watch.mjs')], {
+        env,
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
+      started.stdout.on('data', keep);
+      started.stderr.on('data', keep);
+      return started;
+    };
+    let server = start();
     try {
-      // A busy machine can take a while to start Node; one that exits is not waited for.
-      await expect
-        .poll(() => fs.existsSync(urlFile) || server.exitCode !== null, { timeout: 20_000 })
-        .toBe(true)
-        .catch(() => undefined);
+      // A busy machine can take a while to start Node; one that exits is not waited for. Another worker can take the
+      // free port between picking it and the server binding it: then it starts again on another.
+      for (let tries = 0; ; tries++) {
+        await expect
+          .poll(() => fs.existsSync(urlFile) || server.exitCode !== null, { timeout: 20_000 })
+          .toBe(true)
+          .catch(() => undefined);
+        if (fs.existsSync(urlFile) || tries === 2 || !/is in use/.test(said)) break;
+        said = '';
+        env.KOPPLER_PORT = String(await freePort());
+        server = start();
+      }
       if (!fs.existsSync(urlFile))
         throw new Error(
           `the canvas server did not start (${server.exitCode === null ? 'still running after 20 s' : `exited with ${String(server.exitCode)}`}):\n${said || 'it printed nothing'}`,
