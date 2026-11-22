@@ -3,6 +3,9 @@
 // Usage (through koppler run): stamp.mjs <log> -- <command...>
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
+import path from 'node:path';
+import { LOGIN_PROMPT, needsLoginLine, needsLoginMessage, tooManyPrompts } from './core/access-login.ts';
+import { appendMessage } from './engine/messages.ts';
 
 const [log = '', dash, ...command] = process.argv.slice(2);
 if (!log || dash !== '--' || command.length === 0) {
@@ -13,12 +16,34 @@ const out = fs.openSync(log, 'a', 0o600);
 const times = fs.openSync(`${log}.times`, 'a', 0o600);
 // Its errors and its output in the order it wrote them: one stream, as when both went straight to the log.
 const child = spawn('sh', ['-c', 'exec "$@" 2>&1', 'sh', ...command], { stdio: ['ignore', 'pipe', 'ignore'] });
+const prompts: number[] = [];
+let stopping = false;
 child.stdout.on('data', (chunk: Buffer) => {
+  if (stopping) return;
   fs.writeSync(out, chunk);
   let lines = 0;
   for (const byte of chunk) if (byte === 10) lines++;
   if (lines) fs.writeSync(times, `${String(Date.now())}\n`.repeat(lines));
+  const now = Date.now();
+  for (let at = chunk.indexOf(LOGIN_PROMPT); at >= 0; at = chunk.indexOf(LOGIN_PROMPT, at + 1)) prompts.push(now);
+  if (tooManyPrompts(prompts, now)) stopLoggedOut();
 });
+/** Ends the whole process group, the keep-alive loop included, so nothing starts the tunnel again. */
+function stopLoggedOut() {
+  stopping = true;
+  fs.writeSync(out, `${needsLoginLine(command)}\n`);
+  fs.writeSync(times, `${String(Date.now())}\n`);
+  try {
+    appendMessage(needsLoginMessage(path.basename(log, '.log'), command));
+  } catch {
+    // The log and status still say it.
+  }
+  try {
+    process.kill(-process.pid, 'SIGTERM');
+  } catch {
+    child.kill('SIGTERM');
+  }
+}
 for (const signal of ['SIGTERM', 'SIGINT', 'SIGHUP'] as const)
   process.on(signal, () => {
     child.kill(signal);

@@ -14,8 +14,10 @@ import {
   sh,
   sleep,
   stopOne,
+  tailOf,
   uptime,
 } from '../engine/processes.ts';
+import { needsLogin } from '../core/access-login.ts';
 import { run } from '../engine/run.ts';
 import { appendNote, live } from '../engine/history.ts';
 import { runLog } from '../engine/run-logs.ts';
@@ -294,7 +296,7 @@ export async function status(args: string[] = []): Promise<void> {
     const up = alive(record);
     return {
       name: record.name,
-      state: up ? 'running' : 'exited',
+      state: up ? 'running' : needsLogin(tailOf(record.log, 1).trim()) ? 'needs login' : 'exited',
       pid: record.pid,
       up: up ? uptime(record.startedAt) : null,
       port: record.port ?? null,
