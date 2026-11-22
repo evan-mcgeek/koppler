@@ -10,6 +10,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { sampleEvent } from './core/sam-events.ts';
 import { takeSecrets } from './safe-env.ts';
+import { samBuild, samEnv } from './sam-cli.ts';
 
 /** The settings the template gives its functions, by name: only these reach the functions. */
 export const declared = (yaml: string): string[] => [
@@ -106,13 +107,7 @@ async function main(target: Target, config: { id?: string; template?: string; en
       say(`${name} is triggered by ${by}; run it once with: koppler invoke ${config.id ?? '<app>'} ${name}`);
     }
 
-  // SAM finds Docker only through DOCKER_HOST: the endpoint of the active Docker context (Colima, Docker Desktop, ...).
-  const env = { ...process.env };
-  if (!env['DOCKER_HOST']) {
-    const inspect = ['context', 'inspect', '--format', '{{.Endpoints.docker.Host}}'];
-    const host = (spawnSync('docker', inspect, { encoding: 'utf8' }).stdout as string | null)?.trim();
-    if (host) env['DOCKER_HOST'] = host;
-  }
+  const env = samEnv();
   // Built outside the repo, in Koppler's own folder for this app, so the clone stays untouched; always under the home
   // folder, which Docker on a Mac (Colima, Docker Desktop) shares with containers. SAM runs from there too, since it
   // keeps its dependency cache (.aws-sam) where it runs.
@@ -142,32 +137,10 @@ async function main(target: Target, config: { id?: string; template?: string; en
     fs.writeFileSync(event, made.stdout, { mode: 0o600 });
   }
   say('building the functions');
-  // Not blocking, so a Stop during the build is heard at once. A build cut short is the end, not a reason to build another way.
-  const build = (how: string) =>
-    new Promise<number | null>(done => {
-      const building = sam([
-        'build',
-        '--template',
-        templatePath,
-        '--build-dir',
-        buildDir,
-        '--cache-dir',
-        cacheDir,
-        how,
-      ]);
-      child = building;
-      building.on('error', () => {
-        done(1);
-      });
-      building.on('exit', (code, signal) => {
-        if (signal) stop(0);
-        done(code);
-      });
-    });
-  if ((await build('--cached')) !== 0) {
-    say('building in the runtime container instead');
-    if ((await build('--use-container')) !== 0) stop(1);
-  }
+  const where = ['--template', templatePath, '--build-dir', buildDir, '--cache-dir', cacheDir, ...withParams];
+  const code = await samBuild(where, { env, cwd: work }, building => (child = building), say);
+  if (code === null) stop(0);
+  if (code !== 0) stop(1);
 
   const built = path.join(buildDir, 'template.yaml');
   if ('invoke' in target) {

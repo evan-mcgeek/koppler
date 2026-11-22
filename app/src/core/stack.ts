@@ -426,6 +426,10 @@ const App = z.looseObject(
         timeout: z.number().positive().optional().describe('Seconds a call may take'),
         memory: z.number().positive().optional().describe('Megabytes it runs with (256 when not set)'),
         routes: z.array(z.string()).optional().describe('The paths it answers on'),
+        api: z
+          .enum(['http', 'rest'])
+          .optional()
+          .describe('Set when an API Gateway calls it: http for an HTTP API, rest for a REST API'),
         env: z
           .array(z.string())
           .optional()

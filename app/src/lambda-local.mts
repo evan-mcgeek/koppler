@@ -1,21 +1,26 @@
 // Runs an AWS Lambda on this Mac in the AWS emulator that holds the board's local queues (Floci, in Docker): the
 // function in its real runtime image, with the settings, secrets and parameters it reads. A local queue it reads
-// triggers it, as its event source mapping does deployed; with none, this process is the address callers post to and
-// each POST becomes a message on a queue of its own. It prints the function's log.
+// triggers it, as its event source mapping does deployed. Called by an API Gateway (`api`), this process is its local
+// address: each call on its routes reaches the function as API Gateway's event, and the caller gets the function's own
+// answer. With neither, each POST on its routes becomes a message on a queue of its own. It prints the function's log.
+// .NET is built with dotnet publish; Node, Python, Java, Ruby and Go with sam build; anything else is zipped as it is.
 // Usage (through `koppler run <app>`, which supplies the stored secrets and starts the emulator):
 //   lambda-local.mjs <config json> <port> [<overrides file>] [<app id>]
 // Config, from the app's `lambda` in stack.json: { project, handler, runtime, timeout?, memory?, routes?: [paths],
-//   env?: [names], environment?: { name: value }, parameters?: [{ name, from }], secret?: { id, from } }
+//   api?: http | rest, env?: [names], environment?: { name: value }, parameters?: [{ name, from }], secret?: { id, from } }
 //   `env` names the settings it reads, taken from what Koppler sets (cables, stored secrets); `environment` gives fixed
 //   ones; each parameter is put in Parameter Store from a stored value; `secret` names the stored value holding a
 //   Secrets Manager secret's JSON, and the overrides file sets keys in it.
+import { randomUUID } from 'node:crypto';
 import { execFileSync, spawn, type ChildProcess, type ExecFileSyncOptions } from 'node:child_process';
 import fs from 'node:fs';
 import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { apiEvent, apiResponse, matchRoute, samTemplate, type Api } from './core/lambda.ts';
 import { ENDPOINT, FUNCTIONS, LAMBDA_QUEUES, LAMBDA_SETTINGS, REGION } from './engine/queues.ts';
+import { samBuild, samEnv } from './sam-cli.ts';
 import { takeSecrets } from './safe-env.ts';
 
 /** The app's `lambda` in stack.json. */
@@ -26,6 +31,8 @@ interface Config {
   timeout?: number;
   memory?: number;
   routes?: string[];
+  /** Called by an API Gateway: an HTTP API (payload 2.0) or a REST API (payload 1.0). */
+  api?: Api;
   env?: string[];
   environment?: Record<string, string>;
   parameters?: { name: string; from: string }[];
@@ -81,6 +88,7 @@ const fromDocker = (value: string) =>
   value.replace(/\/\/(localhost|127\.0\.0\.1)(?=[:/]|$)/g, '//host.docker.internal');
 const requests = `${fn}-requests`;
 let logs: ChildProcess | undefined;
+let building: ChildProcess | undefined;
 /** What this function left in the emulator, which outlives it: its triggers, the function, its own queue and secret. */
 const clean = () => {
   quietly(() => {
@@ -110,6 +118,7 @@ const clean = () => {
 };
 const stop = (code: number): never => {
   logs?.kill();
+  building?.kill('SIGTERM');
   clean();
   fs.rmSync(work, { recursive: true, force: true });
   process.exit(code);
@@ -217,7 +226,9 @@ function health(): { ok: boolean; function?: string; trigger?: string; error?: s
   try {
     const deployed = of('get-function', '--function-name', fn, '--query', 'Configuration.State');
     const trigger = of('list-event-source-mappings', '--function-name', fn, '--query', 'EventSourceMappings[0].State');
-    return { ok: deployed === 'Active' && trigger === 'Enabled', function: deployed, trigger };
+    // Called only through its API, it has no trigger to be on.
+    const on = trigger === 'Enabled' || (!!config?.api && !triggers.length);
+    return { ok: deployed === 'Active' && on, function: deployed, ...(trigger !== 'None' && { trigger }) };
   } catch {
     return { ok: false, error: 'the emulator does not answer' };
   }
@@ -238,12 +249,33 @@ try {
   say('building the function');
   const out = path.join(work, 'out');
   const project = config.project ?? '.';
+  const code = path.resolve(project);
+  const sam = samTemplate(config, code, arch, fs.existsSync(path.join(code, 'go.mod')));
   if (config.runtime.startsWith('dotnet')) {
     const target = `linux-${arch === 'arm64' ? 'arm64' : 'x64'}`;
     run('dotnet', ['publish', project, '-c', 'Release', '-r', target, '--self-contained', 'false', '-o', out]);
-  }
-  // ponytail: other runtimes are zipped as they are, with no install or build step
-  else fs.cpSync(path.resolve(project), out, { recursive: true });
+  } else if (sam) {
+    // Built outside the repo, under the home folder, which Docker on a Mac shares with a build container. SAM runs
+    // from there too, since it keeps its dependency cache where it runs.
+    const home = state.startsWith(os.homedir()) ? state : path.join(os.homedir(), '.local', 'state', 'koppler');
+    const samWork = path.join(home, 'lambda', 'build', fn);
+    fs.mkdirSync(samWork, { recursive: true });
+    const template = path.join(samWork, 'template.json');
+    fs.writeFileSync(template, sam.template);
+    const where = [
+      '--template',
+      template,
+      '--build-dir',
+      path.join(samWork, 'build'),
+      '--cache-dir',
+      path.join(samWork, 'cache'),
+    ];
+    const built = await samBuild(where, { env: samEnv(), cwd: samWork }, child => (building = child), say);
+    building = undefined;
+    if (built === null) stop(0);
+    if (built !== 0) throw new Error('sam build failed; its log is above');
+    fs.cpSync(path.join(samWork, 'build', 'Function'), out, { recursive: true });
+  } else fs.cpSync(code, out, { recursive: true });
   const zipped = path.join(work, 'fn.zip');
   run('zip', ['-q', '-r', zipped, '.'], { cwd: out });
 
@@ -257,8 +289,8 @@ try {
   aws(
     'lambda',
     'create-function',
-    ...['--function-name', fn, '--runtime', config.runtime, '--architectures', arch],
-    ...['--handler', config.handler, '--role', 'arn:aws:iam::000000000000:role/lambda'],
+    ...['--function-name', fn, '--runtime', sam?.runtime ?? config.runtime, '--architectures', arch],
+    ...['--handler', sam?.handler ?? config.handler, '--role', 'arn:aws:iam::000000000000:role/lambda'],
     ...['--zip-file', `fileb://${zipped}`, '--timeout', String(config.timeout ?? 30)],
     ...['--memory-size', String(config.memory ?? 256), '--environment', JSON.stringify({ Variables: variables })],
     ...(secret ? ['--layers', secret.layer] : []),
@@ -278,24 +310,87 @@ try {
     trigger(queue);
     say(`triggered by the local queue ${queue}`);
   }
-  // With no local queue of the board, what API Gateway does in the cloud: a POST on one of the routes becomes a
-  // message on a queue of its own.
-  const own = triggers.length ? undefined : aws('sqs', 'create-queue', '--queue-name', requests, '--query', 'QueueUrl');
+  // Not called by an API Gateway and with no local queue of the board: a POST on one of the routes becomes a message
+  // on a queue of its own.
+  const { api } = config;
+  const own =
+    triggers.length || api ? undefined : aws('sqs', 'create-queue', '--queue-name', requests, '--query', 'QueueUrl');
   if (own) trigger(own);
-  const routes = (config.routes ?? []).map(route => `/${route.replace(/^\/+|\/+$/g, '')}`);
-  const toQueue = async (queue: string, body: string) => {
+  // The paths, without the method an API route can start with.
+  const routes = (config.routes ?? []).map(route => `/${route.replace(/^[A-Z]+\s+/, '').replace(/^\/+|\/+$/g, '')}`);
+  // The emulator takes any signature; it reads the region and service from it.
+  const signed = (service: string) => {
     const day = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    return `AWS4-HMAC-SHA256 Credential=test/${day}/${REGION}/${service}/aws4_request, SignedHeaders=host, Signature=0`;
+  };
+  const toQueue = async (queue: string, body: string) => {
     return fetch(ENDPOINT, {
       method: 'POST',
-      headers: {
-        'content-type': 'application/x-www-form-urlencoded',
-        authorization: `AWS4-HMAC-SHA256 Credential=test/${day}/${REGION}/sqs/aws4_request, SignedHeaders=host, Signature=0`,
-      },
+      headers: { 'content-type': 'application/x-www-form-urlencoded', authorization: signed('sqs') },
       body: new URLSearchParams({ Action: 'SendMessage', Version: '2012-11-05', QueueUrl: queue, MessageBody: body }),
+    });
+  };
+  // What API Gateway does: the call as its event, invoked and waited for; the function's answer goes back to the caller.
+  const viaApi = (api: Api, request: http.IncomingMessage, response: http.ServerResponse) => {
+    const method = request.method ?? 'GET';
+    const pathname = new URL(request.url ?? '/', 'http://x').pathname;
+    const matched = matchRoute(config.routes ?? [], method, pathname);
+    if (!matched) {
+      response.writeHead(404, { 'content-type': 'application/json' }).end('{"message":"Not Found"}');
+      return;
+    }
+    const chunks: Buffer[] = [];
+    let size = 0;
+    request.on('data', (chunk: Buffer) => {
+      size += chunk.length;
+      // A synchronous call carries at most 6 MB.
+      if (size > 6 * 1024 * 1024) {
+        response.writeHead(413).end();
+        request.destroy();
+      } else chunks.push(chunk);
+    });
+    request.on('end', () => {
+      const headers: [string, string][] = [];
+      for (let at = 0; at + 1 < request.rawHeaders.length; at += 2)
+        headers.push([request.rawHeaders[at] ?? '', request.rawHeaders[at + 1] ?? '']);
+      const call = { method, url: request.url ?? '/', headers, body: Buffer.concat(chunks), sourceIp: '127.0.0.1' };
+      const event = apiEvent(api, call, matched, new Date(), randomUUID());
+      fetch(`${ENDPOINT}/2015-03-31/functions/${fn}/invocations`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: signed('lambda') },
+        body: JSON.stringify(event),
+      })
+        .then(async invoked => {
+          const text = await invoked.text();
+          let result: unknown = text;
+          try {
+            result = JSON.parse(text);
+          } catch {
+            // Not JSON: the answer as it is.
+          }
+          const failed = !invoked.ok || invoked.headers.has('x-amz-function-error');
+          const answer = failed
+            ? {
+                status: 502,
+                headers: [['content-type', 'application/json']] as [string, string][],
+                body: Buffer.from('{"message":"Internal server error"}'),
+              }
+            : apiResponse(api, result);
+          console.log(`koppler: ${method} ${pathname} -> ${String(answer.status)}`);
+          response.writeHead(answer.status, answer.headers.flat()).end(answer.body);
+        })
+        .catch(() => response.writeHead(502).end());
     });
   };
   const server = http.createServer((request, response) => {
     const where = new URL(request.url ?? '', 'http://x').pathname.replace(/\/+$/, '') || '/';
+    // GET / and /health are Koppler's own answers, unless one of the function's routes names them.
+    const kopplers = request.method === 'GET' && (where === '/' || where === '/health');
+    const routed = !!config.routes?.length && !!matchRoute(config.routes, 'GET', where);
+    if (api && (!kopplers || routed)) {
+      viaApi(api, request, response);
+      return;
+    }
     if (request.method === 'GET' && where === '/') {
       response.writeHead(200, { 'content-type': 'text/plain' }).end(`koppler: local Lambda ${config.handler}\n`);
       return;
@@ -327,9 +422,11 @@ try {
   });
   server.listen(port, '127.0.0.1', () => {
     say(
-      own
-        ? `ready: POST http://localhost:${String(port)}${routes[0] ?? '/'} reaches the function through its queue`
-        : `ready: messages on its local queue reach the function`,
+      api
+        ? `ready: calls on http://localhost:${String(port)}${routes[0] ?? '/'} reach the function as API Gateway's event`
+        : own
+          ? `ready: POST http://localhost:${String(port)}${routes[0] ?? '/'} reaches the function through its queue`
+          : `ready: messages on its local queue reach the function`,
     );
   });
 

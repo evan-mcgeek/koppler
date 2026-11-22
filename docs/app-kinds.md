@@ -72,11 +72,12 @@ It runs on an emulator only for now, not on a phone.
 
 ## Serverless and cloud
 
-| Stack                       | Kind     | Started with                                                                                                                                                                                   | Needs               |                     |
-| --------------------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------- | ------------------- |
-| AWS Lambda, queue-triggered | `lambda` | the function in its real runtime image, in the local AWS emulator that holds the board's local queues. It is triggered by the queue it reads or, with none, by a local address callers post to | Docker, the AWS CLI | Run for real (.NET) |
-| AWS SAM                     | `sam`    | `sam build`, then `sam local start-api`, with the environment's deploy parameters from `samconfig.toml`                                                                                        | Docker, the SAM CLI | Run for real        |
+| Stack      | Kind     | Started with                                                                                                                                                                                                                                               | Needs                            |                     |
+| ---------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------- | ------------------- |
+| AWS Lambda | `lambda` | the function in its real runtime image, in the local AWS emulator that holds the board's local queues. A queue it reads triggers it. With `lambda.api`, each call to its local address reaches it as API Gateway's event. With neither, callers post to it | Docker, the AWS CLI, the SAM CLI | Run for real (.NET) |
+| AWS SAM    | `sam`    | `sam build`, then `sam local start-api`, with the environment's deploy parameters from `samconfig.toml`                                                                                                                                                    | Docker, the SAM CLI              | Run for real        |
 
+.NET is built with `dotnet publish`. Node, Python, Java, Ruby and Go are built with `sam build`, outside the repo.
 A Lambda gets the settings its stack entry names (`lambda.env`), from a cable to a local app or a stored secret.
 It gets Parameter Store values from stored secrets (`lambda.parameters`).
 It can live in another app's repo, with that app's `slug` and its folder as `lambda.project`.
