@@ -41,3 +41,15 @@ test('a call whose setting holds a route keeps it when the call goes local', () 
   Object.assign(routed.apps['web']?.consumes?.['api'] ?? {}, { path: '/retry_request' });
   expect(wireInfo(routed, {}, 'web', 'api', 'qa')).toMatchObject({ value: 'http://localhost:5000/retry_request' });
 });
+
+test('a setting goes into a launch profile only for an app that has launch profiles', () => {
+  // A Node app has none: the run sets the variable in its environment when it starts it.
+  expect(wireInfo(stack, {}, 'web', 'api', 'qa').profile).toBeUndefined();
+  const dotnet = structuredClone(stack);
+  Object.assign(dotnet.apps['web'] ?? {}, {
+    kind: 'dotnet',
+    launchSettings: 'Properties/launchSettings.json',
+    baseProfile: 'QA',
+  });
+  expect(wireInfo(dotnet, {}, 'web', 'api', 'qa').profile).toBe('QA-LOCAL');
+});

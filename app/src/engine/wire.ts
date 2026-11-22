@@ -23,7 +23,7 @@ export interface Wiring {
   device: string | null;
   /** The settings that carry the address, and the launch profile they go into. */
   env?: string | string[] | undefined;
-  profile?: string;
+  profile?: string | undefined;
   /** The file (and key in it) to edit, or the env file to add `lines` to. */
   file?: string;
   key?: string | undefined;
@@ -34,7 +34,7 @@ export interface Wiring {
   needsLan: boolean;
   found: string | undefined;
   /** Settings the callee needs so a browser front end may call it. */
-  cors: { app: 'callee'; env: string; value: string; profile: string }[];
+  cors: { app: 'callee'; env: string; value: string; profile?: string | undefined }[];
   warnings: string[];
   note: string | undefined;
   /** The call as the stack records it. */
@@ -91,7 +91,9 @@ export function wireInfo(
   const browser = kindOf(caller).browser
     ? browserChecks(callee, browserUrl(caller, clones[from]), Math.max(slot, 0))
     : { settings: [], warnings: [] };
-  const profileFor = (app: App, id: string) => launchProfile(app, profilesOf(app, clones[id]?.path), env).local;
+  // Only an app with launch profiles has a -LOCAL one; any other gets the setting in its environment when it starts.
+  const profileFor = (app: App, id: string) =>
+    app.launchSettings ? launchProfile(app, profilesOf(app, clones[id]?.path), env).local : undefined;
   return {
     from,
     to,
@@ -117,7 +119,8 @@ function print(caller: App, callee: App, wiring: Wiring): void {
     .flat()
     .map(name => `${name}=${value}`)
     .join(', ');
-  if (call.how === 'env') console.log(`  set in ${wiring.profile ?? ''}: ${settings}`);
+  if (call.how === 'env')
+    console.log(`  set in ${wiring.profile ?? `${caller.name}'s environment when it starts`}: ${settings}`);
   else if (call.how === 'edit')
     console.log(`  edit ${call.file ?? ''}: ${call.key ?? ''} (mark it "koppler: do not commit")`);
   else if (call.how === 'secret')
@@ -134,7 +137,9 @@ function print(caller: App, callee: App, wiring: Wiring): void {
   }
   if (wiring.needsLan) console.log(`  ${callee.name} must listen on the network: koppler run ${wiring.to} --lan`);
   for (const setting of wiring.cors)
-    console.log(`  allow the browser origin in ${callee.name}'s ${setting.profile}: ${setting.env}=${setting.value}`);
+    console.log(
+      `  allow the browser origin in ${callee.name}'s ${setting.profile ?? 'environment when it starts'}: ${setting.env}=${setting.value}`,
+    );
   for (const warning of wiring.warnings) console.log(`  warning: ${warning}`);
   if (wiring.note) console.log(`  note: ${wiring.note}`);
 }
