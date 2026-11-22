@@ -233,6 +233,7 @@ function startSam(app: App, ctx: StartContext): Start {
   const port = portOf(app.url) ?? 3000;
   const named = ctx.env ? app.sam?.envs?.[ctx.env] : undefined;
   const config = {
+    ...(ctx.id && { id: ctx.id }),
     ...(app.sam?.template && { template: app.sam.template }),
     envs: named ? [named].flat() : (ctx.envNames ?? [ctx.env]),
   };
