@@ -80,7 +80,13 @@ export function resolveDevice(spec: string | undefined, app: Pick<App, 'mobile' 
   const all = devices();
   const simulator = all.find(device => device.platform === 'ios' && !device.physical);
   const emulator = all.find(device => device.platform === 'android' && !device.physical);
-  const want = spec ?? ((app.mobile?.iosBundleId && simulator) || !emulator || app.kind === 'ios' ? 'ios' : 'android');
+  const want =
+    spec ??
+    (app.kind === 'android'
+      ? 'android'
+      : (app.mobile?.iosBundleId && simulator) || !emulator || app.kind === 'ios'
+        ? 'ios'
+        : 'android');
   const found =
     want === 'ios'
       ? simulator

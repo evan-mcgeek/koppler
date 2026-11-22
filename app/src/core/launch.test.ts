@@ -342,3 +342,58 @@ test('iOS: a setting given for the start reaches the app on the simulator', () =
   expect(ran.stdout).toContain('xcrun simctl launch --console-pty --terminate-running-process SIM-1 com.acme.shop');
   expect(ran.stdout).toContain('app sees ORDERS_API_URL=http://localhost:5001');
 });
+
+test('Android: installed on the emulator, then launched with its settings, its log as the log; stopping closes it', () => {
+  const app: App = { kind: 'android', mobile: { androidPackage: 'com.acme.shop' } };
+  const device = { id: 'emulator-5554', platform: 'android' };
+  const ctx: StartContext = { repo: '/m', override: ['ORDERS_API_URL'], device };
+  const start = startCommand(app, ctx);
+  expect(command(start).slice(0, 2)).toEqual(['sh', '-c']);
+  expect(script(start)).toContain('installDebug');
+  expect(startCommand({ ...app, android: { variant: 'freeDebug' } }, ctx).command?.[2]).toContain('installFreeDebug');
+  expect(start.onStop).toEqual([['adb', '-s', 'emulator-5554', 'shell', 'am', 'force-stop', 'com.acme.shop']]);
+  // No package set: the applicationId its Gradle file gives.
+  expect(script(startCommand({ kind: 'android' }, ctx))).toContain('applicationId');
+  expect(startCommand(app, { repo: '/m' }).error).toMatch(/needs a device/);
+  const phone = { id: 'R5CT', platform: 'android', physical: true };
+  expect(startCommand(app, { repo: '/m', device: phone }).error).toMatch(/emulator only for now/);
+  expect(startCommand(app, { repo: '/m', device: { id: 'SIM-1', platform: 'ios' } }).error).toMatch(/Android emulator/);
+});
+
+test('Android: the applicationId is read from Gradle, and a setting reaches the app as a launch extra', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-android-'));
+  const bin = path.join(dir, 'bin');
+  fs.mkdirSync(path.join(dir, 'app'), { recursive: true });
+  fs.mkdirSync(bin);
+  fs.writeFileSync(
+    path.join(dir, 'app', 'build.gradle.kts'),
+    'android {\n  defaultConfig {\n    applicationId = "com.acme.shop"\n  }\n}\n',
+  );
+  fs.writeFileSync(path.join(dir, 'gradlew'), '#!/bin/sh\necho "gradlew $*"\n', { mode: 0o755 });
+  // adb says what it was asked, as the device's shell would read it.
+  fs.writeFileSync(
+    path.join(bin, 'adb'),
+    `#!/bin/sh
+shift 2
+case "$2 $3" in
+  "cmd package") echo "com.acme.shop/.MainActivity" ;;
+  "pidof -s") echo 4242 ;;
+  *) echo "adb $*" ;;
+esac
+`,
+    { mode: 0o755 },
+  );
+  const device = { id: 'emulator-5554', platform: 'android' };
+  const start = startCommand({ kind: 'android' }, { repo: dir, override: ['ORDERS_API_URL'], device });
+  const [shell = '', ...args] = command(start);
+  const address = "http://10.0.2.2:5001/api?a=1&b='2'";
+  const env = { ...process.env, PATH: `${bin}:${process.env['PATH'] ?? ''}`, ORDERS_API_URL: address };
+  const ran = spawnSync(shell, args, { cwd: dir, env, encoding: 'utf8', timeout: 5000 });
+  fs.rmSync(dir, { recursive: true, force: true });
+  expect(ran.status, ran.stderr).toBe(0);
+  expect(ran.stdout).toContain('gradlew installDebug');
+  expect(ran.stdout).toContain(
+    `adb shell am start -W -n com.acme.shop/.MainActivity --es ORDERS_API_URL 'http://10.0.2.2:5001/api?a=1&b='\\''2'\\'''`,
+  );
+  expect(ran.stdout).toContain('adb logcat --pid=4242');
+});

@@ -424,7 +424,7 @@ function wireCables(up: Up): void {
       if (!viaRecipe) left.push(wired.error);
       continue;
     }
-    if (wired.how === 'env' && (!kindOf(stack.apps[from]).platforms || stack.apps[from]?.kind === 'ios'))
+    if (wired.how === 'env' && (!kindOf(stack.apps[from]).platforms || NATIVE.includes(stack.apps[from]?.kind ?? '')))
       for (const name of [wired.call.env ?? []].flat()) settingsFor(up, from)[name] = wired.value;
     else if (wired.how === 'secret' && wired.call.key) (secretKeys[from] ??= {})[wired.call.key] = wired.value;
     // Only a change the stack names a file for is taken as made from what the file says; otherwise a logged change is
@@ -450,6 +450,9 @@ function wireCables(up: Up): void {
   for (const [app, set] of Object.entries(secretKeys))
     writeLogged(up.logFile, app, lambdaOverrides(app), `${JSON.stringify({ set }, null, 2)}\n`);
 }
+
+/** Native mobile kinds take a cable's setting at launch; Flutter and React Native are wired another way. */
+const NATIVE = ['ios', 'android'];
 
 /** Tunnels first; the board's "no tunnels" choice is kept. */
 async function openTunnels(up: Up): Promise<void> {

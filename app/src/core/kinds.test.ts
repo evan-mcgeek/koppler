@@ -24,6 +24,16 @@ test('a clone is recognised by its files', () => {
   // A Flutter app keeps its Xcode project in ios/: it is still Flutter.
   expect(detect(repoOf({ 'pubspec.yaml': '', 'ios/Runner.xcodeproj/project.pbxproj': '' }))).toBe('flutter');
   expect(detect(repoOf({ 'AcmeShop.xcworkspace/contents.xcworkspacedata': '' }))).toBe('ios');
+  // An Android app applies the Android application plugin; any other Gradle repo is still Java or Kotlin.
+  expect(detect(repoOf({ 'app/build.gradle.kts': 'plugins { id("com.android.application") }' }))).toBe('android');
+  expect(detect(repoOf({ 'app/build.gradle.kts': 'plugins { alias(libs.plugins.android.application) }' }))).toBe(
+    'android',
+  );
+  expect(detect(repoOf({ 'build.gradle': "apply plugin: 'com.android.application'" }))).toBe('android');
+  expect(detect(repoOf({ 'build.gradle': "apply plugin: 'com.android.library'" }))).toBe('java');
+  expect(detect(repoOf({ 'pubspec.yaml': '', 'android/app/build.gradle': "id 'com.android.application'" }))).toBe(
+    'flutter',
+  );
   expect(detect(repoOf({ 'Package.swift': '' }))).toBeNull();
 });
 
