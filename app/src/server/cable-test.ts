@@ -238,7 +238,7 @@ async function testApp(app: App | null, probe: Probe): Promise<Tested> {
     return {
       ok: true,
       text: 'Function ready',
-      detail: `${app.name}: the emulator is up, the function is deployed and its queue trigger is on.`,
+      detail: `${app.name}: the emulator is up, the function is deployed and ${health.trigger ? 'its queue trigger is on' : 'answers through its API'}.`,
     };
   const state =
     health.error ??
