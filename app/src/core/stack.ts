@@ -10,7 +10,7 @@ import { VERSION as PRESET_VERSION } from './presets.ts';
 import { BOARD_FORMAT } from './migrations/board/index.ts';
 import { migrateStack } from './migrations/stack/index.ts';
 import { compareVersions, isVersion } from './migrations/run.ts';
-import { SECRET_TYPES } from './secret-types.ts';
+import { probeUrlOk, SECRET_TYPES } from './secret-types.ts';
 
 // Values that end up in commands (tunnels, sign-ins, hosts entries, secret steps, clone commands) must look like what
 // they are, so a shared stack file cannot smuggle shell syntax into them.
@@ -62,11 +62,24 @@ const Prereq = z.looseObject(
   },
   { error: 'an object: a tunnel, a sign-in or another need' },
 );
+const PROBE_URL = 'an https address, or http on this Mac';
 const Secret = z.looseObject(
   {
     /** The setting the stored value is given to the app as. */
     env: setting.optional().describe('The setting the stored value is given to the app as'),
-    type: z.string().optional().describe('postgres, mysql or redis, so it can be tested'),
+    type: z.string().optional().describe('postgres, mysql, redis or key, so it can be tested'),
+    probe: z
+      .looseObject({
+        url: z
+          .string({ error: PROBE_URL })
+          .refine(probeUrlOk, PROBE_URL)
+          .describe('Where a key is tried: one request, and only its status is read'),
+        header: matching(/^[A-Za-z0-9-]{1,64}$/, 'a header name')
+          .optional()
+          .describe('The header that carries the key; without one it goes as a bearer token'),
+      })
+      .optional()
+      .describe('For a key: where to try it, and how it is sent'),
     file: z.string().optional().describe("A file in the app's repo that holds the secret, instead of a setting"),
     when: z.string().optional().describe('When it is needed, if not always'),
     fetch: z
@@ -692,6 +705,8 @@ function appProblems(id: string, app: Loose, stack: Loose, envs: string[]): stri
       problems.push(
         `${at}.${where}: type "${typeof type === 'string' ? type : JSON.stringify(type)}" is not one Koppler tests (${SECRET_TYPES.join(', ')})`,
       );
+    if (type === 'key' && !(isObject(secret['probe']) && secret['probe']['url']))
+      problems.push(`${at}.${where}: a key needs probe.url, the address it is tried at`);
   }
   return problems;
 }

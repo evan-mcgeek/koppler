@@ -45,6 +45,7 @@ A change with no command yet is a missing feature: build the command (and the co
 | A change Stop must undo | `koppler actions add` / `clear`                                                                                           | History shows it          |
 | A step on a card        | `koppler status step`                                                                                                     | The card                  |
 | A message to the user   | `koppler say`                                                                                                             | The inbox                 |
+| Where a key may be sent | `koppler secret approve` / `revoke`                                                                                       | None yet                  |
 
 ## A change to a file's format comes with its migration
 

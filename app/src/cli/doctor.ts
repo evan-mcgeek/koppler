@@ -1,6 +1,7 @@
 // The commands that say whether something can run here, and what it needs: doctor (tools, what the user still has to
 // do, secrets, connections), the tunnels of a plan, and the secrets themselves.
 import { spawnSync } from 'node:child_process';
+import { approve, revoke } from '../approvals.ts';
 import path from 'node:path';
 import { isProtected } from '../core/plan.ts';
 import { describePlan, planSteps, planTunnels } from '../core/ports.ts';
@@ -158,10 +159,27 @@ export async function doctor(args: string[]): Promise<void> {
     process.exitCode = 1;
 }
 
+/** Lets a stored key be sent to one host to test it, or takes that back; the stack never decides this. */
+function keyApproval(action: 'approve' | 'revoke', [store = '', name = '', host = '']: string[]): never {
+  const usage = `usage: koppler secret ${action} <app>[@<env>] <NAME>${action === 'approve' ? ' <host>' : ''}`;
+  const hostOk = /^(?:[a-z0-9-]+\.)*[a-z0-9-]+$|^\[[0-9a-f:]+\]$/i.test(host);
+  if (!/^[a-z0-9-]+(@[a-z0-9-]+)?$/.test(store) || !/^[A-Za-z_]\w*$/.test(name) || (action === 'approve' && !hostOk))
+    fail(usage);
+  if (action === 'approve') {
+    approve(store, name, host);
+    console.log(`${name} of ${store} may be sent to ${host.toLowerCase()} to test it`);
+  } else {
+    revoke(store, name);
+    console.log(`${name} of ${store} is no longer sent anywhere to test it`);
+  }
+  process.exit(0);
+}
+
 const SCRIPTS: Record<string, string | undefined> = { set: 'secret-set', list: 'secret-list', psql: 'secret-psql' };
 /** Secrets, in the user's own terminal: the values never pass through Koppler's output. */
 export function secret(args: string[]): never {
   const [action = '', ...rest] = args;
+  if (action === 'approve' || action === 'revoke') keyApproval(action, rest);
   if (action === 'remove') {
     const [store, name] = rest;
     if (!store || !name) fail('usage: koppler secret remove <app>[@<env>] <NAME>');
@@ -169,7 +187,7 @@ export function secret(args: string[]): never {
   }
   const script =
     (Object.hasOwn(SCRIPTS, action) ? SCRIPTS[action] : undefined) ??
-    fail('usage: koppler secret set|list|remove|psql <app>[@<env>] [<NAME>]');
+    fail('usage: koppler secret set|list|remove|psql|approve|revoke <app>[@<env>] [<NAME>]');
   // A protected environment's value is stored so that every read asks the user (the stack says which; else all but
   // the first).
   const stack = readStack();
