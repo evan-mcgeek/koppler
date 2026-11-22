@@ -205,6 +205,24 @@ function announce(up: Up): void {
   }
 }
 
+/**
+ * A caller with a cable that only the agent or the user can point: the stack found the call but does not record how a
+ * local run repoints it, and nothing this run applies (a recipe, the stack's own code changes, a logged change) does.
+ */
+function cannotRewire(up: Up, from: string): boolean {
+  const { stack, env } = up;
+  if (up.node(from).run === 'mock' || stack.apps[from]?.localChanges?.length) return false;
+  return up.edges.some(({ from: caller, to }) => {
+    if (caller !== from) return false;
+    const wired = wireInfo(stack, up.clones, from, to, env, up.node(from).platform);
+    if (wired.error !== undefined || wired.how !== 'unknown') return false;
+    const viaRecipe = recipesFor(stack, from).some(
+      recipe => recipe.when?.calls === to && matches(recipe, { env, calls: [to] }),
+    );
+    return !viaRecipe && !pointsAt(up, from, wired.value, undefined);
+  });
+}
+
 /** What the plan stops or restarts goes first; its own code changes stay for the agent to revert. */
 async function stopFirst(up: Up, board: Run): Promise<void> {
   let actions: Action[];
@@ -216,6 +234,9 @@ async function stopFirst(up: Up, board: Run): Promise<void> {
   const { stops = [], restarts = [] } = board.plan ?? {};
   for (const { id } of [...stops, ...restarts]) {
     const record = readRecord(id);
+    // A restart for a cable this run cannot wire would only take the app down: it keeps running, and wireCables says
+    // what is missing.
+    if (restarts.some(step => step.id === id) && cannotRewire(up, id)) continue;
     if (record && alive(record)) console.log(await stopOne(record));
     const leaves = stops.some(step => step.id === id);
     if (leaves && actions.some(action => action.app === id && action.kind !== 'process'))
