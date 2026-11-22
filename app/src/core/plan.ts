@@ -235,7 +235,7 @@ export const same = (a: StepsOnly | null | undefined, b: StepsOnly | null | unde
 
 /** Queue types a stack can name, and the ones Koppler can run on this machine (in an emulator). */
 export const QUEUE_TYPES = ['sqs', 'sns', 'eventbridge', 'kafka', 'other'] as const;
-export const LOCAL_QUEUE_TYPES = ['sqs', 'kafka'] as const;
+export const LOCAL_QUEUE_TYPES = ['sqs', 'sns', 'eventbridge', 'kafka'] as const;
 
 interface AppQueues {
   publishes?: Record<string, unknown> | undefined;

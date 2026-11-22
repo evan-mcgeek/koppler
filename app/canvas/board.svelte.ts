@@ -1008,7 +1008,7 @@ class Board {
         data: {
           queue: one.id,
           name: one.queue.name,
-          kind: one.queue.type.toUpperCase(),
+          kind: one.queue.type === 'eventbridge' ? 'BUS' : one.queue.type.toUpperCase(),
           local,
           shares: shares ? `Your local ${shares} reads the ${env} queue` : '',
           about: [

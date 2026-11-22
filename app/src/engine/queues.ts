@@ -1,12 +1,14 @@
 // Queues switched to local on the board, and the Lambdas that read them.
-//   SQS: one AWS emulator in Docker holds them all; every app on one starts with the AWS SDK's SQS endpoint pointed at
-//   it and its queue settings set to the local queue. A Lambda on one runs in the same emulator, triggered by it.
+//   SQS, SNS and EventBridge: one AWS emulator in Docker holds them all; every app on one starts with the AWS SDK's
+//   endpoint for it pointed at the emulator and its settings set to the local queue, topic or bus. A Lambda runs in the
+//   same emulator, triggered by an SQS queue it reads. A local topic or bus feeds only a local SQS queue.
 //   Kafka: one local broker in Docker (apache/kafka); the topic is created on it and every app on one starts with its
 //   broker settings pointed at it.
 import { execFileSync } from 'node:child_process';
 import { of as kindOf } from '../core/kinds.ts';
 import { LOCAL_QUEUE_TYPES } from '../core/plan.ts';
 import type { Stack } from '../core/stack.ts';
+import type { FeedVia } from '../core/terraform.ts';
 
 export const PORT = 4566;
 export const ENDPOINT = `http://127.0.0.1:${String(PORT)}`;
@@ -65,6 +67,15 @@ export const BROKER = [
 
 /** The local queues a Lambda reads, by URL, comma between them: the queues it is triggered by. */
 export const LAMBDA_QUEUES = 'KOPPLER_LAMBDA_QUEUES';
+/** The settings Koppler set for a Lambda that sends to a local queue, topic or bus, comma between them. */
+export const LAMBDA_SETTINGS = 'KOPPLER_LAMBDA_SETTINGS';
+/** The setting each AWS SDK reads for the address of one service. */
+const ENDPOINT_SETTING: Record<string, string> = {
+  sqs: 'AWS_ENDPOINT_URL_SQS',
+  sns: 'AWS_ENDPOINT_URL_SNS',
+  eventbridge: 'AWS_ENDPOINT_URL_EVENTBRIDGE',
+};
+const WORD: Record<string, string> = { sns: 'topic', eventbridge: 'event bus' };
 
 /** A queue of the board that runs locally, and the apps on it with the settings that name it. */
 export interface LocalQueue {
@@ -116,26 +127,38 @@ export function queueEnv(
 ): { set: Record<string, Record<string, string>>; left: string[] } {
   const set: Record<string, Record<string, string>> = {};
   const left: string[] = [];
+  const append = (id: string, name: string, value: string) => {
+    const all = set[id]?.[name];
+    (set[id] ??= {})[name] = all ? `${all},${value}` : value;
+  };
   for (const queue of list)
     for (const { id, env } of queue.apps) {
       const app = stack.apps[id];
       const url = urls[queue.id];
       if (!app || url === undefined) continue;
       const kafka = queue.type === 'kafka';
-      // A Lambda that reads an SQS queue is triggered by it in the emulator, as its event source mapping does deployed.
-      if (app.kind === 'lambda' && !kafka && app.reads?.[queue.id]) {
-        const all = set[id]?.[LAMBDA_QUEUES];
-        (set[id] ??= {})[LAMBDA_QUEUES] = all ? `${all},${url}` : url;
+      if (app.kind === 'lambda' && !kafka) {
+        // A Lambda that reads an SQS queue is triggered by it in the emulator, as its event source mapping does deployed.
+        if (app.reads?.[queue.id] && queue.type === 'sqs') append(id, LAMBDA_QUEUES, url);
+        else if (app.reads?.[queue.id])
+          left.push(`${app.name}: Koppler triggers a local Lambda only from an SQS queue, not from ${queue.name}.`);
+        // The emulator is its endpoint already: it gets only the settings that name the queue.
+        else
+          for (const name of env) {
+            (set[id] ??= {})[name] = url;
+            append(id, LAMBDA_SETTINGS, name);
+          }
         continue;
       }
       if (kindOf(app).platforms || app.kind === 'lambda') {
-        left.push(`${app.name}: point it at the local ${queue.name} queue (${url}); Koppler cannot pass it at start`);
+        const word = WORD[queue.type] ?? 'queue';
+        left.push(`${app.name}: point it at the local ${queue.name} ${word} (${url}); Koppler cannot pass it at start`);
         continue;
       }
-      // A Kafka app's settings name its brokers; an SQS app's name the queue, with the SDK's endpoint beside them.
+      // A Kafka app's settings name its brokers; an AWS app's name the queue, with the SDK's endpoint beside them.
       Object.assign(
         (set[id] ??= {}),
-        kafka ? {} : { AWS_ENDPOINT_URL_SQS: ENDPOINT },
+        kafka ? {} : { [ENDPOINT_SETTING[queue.type] ?? 'AWS_ENDPOINT_URL']: ENDPOINT },
         // At an endpoint of its own, the AWS SDK for .NET signs for us-east-1 whatever its region; the emulator
         // keeps queues by the region a request is signed for.
         !kafka && app.kind === 'dotnet' ? { AWS__AuthenticationRegion: REGION } : {},
@@ -143,6 +166,30 @@ export function queueEnv(
       );
     }
   return { set, left };
+}
+
+/** A local topic or bus and the local SQS queue it feeds. */
+export interface LocalFeed {
+  from: LocalQueue;
+  to: LocalQueue;
+  via: FeedVia;
+}
+const RUNS_HERE: Record<string, FeedVia> = { sns: 'subscription', eventbridge: 'rule' };
+
+/** What the local queues feed: a topic's subscription or a bus's rule to a local SQS queue; the rest is said in `left`. */
+export function localFeeds(stack: QueueStack, list: LocalQueue[]): { feeds: LocalFeed[]; left: string[] } {
+  const feeds: LocalFeed[] = [];
+  const left: string[] = [];
+  for (const from of list)
+    for (const [id, { via }] of Object.entries(stack.queues?.[from.id]?.feeds ?? {})) {
+      const to = list.find(queue => queue.id === id);
+      const name = stack.queues?.[id]?.name ?? id;
+      if (!to) left.push(`${from.name} feeds ${name}, which stays deployed. Local messages do not reach it.`);
+      else if (RUNS_HERE[from.type] !== via || to.type !== 'sqs')
+        left.push(`Koppler cannot run the ${via} from ${from.name} to ${name} here yet.`);
+      else feeds.push({ from, to, via });
+    }
+  return { feeds, left };
 }
 
 /** Creates the topic on the local broker; returns its name. */
@@ -155,11 +202,9 @@ export function createTopic(name: string): string {
   return name;
 }
 
-/** Creates the queue in the running emulator and returns its local URL. */
-export function createQueue(name: string): string {
-  const attrs = name.endsWith('.fifo') ? ['--attributes', 'FifoQueue=true,ContentBasedDeduplication=true'] : [];
-  const create = ['sqs', 'create-queue', '--queue-name', name, ...attrs, '--query', 'QueueUrl'];
-  return execFileSync('aws', ['--endpoint-url', ENDPOINT, '--region', REGION, '--output', 'text', ...create], {
+/** The AWS CLI against the running emulator, never the user's AWS account; returns what it printed. */
+function emulator(...args: string[]): string {
+  return execFileSync('aws', ['--endpoint-url', ENDPOINT, '--region', REGION, '--output', 'text', ...args], {
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'pipe'],
     // The emulator takes any key; the user's own profile and session must not reach it.
@@ -172,4 +217,47 @@ export function createQueue(name: string): string {
       AWS_PAGER: '',
     },
   }).trim();
+}
+
+const FIFO = 'ContentBasedDeduplication=true';
+/** Makes the queue, topic or bus in the running emulator; returns what an app names it by: a URL, an ARN or a name. */
+export function createLocal(type: string, name: string): string {
+  const fifo = name.endsWith('.fifo');
+  if (type === 'sqs')
+    return emulator(
+      ...['sqs', 'create-queue', '--queue-name', name],
+      ...(fifo ? ['--attributes', `FifoQueue=true,${FIFO}`] : []),
+      ...['--query', 'QueueUrl'],
+    );
+  if (type === 'sns')
+    return emulator(
+      ...['sns', 'create-topic', '--name', name],
+      ...(fifo ? ['--attributes', `FifoTopic=true,${FIFO}`] : []),
+      ...['--query', 'TopicArn'],
+    );
+  // The default bus is always there; a bus an earlier run made is kept.
+  if (name !== 'default')
+    try {
+      emulator('events', 'create-event-bus', '--name', name, '--query', 'EventBusArn');
+    } catch (error) {
+      if (!String((error as { stderr?: string }).stderr).includes('ResourceAlreadyExists')) throw error;
+    }
+  return name;
+}
+
+/**
+ * Sends what reaches a local topic or bus on to a local SQS queue: a subscription, or a rule that matches every event.
+ * ponytail: the deployed rule's pattern and a subscription's raw delivery are not in the stack; read them when needed.
+ */
+export function feedLocal(from: { type: string; address: string }, queueUrl: string): void {
+  const attribute = ['--attribute-names', 'QueueArn', '--query', 'Attributes.QueueArn'];
+  const arn = emulator('sqs', 'get-queue-attributes', '--queue-url', queueUrl, ...attribute);
+  if (from.type === 'sns') {
+    emulator('sns', 'subscribe', '--topic-arn', from.address, '--protocol', 'sqs', '--notification-endpoint', arn);
+    return;
+  }
+  const rule = `koppler-to-${arn.split(':').pop() ?? ''}`.slice(0, 64);
+  const on = ['--event-bus-name', from.address];
+  emulator('events', 'put-rule', '--name', rule, ...on, '--event-pattern', '{"source":[{"prefix":""}]}');
+  emulator('events', 'put-targets', '--rule', rule, ...on, '--targets', `Id=koppler,Arn=${arn}`);
 }
