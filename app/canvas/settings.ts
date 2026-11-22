@@ -189,6 +189,7 @@ export const BY_KIND: Record<string, string[]> = {
   node: ['script'],
   web: ['script'],
   flutter: ['flutter', 'mobile'],
+  ios: ['ios', 'mobile'],
   lambda: ['lambda', 'sam'],
 };
 export const KIND_FIELDS = [...new Set(Object.values(BY_KIND).flat())];
@@ -209,6 +210,7 @@ export const APP_TABS: Tab[] = [
       'baseProfile',
       'script',
       'flutter',
+      'ios',
       'mobile',
       'lambda',
       'sam',

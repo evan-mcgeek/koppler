@@ -290,3 +290,55 @@ test("a stack's own kind starts as the stack says", () => {
   expect([script(elixir), elixir.port]).toEqual(['mix phx.server', 4000]);
   expect(startCommand({ kind: 'elixir' }, { repo: '/r' }).error).toMatch(/cannot start by id yet/);
 });
+
+test('iOS: built for the simulator, installed, then launched with its output as the log; stopping closes it', () => {
+  const app: App = { kind: 'ios', ios: { scheme: 'AcmeShop' }, mobile: { iosBundleId: 'com.acme.shop' } };
+  const device = { id: 'SIM-1', platform: 'ios' };
+  const ctx: StartContext = { repo: '/m', derivedData: '/t/ios-shop', override: ['ORDERS_API_URL'], device };
+  const start = startCommand(app, ctx);
+  expect(command(start).slice(0, 2)).toEqual(['sh', '-c']);
+  expect(script(start)).toContain('scheme=AcmeShop\n');
+  expect(script(start)).toContain('-destination id=SIM-1 -derivedDataPath /t/ios-shop');
+  expect(start.onStop).toEqual([['xcrun', 'simctl', 'terminate', 'SIM-1', 'com.acme.shop']]);
+  // No scheme set: the only one the project has. No bundle id: the built app's own.
+  const found = startCommand({ kind: 'ios' }, ctx);
+  expect(script(found)).toContain('xcodebuild -list -json');
+  expect(script(found)).toContain('CFBundleIdentifier');
+  expect(startCommand(app, { repo: '/m' }).error).toMatch(/needs a device/);
+  const phone = { id: 'P', platform: 'ios', physical: true };
+  expect(startCommand(app, { repo: '/m', device: phone }).error).toMatch(/simulator only for now/);
+  const android = { id: 'emulator-5554', platform: 'android' };
+  expect(startCommand(app, { repo: '/m', device: android }).error).toMatch(/iOS simulator/);
+});
+
+test('iOS: a setting given for the start reaches the app on the simulator', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-ios-'));
+  const bin = path.join(dir, 'bin');
+  fs.mkdirSync(bin);
+  fs.mkdirSync(path.join(dir, 'AcmeShop.xcodeproj'));
+  // xcodebuild leaves the app where Xcode does; xcrun says what it was asked and what the app would see.
+  fs.writeFileSync(
+    path.join(bin, 'xcodebuild'),
+    '#!/bin/sh\necho "$@" > "$0.args"\nwhile [ $# -gt 0 ]; do [ "$1" = -derivedDataPath ] && dd=$2; shift; done\nmkdir -p "$dd/Build/Products/Debug-iphonesimulator/AcmeShop.app"\n',
+    { mode: 0o755 },
+  );
+  fs.writeFileSync(
+    path.join(bin, 'xcrun'),
+    '#!/bin/sh\necho "xcrun $*"\n[ "$2" = launch ] && echo "app sees ORDERS_API_URL=$SIMCTL_CHILD_ORDERS_API_URL"\nexit 0\n',
+    { mode: 0o755 },
+  );
+  const app: App = { kind: 'ios', ios: { scheme: 'AcmeShop' }, mobile: { iosBundleId: 'com.acme.shop' } };
+  const derivedData = path.join(dir, 'dd');
+  const device = { id: 'SIM-1', platform: 'ios' };
+  const start = startCommand(app, { repo: dir, derivedData, override: ['ORDERS_API_URL'], device });
+  const [shell = '', ...args] = command(start);
+  const env = { ...process.env, PATH: `${bin}:${process.env['PATH'] ?? ''}`, ORDERS_API_URL: 'http://localhost:5001' };
+  const ran = spawnSync(shell, args, { cwd: dir, env, encoding: 'utf8', timeout: 5000 });
+  const built = fs.readFileSync(path.join(bin, 'xcodebuild.args'), 'utf8');
+  fs.rmSync(dir, { recursive: true, force: true });
+  expect(ran.status, ran.stderr).toBe(0);
+  expect(built).toMatch(/^-project AcmeShop\.xcodeproj -scheme AcmeShop /);
+  expect(ran.stdout).toContain('xcrun simctl install SIM-1 ');
+  expect(ran.stdout).toContain('xcrun simctl launch --console-pty --terminate-running-process SIM-1 com.acme.shop');
+  expect(ran.stdout).toContain('app sees ORDERS_API_URL=http://localhost:5001');
+});

@@ -9,8 +9,8 @@ export function repoOf(files: Record<string, string>): RepoView {
     find: suffix => paths.some(p => p.endsWith(suffix)),
     // The names directly inside `dir` that are folders themselves.
     list: dir => {
-      const depth = dir.split('/').length;
-      const inside = paths.filter(p => p.startsWith(`${dir}/`) && p.split('/').length > depth + 1);
+      const depth = dir ? dir.split('/').length : 0;
+      const inside = paths.filter(p => p.startsWith(dir ? `${dir}/` : '') && p.split('/').length > depth + 1);
       return [...new Set(inside.map(p => p.split('/')[depth] ?? ''))];
     },
   };
@@ -29,5 +29,6 @@ export const CLONES: Record<string, Record<string, string>> = {
   python: { 'pyproject.toml': 'dependencies = ["fastapi"]', 'app/main.py': '' },
   ruby: { Gemfile: '', 'config/application.rb': '' },
   php: { artisan: '', 'composer.json': '{}' },
+  ios: { 'AcmeShop.xcodeproj/project.pbxproj': '' },
   compose: { 'compose.yaml': 'services:\n  api:\n    ports:\n      - "8085:80"\n' },
 };

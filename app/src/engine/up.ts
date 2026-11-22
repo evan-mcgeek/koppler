@@ -424,7 +424,7 @@ function wireCables(up: Up): void {
       if (!viaRecipe) left.push(wired.error);
       continue;
     }
-    if (wired.how === 'env' && !kindOf(stack.apps[from]).platforms)
+    if (wired.how === 'env' && (!kindOf(stack.apps[from]).platforms || stack.apps[from]?.kind === 'ios'))
       for (const name of [wired.call.env ?? []].flat()) settingsFor(up, from)[name] = wired.value;
     else if (wired.how === 'secret' && wired.call.key) (secretKeys[from] ??= {})[wired.call.key] = wired.value;
     // Only a change the stack names a file for is taken as made from what the file says; otherwise a logged change is

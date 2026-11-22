@@ -83,6 +83,7 @@ function contextFor(
     engine: CODE,
     lambdaOverrides: lambdaOverrides(id),
     flutterPid: flutterPid(id),
+    derivedData: path.join(tempDir(), `ios-${id}`),
     override: Object.keys(options.setEnv ?? {}),
     envNames: [env, ...aliases],
   };
@@ -155,7 +156,7 @@ export function appStart(id: string, options: RunOptions): AppStart | null {
       `${base.name} is started by a command from the stack that you have not allowed yet, or that changed since. Review it in your own terminal: ${APPROVE}`,
     );
   const repo = readClones()[id]?.path ?? fail(`${id} is not cloned (koppler sync --rescan after cloning)`);
-  const device = app.kind === 'flutter' ? resolveDevice(options.device, app) : undefined;
+  const device = app.kind === 'flutter' || app.kind === 'ios' ? resolveDevice(options.device, app) : undefined;
   const ctx = { ...contextFor(id, app, repo, env, options, stack.envAliases?.[env] ?? [], device), stack };
   const start = startCommand(app, ctx);
   if (start.error !== undefined) fail(`${id}: ${start.error}; or run any command: koppler run ${id} -- <command>`);
