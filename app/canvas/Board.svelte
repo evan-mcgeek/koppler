@@ -408,7 +408,8 @@
       untrack(() => (board.fullHeights = { ...board.fullHeights, ...heights }));
   });
   const arrange = async () => {
-    // Cards are placed by their full size, so pressing again changes nothing, whatever the zoom or the view.
+    // Cards are placed by their full size, so the layout is the same whatever the zoom or the view; pressing again
+    // goes on to the next layout.
     // In Edit, a card never seen in full brings the board in close first, to be measured.
     if (!board.live && viewport.current.zoom < FAR_ZOOM && !board.nodes.every(node => full[node.id])) {
       await flow.setZoom(1, { duration: 0 });

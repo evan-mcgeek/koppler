@@ -6,6 +6,7 @@ import * as kp from '../core/plan.ts';
 import { notRunHere } from '../core/stack.ts';
 import { APP_ID, RUN_ID } from '../ids.ts';
 import { readStack } from '../data.ts';
+import { writeJson } from '../json-files.ts';
 import { tempDir } from '../paths.ts';
 
 type Loose = Record<string, unknown>;
@@ -305,3 +306,8 @@ export const live = (): LiveBoard | null => {
     return null;
   }
 };
+/** Nothing runs from the board any more, as after a Stop: the run's record stays, its apps and cables go. */
+export function endLive(): void {
+  const now = live();
+  if (now) writeJson(liveFile(), { id: now.id, at: stamp(), env: now.env, nodes: {}, edges: [] });
+}

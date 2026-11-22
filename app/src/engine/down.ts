@@ -10,6 +10,7 @@ import { flagValue } from '../cli/output.ts';
 import { fail, Failure } from '../failure.ts';
 import { readData } from '../data.ts';
 import { tempDir } from '../paths.ts';
+import { endLive } from './history.ts';
 import { appliedCommand } from './runs.ts';
 import {
   readActions,
@@ -198,6 +199,8 @@ export async function down(args: string[]): Promise<void> {
   for (const record of records().filter(r => r.name !== 'canvas')) console.log(await stopOne(record));
   keepRunLogs();
   fs.rmSync(path.join(tempDir(), 'progress.json'), { force: true });
+  // Closing a Stop sent from the canvas ends the run when that Stop is marked done; on its own, down ends it here.
+  if (!flagValue(args, '--run')) endLive();
   let log: Action[];
   try {
     log = readActions(logFile);
