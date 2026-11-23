@@ -93,6 +93,12 @@ function contextFor(
   };
   if (app.kind === 'dotnet' && app.launchSettings) ctx.profiles = profilesOf(app, repo);
   if (app.kind === 'dotnet' && fs.existsSync(libraryTargets(id))) ctx.libraryTargets = libraryTargets(id);
+  if (app.kind === 'android') {
+    const gradle = ['app/build.gradle.kts', 'app/build.gradle', 'build.gradle.kts', 'build.gradle']
+      .map(file => path.join(repo, file))
+      .find(file => fs.existsSync(file));
+    ctx.gradle = gradle ? fs.readFileSync(gradle, 'utf8') : null;
+  }
   if (app.kind === 'node' || app.kind === 'web') {
     ctx.pkg = readJson(path.join(repo, 'package.json')) as NonNullable<StartContext['pkg']> | null;
     if (ctx.pkg?.scripts) ctx.scripts = ctx.pkg.scripts;
