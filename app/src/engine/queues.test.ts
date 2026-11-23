@@ -185,8 +185,12 @@ test('a bus already made by an earlier run is kept', () => {
   expect(createLocal('eventbridge', 'shop')).toBe('shop');
 });
 
+/** The emulator's answers: the queue's ARN, and how many targets failed. */
+const answers = (queueArn: string, failed = '0') =>
+  exec.mockImplementation((_, args) => ((args as string[]).includes('put-targets') ? `${failed}\n` : `${queueArn}\n`));
+
 test('a topic subscribes the queue; a bus gets a rule that sends every event to it', () => {
-  exec.mockReturnValue('arn:aws:sqs:eu-west-1:000000000000:emails\n');
+  answers('arn:aws:sqs:eu-west-1:000000000000:emails');
   feedLocal({ type: 'sns', address: topicArn }, 'http://e');
   feedLocal({ type: 'eventbridge', address: 'shop' }, 'http://e');
   exec.mockReturnValue('printed\n');
@@ -214,9 +218,28 @@ test('a topic subscribes the queue; a bus gets a rule that sends every event to 
       '--event-bus-name',
       'shop',
       '--targets',
-      `Id=koppler,Arn=${queueArn}`,
+      JSON.stringify([{ Id: 'koppler', Arn: queueArn }]),
+      '--query',
+      'FailedEntryCount',
     ],
   ]);
+});
+
+test('a bus feeding a FIFO queue sends each event with a message group', () => {
+  const queueArn = 'arn:aws:sqs:eu-west-1:000000000000:orders.fifo';
+  answers(queueArn);
+  feedLocal({ type: 'eventbridge', address: 'shop' }, 'http://e');
+  exec.mockReturnValue('printed\n');
+  const targets = calls().find(call => call.includes('put-targets'));
+  expect(targets?.[targets.indexOf('--targets') + 1]).toBe(
+    JSON.stringify([{ Id: 'koppler', Arn: queueArn, SqsParameters: { MessageGroupId: 'koppler' } }]),
+  );
+});
+
+test('a bus target the emulator turns down is a failure, not a feed', () => {
+  answers('arn:aws:sqs:eu-west-1:000000000000:emails', '1');
+  expect(() => feedLocal({ type: 'eventbridge', address: 'shop' }, 'http://e')).toThrow(/turned down/);
+  exec.mockReturnValue('printed\n');
 });
 
 test('the broker is reached and advertised on IPv4, where it is published, never as localhost', () => {

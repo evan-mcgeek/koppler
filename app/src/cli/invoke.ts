@@ -4,6 +4,8 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { readStack } from '../data.ts';
 import { appStart } from '../engine/app-start.ts';
+import { live } from '../engine/history.ts';
+import { readRecord } from '../engine/processes.ts';
 import { fail } from '../failure.ts';
 import { appEnv } from '../safe-env.ts';
 import { flagValue, positional } from './output.ts';
@@ -18,8 +20,10 @@ export function invoke(args: string[]): void {
   const given = flagValue(args, '--event');
   const event = given && path.resolve(given);
   if (event && !fs.existsSync(event)) fail(`no event file at ${event}`);
-  const env = flagValue(args, '--env');
-  const start = appStart(id, { name: id, command: [], restart: false, ...(env && { env }) }) ?? fail(USAGE);
+  // As `koppler shell`: the running board's environment, and the settings the running app was started with.
+  const env = flagValue(args, '--env') ?? live()?.env ?? undefined;
+  const setEnv = readRecord(id)?.start?.setEnv ?? {};
+  const start = appStart(id, { name: id, command: [], restart: false, setEnv, ...(env && { env }) }) ?? fail(USAGE);
   // The same start as `koppler run`, secrets included, with the runner told to invoke instead of serve.
   const at = start.command.findIndex(word => word.endsWith('sam-local.mjs'));
   const config = start.command[at + 2];
@@ -32,6 +36,6 @@ export function invoke(args: string[]): void {
     config,
     ...(event ? [event] : []),
   ];
-  const ran = spawnSync(program, rest, { cwd: start.cwd, stdio: 'inherit', env: appEnv().env });
+  const ran = spawnSync(program, rest, { cwd: start.cwd, stdio: 'inherit', env: { ...appEnv().env, ...setEnv } });
   process.exitCode = ran.status ?? 1;
 }

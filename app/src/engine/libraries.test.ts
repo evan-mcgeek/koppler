@@ -2,7 +2,17 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { packageOf, dependenciesOf, librariesFor, libraryTargets, link, nugetPackagesOf, unlink } from './libraries.ts';
+import {
+  packageOf,
+  dependenciesOf,
+  dropTargets,
+  librariesFor,
+  libraryTargets,
+  link,
+  nugetPackagesOf,
+  targetsFor,
+  unlink,
+} from './libraries.ts';
 import { readActions } from './actions.ts';
 import { test } from 'vitest';
 
@@ -186,6 +196,28 @@ test('a .NET app uses the clone of a NuGet library through a targets file outsid
     assert.deepEqual(fs.readdirSync(app, { recursive: true }).sort(), before);
     assert.equal(unlink(done[0] as any), 'shop-api.targets removed');
     assert.equal(fs.existsSync(targets), false);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('a targets file swaps libraries only while the action log holds it; a stale one is removed', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-targets-'));
+  const log = path.join(dir, 'actions.json');
+  const lib = { name: 'acme.common', path: dir, ecosystem: 'nuget' as const, project: path.join(dir, 'A.csproj') };
+  try {
+    assert.equal(targetsFor('shop-api', log), undefined);
+    link('shop-api', dir, [lib], log);
+    assert.equal(targetsFor('shop-api', log), libraryTargets('shop-api'));
+    // The board no longer asks for it: the file and its entry go.
+    dropTargets('shop-api', log);
+    assert.equal(fs.existsSync(libraryTargets('shop-api')), false);
+    assert.deepEqual(readActions(log), []);
+    // Left behind after its entry was cleared (koppler actions clear): never used, and removed.
+    link('shop-api', dir, [lib], log);
+    fs.writeFileSync(log, '[]');
+    assert.equal(targetsFor('shop-api', log), undefined);
+    assert.equal(fs.existsSync(libraryTargets('shop-api')), false);
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }

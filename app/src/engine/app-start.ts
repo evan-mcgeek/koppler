@@ -15,7 +15,7 @@ import { repoFiles } from './investigate.ts';
 import { readJson } from '../json-files.ts';
 import { BIN, CODE, tempDir } from '../paths.ts';
 import { resolveDevice, type RunDevice } from './devices.ts';
-import { libraryTargets } from './libraries.ts';
+import { targetsFor } from './libraries.ts';
 import { sh, type Once, type Ready, type RunOptions } from './processes.ts';
 import { appOn, storeOf } from '../core/stack.ts';
 
@@ -92,7 +92,8 @@ function contextFor(
     envNames: [env, ...aliases],
   };
   if (app.kind === 'dotnet' && app.launchSettings) ctx.profiles = profilesOf(app, repo);
-  if (app.kind === 'dotnet' && fs.existsSync(libraryTargets(id))) ctx.libraryTargets = libraryTargets(id);
+  const targets = app.kind === 'dotnet' ? targetsFor(id, path.join(tempDir(), 'actions.json')) : undefined;
+  if (targets) ctx.libraryTargets = targets;
   if (app.kind === 'android') {
     const gradle = ['app/build.gradle.kts', 'app/build.gradle', 'build.gradle.kts', 'build.gradle']
       .map(file => path.join(repo, file))

@@ -106,6 +106,28 @@ export function librariesFor(appDir: string, clones: Library[]): Library[] {
 /** Where the targets file that swaps an app's NuGet packages for local projects is kept. */
 export const libraryTargets = (appId: string): string => path.join(tempDir(), 'libraries', `${appId}.targets`);
 
+const loggedTargets = (appId: string) => (action: Action) =>
+  action.kind === 'file' && action.file === libraryTargets(appId);
+
+/** The targets file this run linked for the app; one left without its log entry is stale, and removed. */
+export function targetsFor(appId: string, logFile: string): string | undefined {
+  const file = libraryTargets(appId);
+  if (!fs.existsSync(file)) return undefined;
+  if (readActions(logFile).some(loggedTargets(appId))) return file;
+  fs.rmSync(file, { force: true });
+  return undefined;
+}
+
+/** Takes away the app's targets file and its log entry: the board no longer asks for a local NuGet library. */
+export function dropTargets(appId: string, logFile: string): void {
+  if (!fs.existsSync(libraryTargets(appId)) && !readActions(logFile).some(loggedTargets(appId))) return;
+  fs.rmSync(libraryTargets(appId), { force: true });
+  updateActions(logFile, list => {
+    const at = list.findIndex(loggedTargets(appId));
+    if (at >= 0) list.splice(at, 1);
+  });
+}
+
 const xml = (text: string) =>
   text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 /** The targets file: in each project that references the package, the package goes and the clone's project comes. */

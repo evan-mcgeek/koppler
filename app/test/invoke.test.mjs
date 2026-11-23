@@ -57,9 +57,9 @@ const env = {
   KOPPLER_TEMP: path.join(dir, 'state'),
   KOPPLER_CONFIG_DIR: path.join(dir, 'config'),
   DOCKER_HOST: 'unix:///nowhere',
-  ORDERS_API_URL: 'http://localhost:5001',
 };
 delete env.CLAUDE_CODE_SESSION_ID;
+delete env.ORDERS_API_URL;
 const entry = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'dist', 'koppler.mjs');
 const koppler = (...args) => {
   const r = spawnSync('node', [entry, ...args], { encoding: 'utf8', env, cwd: dir });
@@ -68,7 +68,7 @@ const koppler = (...args) => {
 fs.mkdirSync(env.KOPPLER_STATE, { recursive: true });
 fs.mkdirSync(env.KOPPLER_CONFIG_DIR, { recursive: true });
 const stack = {
-  envs: ['qa'],
+  envs: ['qa', 'qa2'],
   apps: {
     'shop-jobs': { name: 'Shop jobs', kind: 'sam', url: 'http://localhost:3100' },
     web: { name: 'Web', kind: 'node', url: 'http://localhost:3000' },
@@ -76,19 +76,35 @@ const stack = {
 };
 fs.writeFileSync(path.join(env.KOPPLER_STATE, 'registry.json'), JSON.stringify(stack));
 fs.writeFileSync(path.join(env.KOPPLER_STATE, 'local.json'), JSON.stringify({ apps: { 'shop-jobs': { path: clone }, web: { path: clone } } }));
+// The board runs on QA2, and the running API was started with the address of the local Orders API.
+fs.writeFileSync(path.join(env.KOPPLER_STATE, 'live.json'), JSON.stringify({ env: 'qa2', nodes: {}, edges: [] }));
+fs.mkdirSync(path.join(env.KOPPLER_STATE, 'procs'));
+fs.writeFileSync(
+  path.join(env.KOPPLER_STATE, 'procs', 'shop-jobs.json'),
+  JSON.stringify({ name: 'shop-jobs', pid: 1, start: { setEnv: { ORDERS_API_URL: 'http://localhost:5001' } } }),
+);
+fs.writeFileSync(
+  path.join(clone, 'samconfig.toml'),
+  '[qa.deploy.parameters]\nparameter_overrides = "Stage=qa"\n[qa2.deploy.parameters]\nparameter_overrides = "Stage=qa2"\n',
+);
 process.on('exit', () => fs.rmSync(dir, { recursive: true, force: true }));
 const ran = () => (fs.existsSync(calls) ? fs.readFileSync(calls, 'utf8').trim().split('\n') : []);
 
-test('a queue function runs once with SAM sample queue message, built first, with the settings the API would get', () => {
+test('a queue function runs once with SAM sample queue message, built first, with the settings and env of the running API', () => {
   const r = koppler('invoke', 'shop-jobs', 'OrdersQueueFunction');
   assert.equal(r.code, 0, r.out);
   const [generate, build, invoke] = ran();
   assert.equal(generate, 'local generate-event sqs receive-message');
   assert.match(build ?? '', /^build /);
+  // Its own build folder: sam build empties the one it builds into, and a running API serves from the other.
+  assert.match(build ?? '', /--build-dir \S+\/invoke-build /);
   assert.match(invoke ?? '', /^local invoke OrdersQueueFunction --template \S+template\.yaml --event \S+ --env-vars \S+/);
   // The function's result reaches the terminal, and so does the local address, as the container sees it.
   assert.match(r.out, /"statusCode":200/);
   assert.match(r.out, /"ORDERS_API_URL":"http:\/\/host\.docker\.internal:5001"/);
+  assert.match(r.out, /deploy parameters from samconfig\.toml \[qa2\]/);
+  // --env still picks another one.
+  assert.match(koppler('invoke', 'shop-jobs', 'OrdersQueueFunction', '--env', 'qa').out, /samconfig\.toml \[qa\]/);
 });
 
 test('an event file of your own is used as it is', () => {
