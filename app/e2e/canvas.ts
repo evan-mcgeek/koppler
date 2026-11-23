@@ -197,7 +197,12 @@ export const test = base.extend<{
         );
       await use({ url: fs.readFileSync(urlFile, 'utf8').trim(), dir, temp });
     } finally {
-      server.kill();
+      // Gone before its folder is: a server still writing as it stops would put a file back while the folder goes.
+      if (server.exitCode === null && server.signalCode === null) {
+        const exited = new Promise(done => server.once('exit', done));
+        server.kill();
+        await exited;
+      }
       // What a test's run started is detached from the server: stopped here, so none outlives the test.
       spawnSync(process.execPath, [path.join(here, '..', 'dist', 'koppler.mjs'), 'stop', '--all', '--yes'], {
         env,
