@@ -79,7 +79,12 @@ export interface LinkedQueue {
 type AppsStack = EnvStack & {
   apps: Record<
     string,
-    { deployedUrl?: string | undefined; envs?: Record<string, Record<string, unknown>> | undefined } | undefined
+    | {
+        name?: string | undefined;
+        deployedUrl?: string | undefined;
+        envs?: Record<string, Record<string, unknown>> | undefined;
+      }
+    | undefined
   >;
 };
 
@@ -164,6 +169,11 @@ const deployedUrlOf = (stack: AppsStack, id: string, env: string) => appOn(stack
 
 const union = (a: string[] | undefined, b: string[]) => [...new Set([...(a ?? []), ...b])];
 
+const words = (text: string) => `-${text.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-`;
+/** A resource named for an app: its id or name, as whole words (`acme-orders-qa` for orders). */
+const namedFor = (resource: string, id: string, name: string | undefined) =>
+  [id, name].some(app => !!app && words(resource).includes(words(app)));
+
 /** The draft for one app: per stack environment its address, account, settings, secrets and calls. */
 export function draftApp(
   id: string,
@@ -243,7 +253,11 @@ export function draftApp(
   }
   return Object.fromEntries(
     Object.entries(gathered).map(([env, found]): [string, Draft] => {
-      const ranked = found.domains.sort((a, b) => RANK[a.from] - RANK[b.from]);
+      // Several ECS services behind one load balancer: only the one named for this app is its address.
+      const services = new Set(found.domains.flatMap(domain => (domain.service ? [domain.service] : [])));
+      const ranked = found.domains
+        .filter(domain => services.size < 2 || !domain.service || namedFor(domain.service, id, stack.apps[id]?.name))
+        .sort((a, b) => RANK[a.from] - RANK[b.from]);
       // The same host twice is one: the better ranked, which may know its path and scheme.
       const domains = ranked.filter((domain, at) => ranked.findIndex(other => other.host === domain.host) === at);
       const settings = [...found.settings.values()];
@@ -533,6 +547,9 @@ const titled = (id: string) =>
     .join(' ');
 
 /** What stack.json would need for the queues it does not list yet: the queue, and publishes / reads on each app. */
+// A name built from another resource's value (`random_id.suffix.hex`) is only known once deployed.
+const DEPLOY_TIME = /\$\{\s*(?!(?:var|local|each|count)\.)[a-z]\w*\.\w+/;
+
 export function queueDraft(queues: LinkedQueue[], stack: QueueStack) {
   const out: {
     queues: Record<string, object>;
@@ -543,7 +560,9 @@ export function queueDraft(queues: LinkedQueue[], stack: QueueStack) {
   const note = (queue: LinkedQueue) =>
     [
       queue.fedBy.length ? `Fed by ${queue.fedBy.join(' and ')}` : '',
-      queue.pattern ? `Its name is set when deployed: ${queue.pattern}` : '',
+      queue.pattern
+        ? `Its name is ${DEPLOY_TIME.test(queue.pattern) ? 'set when deployed' : 'not read here'}: ${queue.pattern}`
+        : '',
     ]
       .filter(Boolean)
       .join('. ');

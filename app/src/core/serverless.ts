@@ -29,7 +29,8 @@ function resolve(value: string, tree: Tree, stage: string | null): string | null
     if (--left < 0) return null;
     const variable = (inner[1] ?? '').trim();
     const looked = variable.startsWith('self:') ? at(tree, variable.slice(5)) : undefined;
-    const filled = STAGE.test(variable) ? stage : typeof looked === 'string' ? looked : null;
+    const plain = typeof looked === 'string' || typeof looked === 'boolean' || typeof looked === 'number';
+    const filled = STAGE.test(variable) ? stage : plain ? String(looked) : null;
     if (filled === null) return null;
     text = text.replace(inner[0], filled);
   }
@@ -47,17 +48,47 @@ export function serverlessDomains(
   const tree = readTree(text);
   const raw = at(tree, 'custom.customDomain.domainName');
   if (typeof raw !== 'string') return { found: [], unread: null };
-  const basePath = at(tree, 'custom.customDomain.basePath');
-  const path = typeof basePath === 'string' && basePath !== '(none)' ? basePath.replace(/^\/|\/$/g, '') : '';
-  const domain = (host: string): Domain[] => [{ host: host.toLowerCase(), from: 'api', ...(path && { path }) }];
+  const settings = {
+    basePath: at(tree, 'custom.customDomain.basePath'),
+    enabled: at(tree, 'custom.customDomain.enabled'),
+  };
+  // Values only known when deployed, in the order met.
+  const unread: string[] = [];
+  /** A setting for a stage: as written, filled in, or undefined (and said) when only known when deployed. */
+  const valueOf = (value: unknown, stage: string | null): unknown => {
+    if (typeof value !== 'string') return value;
+    const filled = resolve(value, tree, stage);
+    if (filled === null) unread.push(value);
+    return filled ?? undefined;
+  };
   const isHost = (host: string | null): host is string => !!host && /^[\w.-]+\.[a-z]{2,}$/i.test(host);
-  const fixed = resolve(raw, tree, null);
-  if (isHost(fixed)) return { found: [{ token: null, domains: domain(fixed) }], unread: null };
-  const maps = [...raw.matchAll(/\$\{self:([\w.-]+)\.\$\{[^}]*\}\}/g)].map(match => at(tree, match[1] ?? ''));
+  /** The domain for a stage: none when turned off, null when a part of it is only known when deployed. */
+  const domainOf = (stage: string | null): Domain[] | null => {
+    const host = resolve(raw, tree, stage);
+    if (!isHost(host)) return null;
+    const enabled = valueOf(settings.enabled, stage);
+    if (enabled === false || enabled === 'false') return [];
+    const basePath = valueOf(settings.basePath, stage);
+    if (
+      (settings.enabled !== undefined && enabled === undefined) ||
+      (settings.basePath !== undefined && basePath === undefined)
+    )
+      return null;
+    const path = typeof basePath === 'string' && basePath !== '(none)' ? basePath.replace(/^\/|\/$/g, '') : '';
+    return [{ host: host.toLowerCase(), from: 'api', ...(path && { path }) }];
+  };
+  const fixed = domainOf(null);
+  if (fixed) return { found: fixed.length ? [{ token: null, domains: fixed }] : [], unread: null };
+  unread.length = 0;
+  const written = [raw, settings.basePath, settings.enabled].filter(value => typeof value === 'string');
+  const maps = written
+    .flatMap(value => [...value.matchAll(/\$\{self:([\w.-]+)\.\$\{[^}]*\}\}/g)])
+    .map(match => at(tree, match[1] ?? ''));
   const keys = maps.flatMap(map => (map && typeof map === 'object' && !Array.isArray(map) ? Object.keys(map) : []));
   const found = [...new Set([...stages, ...keys])].flatMap(stage => {
-    const host = resolve(raw, tree, stage);
-    return isHost(host) ? [{ token: stage, domains: domain(host) }] : [];
+    const domains = domainOf(stage);
+    return domains?.length ? [{ token: stage, domains }] : [];
   });
-  return { found, unread: found.length ? null : raw };
+  if (found.length) return { found, unread: null };
+  return { found, unread: unread[0] ?? (isHost(resolve(raw, tree, stages[0] ?? null)) ? null : raw) };
 }
