@@ -378,15 +378,20 @@ test('Android: installed on the emulator, then launched with its settings, its l
   expect(script(start)).toContain('installDebug');
   expect(startCommand({ ...app, android: { variant: 'freeDebug' } }, ctx).command?.[2]).toContain('installFreeDebug');
   expect(start.onStop).toEqual([['adb', '-s', 'emulator-5554', 'shell', 'am', 'force-stop', 'com.acme.shop']]);
-  // No package set: the applicationId its Gradle file gives.
-  expect(script(startCommand({ kind: 'android' }, ctx))).toContain('applicationId');
+  // No package set: the id the variant installs as, from its Gradle file; unread, it asks instead of guessing.
+  const gradle =
+    'android {\n  defaultConfig {\n    applicationId = "com.acme.shop"\n  }\n  buildTypes {\n    debug {\n      applicationIdSuffix = ".debug"\n    }\n  }\n}\n';
+  const read = startCommand({ kind: 'android' }, { ...ctx, gradle });
+  expect(script(read)).toContain('pkg=com.acme.shop.debug\n');
+  expect(read.onStop).toEqual([['adb', '-s', 'emulator-5554', 'shell', 'am', 'force-stop', 'com.acme.shop.debug']]);
+  expect(startCommand({ kind: 'android' }, ctx).error).toMatch(/mobile\.androidPackage/);
   expect(startCommand(app, { repo: '/m' }).error).toMatch(/needs a device/);
   const phone = { id: 'R5CT', platform: 'android', physical: true };
   expect(startCommand(app, { repo: '/m', device: phone }).error).toMatch(/emulator only for now/);
   expect(startCommand(app, { repo: '/m', device: { id: 'SIM-1', platform: 'ios' } }).error).toMatch(/Android emulator/);
 });
 
-test('Android: the applicationId is read from Gradle, and a setting reaches the app as a launch extra', () => {
+test('Android: the app id comes from its Gradle file, and a setting reaches the app as a launch extra', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koppler-android-'));
   const bin = path.join(dir, 'bin');
   fs.mkdirSync(path.join(dir, 'app'), { recursive: true });
@@ -410,7 +415,8 @@ esac
     { mode: 0o755 },
   );
   const device = { id: 'emulator-5554', platform: 'android' };
-  const start = startCommand({ kind: 'android' }, { repo: dir, override: ['ORDERS_API_URL'], device });
+  const gradle = fs.readFileSync(path.join(dir, 'app', 'build.gradle.kts'), 'utf8');
+  const start = startCommand({ kind: 'android' }, { repo: dir, gradle, override: ['ORDERS_API_URL'], device });
   const [shell = '', ...args] = command(start);
   const address = "http://10.0.2.2:5001/api?a=1&b='2'";
   const env = { ...process.env, PATH: `${bin}:${process.env['PATH'] ?? ''}`, ORDERS_API_URL: address };

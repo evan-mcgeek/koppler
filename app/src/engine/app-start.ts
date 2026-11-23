@@ -8,7 +8,7 @@ import { fail } from '../failure.ts';
 import { launchProfile, mockCommand, startCommand, type LaunchProfiles, type StartContext } from '../core/launch.ts';
 import { ON_DEVICE } from '../core/kinds.ts';
 import { isProtected } from '../core/plan.ts';
-import { testArgs } from '../core/secret-types.ts';
+import { beforeStart, testArgs } from '../core/secret-types.ts';
 import type { App, Secret } from '../core/stack.ts';
 import { readClones, readStack } from '../data.ts';
 import { repoFiles } from './investigate.ts';
@@ -93,6 +93,12 @@ function contextFor(
   };
   if (app.kind === 'dotnet' && app.launchSettings) ctx.profiles = profilesOf(app, repo);
   if (app.kind === 'dotnet' && fs.existsSync(libraryTargets(id))) ctx.libraryTargets = libraryTargets(id);
+  if (app.kind === 'android') {
+    const gradle = ['app/build.gradle.kts', 'app/build.gradle', 'build.gradle.kts', 'build.gradle']
+      .map(file => path.join(repo, file))
+      .find(file => fs.existsSync(file));
+    ctx.gradle = gradle ? fs.readFileSync(gradle, 'utf8') : null;
+  }
   if (app.kind === 'node' || app.kind === 'web') {
     ctx.pkg = readJson(path.join(repo, 'package.json')) as NonNullable<StartContext['pkg']> | null;
     if (ctx.pkg?.scripts) ctx.scripts = ctx.pkg.scripts;
@@ -130,11 +136,13 @@ function checkSecrets(id: string, app: App, store: string, env: string, test: bo
   for (const secret of named) {
     const result = secretTest(store, secret);
     const name = secret.env ?? '';
-    if (result.code === 1) {
+    const verdict = beforeStart(secret.type, result);
+    if (verdict === 'stop') {
       const why = result.message.replace(/^failed: /, 'did not pass its test: ');
       fail(`${id}: ${name} for ${env.toUpperCase()} ${why}. Fix it, or start anyway with --no-test.`);
     }
-    if (result.code === 0) console.log(`${name}: ${result.message}`);
+    if (verdict === 'warn') console.log(`${name}: could not be checked, ${result.message.replace(/^failed: /, '')}`);
+    if (verdict === 'ok') console.log(`${name}: ${result.message}`);
   }
 }
 

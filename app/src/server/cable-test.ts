@@ -190,6 +190,8 @@ interface Health {
   error?: string;
   function?: string;
   trigger?: string;
+  /** Called only through its API: no queue trigger. */
+  api?: boolean;
 }
 const cannot = (detail: string): Tested => ({ ok: false, unsure: true, text: 'Cannot test', detail });
 /** An app's local address, when it is one this Mac answers on. */
@@ -238,11 +240,10 @@ async function testApp(app: App | null, probe: Probe): Promise<Tested> {
     return {
       ok: true,
       text: 'Function ready',
-      detail: `${app.name}: the emulator is up, the function is deployed and ${health.trigger ? 'its queue trigger is on' : 'answers through its API'}.`,
+      detail: `${app.name}: the emulator is up, the function is deployed and ${health.api ? 'answers through its API' : 'its queue trigger is on'}.`,
     };
-  const state =
-    health.error ??
-    `its function is ${health.function ?? 'missing'} and its queue trigger ${health.trigger ?? 'missing'}`;
+  const fn = `its function is ${health.function ?? 'missing'}`;
+  const state = health.error ?? (health.api ? fn : `${fn} and its queue trigger ${health.trigger ?? 'missing'}`);
   return { ok: false, text: 'Function not ready', detail: `${app.name} answers on ${url.host}, but ${state}.` };
 }
 

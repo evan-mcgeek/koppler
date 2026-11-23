@@ -65,7 +65,9 @@ It runs on a simulator only for now, not on a phone.
 An `android` app is a Gradle repo that applies the Android application plugin.
 Koppler installs it with `./gradlew installDebug`, or the variant in `android.variant`.
 It launches the app on the emulator, and the app's own log is its log on the card.
-The app id is `mobile.androidPackage`, else the `applicationId` in its Gradle file.
+The app id is `mobile.androidPackage`, else the id its variant installs as, read from its Gradle file.
+That is the flavor's own `applicationId` or the default one, then each `applicationIdSuffix`, as Gradle builds it.
+When any part is set in code rather than plain text, Koppler asks for `mobile.androidPackage` instead of guessing.
 A local address reaches it as a launch extra, read with `intent.getStringExtra`.
 A line in a file it reads can be changed instead, and is undone on Stop.
 Stop closes the app on the emulator.
