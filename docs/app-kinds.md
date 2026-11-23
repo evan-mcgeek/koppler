@@ -56,6 +56,7 @@ A phone reaches them at your Mac's address on the network, with the apps it call
 Koppler works out that address per device for Flutter, React Native and native iOS and Android apps.
 An `ios` app is a repo with an Xcode project or workspace at its root.
 Koppler builds its scheme: the only one it has, or `ios.scheme` in `stack.json`.
+It installs the app that scheme builds, read from its build settings, so an app left by another scheme is never installed.
 Its output is its log on the card, and Stop closes it on the simulator.
 A local address reaches it as a launch setting, read with `ProcessInfo.processInfo.environment`.
 A line in a file it reads, such as an `.xcconfig`, can be changed instead, and is undone on Stop.
