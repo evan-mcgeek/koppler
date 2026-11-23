@@ -304,6 +304,8 @@ test('a lock in the Areas tab keeps what it covers, and Remove says which lock h
         // Null until the server has written its first status: the poll asks again.
         ((await (await page.request.get(`${canvas.url}data/status.json`)).json()) as { locks?: string[] } | null)
           ?.locks,
+      // The status is put together every 1.5 s, and one round can take seconds on a loaded machine.
+      { timeout: 15_000 },
     )
     .toEqual(expect.arrayContaining(['areas.shipping.name', 'apps.orders.areas']));
   await fromMenu(page, 'Settings', 'Stack settings');

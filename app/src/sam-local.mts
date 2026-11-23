@@ -121,7 +121,8 @@ async function main(target: Target, config: { id?: string; template?: string; en
       .replace(/[^\w.-]+/g, '_')
       .slice(-80),
   );
-  const buildDir = path.join(work, 'build');
+  // sam build empties the folder it builds into first, so an invoke builds beside the folder a running API serves from.
+  const buildDir = path.join(work, 'invoke' in target ? 'invoke-build' : 'build');
   const cacheDir = path.join(work, 'cache');
   const templatePath = path.resolve(template);
   fs.mkdirSync(work, { recursive: true });
