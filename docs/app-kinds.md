@@ -104,7 +104,7 @@ Compose is checked last: many repos have a compose file only for their database.
 - **Local addresses** for every cable, in the way the kind takes settings.
 - **Secrets** from your secret store, loaded into that process only.
 - **Tunnels** to deployed databases and services, opened first.
-- **Local queues**, when switched on: an AWS emulator in Docker for SQS, SNS and EventBridge, or a Kafka broker in Docker. A local topic or bus feeds only a local SQS queue.
+- **Local queues**, when switched on: an AWS emulator in Docker for SQS, SNS and EventBridge, or a Kafka broker in Docker. A local topic or bus feeds only a local SQS queue. A topic sends each message wrapped as an SNS notification, with no raw delivery.
 - **Local libraries**, linked for the run: `pubspec_overrides.yaml` for Dart and Flutter, `npm install --no-save` for npm.
   For .NET, a targets file in Koppler's own folder swaps the NuGet package for the clone's project when `dotnet run` builds.
   Nothing tracked changes, and Stop puts the published packages back.

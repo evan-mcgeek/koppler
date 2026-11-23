@@ -259,5 +259,14 @@ export function feedLocal(from: { type: string; address: string }, queueUrl: str
   const rule = `koppler-to-${arn.split(':').pop() ?? ''}`.slice(0, 64);
   const on = ['--event-bus-name', from.address];
   emulator('events', 'put-rule', '--name', rule, ...on, '--event-pattern', '{"source":[{"prefix":""}]}');
-  emulator('events', 'put-targets', '--rule', rule, ...on, '--targets', `Id=koppler,Arn=${arn}`);
+  // A FIFO queue takes an event only with a message group.
+  const target = {
+    Id: 'koppler',
+    Arn: arn,
+    ...(arn.endsWith('.fifo') && { SqsParameters: { MessageGroupId: 'koppler' } }),
+  };
+  const targets = ['--targets', JSON.stringify([target]), '--query', 'FailedEntryCount'];
+  // It answers a target it turns down with a count, not an error.
+  if (emulator('events', 'put-targets', '--rule', rule, ...on, ...targets) !== '0')
+    throw new Error(`the emulator turned down ${arn} as a target`);
 }
