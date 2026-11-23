@@ -16,6 +16,7 @@ import { APP, BIN } from '../paths.ts';
 import { confirm, envOf, positional } from './output.ts';
 import { fail } from '../failure.ts';
 import { appOn, notRunHere, storeOf } from '../core/stack.ts';
+import { probeUrlOk } from '../core/secret-types.ts';
 
 const loaded = (): Registry => readStack() ?? fail('no stack loaded (koppler init)');
 const portOf = (stack: Registry, id: string) => Number(new URL(stack.apps[id]?.url ?? 'http://x').port);
@@ -159,26 +160,33 @@ export async function doctor(args: string[]): Promise<void> {
     process.exitCode = 1;
 }
 
-/** Lets a stored key be sent to one host to test it, or takes that back; the stack never decides this. */
-async function keyApproval(action: 'approve' | 'revoke', [store = '', name = '', host = '']: string[]): Promise<never> {
-  const usage = `usage: koppler secret ${action} <app>[@<env>] <NAME>${action === 'approve' ? ' <host>' : ''}`;
-  const hostOk = /^(?:[a-z0-9-]+\.)*[a-z0-9-]+$|^\[[0-9a-f:]+\]$/i.test(host);
-  if (!/^[a-z0-9-]+(@[a-z0-9-]+)?$/.test(store) || !/^[A-Za-z_]\w*$/.test(name) || (action === 'approve' && !hostOk))
-    fail(usage);
-  if (action === 'approve') {
-    // Sending a stored key to an address is the user's call alone: a person at the terminal, never a script or --yes.
-    if (!process.stdin.isTTY)
-      fail(
-        `not approved: approving needs you to answer at a terminal. Run koppler secret approve ${store} ${name} ${host} in your own terminal window, not through an agent or a ! command`,
-      );
-    if (!(await confirm(`Send ${name} of ${store} to ${host.toLowerCase()} whenever Koppler tests it?`)))
-      fail('not approved');
-    approve(store, name, host);
-    console.log(`${name} of ${store} may be sent to ${host.toLowerCase()} to test it`);
-  } else {
+/** Lets a stored key be sent to the probe the stack names for it, or takes that back; the stack alone never decides. */
+async function keyApproval(action: 'approve' | 'revoke', args: string[]): Promise<never> {
+  // --yes is passed over: only an answer at the terminal approves.
+  const words = args.filter(arg => !arg.startsWith('-'));
+  const [store = '', name = ''] = words;
+  if (words.length !== 2 || !/^[a-z0-9-]+(@[a-z0-9-]+)?$/.test(store) || !/^[A-Za-z_]\w*$/.test(name))
+    fail(`usage: koppler secret ${action} <app>[@<env>] <NAME>`);
+  if (action === 'revoke') {
     revoke(store, name);
     console.log(`${name} of ${store} is no longer sent anywhere to test it`);
+    process.exit(0);
   }
+  const stack = loaded();
+  const [id = '', env = stack.envs[0] ?? ''] = store.split('@');
+  const secret = appOn(stack, id, env)?.secrets?.find(declared => declared.env === name);
+  const url = secret?.type === 'key' ? secret.probe?.url : undefined;
+  if (!url || !probeUrlOk(url)) fail(`${name} of ${store} is not a key with probe.url in the stack`);
+  const probe = { url, header: secret?.probe?.header };
+  // Sending a stored key to an address is the user's call alone: a person at the terminal, never a script or --yes.
+  if (!process.stdin.isTTY)
+    fail(
+      `not approved: approving needs you to answer at a terminal. Run koppler secret approve ${store} ${name} in your own terminal window, not through an agent or a ! command`,
+    );
+  const how = probe.header ? `in the ${probe.header} header` : 'as a bearer token';
+  if (!(await confirm(`Send ${name} of ${store} to ${url} ${how} whenever Koppler tests it?`))) fail('not approved');
+  approve(store, name, probe);
+  console.log(`${name} of ${store} may be sent to ${url} ${how} to test it`);
   process.exit(0);
 }
 
