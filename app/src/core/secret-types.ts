@@ -29,3 +29,13 @@ export const testArgs = (
   ...(secret.type === 'key' && secret.probe?.url ? ['--url', secret.probe.url] : []),
   ...(secret.type === 'key' && secret.probe?.header ? ['--header', secret.probe.header] : []),
 ];
+
+/**
+ * What a failed or passed test means for a start. A wrong login or a rejected key stops it; an outside API that cannot
+ * be reached, or answers something else, cannot say the key is wrong, so the app starts with a warning.
+ */
+export function beforeStart(type: string | undefined, result: { code: number; message: string }) {
+  if (result.code === 0) return 'ok';
+  if (result.code !== 1) return 'skip';
+  return type === 'key' && result.message !== 'failed: it rejected the key' ? 'warn' : 'stop';
+}
