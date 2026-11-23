@@ -81,7 +81,13 @@ test('A Node Lambda called by an HTTP API: built by sam build, and each call rea
     // Off its routes, API Gateway's not-found; its health is Koppler's own, with no queue trigger to wait for.
     assert.equal((await fetch(`http://127.0.0.1:${String(port)}/carts`, { method: 'POST' })).status, 404);
     const health = await (await fetch(`http://127.0.0.1:${String(port)}/health`)).json();
-    assert.deepEqual(health, { koppler: 'lambda', ok: true, function: 'Active' });
+    assert.deepEqual(health, { koppler: 'lambda', ok: true, function: 'Active', api: true });
+
+    // A malformed escape is API Gateway's bad request, and the runner keeps serving.
+    const bad = await fetch(`http://127.0.0.1:${String(port)}/orders/100%`, { method: 'POST' });
+    assert.equal(bad.status, 400);
+    assert.equal((await fetch(`http://127.0.0.1:${String(port)}/health`)).status, 200);
+    assert.equal(events.length, 1);
 
     const ran = fs.readFileSync(calls, 'utf8');
     const build = ran.split('\n').find(line => line.startsWith('sam build'));

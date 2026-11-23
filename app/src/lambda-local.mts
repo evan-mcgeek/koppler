@@ -221,14 +221,20 @@ function environment(): Record<string, string> {
 }
 
 /** For Koppler's flow check: the function is deployed and its trigger is on. */
-function health(): { ok: boolean; function?: string; trigger?: string; error?: string } {
+function health(): { ok: boolean; function?: string; trigger?: string; api?: true; error?: string } {
   const of = (...query: string[]) => aws('lambda', ...query);
   try {
     const deployed = of('get-function', '--function-name', fn, '--query', 'Configuration.State');
     const trigger = of('list-event-source-mappings', '--function-name', fn, '--query', 'EventSourceMappings[0].State');
     // Called only through its API, it has no trigger to be on.
-    const on = trigger === 'Enabled' || (!!config?.api && !triggers.length);
-    return { ok: deployed === 'Active' && on, function: deployed, ...(trigger !== 'None' && { trigger }) };
+    const api = !!config?.api && !triggers.length;
+    const on = trigger === 'Enabled' || api;
+    return {
+      ok: deployed === 'Active' && on,
+      function: deployed,
+      ...(trigger !== 'None' && { trigger }),
+      ...(api && { api: true as const }),
+    };
   } catch {
     return { ok: false, error: 'the emulator does not answer' };
   }
@@ -330,6 +336,18 @@ try {
       body: new URLSearchParams({ Action: 'SendMessage', Version: '2012-11-05', QueueUrl: queue, MessageBody: body }),
     });
   };
+  // No call can end the runner: a malformed escape is a bad request, as API Gateway answers; anything else a 500.
+  const guarded = (response: http.ServerResponse, work: () => void) => {
+    try {
+      work();
+    } catch (error) {
+      if (response.headersSent) return void response.end();
+      const bad = error instanceof URIError;
+      response
+        .writeHead(bad ? 400 : 500, { 'content-type': 'application/json' })
+        .end(bad ? '{"message":"Bad Request"}' : '{"message":"Internal server error"}');
+    }
+  };
   // What API Gateway does: the call as its event, invoked and waited for; the function's answer goes back to the caller.
   const viaApi = (api: Api, request: http.IncomingMessage, response: http.ServerResponse) => {
     const method = request.method ?? 'GET';
@@ -350,74 +368,81 @@ try {
       } else chunks.push(chunk);
     });
     request.on('end', () => {
-      const headers: [string, string][] = [];
-      for (let at = 0; at + 1 < request.rawHeaders.length; at += 2)
-        headers.push([request.rawHeaders[at] ?? '', request.rawHeaders[at + 1] ?? '']);
-      const call = { method, url: request.url ?? '/', headers, body: Buffer.concat(chunks), sourceIp: '127.0.0.1' };
-      const event = apiEvent(api, call, matched, new Date(), randomUUID());
-      fetch(`${ENDPOINT}/2015-03-31/functions/${fn}/invocations`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json', authorization: signed('lambda') },
-        body: JSON.stringify(event),
-      })
-        .then(async invoked => {
-          const text = await invoked.text();
-          let result: unknown = text;
-          try {
-            result = JSON.parse(text);
-          } catch {
-            // Not JSON: the answer as it is.
-          }
-          const failed = !invoked.ok || invoked.headers.has('x-amz-function-error');
-          const answer = failed
-            ? {
-                status: 502,
-                headers: [['content-type', 'application/json']] as [string, string][],
-                body: Buffer.from('{"message":"Internal server error"}'),
-              }
-            : apiResponse(api, result);
-          console.log(`koppler: ${method} ${pathname} -> ${String(answer.status)}`);
-          response.writeHead(answer.status, answer.headers.flat()).end(answer.body);
+      guarded(response, () => {
+        const headers: [string, string][] = [];
+        for (let at = 0; at + 1 < request.rawHeaders.length; at += 2)
+          headers.push([request.rawHeaders[at] ?? '', request.rawHeaders[at + 1] ?? '']);
+        const call = { method, url: request.url ?? '/', headers, body: Buffer.concat(chunks), sourceIp: '127.0.0.1' };
+        const event = apiEvent(api, call, matched, new Date(), randomUUID());
+        fetch(`${ENDPOINT}/2015-03-31/functions/${fn}/invocations`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', authorization: signed('lambda') },
+          body: JSON.stringify(event),
         })
-        .catch(() => response.writeHead(502).end());
+          .then(async invoked => {
+            const text = await invoked.text();
+            let result: unknown = text;
+            try {
+              result = JSON.parse(text);
+            } catch {
+              // Not JSON: the answer as it is.
+            }
+            const failed = !invoked.ok || invoked.headers.has('x-amz-function-error');
+            const answer = failed
+              ? {
+                  status: 502,
+                  headers: [['content-type', 'application/json']] as [string, string][],
+                  body: Buffer.from('{"message":"Internal server error"}'),
+                }
+              : apiResponse(api, result);
+            console.log(`koppler: ${method} ${pathname} -> ${String(answer.status)}`);
+            response.writeHead(answer.status, answer.headers.flat()).end(answer.body);
+          })
+          .catch(() => {
+            if (!response.headersSent) response.writeHead(502);
+            response.end();
+          });
+      });
     });
   };
   const server = http.createServer((request, response) => {
-    const where = new URL(request.url ?? '', 'http://x').pathname.replace(/\/+$/, '') || '/';
-    // GET / and /health are Koppler's own answers, unless one of the function's routes names them.
-    const kopplers = request.method === 'GET' && (where === '/' || where === '/health');
-    const routed = !!config.routes?.length && !!matchRoute(config.routes, 'GET', where);
-    if (api && (!kopplers || routed)) {
-      viaApi(api, request, response);
-      return;
-    }
-    if (request.method === 'GET' && where === '/') {
-      response.writeHead(200, { 'content-type': 'text/plain' }).end(`koppler: local Lambda ${config.handler}\n`);
-      return;
-    }
-    if (request.method === 'GET' && where === '/health') {
-      const { ok, ...found } = health();
-      const answer = JSON.stringify({ koppler: 'lambda', ok, ...found });
-      response.writeHead(ok ? 200 : 503, { 'content-type': 'application/json' }).end(answer);
-      return;
-    }
-    if (!own || request.method !== 'POST' || (routes.length && !routes.includes(where))) {
-      response.writeHead(404).end();
-      return;
-    }
-    let body = '';
-    request.on('data', (chunk: Buffer) => {
-      body += chunk.toString();
-      if (body.length > 262144) request.destroy();
-    });
-    request.on('end', () => {
-      toQueue(own, body)
-        .then(async sent => {
-          console.log(`koppler: POST ${where} -> queue (${String(sent.status)})`);
-          const type = sent.headers.get('content-type') ?? 'text/xml';
-          response.writeHead(sent.status, { 'content-type': type }).end(await sent.text());
-        })
-        .catch(() => response.writeHead(502).end());
+    guarded(response, () => {
+      const where = new URL(request.url ?? '', 'http://x').pathname.replace(/\/+$/, '') || '/';
+      // GET / and /health are Koppler's own answers, unless one of the function's routes names them.
+      const kopplers = request.method === 'GET' && (where === '/' || where === '/health');
+      const routed = !!config.routes?.length && !!matchRoute(config.routes, 'GET', where);
+      if (api && (!kopplers || routed)) {
+        viaApi(api, request, response);
+        return;
+      }
+      if (request.method === 'GET' && where === '/') {
+        response.writeHead(200, { 'content-type': 'text/plain' }).end(`koppler: local Lambda ${config.handler}\n`);
+        return;
+      }
+      if (request.method === 'GET' && where === '/health') {
+        const { ok, ...found } = health();
+        const answer = JSON.stringify({ koppler: 'lambda', ok, ...found });
+        response.writeHead(ok ? 200 : 503, { 'content-type': 'application/json' }).end(answer);
+        return;
+      }
+      if (!own || request.method !== 'POST' || (routes.length && !routes.includes(where))) {
+        response.writeHead(404).end();
+        return;
+      }
+      let body = '';
+      request.on('data', (chunk: Buffer) => {
+        body += chunk.toString();
+        if (body.length > 262144) request.destroy();
+      });
+      request.on('end', () => {
+        toQueue(own, body)
+          .then(async sent => {
+            console.log(`koppler: POST ${where} -> queue (${String(sent.status)})`);
+            const type = sent.headers.get('content-type') ?? 'text/xml';
+            response.writeHead(sent.status, { 'content-type': type }).end(await sent.text());
+          })
+          .catch(() => response.writeHead(502).end());
+      });
     });
   });
   server.listen(port, '127.0.0.1', () => {

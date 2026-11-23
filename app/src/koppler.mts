@@ -640,7 +640,7 @@ const COMMANDS: Command[] = [
   {
     name: 'secret',
     who: 'you',
-    args: 'set|list|remove|psql|approve|revoke <app>[@<env>] [<NAME>] [<host>] [--stdin] [--pgpass]',
+    args: 'set|list|remove|psql|approve|revoke <app>[@<env>] [<NAME>] [--stdin] [--pgpass]',
     about: 'store and manage secrets; values never show',
     run: secret,
     example: 'koppler secret set orders-api@prod DB_URL',
@@ -652,7 +652,10 @@ const COMMANDS: Command[] = [
         'psql <app>[@<env>] <NAME> [--pgpass]',
         "open psql with the app's stored connection; --pgpass writes a pgpass file for another client",
       ],
-      ['approve <app>[@<env>] <NAME> <host>', 'let a stored key be sent to this host to test it'],
+      [
+        'approve <app>[@<env>] <NAME>',
+        "let a stored key be sent to its stack's probe.url to test it; asks at a terminal",
+      ],
       ['revoke <app>[@<env>] <NAME>', 'send that key nowhere to test it again'],
     ],
   },

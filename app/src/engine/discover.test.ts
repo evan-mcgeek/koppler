@@ -167,4 +167,5 @@ test('the clones say where apps run, their deployed addresses and their calls', 
   );
   assert.equal(f3[0]!.why, 'its own code, src/Swagger.cs:4');
   fs.rmSync(dir, { recursive: true });
-});
+  // It runs git in each clone: a few seconds alone, more under a full parallel run.
+}, 20_000);
