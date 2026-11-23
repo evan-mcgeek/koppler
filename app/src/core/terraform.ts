@@ -55,6 +55,8 @@ export interface Domain {
   path?: string;
   /** Served over plain HTTP: a load balancer listener on port 80. */
   http?: true;
+  /** The ECS service behind a load balancer this address leads to, by its name. */
+  service?: string;
 }
 
 export interface Setting {
@@ -308,14 +310,19 @@ const forwardsTo = (body: string, head: RegExp) =>
  * The hosts an ECS service behind a load balancer answers on, as written: the host of the listener rule that forwards
  * to it, else the Route 53 alias of its load balancer. Its own DNS name is only known when deployed, so it is not used.
  */
-function loadBalancerHosts(tf: string): { raw: string; path?: string; http: boolean }[] {
-  const served = new Set(
-    blocks(tf, resource('aws_ecs_service'))
-      .flatMap(({ body }) => blocks(body, /load_balancer\s*\{/g))
-      .map(({ body }) => refTo(assigned(body, 'target_group_arn'), 'aws_lb_target_group')),
+function loadBalancerHosts(tf: string): { raw: string; path?: string; http: boolean; service: string }[] {
+  // Each target group an ECS service is behind, with that service's name as written.
+  const served = new Map<string | undefined, string>(
+    blocks(tf, resource('aws_ecs_service')).flatMap(({ match, body }) => {
+      const service = assigned(body, 'name') ?? `"${nameOf(match)}"`;
+      return blocks(body, /load_balancer\s*\{/g).map(
+        ({ body: lb }) => [refTo(assigned(lb, 'target_group_arn'), 'aws_lb_target_group'), service] as const,
+      );
+    }),
   );
   served.delete(undefined);
   if (!served.size) return [];
+  const serviceOf = (groups: (string | undefined)[]) => served.get(groups.find(group => served.has(group)));
   const aliases = new Map<string | undefined, string>(
     blocks(tf, resource('aws_route53_record')).flatMap(({ body }) => {
       const name = assigned(body, 'name');
@@ -336,7 +343,8 @@ function loadBalancerHosts(tf: string): { raw: string; path?: string; http: bool
   const firstValue = (body: string, head: RegExp) =>
     blocks(body, head).flatMap(block => listed(assigned(block.body, 'values') ?? ''));
   const fromRules = blocks(tf, resource('aws_lb_listener_rule')).flatMap(({ body }) => {
-    if (!forwardsTo(body, /action\s*\{/g).some(group => served.has(group))) return [];
+    const service = serviceOf(forwardsTo(body, /action\s*\{/g));
+    if (!service) return [];
     const listener = listeners.get(refTo(assigned(body, 'listener_arn'), 'aws_lb_listener') ?? '');
     const path = firstValue(body, /path_pattern\s*\{/g)[0];
     const hosts = firstValue(body, /host_header\s*\{/g);
@@ -345,17 +353,19 @@ function loadBalancerHosts(tf: string): { raw: string; path?: string; http: bool
       raw,
       ...(path && { path }),
       http: listener?.http ?? false,
+      service,
     }));
   });
   const fromListeners = [...listeners.values()].flatMap(listener => {
     const alias = aliases.get(listener.lb);
-    return alias && listener.forwards.some(group => served.has(group)) ? [{ raw: alias, http: listener.http }] : [];
+    const service = serviceOf(listener.forwards);
+    return alias && service ? [{ raw: alias, http: listener.http, service }] : [];
   });
   return [...fromRules, ...fromListeners];
 }
 
 /** A domain as written, before it is worked out for an environment. */
-type DeclaredDomain = { raw: string; from: Domain['from']; path?: string; http?: boolean };
+type DeclaredDomain = { raw: string; from: Domain['from']; path?: string; http?: boolean; service?: string };
 
 /** A path pattern as a plain base path (`/api/*` reads as api), or nothing. */
 const basePath = (value: unknown) => {
@@ -724,7 +734,7 @@ function instancesOf(queue: QueueUse, context: Context): { index: string; key: s
       ? (reference[1] === 'var' ? context.vars : context.locals)[reference[2] ?? '']
       : queue.count;
     const count = Number((written ?? '').replace(/"/g, '').trim());
-    if (!Number.isInteger(count) || count < 1 || count > 100) return null;
+    if (!Number.isInteger(count) || count < 0 || count > 100) return null;
     return Array.from({ length: count }, (_, at) => ({ index: String(at), key: String(at) }));
   }
   if (!queue.forEach) return null;
@@ -743,6 +753,14 @@ function instancesOf(queue: QueueUse, context: Context): { index: string; key: s
 /** A name as written for one instance: `each.key`, `each.value` and `count.index` become that instance's. */
 const forInstance = (raw: string, { key, value }: { key: string; value?: string | undefined }) =>
   raw
+    // Simple arithmetic on the index (`count.index + 1`) is worked out; `key` is the index then.
+    .replace(/\bcount\.index\s*([+*-])\s*(\d+)\b/g, (_, op: string, by: string) =>
+      JSON.stringify(
+        String(
+          op === '+' ? Number(key) + Number(by) : op === '-' ? Number(key) - Number(by) : Number(key) * Number(by),
+        ),
+      ),
+    )
     .replace(/\beach\.key\b/g, JSON.stringify(key))
     .replace(/\bcount\.index\b/g, JSON.stringify(key))
     .replace(/\beach\.value\b(?!\.)/g, value === undefined ? 'each.value' : JSON.stringify(value));
@@ -878,8 +896,17 @@ export function readModule(files: { name: string; text: string }[], workspaces: 
     domains: declared.domains.flatMap((domain): Domain[] => {
       const host = addressOf(resolve(domain.raw, context) ?? '');
       const path = basePath(resolve(domain.path, context));
+      const service = domain.service && (named(domain.service, context) ?? domain.service.replace(/^"|"$/g, ''));
       return host && !host.includes('/')
-        ? [{ host, from: domain.from, ...(path && { path }), ...(domain.http ? { http: true as const } : {}) }]
+        ? [
+            {
+              host,
+              from: domain.from,
+              ...(path && { path }),
+              ...(domain.http ? { http: true as const } : {}),
+              ...(service && { service }),
+            },
+          ]
         : [];
     }),
     settings: declared.settings

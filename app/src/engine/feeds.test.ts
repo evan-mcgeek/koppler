@@ -164,3 +164,19 @@ resource "aws_lambda_event_source_mapping" "jobs" {
     'Its name is set when deployed: acme-jobs-${random_id.suffix.hex}',
   );
 });
+
+test('a name Koppler could not read is noted as not read, not as set when deployed', () => {
+  const tf = `
+resource "aws_sqs_queue" "jobs" {
+  name = "acme-jobs-\${var.missing}"
+}
+resource "aws_lambda_event_source_mapping" "jobs" {
+  event_source_arn = aws_sqs_queue.jobs.arn
+}`;
+  const drafts = { shop: draftApp('shop', readModule(files({ 'q.tf': tf }), ['qa']), stack, new Map()) };
+  const draft = queueDraft(linkQueues(drafts, stack), {});
+  assert.equal(
+    (draft.queues['shop-jobs'] as { note?: string }).note,
+    'Its name is not read here: acme-jobs-${var.missing}',
+  );
+});

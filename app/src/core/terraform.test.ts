@@ -129,7 +129,7 @@ resource "aws_lb_listener_rule" "billing" {
 test('an ECS service behind a load balancer: the host and path of the rule that forwards to it', () => {
   const [qa] = readModule(files(ECS));
   const lb = (qa?.domains ?? []).filter(domain => domain.from === 'lb');
-  expect(lb).toEqual([{ host: 'orders.acme-qa.example', from: 'lb', path: 'api' }]);
+  expect(lb).toEqual([{ host: 'orders.acme-qa.example', from: 'lb', path: 'api', service: 'orders' }]);
 });
 
 test('with no host on the rule, the Route 53 alias of its load balancer; plain HTTP is said', () => {
@@ -166,11 +166,28 @@ resource "aws_route53_record" "orders" {
     }),
   );
   const lb = (module?.domains ?? []).filter(domain => domain.from === 'lb');
-  expect(lb).toEqual([{ host: 'orders.acme.example', from: 'lb', http: true }]);
+  expect(lb).toEqual([{ host: 'orders.acme.example', from: 'lb', http: true, service: 'orders' }]);
 });
 
 test('a load balancer with no ECS service behind it gives no address of its own', () => {
   const tf = ECS['ecs.tf'].replace(/resource "aws_ecs_service"[\s\S]*?\n\}\n/, '');
   const [qa] = readModule(files({ ...ECS, 'ecs.tf': tf }));
   expect((qa?.domains ?? []).filter(domain => domain.from === 'lb')).toEqual([]);
+});
+
+test('count = 0 in an environment makes no queue there; count.index + 1 is worked out', () => {
+  const tf = `
+resource "aws_sqs_queue" "a" {
+  count = var.n
+  name  = "acme-a-\${var.env}"
+}
+resource "aws_sqs_queue" "b" {
+  count = 2
+  name  = "acme-b-\${count.index + 1}"
+}`;
+  const [qa] = readModule(files({ 'q.tf': tf, 'qa.tfvars': 'env = "qa"\nn = 0' }));
+  expect(qa?.queues.map(queue => [queue.address, queue.name])).toEqual([
+    ['aws_sqs_queue.b[0]', 'acme-b-1'],
+    ['aws_sqs_queue.b[1]', 'acme-b-2'],
+  ]);
 });

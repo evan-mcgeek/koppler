@@ -365,3 +365,48 @@ resource "aws_lb_listener_rule" "orders" {
   const draft = draftApp('orders', readModule([{ name: 'main.tf', text: tf }]), stack, new Map());
   assert.equal(draft.qa!.deployedUrl, 'https://orders.acme.example/api/');
 });
+
+test('two ECS services behind one load balancer: each app gets only its own service address', () => {
+  const service = (name: string) => `
+resource "aws_ecs_service" "${name}" {
+  name = "acme-${name}-\${var.env}"
+  load_balancer {
+    target_group_arn = aws_lb_target_group.${name}.arn
+  }
+}
+resource "aws_lb_target_group" "${name}" {
+  port = 8080
+}
+resource "aws_lb_listener_rule" "${name}" {
+  listener_arn = aws_lb_listener.https.arn
+  action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.${name}.arn
+  }
+  condition {
+    host_header {
+      values = ["${name}.acme.example"]
+    }
+  }
+}`;
+  const tf = `${service('admin')}${service('orders')}
+resource "aws_lb" "public" {
+  name = "acme-public"
+}
+resource "aws_lb_listener" "https" {
+  load_balancer_arn = aws_lb.public.arn
+  port              = 443
+}`;
+  const modules = readModule([
+    { name: 'main.tf', text: tf },
+    { name: 'qa.tfvars', text: 'env = "qa"' },
+  ]);
+  const stack = { envs: ['qa'], apps: { orders: { name: 'Orders' }, admin: { name: 'Admin' }, billing: {} } };
+  for (const id of ['orders', 'admin']) {
+    const draft = draftApp(id, modules, stack, new Map());
+    assert.equal(draft.qa!.deployedUrl, `https://${id}.acme.example/`);
+    assert.deepEqual(draft.qa!.otherAddresses, []);
+  }
+  // An app no service is named for gets no guessed address from them.
+  assert.equal(draftApp('billing', modules, stack, new Map()).qa!.deployedUrl, null);
+});
