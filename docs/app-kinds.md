@@ -107,6 +107,7 @@ Compose is checked last: many repos have a compose file only for their database.
 - **Local queues**, when switched on: an AWS emulator in Docker for SQS, SNS and EventBridge, or a Kafka broker in Docker. A local topic or bus feeds only a local SQS queue.
 - **Local libraries**, linked for the run: `pubspec_overrides.yaml` for Dart and Flutter, `npm install --no-save` for npm.
   For .NET, a targets file in Koppler's own folder swaps the NuGet package for the clone's project when `dotnet run` builds.
+  It applies only while the board asks for that library and the action log holds the file; otherwise Koppler removes it.
   Nothing tracked changes, and Stop puts the published packages back.
 
 See the [project board](https://github.com/users/evan-mcgeek/projects/2) for what is planned.

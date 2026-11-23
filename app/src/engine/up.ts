@@ -22,7 +22,7 @@ import { lambdaOverrides } from './app-start.ts';
 import { inEffect } from '../core/comments.ts';
 import { switchTo, type Carry } from './branch.ts';
 import { APPROVE, approved, missingTunnels, startsFromStack } from './checks.ts';
-import { link } from './libraries.ts';
+import { dropTargets, link } from './libraries.ts';
 import { sdkSignIn } from './aws-sso.ts';
 import { isDone, sdkNote } from './needs.ts';
 import { alive, listener, readRecord, records, sh, sleep, startProcess, stopOne } from './processes.ts';
@@ -285,9 +285,12 @@ function switchBranches(up: Up): void {
 function linkLibraries(up: Up): void {
   for (const id of up.ids) {
     const asked = up.node(id).libraries ?? [];
-    if (up.skip.has(id) || !asked.length) continue;
+    if (up.skip.has(id)) continue;
     const clone = up.clones[id];
     const wanted = (clone?.libraries ?? []).filter(library => asked.includes(library.name));
+    // A NuGet library the board no longer asks for stops being swapped in.
+    if (!wanted.some(library => library.ecosystem === 'nuget')) dropTargets(id, up.logFile);
+    if (!asked.length) continue;
     const names = wanted.map(library => library.name).join(', ');
     try {
       if (!clone) throw new Error('it is not cloned');

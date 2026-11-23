@@ -1,6 +1,5 @@
 // Starting a stack app by its id: the facts are gathered here (the app as the environment has it, its clone, launch
 // profiles, the device), the command comes from core/launch, and the app's stored secrets are checked and attached.
-import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { APPROVE, approved, startsFromStack } from './checks.ts';
@@ -15,7 +14,7 @@ import { repoFiles } from './investigate.ts';
 import { readJson } from '../json-files.ts';
 import { BIN, CODE, tempDir } from '../paths.ts';
 import { resolveDevice, type RunDevice } from './devices.ts';
-import { libraryTargets } from './libraries.ts';
+import { targetsFor } from './libraries.ts';
 import { sh, type Once, type Ready, type RunOptions } from './processes.ts';
 import { appOn, storeOf } from '../core/stack.ts';
 
@@ -92,7 +91,8 @@ function contextFor(
     envNames: [env, ...aliases],
   };
   if (app.kind === 'dotnet' && app.launchSettings) ctx.profiles = profilesOf(app, repo);
-  if (app.kind === 'dotnet' && fs.existsSync(libraryTargets(id))) ctx.libraryTargets = libraryTargets(id);
+  const targets = app.kind === 'dotnet' ? targetsFor(id, path.join(tempDir(), 'actions.json')) : undefined;
+  if (targets) ctx.libraryTargets = targets;
   if (app.kind === 'node' || app.kind === 'web') {
     ctx.pkg = readJson(path.join(repo, 'package.json')) as NonNullable<StartContext['pkg']> | null;
     if (ctx.pkg?.scripts) ctx.scripts = ctx.pkg.scripts;
