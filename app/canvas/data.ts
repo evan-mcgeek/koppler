@@ -75,9 +75,44 @@ export async function send(route: string, body: object = {}, leaving = false): P
   }
 }
 
-/** Hands the board to the server to keep. False when it could not be kept. */
-export const save = async (board: SavedBoard, leaving = false): Promise<boolean> =>
-  !!(await send('state', board, leaving))?.ok;
+// The saves under way, one after another: a later board sent beside an earlier one could reach the server first, and
+// the earlier one would then overwrite it.
+let saving: Promise<unknown> = Promise.resolve();
+// The board last handed to the server, which it keeps once every save is answered; and the last one it took.
+let asked = '';
+let took = '';
+
+/** Whether this board is what the server keeps once the saves under way are answered (as it is leaving: already took). */
+export const isKept = (board: SavedBoard, leaving = false): boolean =>
+  JSON.stringify(board) === (leaving ? took : asked);
+/** The server has this board already, as it handed it over. */
+export const hasBoard = (board: SavedBoard): void => {
+  asked = took = JSON.stringify(board);
+};
+/** The server's board changed without this page (from the terminal): the next save goes whatever it holds. */
+export const boardChanged = (): void => {
+  asked = took = '';
+};
+
+/**
+ * Hands the board to the server to keep, after every save asked for before it has been answered. False when it could
+ * not be kept. As the page closes it goes at once: the page may be gone before the others are answered.
+ */
+export function save(board: SavedBoard, leaving = false): Promise<boolean> {
+  const text = JSON.stringify(board);
+  asked = text;
+  const answered = (answer: Response | null) => {
+    const ok = !!answer?.ok;
+    if (ok) took = text;
+    // Not taken: the next save goes, even with this same board.
+    else if (asked === text) asked = '';
+    return ok;
+  };
+  if (leaving) return send('state', board, true).then(answered);
+  const kept = saving.then(() => send('state', board)).then(answered);
+  saving = kept;
+  return kept;
+}
 
 /** Asks the canvas server to do something. Gives its answer, or why it was not done. */
 export async function post<T extends object>(route: string, body: object = {}): Promise<T | { error: string }> {

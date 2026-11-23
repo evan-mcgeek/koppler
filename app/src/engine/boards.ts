@@ -20,7 +20,7 @@ import {
 import { canvas } from '../cli/running.ts';
 import { fetchPresets } from '../server/sanitize.ts';
 import type { Edge } from '../core/plan.ts';
-import { changeData, readClones, readData, readStack, writeData } from '../data.ts';
+import { changeData, readClones, readData, readStack } from '../data.ts';
 import { fail } from '../failure.ts';
 import { locked, readJson, writeJson } from '../json-files.ts';
 import { readUpgraded } from '../upgraded.ts';
@@ -44,7 +44,9 @@ export interface QueuedEdit {
   delete?: true;
 }
 
-const queued = () => (readData('board-edits')?.['edits'] ?? []) as QueuedEdit[];
+/** A list kept in a data file, as written there. */
+const listed = <T = QueuedEdit>(value: unknown): T[] => (Array.isArray(value) ? (value as T[]) : []);
+const queued = () => listed(readData('board-edits')?.['edits']);
 const DAY = 86_400_000;
 
 /** The edits an open canvas of the stack in use has not made yet. */
@@ -52,7 +54,7 @@ export const boardEdits = (): QueuedEdit[] => queued().filter(one => one.stack =
 
 /** The canvas made it (or had it already): it waits no longer. */
 export function editDone(id: unknown): void {
-  writeData('board-edits', { edits: queued().filter(one => one.id !== id) });
+  changeData('board-edits', now => ({ ...now, edits: listed(now['edits']).filter(one => one.id !== id) }));
 }
 
 const CHANGES =
@@ -68,7 +70,11 @@ function enqueue(change: Omit<QueuedEdit, 'id' | 'at' | 'stack'>): void {
     stack: currentStack(),
     ...change,
   };
-  writeData('board-edits', { edits: [...queued().filter(one => now - Date.parse(one.at) < DAY), entry] });
+  // Locked: the canvas taking an edit off the list at the same moment must not drop this one, or this it.
+  changeData('board-edits', kept => ({
+    ...kept,
+    edits: [...listed(kept['edits']).filter(one => now - Date.parse(one.at) < DAY), entry],
+  }));
 }
 
 /** A board by its name, its exact spelling first. */
@@ -432,7 +438,10 @@ const proposals = () => (readData('board-proposals')?.['proposals'] ?? []) as Pr
 export function answerProposal(message: string, accepted: boolean): string | null {
   const proposal = proposals().find(one => one.message === message);
   if (!proposal) return null;
-  writeData('board-proposals', { proposals: proposals().filter(one => one !== proposal && one.message !== message) });
+  changeData('board-proposals', now => ({
+    ...now,
+    proposals: listed<Proposal>(now['proposals']).filter(one => one.message !== message),
+  }));
   if (!accepted) return `Left ${proposal.board} as it is.`;
   return changeBoard(proposal.board, proposal.edit, !!proposal.create, false).join(' ');
 }
@@ -522,12 +531,13 @@ export function changeBoard(name: string, edit: BoardEdit, create: boolean, prop
         { id: 'reject', label: 'Leave it as it is' },
       ],
     });
-    writeData('board-proposals', {
+    changeData('board-proposals', now => ({
+      ...now,
       proposals: [
-        ...proposals(),
+        ...listed<Proposal>(now['proposals']),
         { message: asked.id, stack: currentStack(), board: board.name, edit, ...(create && { create: true as const }) },
       ],
-    });
+    }));
     return [
       `PROPOSED ${board.name}: ${describeEdit(edit, named, false, before)}`,
       'The user answers in the canvas inbox; the answer comes back as a koppler-reply prompt.',
