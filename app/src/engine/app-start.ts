@@ -8,7 +8,7 @@ import { fail } from '../failure.ts';
 import { launchProfile, mockCommand, startCommand, type LaunchProfiles, type StartContext } from '../core/launch.ts';
 import { ON_DEVICE } from '../core/kinds.ts';
 import { isProtected } from '../core/plan.ts';
-import { testArgs } from '../core/secret-types.ts';
+import { beforeStart, testArgs } from '../core/secret-types.ts';
 import type { App, Secret } from '../core/stack.ts';
 import { readClones, readStack } from '../data.ts';
 import { repoFiles } from './investigate.ts';
@@ -136,11 +136,13 @@ function checkSecrets(id: string, app: App, store: string, env: string, test: bo
   for (const secret of named) {
     const result = secretTest(store, secret);
     const name = secret.env ?? '';
-    if (result.code === 1) {
+    const verdict = beforeStart(secret.type, result);
+    if (verdict === 'stop') {
       const why = result.message.replace(/^failed: /, 'did not pass its test: ');
       fail(`${id}: ${name} for ${env.toUpperCase()} ${why}. Fix it, or start anyway with --no-test.`);
     }
-    if (result.code === 0) console.log(`${name}: ${result.message}`);
+    if (verdict === 'warn') console.log(`${name}: could not be checked, ${result.message.replace(/^failed: /, '')}`);
+    if (verdict === 'ok') console.log(`${name}: ${result.message}`);
   }
 }
 

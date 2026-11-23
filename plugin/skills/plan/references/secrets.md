@@ -47,10 +47,14 @@ An API key or token (`type: key`) names no host, so the stack says where to try 
 It goes as a bearer token, or in the header `probe.header` names.
 The test sends one request and reads only the status: `accepted`, rejected (401 or 403), or the status it got.
 It never follows a redirect, and never shows the value or the answer.
-A key goes only to a host the user approved for that secret on this Mac: `koppler secret approve <app>[@<env>] <NAME> <host>`.
+A key goes only to the exact probe the user approved for that secret on this Mac: `koppler secret approve <app>[@<env>] <NAME>`.
+Approving reads `probe.url` and `probe.header` from the stack and asks the user to send the key there.
 Anyone editing `stack.json` could point `probe.url` elsewhere, so the approval lives in `~/.config/koppler/approvals.json`, never in the stack.
-A new host asks again, and `koppler secret revoke <app>[@<env>] <NAME>` takes every approval back.
-Without one, the test says so and prints the approve command; the agent hands that command to the user and never runs it.
+Any change to the probe's address, port, path or header asks again, and `koppler secret revoke <app>[@<env>] <NAME>` takes the approval back.
+Without one, the test says so and prints the approve command for the user.
+Approving asks yes or no at a terminal, so it refuses through an agent or a `!` command.
+The user runs it in their own terminal window.
+Before `koppler run`, a rejected key stops the start; an API that does not answer, or answers something else, only warns.
 `koppler secret psql <app or app@env> <NAME>` opens `psql` with a stored connection string.
 `... --pgpass` adds its line to `~/.pgpass` (for `localhost` and `127.0.0.1`), so other database tools find the password.
 Both are for the user's own terminal.
