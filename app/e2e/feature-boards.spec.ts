@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import type { Page } from '@playwright/test';
+import type { Page, Request } from '@playwright/test';
 import { at, card, expect, nextEdit, sent, STACK, test, fromBoardMenu } from './canvas.ts';
 
 const stack = {
@@ -432,6 +432,43 @@ test('one link is a step in two phases: both are walked, one is taken off, and a
   await panel.getByRole('button', { name: 'Remove Refund' }).click();
   await expect(panel.getByRole('button', { name: 'Refund', exact: true })).toHaveCount(0);
   await expect.poll(() => kept(canvas.temp)?.feature?.phases.length).toBe(1);
+});
+
+test('a slow save is never overtaken by a later one: the board kept is the last one on screen', async ({
+  page,
+  canvas,
+}) => {
+  await newFeature(page);
+  await page.getByLabel('Describe the feature').fill('Customers pay, and get a refund.');
+  await page.getByRole('button', { name: 'Hand it to the agent' }).click();
+  await expect.poll(() => kept(canvas.temp)?.feature?.request).toBe('Customers pay, and get a refund.');
+  koppler(canvas, 'board', 'edit', 'New feature', '--phase', 'Order', '--step', 'web:orders=Places it');
+  koppler(canvas, 'board', 'edit', 'New feature', '--phase', 'Refund', '--step', 'web:orders=Refunds it');
+  const panel = page.getByRole('complementary', { name: 'New feature' });
+  await expect(panel.getByRole('button', { name: 'Refund', exact: true })).toBeVisible();
+  // The next save is held on its way, as a busy server holds it.
+  let held: () => void = () => undefined;
+  const reached = new Promise<Request>(done => {
+    let first = true;
+    void page.route('**/state?*', async route => {
+      if (!first || route.request().method() !== 'POST') return route.continue();
+      first = false;
+      done(route.request());
+      await new Promise<void>(go => (held = go));
+      await route.continue();
+    });
+  });
+  await panel.getByRole('button', { name: 'Remove Order' }).click();
+  await nextEdit(page);
+  const slow = await reached;
+  // A later change, still while the first save is on its way: it must not reach the server before it.
+  await panel.getByRole('button', { name: 'Remove Refund' }).click();
+  await expect(panel.getByRole('button', { name: 'Refund', exact: true })).toHaveCount(0);
+  await nextEdit(page);
+  held();
+  await slow.response();
+  await nextEdit(page);
+  await expect.poll(() => kept(canvas.temp)?.feature?.phases.length).toBe(0);
 });
 
 test('every phase title shows whole on the map; one picked there dims the other phases and is marked in the panel', async ({

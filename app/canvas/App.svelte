@@ -107,7 +107,9 @@
     if (!withFile(ev)) return;
     ev.preventDefault();
     dropping = false;
-    void openFile(ev.dataTransfer?.files[0]);
+    // Dropped while the page still loads: the board opens once the stack is in, or the load would put it away.
+    const file = ev.dataTransfer?.files[0];
+    void opened.then(() => openFile(file));
   };
   let noting = $state<HTMLDialogElement>();
   let note = $state('');
@@ -170,22 +172,32 @@
   });
 
   // Every change is kept: sent once the board has been still for a moment, and again as the page is left.
+  // One save at a time: a later one sent while an earlier is on its way could reach the server first, and the
+  // earlier one would then overwrite it. A change made meanwhile goes as soon as the earlier save is answered.
   let sent = '';
-  let sending = '';
+  let sending = false;
+  let again = false;
   let waiting: ReturnType<typeof setTimeout> | undefined;
   const keep = (leaving = false) => {
     clearTimeout(waiting);
+    if (sending && !leaving) {
+      again = true;
+      return;
+    }
     board.commit();
     const now = board.saved();
     const text = JSON.stringify(now);
-    if (text === sent || text === sending) return;
-    sending = text;
+    if (text === sent) return;
+    sending = true;
     void save(now, leaving).then(kept => {
-      sending = '';
+      sending = false;
       board.unsaved = !kept;
       // Only what the server took counts as sent; what it did not is tried again until it does.
       if (kept) sent = text;
-      else waiting = setTimeout(keep, 2000);
+      if (again) {
+        again = false;
+        keep();
+      } else if (!kept) waiting = setTimeout(keep, 2000);
     });
   };
   // The tunnel, database and queue cards follow what is on the board: its apps, which of them run without tunnels or

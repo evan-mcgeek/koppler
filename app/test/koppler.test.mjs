@@ -25,8 +25,12 @@ test('A process that hands over to another program (as the secrets wrapper does)
   assert.doesNotMatch(koppler('status'), /handover\s+running/);
   // A worker that ignores the polite signal does not outlive its app.
   assert.match(koppler('run', 'stubborn', '--', 'sh', '-c', '(trap "" TERM; exec sleep 31339) & wait'), /started stubborn/);
+  // Its own process group, not every `sleep 31339` on the machine: another run of this test may have one.
+  const { pid } = JSON.parse(fs.readFileSync(path.join(dir, 'procs', 'stubborn.json'), 'utf8'));
+  const groupAlive = () => { try { process.kill(-pid, 0); return true; } catch { return false; } };
+  assert.ok(groupAlive());
   assert.match(koppler('stop', 'stubborn'), /stubborn: stopped \(killed after 8s\)/);
-  assert.equal(spawnSync('pgrep', ['-f', 'sleep 31339']).status, 1);
+  assert.equal(groupAlive(), false);
   // With a readiness path, "started" waits for it: the port answers first, while /health still says 503.
   const [slow] = await freePorts(1);
   const server = wait => `const t = Date.now(); require('http').createServer((q, r) => { r.statusCode = Date.now() - t < ${wait} ? 503 : 200; r.end(); }).listen(${slow});`;
