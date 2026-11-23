@@ -282,12 +282,9 @@ export async function main(args: string[], here: string): Promise<never> {
   if (!/^[a-z0-9-]+(@[a-z0-9-]+)?$/.test(store)) fail(`invalid app id: ${store}`);
   if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) fail(`invalid env name: ${name}`);
   // Asked before the value is read: an unapproved key never leaves its store.
-  if (type === 'key' && probe.url && probeUrlOk(probe.url)) {
-    const host = new URL(probe.url).hostname;
-    if (!isApproved(store, name, host)) {
-      console.log(`cannot test: approve sending it to ${host} first: koppler secret approve ${store} ${name} ${host}`);
-      process.exit(2);
-    }
+  if (type === 'key' && probe.url && probeUrlOk(probe.url) && !isApproved(store, name, { ...probe, url: probe.url })) {
+    console.log(`cannot test: approve sending it to ${probe.url} first: koppler secret approve ${store} ${name}`);
+    process.exit(2);
   }
   let value = '';
   try {
