@@ -592,7 +592,9 @@ async function startQueues(up: Up, chosen: Record<string, string>): Promise<void
   for (const { from, to } of feeds.feeds)
     try {
       localQueue.feedLocal({ type: from.type, address: urls[from.id] ?? '' }, urls[to.id] ?? '');
-      console.log(`queues: ${from.name} feeds the local ${to.name}`);
+      // A local subscription has no raw delivery: a reader that expects the bare message sees the SNS wrapper.
+      const wrapped = from.type === 'sns' ? ', each message wrapped as an SNS notification' : '';
+      console.log(`queues: ${from.name} feeds the local ${to.name}${wrapped}`);
     } catch (error) {
       left.push(`${from.name}: it could not be made to feed the local ${to.name} (${lastLine(error)})`);
     }
