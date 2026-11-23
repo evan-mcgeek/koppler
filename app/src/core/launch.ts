@@ -173,7 +173,23 @@ function startIos(app: App, ctx: StartContext): Start {
     '[ "$n" = 1 ] || { echo "koppler: $c has $n schemes; pick one: koppler stack set apps.<app>.ios.scheme <name>" >&2; exit 1; }',
     'scheme=$(printf %s "$schemes" | plutil -extract $kind.schemes.0 raw -o - -)',
   ];
-  const findApp = `app=$(ls -d ${derived}/Build/Products/*-iphonesimulator/*.app | head -n 1)`;
+  const project = `-$kind "$c" -scheme "$scheme" -destination id=${udid} -derivedDataPath ${derived}`;
+  // The scheme's own app, from its build settings: derived data kept across runs can hold apps of other schemes.
+  const findApp = [
+    `settings=$(xcodebuild ${project} -showBuildSettings -json 2>/dev/null)`,
+    's() { printf %s "$settings" | plutil -extract "$1.buildSettings.$2" raw -o - - 2>/dev/null; }',
+    'app=; named=; n=0; i=0',
+    'while name=$(s $i TARGET_NAME); do',
+    '  if [ "$(s $i PRODUCT_TYPE)" = com.apple.product-type.application ]; then',
+    '    app="$(s $i TARGET_BUILD_DIR)/$(s $i FULL_PRODUCT_NAME)"; n=$((n + 1))',
+    '    [ "$name" = "$scheme" ] && named=$app',
+    '  fi',
+    '  i=$((i + 1))',
+    'done',
+    '[ "$n" = 1 ] || app=$named',
+    '[ -n "$app" ] || { echo "koppler: $scheme builds $n apps and none is named after it; pick a scheme that builds one" >&2; exit 1; }',
+    `printf %s "$app" > ${derived}/koppler-app`,
+  ];
   const plist = `/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$app/Info.plist"`;
   const bundle = app.mobile?.iosBundleId;
   // A setting given for this start (a cable's local address) reaches the app through the simulator's launch.
@@ -183,8 +199,8 @@ function startIos(app: App, ctx: StartContext): Start {
     'c=$(ls -d *.xcworkspace 2>/dev/null | head -n 1); kind=workspace',
     '[ -n "$c" ] || { c=$(ls -d *.xcodeproj | head -n 1); kind=project; }',
     ...(scheme ? [`scheme=${quote(scheme)}`] : findScheme),
-    `xcodebuild -$kind "$c" -scheme "$scheme" -destination id=${udid} -derivedDataPath ${derived} -quiet build`,
-    findApp,
+    `xcodebuild ${project} -quiet build`,
+    ...findApp,
     `xcrun simctl install ${udid} "$app"`,
     `bundle=${bundle ? quote(bundle) : `$(${plist})`}`,
     ...settings.map(name => `export SIMCTL_CHILD_${name}="$${name}"`),
@@ -193,7 +209,7 @@ function startIos(app: App, ctx: StartContext): Start {
   // Ending the launch closes the app; this closes it too when the launch was killed before it could.
   const onStop = bundle
     ? [['xcrun', 'simctl', 'terminate', device.id, bundle]]
-    : [['sh', '-c', `${findApp}; xcrun simctl terminate ${udid} "$(${plist})"`]];
+    : [['sh', '-c', `app=$(cat ${derived}/koppler-app) && xcrun simctl terminate ${udid} "$(${plist})"`]];
   return { cwd: ctx.repo, command: ['sh', '-c', script], onStop };
 }
 

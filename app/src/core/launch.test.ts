@@ -330,7 +330,17 @@ test('iOS: a setting given for the start reaches the app on the simulator', () =
   // xcodebuild leaves the app where Xcode does; xcrun says what it was asked and what the app would see.
   fs.writeFileSync(
     path.join(bin, 'xcodebuild'),
-    '#!/bin/sh\necho "$@" > "$0.args"\nwhile [ $# -gt 0 ]; do [ "$1" = -derivedDataPath ] && dd=$2; shift; done\nmkdir -p "$dd/Build/Products/Debug-iphonesimulator/AcmeShop.app"\n',
+    `#!/bin/sh
+echo "$@" >> "$0.args"
+all="$*"
+products=
+while [ $# -gt 0 ]; do [ "$1" = -derivedDataPath ] && products="$2/Build/Products/Debug-iphonesimulator"; shift; done
+case "$all" in
+  *-showBuildSettings*)
+    printf '[{"buildSettings":{"TARGET_NAME":"AcmeShopTests","PRODUCT_TYPE":"com.apple.product-type.bundle.unit-test","TARGET_BUILD_DIR":"%s","FULL_PRODUCT_NAME":"AcmeShopTests.xctest"}},{"buildSettings":{"TARGET_NAME":"AcmeShop","PRODUCT_TYPE":"com.apple.product-type.application","TARGET_BUILD_DIR":"%s","FULL_PRODUCT_NAME":"AcmeShop.app"}}]' "$products" "$products" ;;
+  *) mkdir -p "$products/AcmeShop.app" ;;
+esac
+`,
     { mode: 0o755 },
   );
   fs.writeFileSync(
@@ -340,6 +350,8 @@ test('iOS: a setting given for the start reaches the app on the simulator', () =
   );
   const app: App = { kind: 'ios', ios: { scheme: 'AcmeShop' }, mobile: { iosBundleId: 'com.acme.shop' } };
   const derivedData = path.join(dir, 'dd');
+  // Left by an earlier scheme: first by name, never the one to install.
+  fs.mkdirSync(path.join(derivedData, 'Build/Products/Debug-iphonesimulator/AaaOld.app'), { recursive: true });
   const device = { id: 'SIM-1', platform: 'ios' };
   const start = startCommand(app, { repo: dir, derivedData, override: ['ORDERS_API_URL'], device });
   const [shell = '', ...args] = command(start);
@@ -349,7 +361,10 @@ test('iOS: a setting given for the start reaches the app on the simulator', () =
   fs.rmSync(dir, { recursive: true, force: true });
   expect(ran.status, ran.stderr).toBe(0);
   expect(built).toMatch(/^-project AcmeShop\.xcodeproj -scheme AcmeShop /);
-  expect(ran.stdout).toContain('xcrun simctl install SIM-1 ');
+  expect(built).toMatch(/-showBuildSettings -json/);
+  expect(ran.stdout).toContain(
+    `xcrun simctl install SIM-1 ${derivedData}/Build/Products/Debug-iphonesimulator/AcmeShop.app\n`,
+  );
   expect(ran.stdout).toContain('xcrun simctl launch --console-pty --terminate-running-process SIM-1 com.acme.shop');
   expect(ran.stdout).toContain('app sees ORDERS_API_URL=http://localhost:5001');
 });
