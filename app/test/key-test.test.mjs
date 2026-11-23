@@ -9,6 +9,12 @@ import { fileURLToPath } from 'node:url';
 import { test } from 'node:test';
 import { check } from '../dist/secret-check.mjs';
 
+/** What `koppler secret approve` writes once the user says yes at the terminal. */
+function allowKey(config, store, name, host) {
+  fs.mkdirSync(config, { recursive: true });
+  fs.writeFileSync(path.join(config, 'approvals.json'), JSON.stringify({ koppler: '0.6.3', keys: [{ store, name, host }] }));
+}
+
 const here = path.dirname(fileURLToPath(import.meta.url));
 const secretTest = path.join(here, '..', 'bin', 'secret-test');
 const entry = path.join(here, '..', 'dist', 'koppler.mjs');
@@ -80,12 +86,15 @@ test('secret-test sends a key only to a host the user approved for that secret, 
     ]);
     assert.equal(seen.length, 0);
 
-    assert.deepEqual(await koppler('approve', 'orders-api@prod', 'PAYMENTS_KEY', '127.0.0.1'), [
-      0,
-      'PAYMENTS_KEY of orders-api@prod may be sent to 127.0.0.1 to test it',
-    ]);
-    const kept = fs.readFileSync(path.join(config, 'approvals.json'), 'utf8');
-    assert.equal(kept.includes(KEY), false);
+    // Only a person at a terminal can approve: not a script, not an agent, not with --yes.
+    const [code, said] = await koppler('approve', 'orders-api@prod', 'PAYMENTS_KEY', '127.0.0.1', '--yes');
+    assert.equal(code, 1);
+    assert.match(said, /^koppler: not approved: approving needs you to answer at a terminal/);
+    assert.equal(fs.existsSync(path.join(config, 'approvals.json')), false);
+    assert.equal((await tryIt())[0], 2);
+    assert.equal(seen.length, 0);
+
+    allowKey(config, 'orders-api@prod', 'PAYMENTS_KEY', '127.0.0.1');
     assert.deepEqual(await tryIt(), [0, 'accepted']);
     assert.equal(seen.length, 1);
 

@@ -160,12 +160,19 @@ export async function doctor(args: string[]): Promise<void> {
 }
 
 /** Lets a stored key be sent to one host to test it, or takes that back; the stack never decides this. */
-function keyApproval(action: 'approve' | 'revoke', [store = '', name = '', host = '']: string[]): never {
+async function keyApproval(action: 'approve' | 'revoke', [store = '', name = '', host = '']: string[]): Promise<never> {
   const usage = `usage: koppler secret ${action} <app>[@<env>] <NAME>${action === 'approve' ? ' <host>' : ''}`;
   const hostOk = /^(?:[a-z0-9-]+\.)*[a-z0-9-]+$|^\[[0-9a-f:]+\]$/i.test(host);
   if (!/^[a-z0-9-]+(@[a-z0-9-]+)?$/.test(store) || !/^[A-Za-z_]\w*$/.test(name) || (action === 'approve' && !hostOk))
     fail(usage);
   if (action === 'approve') {
+    // Sending a stored key to an address is the user's call alone: a person at the terminal, never a script or --yes.
+    if (!process.stdin.isTTY)
+      fail(
+        `not approved: approving needs you to answer at a terminal. Run koppler secret approve ${store} ${name} ${host} in your own terminal window, not through an agent or a ! command`,
+      );
+    if (!(await confirm(`Send ${name} of ${store} to ${host.toLowerCase()} whenever Koppler tests it?`)))
+      fail('not approved');
     approve(store, name, host);
     console.log(`${name} of ${store} may be sent to ${host.toLowerCase()} to test it`);
   } else {
@@ -177,9 +184,9 @@ function keyApproval(action: 'approve' | 'revoke', [store = '', name = '', host 
 
 const SCRIPTS: Record<string, string | undefined> = { set: 'secret-set', list: 'secret-list', psql: 'secret-psql' };
 /** Secrets, in the user's own terminal: the values never pass through Koppler's output. */
-export function secret(args: string[]): never {
+export async function secret(args: string[]): Promise<never> {
   const [action = '', ...rest] = args;
-  if (action === 'approve' || action === 'revoke') keyApproval(action, rest);
+  if (action === 'approve' || action === 'revoke') return keyApproval(action, rest);
   if (action === 'remove') {
     const [store, name] = rest;
     if (!store || !name) fail('usage: koppler secret remove <app>[@<env>] <NAME>');
