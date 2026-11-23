@@ -259,6 +259,28 @@ test('a board opens from a file dropped on the page, and from a link the server 
   await expect(picker(page)).toHaveText('From a link');
 });
 
+test('a board dropped while the page still loads opens once it has loaded', async ({ page }) => {
+  const preset = { name: 'Dropped early', version: 1, nodes: { catalog: { run: 'cli' } }, edges: [] };
+  // The stack is held on its way, so the drop comes before the page has it.
+  let release: () => void = () => undefined;
+  const held = new Promise<void>(go => (release = go));
+  await page.route('**/data/registry.json', async route => {
+    await held;
+    await route.continue();
+  });
+  await page.reload();
+  const data = await page.evaluateHandle(text => {
+    const transfer = new DataTransfer();
+    transfer.items.add(new File([text], 'board.json', { type: 'application/json' }));
+    return transfer;
+  }, JSON.stringify(preset));
+  await page.dispatchEvent('body', 'dragenter', { dataTransfer: data });
+  await page.dispatchEvent('body', 'drop', { dataTransfer: data });
+  release();
+  await expect(picker(page)).toHaveText('Dropped early');
+  await expect(page.locator('.svelte-flow__node-app')).toHaveCount(1);
+});
+
 test('a board of your own is shared with the team: it moves into the stack, one board', async ({ page, canvas }) => {
   const file = path.join(canvas.dir, 'stack', 'stack.json');
   await (await fromList(page, 'Web Shop')).getByRole('button', { name: 'Add Web Shop to the board' }).click();

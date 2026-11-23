@@ -49,7 +49,7 @@
   import { undo } from './undo.svelte.ts';
   import { openBoard, openFile } from './boards.ts';
   import { dialogs } from './dialogs.svelte.ts';
-  import { load, post, save } from './data.ts';
+  import { boardChanged, hasBoard, isKept, load, post, save } from './data.ts';
   import { describeEdit } from '../src/core/presets.ts';
   import { live } from './live.svelte.ts';
   import { toasts } from './toast.svelte.ts';
@@ -107,7 +107,9 @@
     if (!withFile(ev)) return;
     ev.preventDefault();
     dropping = false;
-    void openFile(ev.dataTransfer?.files[0]);
+    // Dropped while the page still loads: the board opens once the stack is in, or the load would put it away.
+    const file = ev.dataTransfer?.files[0];
+    void opened.then(() => openFile(file));
   };
   let noting = $state<HTMLDialogElement>();
   let note = $state('');
@@ -170,22 +172,17 @@
   });
 
   // Every change is kept: sent once the board has been still for a moment, and again as the page is left.
-  let sent = '';
-  let sending = '';
+  let handed = false;
   let waiting: ReturnType<typeof setTimeout> | undefined;
   const keep = (leaving = false) => {
     clearTimeout(waiting);
     board.commit();
     const now = board.saved();
-    const text = JSON.stringify(now);
-    if (text === sent || text === sending) return;
-    sending = text;
+    if (isKept(now, leaving)) return;
     void save(now, leaving).then(kept => {
-      sending = '';
       board.unsaved = !kept;
-      // Only what the server took counts as sent; what it did not is tried again until it does.
-      if (kept) sent = text;
-      else waiting = setTimeout(keep, 2000);
+      // What the server did not take is tried again until it does.
+      if (!kept) waiting = setTimeout(keep, 2000);
     });
   };
   // The tunnel, database and queue cards follow what is on the board: its apps, which of them run without tunnels or
@@ -228,6 +225,8 @@
       for (const one of edits.filter(one => !made[one.id])) {
         if (opening) return;
         made[one.id] = true;
+        // The terminal wrote the board file itself: what this page saved last is not what the server has now.
+        boardChanged();
         // A queue or database a feature step names is said by its name too.
         const name = (id: string) => (id.includes(':') ? discovered.data(id, false).name : board.nameOf(id));
         if (one.delete) {
@@ -289,8 +288,10 @@
     untrack(() => {
       board.commit();
       // What the server handed over is what it has.
-      if (!sent) sent = JSON.stringify(board.saved());
-      else waiting = setTimeout(keep, 400);
+      if (!handed) {
+        handed = true;
+        hasBoard(board.saved());
+      } else waiting = setTimeout(keep, 400);
     });
     return () => {
       clearTimeout(waiting);
