@@ -75,3 +75,34 @@ resources:
   expect(hosts(yml, ['qa'])).toEqual(['qa: api.qa.acme.dev/orders']);
   expect(serverlessDomains('custom: [unclosed\n', ['qa'])).toEqual({ found: [], unread: null });
 });
+
+test('the base path is filled in per stage, and one only known when deployed drafts no address', () => {
+  const yml = `custom:
+  paths:
+    qa: orders-qa
+    prod: orders
+  customDomain:
+    domainName: api.acme.dev
+    basePath: \${self:custom.paths.\${sls:stage}}
+`;
+  expect(hosts(yml, ['qa', 'prod'])).toEqual(['qa: api.acme.dev/orders-qa', 'prod: api.acme.dev/orders']);
+  const unread = serverlessDomains(
+    'custom:\n  customDomain:\n    domainName: api.acme.dev\n    basePath: ${ssm:/acme/path}\n',
+    ['qa'],
+  );
+  expect(unread).toEqual({ found: [], unread: '${ssm:/acme/path}' });
+});
+
+test('a custom domain turned off is not drafted, for every stage or for one', () => {
+  const off = 'custom:\n  customDomain:\n    domainName: api.acme.dev\n    enabled: false\n';
+  expect(serverlessDomains(off, ['qa'])).toEqual({ found: [], unread: null });
+  const perStage = `custom:
+  domainOn:
+    qa: false
+    prod: true
+  customDomain:
+    domainName: api.\${sls:stage}.acme.dev
+    enabled: \${self:custom.domainOn.\${sls:stage}}
+`;
+  expect(hosts(perStage, ['qa', 'prod'])).toEqual(['prod: api.prod.acme.dev']);
+});

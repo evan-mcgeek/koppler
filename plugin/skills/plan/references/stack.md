@@ -207,6 +207,7 @@ A Lambda that `reads` an SQS queue switched to local on the board is triggered b
 A Lambda called by an API Gateway says which with `"api": "http"` (an HTTP API, payload 2.0) or `"api": "rest"` (a REST API, payload 1.0).
 Then each call on its `routes` (such as `"GET /orders/{id}"`, or any path with none) reaches it as API Gateway's event.
 The caller gets the function's own answer.
+As in API Gateway, the most specific route wins: a fixed path over `{id}`, `{id}` over `{proxy+}`, then a named method over `ANY`.
 With neither, a POST on one of its `routes` becomes a message on a queue of its own.
 It gets the settings it reads, named in `"env": ["MESSAGES_API_BASE_URL", "MESSAGES_API_KEY"]`, from what Koppler sets.
 That is a cable to a local app (with `localhost` made reachable from Docker) or a stored secret.

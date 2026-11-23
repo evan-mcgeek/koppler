@@ -1,5 +1,6 @@
 // How `koppler run <app>` starts a stack app of each kind. Pure: the caller gathers the facts (launch profiles,
 // package.json, the chosen device, a view of the clone) and gets back the command to run, or why there is none.
+import { androidAppId } from './gradle.ts';
 import type { Device } from './addresses.ts';
 import { frameworkOf, type PackageJson } from './frameworks.ts';
 import { recipeOf, type RepoView } from './kinds.ts';
@@ -35,6 +36,8 @@ export interface StartContext {
   device?: (Device & { id: string }) | null | undefined;
   /** Where a run keeps what a Lambda's secret holds for this start: local addresses of the apps it calls. */
   lambdaOverrides?: string;
+  /** An Android app's Gradle file, which gives the id each variant installs as. */
+  gradle?: string | null | undefined;
   /** Where an iOS app is built. */
   derivedData?: string;
   /** .NET: the targets file that swaps packages for local libraries, when some are picked. */
@@ -197,9 +200,6 @@ function startIos(app: App, ctx: StartContext): Start {
   return { cwd: ctx.repo, command: ['sh', '-c', script], onStop };
 }
 
-/** The applicationId its Gradle files give, in double or single quotes. */
-const FIND_PACKAGE = String.raw`pkg=$(grep -hoE "applicationId[ =]*[\"'][^\"']+" app/build.gradle.kts app/build.gradle build.gradle.kts build.gradle 2>/dev/null | head -n 1 | sed -E "s/.*[\"']//")`;
-
 function startAndroid(app: App, ctx: StartContext): Start {
   const { device } = ctx;
   if (!device) return { error: 'needs a device: --device android, or an emulator id (adb devices)' };
@@ -208,15 +208,18 @@ function startAndroid(app: App, ctx: StartContext): Start {
   const adb = `adb -s ${quote(device.id)}`;
   const variant = app.android?.variant ?? 'debug';
   const install = `install${variant.charAt(0).toUpperCase()}${variant.slice(1)}`;
-  const pkg = app.mobile?.androidPackage;
+  const found = app.mobile?.androidPackage
+    ? { id: app.mobile.androidPackage }
+    : androidAppId(ctx.gradle ?? '', variant);
+  if (found.error !== undefined) return { error: found.error };
+  const pkg = found.id;
   // A setting given for this start (a cable's local address) reaches the app as a launch extra.
   const extras = (ctx.override ?? []).filter(name => /^\w+$/.test(name)).map(name => `--es ${name} "$(q "$${name}")"`);
   const script = [
     'set -e',
     'g=./gradlew; [ -x "$g" ] || g=gradle',
     `"$g" ${install}`,
-    pkg ? `pkg=${quote(pkg)}` : FIND_PACKAGE,
-    '[ -n "$pkg" ] || { echo "koppler: no applicationId found; set it: koppler stack set apps.<app>.mobile.androidPackage <id>" >&2; exit 1; }',
+    `pkg=${quote(pkg)}`,
     // The device's shell reads each extra again, so each is quoted for it.
     String.raw`q() { printf "'%s'" "$(printf %s "$1" | sed "s/'/'\\\\''/g")"; }`,
     `act=$(${adb} shell cmd package resolve-activity --brief -c android.intent.category.LAUNCHER "$pkg" | tail -n 1 | tr -d '\\r')`,
@@ -226,10 +229,11 @@ function startAndroid(app: App, ctx: StartContext): Start {
     // ponytail: the log follows the launched process only; an app that restarts itself is followed from the next start.
     `exec ${adb} logcat --pid="$pid"`,
   ].join('\n');
-  const onStop = pkg
-    ? [['adb', '-s', device.id, 'shell', 'am', 'force-stop', pkg]]
-    : [['sh', '-c', `cd ${quote(ctx.repo ?? '.')} && ${FIND_PACKAGE} && ${adb} shell am force-stop "$pkg"`]];
-  return { cwd: ctx.repo, command: ['sh', '-c', script], onStop };
+  return {
+    cwd: ctx.repo,
+    command: ['sh', '-c', script],
+    onStop: [['adb', '-s', device.id, 'shell', 'am', 'force-stop', pkg]],
+  };
 }
 
 function startNode(app: App, ctx: StartContext): Start {
