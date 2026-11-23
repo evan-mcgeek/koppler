@@ -30,34 +30,67 @@ export function samTemplate(
   return { template, handler, runtime };
 }
 
-/** The route a call matches, and its path parameters; with no routes, every call matches. */
-export function matchRoute(
-  routes: string[],
-  method: string,
-  path: string,
-): { route: string; params: Record<string, string> } | null {
-  if (!routes.length) return { route: '$default', params: {} };
+/** A matched route: its HTTP API route key, its REST resource (the path template) and its path parameters. */
+export interface Matched {
+  route: string;
+  resource: string;
+  params: Record<string, string>;
+}
+
+// How specific a path segment is: a literal, then `{name}`, then a greedy `{name+}`.
+const LITERAL = 0;
+const PARAM = 1;
+const GREEDY = 2;
+
+/**
+ * The route a call matches, picked as API Gateway does: the most specific path, then a named method over ANY.
+ * With no routes, every call matches as a greedy proxy. Throws URIError on a malformed escape in a path parameter.
+ */
+export function matchRoute(routes: string[], method: string, path: string): Matched | null {
+  if (!routes.length) return { route: '$default', resource: '/{proxy+}', params: { proxy: path.replace(/^\/+/, '') } };
+  const found: (Matched & { rank: number[] })[] = [];
   for (const route of routes) {
-    const [verb, given] = route.includes(' ') ? route.split(/\s+/, 2) : ['ANY', route];
-    if (verb !== 'ANY' && verb?.toUpperCase() !== method) continue;
+    const [verb = 'ANY', given = ''] = route.includes(' ') ? route.trim().split(/\s+/, 2) : ['ANY', route];
+    const named = verb.toUpperCase();
+    if (named !== 'ANY' && named !== method.toUpperCase()) continue;
+    const resource = `/${given.replace(/^\/+|\/+$/g, '')}`;
     const names: string[] = [];
-    const pattern = `/${(given ?? '').replace(/^\/+|\/+$/g, '')}`
+    const rank: number[] = [];
+    const pattern = resource
       .split('/')
+      .slice(1)
       .map(part => {
         const param = /^\{(\w+)(\+?)\}$/.exec(part);
-        if (!param) return part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        if (!param) {
+          rank.push(LITERAL);
+          return part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        }
         names.push(param[1] ?? '');
+        rank.push(param[2] ? GREEDY : PARAM);
         return param[2] ? '(.+)' : '([^/]+)';
       })
       .join('/');
-    const found = new RegExp(`^${pattern}/?$`).exec(path);
-    if (found)
-      return {
-        route: route.includes(' ') ? route : `/${(given ?? '').replace(/^\/+|\/+$/g, '')}`,
-        params: Object.fromEntries(names.map((name, at) => [name, decodeURIComponent(found[at + 1] ?? '')])),
-      };
+    const hit = new RegExp(`^/${pattern}/?$`).exec(path);
+    if (!hit) continue;
+    const params = Object.fromEntries(names.map((name, at) => [name, decodeURIComponent(hit[at + 1] ?? '')]));
+    found.push({ route: `${named} ${resource}`, resource, params, rank: [...rank, named === 'ANY' ? 1 : 0] });
   }
-  return null;
+  const order = (a: number[], b: number[]) => {
+    for (let at = 0; at < Math.min(a.length, b.length); at++) if (a[at] !== b[at]) return (a[at] ?? 0) - (b[at] ?? 0);
+    return b.length - a.length;
+  };
+  const best = found.sort((a, b) => order(a.rank, b.rank))[0];
+  if (!best) return null;
+  const { rank: _rank, ...matched } = best;
+  return matched;
+}
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+/** The time as API Gateway writes it in an event: `22/Nov/2026:10:00:00 +0000`. */
+function apiTime(now: Date): string {
+  const two = (n: number) => String(n).padStart(2, '0');
+  const day = `${two(now.getUTCDate())}/${MONTHS[now.getUTCMonth()] ?? ''}/${String(now.getUTCFullYear())}`;
+  return `${day}:${two(now.getUTCHours())}:${two(now.getUTCMinutes())}:${two(now.getUTCSeconds())} +0000`;
 }
 
 /** A call to the function's local address, as the HTTP server got it. */
@@ -77,7 +110,7 @@ const TEXT = /^(text\/|application\/(json|xml|javascript|x-www-form-urlencoded)|
 export function apiEvent(
   api: Api,
   request: ApiRequest,
-  matched: { route: string; params: Record<string, string> },
+  matched: Matched,
   now: Date,
   requestId: string,
 ): Record<string, unknown> {
@@ -87,6 +120,8 @@ export function apiEvent(
   const body = request.body.length ? request.body.toString(binary ? 'base64' : 'utf8') : null;
   const agent = request.headers.find(([name]) => name.toLowerCase() === 'user-agent')?.[1] ?? '';
   const params = Object.keys(matched.params).length ? matched.params : null;
+  // An HTTP API's $default route has no path parameters.
+  const pathParams = matched.route === '$default' ? null : params;
   const query = [...url.searchParams];
   const common = { accountId: '000000000000', apiId: 'local', domainName: 'localhost', requestId };
   if (api === 'http') {
@@ -107,7 +142,7 @@ export function apiEvent(
       ...(cookies.length && { cookies }),
       headers,
       ...(query.length && { queryStringParameters: values }),
-      ...(params && { pathParameters: params }),
+      ...(pathParams && { pathParameters: pathParams }),
       requestContext: {
         ...common,
         domainPrefix: 'localhost',
@@ -120,7 +155,7 @@ export function apiEvent(
         },
         routeKey: matched.route,
         stage: '$default',
-        time: now.toISOString(),
+        time: apiTime(now),
         timeEpoch: now.getTime(),
       },
       ...(body !== null && { body }),
@@ -137,7 +172,7 @@ export function apiEvent(
   const headers = many(request.headers);
   const values = many(query);
   return {
-    resource: matched.route,
+    resource: matched.resource,
     path: url.pathname,
     httpMethod: request.method,
     headers: last(headers),
@@ -148,12 +183,13 @@ export function apiEvent(
     stageVariables: null,
     requestContext: {
       ...common,
-      resourcePath: matched.route,
+      resourcePath: matched.resource,
       httpMethod: request.method,
       path: url.pathname,
       stage: 'local',
       protocol: 'HTTP/1.1',
       identity: { sourceIp: request.sourceIp, userAgent: agent },
+      requestTime: apiTime(now),
       requestTimeEpoch: now.getTime(),
     },
     body,
