@@ -348,6 +348,18 @@ esac
     '#!/bin/sh\necho "xcrun $*"\n[ "$2" = launch ] && echo "app sees ORDERS_API_URL=$SIMCTL_CHILD_ORDERS_API_URL"\nexit 0\n',
     { mode: 0o755 },
   );
+  // plutil is on every Mac; elsewhere (the Linux CI) a stand-in reads the same key path from JSON on stdin.
+  if (spawnSync('sh', ['-c', 'command -v plutil']).status !== 0)
+    fs.writeFileSync(
+      path.join(bin, 'plutil'),
+      `#!/usr/bin/env node
+let v = JSON.parse(require('fs').readFileSync(0, 'utf8'));
+for (const key of process.argv[3].split('.')) v = v == null ? undefined : v[key];
+if (v === undefined) process.exit(1);
+process.stdout.write(typeof v === 'object' ? JSON.stringify(v) : String(v));
+`,
+      { mode: 0o755 },
+    );
   const app: App = { kind: 'ios', ios: { scheme: 'AcmeShop' }, mobile: { iosBundleId: 'com.acme.shop' } };
   const derivedData = path.join(dir, 'dd');
   // Left by an earlier scheme: first by name, never the one to install.
